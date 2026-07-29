@@ -157,7 +157,7 @@ describe('reportService', () => {
     ]);
   });
 
-  it('does not expose stale department snapshots when resolution fails', async () => {
+  it('keeps legacy department evidence when canonical resolution fails', async () => {
     (DeptService.findAll as any).mockRejectedValue(new Error('db down'));
     (prisma.quality_losses.findMany as any).mockResolvedValue([
       {
@@ -176,7 +176,9 @@ describe('reportService', () => {
       '2026-01-01',
       '2026-01-07',
     );
-    expect(result.trackingIssues[0]?.respDept).toBe('未分配');
+    expect(result.trackingIssues[0]?.respDept).toBe(
+      '主数据已失效：Legacy Department',
+    );
   });
 
   it('uses canonical after-sales classification names after rename', async () => {
@@ -228,7 +230,44 @@ describe('reportService', () => {
     expect(result.externalIssues[0]).toMatchObject({
       cause: 'Renamed Defect - Renamed Subcategory',
       product: 'Renamed Product',
-      respDept: '未分配',
+      respDept: '数据待治理：Legacy Department',
+    });
+  });
+
+  it('keeps legacy after-sales classification snapshots without IDs', async () => {
+    (DeptService.findAll as any).mockResolvedValue([]);
+    (prisma.quality_losses.findMany as any).mockResolvedValue([]);
+    (prisma.quality_records.findMany as any).mockResolvedValue([]);
+    (prisma.after_sales.findMany as any).mockResolvedValue([
+      {
+        actualSolution: null,
+        claimStatus: 'OPEN',
+        defectCategoryId: null,
+        defectSubcategoryId: null,
+        defectSubtype: 'Legacy Subcategory',
+        defectType: 'Legacy Defect',
+        failureCause: null,
+        issueDescription: 'external',
+        productCategoryId: null,
+        productType: 'Legacy Product',
+        projectName: '',
+        respDept: 'Legacy Department',
+        respDeptId: null,
+        severity: 'low',
+        solution: null,
+        updatedAt: new Date('2026-01-06'),
+      },
+    ]);
+
+    const result = await ReportService.getWeeklyReport(
+      '2026-01-01',
+      '2026-01-07',
+    );
+
+    expect(result.externalIssues[0]).toMatchObject({
+      cause: '数据待治理：Legacy Defect - 数据待治理：Legacy Subcategory',
+      product: '数据待治理：Legacy Product',
+      respDept: '数据待治理：Legacy Department',
     });
   });
 

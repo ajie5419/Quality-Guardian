@@ -24,7 +24,7 @@ vi.mock('~/modules/quality-classification', () => {
   const listForManagement = vi.fn().mockResolvedValue([]);
   return {
     QualityClassificationService: {
-      findActiveCategoryByCode: vi.fn().mockResolvedValue({
+      findHistoricalCategoryByCode: vi.fn().mockResolvedValue({
         code: 'VEHICLE_PRODUCT',
         id: 'vehicle-product',
         name: 'Vehicle Product',

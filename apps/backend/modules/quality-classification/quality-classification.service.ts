@@ -226,6 +226,19 @@ export const QualityClassificationService = {
     });
   },
 
+  async findHistoricalCategoryByCode(
+    scope: QualityClassificationScope,
+    code: string,
+  ) {
+    return prisma.quality_classification_categories.findFirst({
+      where: {
+        code: code.trim().toUpperCase(),
+        scope,
+      },
+      select: { code: true, id: true, name: true },
+    });
+  },
+
   async resolveCategoryNamesByIds(
     scope: QualityClassificationScope,
     ids: string[],

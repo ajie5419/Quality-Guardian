@@ -56,7 +56,7 @@ export const VehicleFailureRateService = {
     const endMonth = parseEndMonth(month);
     const vehicleDeptIds = await getVehicleDeptIds();
     const vehicleProduct =
-      await QualityClassificationService.findActiveCategoryByCode(
+      await QualityClassificationService.findHistoricalCategoryByCode(
         QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
         VEHICLE_PRODUCT_CODE,
       );

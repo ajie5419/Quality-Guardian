@@ -262,6 +262,31 @@ describe('quality classification service', () => {
     });
   });
 
+  it('includes inactive semantic categories for historical reporting', async () => {
+    vi.mocked(
+      prisma.quality_classification_categories.findFirst,
+    ).mockResolvedValue({
+      code: 'VEHICLE_PRODUCT',
+      id: 'category-1',
+      name: 'Vehicle product',
+    } as never);
+
+    await QualityClassificationService.findHistoricalCategoryByCode(
+      'AFTER_SALES_PRODUCT',
+      ' vehicle_product ',
+    );
+
+    expect(
+      prisma.quality_classification_categories.findFirst,
+    ).toHaveBeenCalledWith({
+      where: {
+        code: 'VEHICLE_PRODUCT',
+        scope: 'AFTER_SALES_PRODUCT',
+      },
+      select: { code: true, id: true, name: true },
+    });
+  });
+
   it('resolves historical category names in one scoped query', async () => {
     vi.mocked(
       prisma.quality_classification_categories.findMany,

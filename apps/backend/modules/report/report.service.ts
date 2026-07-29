@@ -1,6 +1,7 @@
 import type { IssueItem, WeeklyReportData } from '@qgs/shared';
 
 import {
+  createIdentityAggregateItem,
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
   QMS_DEFAULT_VALUES,
@@ -49,19 +50,45 @@ function mapTrackingProgress(status?: null | string): string {
 }
 
 async function createDepartmentNameResolver(): Promise<
-  (id: null | string) => string
+  (id: null | string, rawName?: null | string) => string
 > {
   try {
     const deptTree = await DeptService.findAll();
     const deptMap = new Map<string, string>();
     for (const node of flattenDeptTree(deptTree))
       deptMap.set(node.id, node.name);
-    return (id: null | string) =>
-      (id && deptMap.get(id)) || QMS_DEFAULT_VALUES.UNASSIGNED;
+    return (id: null | string, rawName?: null | string) =>
+      createIdentityAggregateItem({
+        canonicalName: id ? deptMap.get(id) : null,
+        id,
+        missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
+        rawName,
+        value: 0,
+      }).name;
   } catch (error) {
     logger.warn({ err: error }, 'Failed to resolve department map');
-    return () => QMS_DEFAULT_VALUES.UNASSIGNED;
+    return (id: null | string, rawName?: null | string) =>
+      createIdentityAggregateItem({
+        id,
+        missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
+        rawName,
+        value: 0,
+      }).name;
   }
+}
+
+function resolveGovernedDisplayName(
+  id: null | string,
+  canonicalNames: Map<string, null | string>,
+  rawName?: null | string,
+) {
+  if (!id && !rawName) return null;
+  return createIdentityAggregateItem({
+    canonicalName: id ? canonicalNames.get(id) : null,
+    id,
+    rawName,
+    value: 0,
+  }).name;
 }
 
 async function resolveAfterSalesClassificationNames(
@@ -137,7 +164,7 @@ export const ReportService = {
           description: item.description || '暂无描述',
           progress: mapTrackingProgress(item.status),
           completionTime: formatDate(item.updatedAt),
-          respDept: getDeptName(item.respDeptId),
+          respDept: getDeptName(item.respDeptId, item.respDept),
           remarks: '',
         })),
       );
@@ -159,7 +186,10 @@ export const ReportService = {
           return {
             product: item.projectName || '-',
             description: item.description || '-',
-            respDept: getDeptName(item.responsibleDepartmentId),
+            respDept: getDeptName(
+              item.responsibleDepartmentId,
+              item.responsibleDepartment,
+            ),
             level,
             cause: item.rootCause || item.analysis || '-',
             measures: item.solution || '-',
@@ -187,31 +217,31 @@ export const ReportService = {
           }
 
           let cause = item.failureCause || '-';
-          const defectCategoryName = item.defectCategoryId
-            ? afterSalesClassificationNames.defectCategories.get(
-                item.defectCategoryId,
-              )
-            : null;
-          const defectSubcategoryName = item.defectSubcategoryId
-            ? afterSalesClassificationNames.defectSubcategories.get(
-                item.defectSubcategoryId,
-              )
-            : null;
+          const defectCategoryName = resolveGovernedDisplayName(
+            item.defectCategoryId,
+            afterSalesClassificationNames.defectCategories,
+            item.defectType,
+          );
+          const defectSubcategoryName = resolveGovernedDisplayName(
+            item.defectSubcategoryId,
+            afterSalesClassificationNames.defectSubcategories,
+            item.defectSubtype,
+          );
           if (cause === '-' && (defectCategoryName || defectSubcategoryName)) {
             cause = [defectCategoryName, defectSubcategoryName]
               .filter(Boolean)
               .join(' - ');
           }
-          const productCategoryName = item.productCategoryId
-            ? afterSalesClassificationNames.productCategories.get(
-                item.productCategoryId,
-              )
-            : null;
+          const productCategoryName = resolveGovernedDisplayName(
+            item.productCategoryId,
+            afterSalesClassificationNames.productCategories,
+            item.productType,
+          );
 
           return {
             product: item.projectName || productCategoryName || '-',
             description: item.issueDescription || '-',
-            respDept: getDeptName(item.respDeptId),
+            respDept: getDeptName(item.respDeptId, item.respDept),
             level,
             cause,
             measures: item.solution || item.actualSolution || '-',
