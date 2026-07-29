@@ -23,6 +23,13 @@ vi.mock('~/modules/dept/dept.service', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-classification', () => ({
+  QualityClassificationService: {
+    resolveCategoryNamesByIds: vi.fn(),
+    resolveSubcategoryNamesByIds: vi.fn(),
+  },
+}));
+
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({
     error: vi.fn(),
@@ -32,8 +39,17 @@ vi.mock('~/utils/logger', () => ({
 }));
 
 describe('reportService', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks();
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(
+      QualityClassificationService.resolveCategoryNamesByIds,
+    ).mockResolvedValue(new Map());
+    vi.mocked(
+      QualityClassificationService.resolveSubcategoryNamesByIds,
+    ).mockResolvedValue(new Map());
   });
 
   it('maps tracking statuses and applies author from user context', async () => {
@@ -48,21 +64,24 @@ describe('reportService', () => {
         description: 'a',
         status: 'Pending',
         updatedAt: new Date('2026-01-02'),
-        respDept: 'd1',
+        respDept: 'Legacy Quality',
+        respDeptId: 'd1',
       },
       {
         id: 'loss-2',
         description: 'b',
         status: 'Processing',
         updatedAt: new Date('2026-01-03'),
-        respDept: 'd2',
+        respDept: 'Legacy Production',
+        respDeptId: 'd2',
       },
       {
         id: 'loss-3',
         description: 'c',
         status: 'Confirmed',
         updatedAt: new Date('2026-01-04'),
-        respDept: 'd1',
+        respDept: 'Legacy Quality',
+        respDeptId: 'd1',
       },
       {
         id: 'loss-4',
@@ -70,6 +89,7 @@ describe('reportService', () => {
         status: 'Resolved',
         updatedAt: new Date('2026-01-05'),
         respDept: null,
+        respDeptId: null,
       },
     ]);
 
@@ -77,7 +97,8 @@ describe('reportService', () => {
       {
         description: 'internal',
         projectName: 'P1',
-        responsibleDepartment: 'd1',
+        responsibleDepartment: 'Legacy Quality',
+        responsibleDepartmentId: 'd1',
         severity: 'high',
         rootCause: 'R',
         analysis: null,
@@ -92,7 +113,8 @@ describe('reportService', () => {
         issueDescription: 'external',
         projectName: 'P2',
         productType: null,
-        respDept: 'd2',
+        respDept: 'Legacy Production',
+        respDeptId: 'd2',
         severity: 'low',
         failureCause: null,
         defectType: 'D1',
@@ -131,11 +153,11 @@ describe('reportService', () => {
       '质量部',
       '生产部',
       '质量部',
-      '-',
+      '未分配',
     ]);
   });
 
-  it('falls back to raw department id when department lookup fails', async () => {
+  it('does not expose stale department snapshots when resolution fails', async () => {
     (DeptService.findAll as any).mockRejectedValue(new Error('db down'));
     (prisma.quality_losses.findMany as any).mockResolvedValue([
       {
@@ -143,7 +165,8 @@ describe('reportService', () => {
         description: 'x',
         status: 'Pending',
         updatedAt: new Date('2026-01-02'),
-        respDept: 'raw-dept',
+        respDept: 'Legacy Department',
+        respDeptId: 'raw-dept',
       },
     ]);
     (prisma.quality_records.findMany as any).mockResolvedValue([]);
@@ -153,7 +176,60 @@ describe('reportService', () => {
       '2026-01-01',
       '2026-01-07',
     );
-    expect(result.trackingIssues[0]?.respDept).toBe('raw-dept');
+    expect(result.trackingIssues[0]?.respDept).toBe('未分配');
+  });
+
+  it('uses canonical after-sales classification names after rename', async () => {
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+    vi.mocked(
+      QualityClassificationService.resolveCategoryNamesByIds,
+    ).mockImplementation(async (scope) => {
+      if (scope === 'AFTER_SALES_PRODUCT') {
+        return new Map([['product-category-1', 'Renamed Product']]);
+      }
+      return new Map([['defect-category-1', 'Renamed Defect']]);
+    });
+    vi.mocked(
+      QualityClassificationService.resolveSubcategoryNamesByIds,
+    ).mockResolvedValue(
+      new Map([['defect-subcategory-1', 'Renamed Subcategory']]),
+    );
+    (DeptService.findAll as any).mockResolvedValue([]);
+    (prisma.quality_losses.findMany as any).mockResolvedValue([]);
+    (prisma.quality_records.findMany as any).mockResolvedValue([]);
+    (prisma.after_sales.findMany as any).mockResolvedValue([
+      {
+        actualSolution: null,
+        claimStatus: 'OPEN',
+        defectCategoryId: 'defect-category-1',
+        defectSubcategoryId: 'defect-subcategory-1',
+        defectSubtype: 'Legacy Subcategory',
+        defectType: 'Legacy Defect',
+        failureCause: null,
+        issueDescription: 'external',
+        productCategoryId: 'product-category-1',
+        productType: 'Legacy Product',
+        projectName: '',
+        respDept: 'Legacy Department',
+        respDeptId: null,
+        severity: 'low',
+        solution: null,
+        updatedAt: new Date('2026-01-06'),
+      },
+    ]);
+
+    const result = await ReportService.getWeeklyReport(
+      '2026-01-01',
+      '2026-01-07',
+    );
+
+    expect(result.externalIssues[0]).toMatchObject({
+      cause: 'Renamed Defect - Renamed Subcategory',
+      product: 'Renamed Product',
+      respDept: '未分配',
+    });
   });
 
   it('throws when date arguments are invalid', async () => {

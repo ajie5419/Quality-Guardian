@@ -3,11 +3,14 @@ import type { IssueItem, WeeklyReportData } from '@qgs/shared';
 import {
   ISSUE_TRACKING_STATUS,
   normalizeIssueTrackingStatus,
+  QMS_DEFAULT_VALUES,
+  QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept';
 import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { InspectionService } from '~/modules/inspection';
+import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossService } from '~/modules/quality-loss';
 import { createModuleLogger } from '~/utils/logger';
 
@@ -53,11 +56,33 @@ async function createDepartmentNameResolver(): Promise<
     const deptMap = new Map<string, string>();
     for (const node of flattenDeptTree(deptTree))
       deptMap.set(node.id, node.name);
-    return (id: null | string) => (id ? deptMap.get(id) || id : '-');
+    return (id: null | string) =>
+      (id && deptMap.get(id)) || QMS_DEFAULT_VALUES.UNASSIGNED;
   } catch (error) {
     logger.warn({ err: error }, 'Failed to resolve department map');
-    return (id: null | string) => id || '-';
+    return () => QMS_DEFAULT_VALUES.UNASSIGNED;
   }
+}
+
+async function resolveAfterSalesClassificationNames(
+  rows: Awaited<ReturnType<typeof AfterSalesAPI.getWeeklyReportIssues>>,
+) {
+  const [productCategories, defectCategories, defectSubcategories] =
+    await Promise.all([
+      QualityClassificationService.resolveCategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_PRODUCT,
+        rows.map((item) => item.productCategoryId || ''),
+      ),
+      QualityClassificationService.resolveCategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+        rows.map((item) => item.defectCategoryId || ''),
+      ),
+      QualityClassificationService.resolveSubcategoryNamesByIds(
+        QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
+        rows.map((item) => item.defectSubcategoryId || ''),
+      ),
+    ]);
+  return { defectCategories, defectSubcategories, productCategories };
 }
 
 export const ReportService = {
@@ -99,7 +124,10 @@ export const ReportService = {
         start,
       });
 
-      const getDeptName = await createDepartmentNameResolver();
+      const [getDeptName, afterSalesClassificationNames] = await Promise.all([
+        createDepartmentNameResolver(),
+        resolveAfterSalesClassificationNames(externalIssuesRaw),
+      ]);
 
       // Transform Data
       const trackingIssues = await Promise.all(
@@ -109,7 +137,7 @@ export const ReportService = {
           description: item.description || '暂无描述',
           progress: mapTrackingProgress(item.status),
           completionTime: formatDate(item.updatedAt),
-          respDept: getDeptName(item.respDept),
+          respDept: getDeptName(item.respDeptId),
           remarks: '',
         })),
       );
@@ -131,7 +159,7 @@ export const ReportService = {
           return {
             product: item.projectName || '-',
             description: item.description || '-',
-            respDept: getDeptName(item.responsibleDepartment),
+            respDept: getDeptName(item.responsibleDepartmentId),
             level,
             cause: item.rootCause || item.analysis || '-',
             measures: item.solution || '-',
@@ -159,16 +187,31 @@ export const ReportService = {
           }
 
           let cause = item.failureCause || '-';
-          if (cause === '-' && (item.defectType || item.defectSubtype)) {
-            cause = [item.defectType, item.defectSubtype]
+          const defectCategoryName = item.defectCategoryId
+            ? afterSalesClassificationNames.defectCategories.get(
+                item.defectCategoryId,
+              )
+            : null;
+          const defectSubcategoryName = item.defectSubcategoryId
+            ? afterSalesClassificationNames.defectSubcategories.get(
+                item.defectSubcategoryId,
+              )
+            : null;
+          if (cause === '-' && (defectCategoryName || defectSubcategoryName)) {
+            cause = [defectCategoryName, defectSubcategoryName]
               .filter(Boolean)
               .join(' - ');
           }
+          const productCategoryName = item.productCategoryId
+            ? afterSalesClassificationNames.productCategories.get(
+                item.productCategoryId,
+              )
+            : null;
 
           return {
-            product: item.projectName || item.productType || '-',
+            product: item.projectName || productCategoryName || '-',
             description: item.issueDescription || '-',
-            respDept: getDeptName(item.respDept),
+            respDept: getDeptName(item.respDeptId),
             level,
             cause,
             measures: item.solution || item.actualSolution || '-',
