@@ -17,6 +17,7 @@ import { dictionaryModule } from '~/modules/dictionary/dictionary.module';
 import { fileStorageModule } from '~/modules/file-storage/file-storage.module';
 import { inspectionModule } from '~/modules/inspection/inspection.module';
 import { knowledgeModule } from '~/modules/knowledge/knowledge.module';
+import { metricRefreshModule } from '~/modules/metric-refresh/metric-refresh.module';
 import { metrologyModule } from '~/modules/metrology/metrology.module';
 import { planningModule } from '~/modules/planning/planning.module';
 import { processMasterModule } from '~/modules/process-master/process-master.module';
@@ -49,6 +50,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   fileStorageModule,
   inspectionModule,
   knowledgeModule,
+  metricRefreshModule,
   metrologyModule,
   planningModule,
   processMasterModule,

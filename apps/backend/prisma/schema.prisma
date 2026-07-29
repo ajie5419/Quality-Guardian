@@ -1280,6 +1280,28 @@ model supplier_score_snapshots {
   @@index([finalStatus])
 }
 
+// @module metric-refresh
+model metric_refresh_jobs {
+  id          String                @id @default(cuid())
+  metricType  metric_refresh_type
+  entityId    String
+  reason      String?
+  status      metric_refresh_status @default(PENDING)
+  attempts    Int                   @default(0)
+  availableAt DateTime              @default(now())
+  leaseOwner  String?
+  leaseUntil  DateTime?
+  lastError   String?               @db.Text
+  completedAt DateTime?
+  isDeleted   Boolean               @default(false)
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@index([metricType, status, availableAt, isDeleted])
+  @@index([status, leaseUntil, isDeleted])
+  @@index([metricType, entityId, status, isDeleted])
+}
+
 model measuring_instruments {
   id               String                        @id @default(cuid())
   orderNo          Int?
@@ -1829,6 +1851,17 @@ enum inspection_category {
 
 enum supplier_identity_type {
   TEAM
+}
+
+enum metric_refresh_type {
+  SUPPLIER_SCORE
+}
+
+enum metric_refresh_status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum team_identity_alias_kind {

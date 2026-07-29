@@ -15,6 +15,7 @@
 - **file-storage/** — QMS 文件中心：文档上传、存储与分类
 - **inspection/** — 检验域核心：检验记录、不合格品、报检任务、模板、归档同步
 - **knowledge/** — 质量知识库：文档分类与知识条目
+- **metric-refresh/** — 派生指标刷新任务与重试
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
 - **planning/** — 质量策划：BOM、DFMEA、ITP、项目文档管理
 - **process-master/** — 全局工序主数据与报检场景配置
