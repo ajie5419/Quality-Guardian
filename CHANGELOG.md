@@ -25,6 +25,67 @@
 
 ## 执行记录
 
+## [0.20.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.19.1...qgs-v0.20.0) (2026-07-29)
+
+
+### Features
+
+* **@qgs/backend:** add canonical identity relations ([b7ad4a1](https://github.com/ajie5419/Quality-Guardian/commit/b7ad4a18bf8348d3504f0207889a2642d292cd50))
+* **@qgs/backend:** add quality classification master data ([7a2fa1e](https://github.com/ajie5419/Quality-Guardian/commit/7a2fa1e70395fad55f1acfc012163bcd0e889acf))
+* **@qgs/backend:** backfill identity relations ([69b4fcd](https://github.com/ajie5419/Quality-Guardian/commit/69b4fcdedfeb3a3a9de2643cbe0700881b3cf134))
+* **@qgs/backend:** configure inspection process options ([5df9448](https://github.com/ajie5419/Quality-Guardian/commit/5df9448935de08ae2647c4319aad07ab89bc34a2))
+* **@qgs/backend:** establish canonical TEAM identities ([bcc7630](https://github.com/ajie5419/Quality-Guardian/commit/bcc7630df5cd0cf71976504b48eb37ca38c88475))
+* **@qgs/backend:** migrate quality classification identities ([decb868](https://github.com/ajie5419/Quality-Guardian/commit/decb868416e6fdaeb2c0f12b1f91a8556c4a9b4d))
+* **@qgs/weapp:** load managed defect classifications ([ad857b6](https://github.com/ajie5419/Quality-Guardian/commit/ad857b6072aafc80e694f96d78c231ea91dd5997))
+* **@qgs/web-antd:** add quality classification options ([97cee16](https://github.com/ajie5419/Quality-Guardian/commit/97cee1611af3ea9c85b6c65654a44f59dc38cbc9))
+* **@qgs/web-antd:** add quality classification settings ([96e879b](https://github.com/ajie5419/Quality-Guardian/commit/96e879bbaac478ad977a9a1976c13ec8c2b44a0c))
+* **@qgs/web-antd:** manage inspection process visibility ([66c4b3f](https://github.com/ajie5419/Quality-Guardian/commit/66c4b3faf014eae704e1122036dae7acddfa4154))
+* **project:** add master data governance workflow ([14a98bd](https://github.com/ajie5419/Quality-Guardian/commit/14a98bd2fefdc48607347cf82922cbd99dbc4f6a))
+* **project:** complete quality identity governance and durable scoring ([7dd794f](https://github.com/ajie5419/Quality-Guardian/commit/7dd794f5ee3d2cc3c9c705f9fd2b17725d35d5b5))
+* **project:** govern BOM process identities ([6411c7d](https://github.com/ajie5419/Quality-Guardian/commit/6411c7d5c419953e680ff678dc5e4038c5a19cc0))
+* **project:** require canonical IDs in write contracts ([d7b1b24](https://github.com/ajie5419/Quality-Guardian/commit/d7b1b240fec4182895730c0e4bf394fbe28ad519))
+* **project:** use managed after-sales classifications ([1f9895c](https://github.com/ajie5419/Quality-Guardian/commit/1f9895c5b86e54e2992c069e8e035e300d7031e2))
+* **project:** use managed inspection defect classifications ([2034b79](https://github.com/ajie5419/Quality-Guardian/commit/2034b799a324dcaccc9f7b52be6afe0d8f538cea))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** backfill reporting identities ([d2b5339](https://github.com/ajie5419/Quality-Guardian/commit/d2b53396ddfb7ffe74315d412abca690d942fd52))
+* **@qgs/backend:** bind pass rate buckets to identities ([18fefeb](https://github.com/ajie5419/Quality-Guardian/commit/18fefeba90ece6579ed56e0e4ba63b67483c1939))
+* **@qgs/backend:** enforce canonical identity writes ([7558d8a](https://github.com/ajie5419/Quality-Guardian/commit/7558d8add9dbea25640e9d88c2b65029c7d6baea))
+* **@qgs/backend:** handle decimal governance counts ([c0798ed](https://github.com/ajie5419/Quality-Guardian/commit/c0798edcb8754ad952e719daa3700c7314bf1b91))
+* **@qgs/backend:** hydrate daily report identities ([71eead1](https://github.com/ajie5419/Quality-Guardian/commit/71eead15cf2a1f5ae716303af538b3a75868519c))
+* **@qgs/backend:** isolate legacy BOM identity imports ([75851ce](https://github.com/ajie5419/Quality-Guardian/commit/75851ceee5191c465b10db4af946f7d0880f97c5))
+* **@qgs/backend:** make team identity merges resumable ([21a13a6](https://github.com/ajie5419/Quality-Guardian/commit/21a13a6b097d9256191560d6ef0d99a7ff249ddc))
+* **@qgs/backend:** persist inspection part identities ([e53dc93](https://github.com/ajie5419/Quality-Guardian/commit/e53dc93094a69dfb5e7404dd3c2046a532f69506))
+* **@qgs/backend:** preserve legacy after-sales statistics ([2cc3968](https://github.com/ajie5419/Quality-Guardian/commit/2cc3968830a170ab0e8cf93ca1cec8adb62604dc))
+* **@qgs/backend:** preserve legacy report identities ([9e45cea](https://github.com/ajie5419/Quality-Guardian/commit/9e45ceafcad483541d058e9767e13f94d60a3e43))
+* **@qgs/backend:** preserve legacy request compatibility ([e2393f3](https://github.com/ajie5419/Quality-Guardian/commit/e2393f32e1d9f5bf345002e3aed9ac78d0ad5d0b))
+* **@qgs/backend:** preserve team identity history ([a93991b](https://github.com/ajie5419/Quality-Guardian/commit/a93991b8661446116b3d1ae639f850d601e2f095))
+* **@qgs/backend:** query required reporting fields safely ([247d355](https://github.com/ajie5419/Quality-Guardian/commit/247d3558f8a336d026ec8594469136b3738fe7f0))
+* **@qgs/backend:** resolve weekly report identities ([b7ff0d6](https://github.com/ajie5419/Quality-Guardian/commit/b7ff0d61925738d185d52dedb3d4c870660ad463))
+* **@qgs/backend:** retain legacy inspection aggregates ([e46a4cd](https://github.com/ajie5419/Quality-Guardian/commit/e46a4cdf73e5350151244ebefdd295e74d2b9f6d))
+* **@qgs/backend:** retain legacy vehicle failure records ([867fa0c](https://github.com/ajie5419/Quality-Guardian/commit/867fa0cc9d1628e737d20f4dface1c6b121e8bea))
+* **@qgs/backend:** shorten quality classification indexes ([475cd93](https://github.com/ajie5419/Quality-Guardian/commit/475cd934319380d1fc4271624c361be3694e64c8))
+* **@qgs/web-antd:** clear request identity prefill after submit ([73a3d34](https://github.com/ajie5419/Quality-Guardian/commit/73a3d3432433ffd15907ffb3d64dbed550fc020f))
+* **@qgs/web-antd:** route team writes through identity api ([4fce415](https://github.com/ajie5419/Quality-Guardian/commit/4fce415cd720d0ce20dd6d8961d08c264ee9db93))
+* **deploy:** preserve mapped TEAM request categories ([3b3c2a7](https://github.com/ajie5419/Quality-Guardian/commit/3b3c2a7bde7b45be7f4f95a19c08bf4399132fb1))
+* **deploy:** reconcile TEAM identities during maintenance ([63ca39d](https://github.com/ajie5419/Quality-Guardian/commit/63ca39d0a5baed662e59acaa754b5f8fb3c659f0))
+* **deploy:** separate online maintenance from backfills ([45d38a4](https://github.com/ajie5419/Quality-Guardian/commit/45d38a446e79c77f6d7d309070bf4877fb98dfc1))
+* **project:** aggregate governed statistics by identity ([5d6cfe3](https://github.com/ajie5419/Quality-Guardian/commit/5d6cfe3a02d01ed11d48be870fc59bf1653d0597))
+* **project:** aggregate inspection stats by canonical identity ([5db464e](https://github.com/ajie5419/Quality-Guardian/commit/5db464ed2266766aa75e4bc91b4ca490ee064246))
+* **project:** aggregate work orders by canonical identity ([b90adee](https://github.com/ajie5419/Quality-Guardian/commit/b90adeed04c1adc96ac3169b50c713ffc253020b))
+* **project:** avoid duplicate release backfill ([fa9e3a1](https://github.com/ajie5419/Quality-Guardian/commit/fa9e3a184d2d985b1be45bd5108e6619211d8d42))
+* **project:** bootstrap historical process identities ([8554f32](https://github.com/ajie5419/Quality-Guardian/commit/8554f322e466610bafd4651cfc93f4e0079156bf))
+* **project:** carry identity through chart contracts ([84a5991](https://github.com/ajie5419/Quality-Guardian/commit/84a5991c09af4056f79e22dcf00b0c553a6d6b83))
+* **project:** enforce canonical inspection request categories ([6a3cf22](https://github.com/ajie5419/Quality-Guardian/commit/6a3cf228cc54a9eecd65cca8f12037c0ec216379))
+* **project:** govern quality loss identities ([2b6db06](https://github.com/ajie5419/Quality-Guardian/commit/2b6db069451ceb215a53f5996fe44e40643eb161))
+* **project:** harden classification governance writes ([0beb64f](https://github.com/ajie5419/Quality-Guardian/commit/0beb64f9ee5365fd96c1db3370d8afd2f883c4f2))
+* **project:** make identity maintenance atomic ([c635ed4](https://github.com/ajie5419/Quality-Guardian/commit/c635ed4745ecd4e05c835c7a612cb7f55944148c))
+* **project:** preserve quality loss identities end to end ([fee9085](https://github.com/ajie5419/Quality-Guardian/commit/fee9085c44f3a11fdeed30039bd53e7fbaa94556))
+* **project:** remove remaining name-based chart aggregation ([a4e5ebe](https://github.com/ajie5419/Quality-Guardian/commit/a4e5ebe944dae41a57e4d5d883838b201286408a))
+* **project:** restore work-order process options ([8b974ac](https://github.com/ajie5419/Quality-Guardian/commit/8b974ac773ad27b57ab4e33b39f9529cad567725))
+
 ### 2026-07-29 供应商与外协评分一致性最终重构
 
 **执行内容：**
