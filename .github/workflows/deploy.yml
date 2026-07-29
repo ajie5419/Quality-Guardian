@@ -95,6 +95,9 @@ jobs:
           username: ${{ env.ECS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script_stop: true
+          # This envelope must exceed the sum of the bounded migration,
+          # maintenance, service restart, and health-check stages below.
+          command_timeout: 45m
           script: |
             set -euo pipefail
             set -x
