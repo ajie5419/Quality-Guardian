@@ -113,6 +113,8 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 `inspections.partId/partName` 是检验记录的正式部件身份。`level1Component/level2Component/materialName` 是历史业务快照，不得再用于部件关联或聚合。回填优先继承关联报检的确定 ID；冲突、重名、无匹配进入 `unresolved_master_data_refs`，不猜测。回填只补 ID，已有历史名称快照不被覆盖。
 
+项目身份在发布维护中先执行空表限定的 canonical bootstrap，再对 `inspections` 和 `quality_records` 等报表及质量损失源表执行唯一精确回填。已存在项目主数据后不再从历史快照创建新身份；无法匹配的项目名称保留原值并进入 unresolved 审计。
+
 ## 报检任务重构边界
 
 报检任务后续重构必须保持外部 API 行为兼容，优先处理结构和类型安全，不在同一阶段修改业务语义。

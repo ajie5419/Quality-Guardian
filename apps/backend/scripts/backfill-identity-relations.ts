@@ -9,6 +9,10 @@ import {
   backfillInspectionPartIdentities,
   backfillWorkOrderRequirementProcessIdentities,
 } from './identity-relation-backfill';
+import {
+  backfillQualityLossSourceDepartmentIdentities,
+  backfillReportingProjectIdentities,
+} from './reporting-identity-backfill';
 
 const logger = createModuleLogger('identity-relation-backfill');
 
@@ -23,10 +27,17 @@ async function main() {
     await MasterDataGovernanceKernel.bootstrapCanonicalFromTargetNames(
       'processName',
     );
+  const projectBootstrap =
+    await MasterDataGovernanceKernel.bootstrapCanonicalFromTargetNames(
+      'projectName',
+    );
   const workOrderProcesses =
     await backfillWorkOrderRequirementProcessIdentities();
   const inspections = await backfillInspectionPartIdentities();
   const bomProcesses = await backfillBomRequiredProcessIdentities();
+  const reportingProjects = await backfillReportingProjectIdentities();
+  const qualityLossDepartments =
+    await backfillQualityLossSourceDepartmentIdentities();
   const governance = await MasterDataGovernanceKernel.runGovernanceByFields({
     configKeys: ['partName', 'processName'],
     failOnAuditError: false,
@@ -39,6 +50,9 @@ async function main() {
       governance,
       inspections,
       processBootstrap,
+      projectBootstrap,
+      qualityLossDepartments,
+      reportingProjects,
       seed,
       workOrderProcesses,
     },
