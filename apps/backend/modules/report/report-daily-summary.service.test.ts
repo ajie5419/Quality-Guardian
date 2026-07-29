@@ -22,6 +22,12 @@ vi.mock('~/modules/vehicle-commissioning/daily-report-storage.service', () => ({
   },
 }));
 
+vi.mock('~/utils/canonical-master-data', () => ({
+  MasterDataGovernanceKernel: {
+    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 vi.mock('~/utils/prisma-error', () => ({
   isPrismaSchemaMismatchError: vi.fn().mockReturnValue(false),
 }));
@@ -159,6 +165,7 @@ describe('reportDailySummaryService', () => {
         partName: 'Panel',
         projectName: 'P1',
         responsibleDepartment: 'Dept1',
+        responsibleDepartmentId: null,
         solution: 'Polish',
         status: 'OPEN',
         workOrderNumber: 'WO-1',
@@ -173,9 +180,44 @@ describe('reportDailySummaryService', () => {
 
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0].description).toBe('Surface scratch');
+    expect(result.issues[0].dept).toBe('数据待治理：Dept1');
     expect(result.issues[0].partName).toBe('Panel');
     expect(result.issues[0].status).toBe('OPEN');
     expect(result.issues[0].seq).toBe(1);
+  });
+
+  it('uses canonical department and work-order project names', async () => {
+    const { InspectionService } = await import('~/modules/inspection');
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(new Map([['dept-1', 'Renamed Department']]));
+    (InspectionService.getDailyReportIssues as any).mockResolvedValue([
+      {
+        createdAt: new Date('2026-06-15T10:00:00.000Z'),
+        description: 'Surface scratch',
+        partName: 'Panel',
+        projectName: 'Old Project',
+        responsibleDepartment: 'Old Department',
+        responsibleDepartmentId: 'dept-1',
+        solution: 'Polish',
+        status: 'OPEN',
+        workOrderNumber: 'WO-1',
+        work_orders: { projectName: 'Renamed Project' },
+      },
+    ]);
+
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
+      date: '2026-06-15',
+      username: 'admin',
+    });
+
+    expect(result.issues[0]).toMatchObject({
+      dept: 'Renamed Department',
+      projectName: 'Renamed Project',
+    });
   });
 
   it('returns archive stats with zero values when no archive data', async () => {
