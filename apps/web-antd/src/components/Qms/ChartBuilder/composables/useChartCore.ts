@@ -37,11 +37,18 @@ export function buildChartOptionFromAggregated(
 function normalizeIdentityDatum(
   item: IdentityAggregateItem,
 ): IdentityChartDatum {
-  const displayName = String(item.name || 'Unknown');
+  const displayName = String(item.name || '数据待治理');
+  const identityKey = item.id
+    ? `${item.resolutionStatus}:${item.id}`
+    : [
+        item.resolutionStatus,
+        item.resolutionReason || 'MISSING_REQUIRED',
+        String(item.rawName || '').trim() || displayName,
+      ].join(':');
   return {
     displayName,
     id: item.id,
-    identityKey: `${item.resolutionStatus}:${item.id || ''}`,
+    identityKey,
     name: displayName,
     resolutionStatus: item.resolutionStatus,
     value: Number(item.value || 0),
@@ -301,7 +308,7 @@ function generateChartOption(
           data?: Partial<EChartsIdentityDatum>;
           percent?: number;
         };
-        const displayName = String(item.data?.displayName || 'Unknown');
+        const displayName = String(item.data?.displayName || '数据待治理');
         return `${displayName}: ${String(item.data?.value ?? '')} (${Number(item.percent || 0)}%)`;
       },
       backgroundColor: 'rgba(255, 255, 255, 0.95)',
@@ -338,7 +345,7 @@ function generateChartOption(
           position: 'center',
           formatter: (params: unknown) => {
             const item = params as { data?: Partial<EChartsIdentityDatum> };
-            return String(item.data?.displayName || 'Unknown');
+            return String(item.data?.displayName || '数据待治理');
           },
         },
         emphasis: {

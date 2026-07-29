@@ -102,13 +102,16 @@ describe('buildChartOptionFromAggregated', () => {
       [
         {
           id: null,
-          name: 'Unclassified',
+          name: 'Data pending governance',
+          rawName: 'Legacy defect',
+          resolutionReason: 'MISSING_REQUIRED',
           resolutionStatus: 'MISSING',
           value: 3,
         },
         {
           id: 'bad-id',
-          name: 'Unknown (bad-id)',
+          name: 'Inactive master data',
+          resolutionReason: 'INVALID_REFERENCE',
           resolutionStatus: 'INVALID',
           value: 2,
         },
@@ -125,7 +128,7 @@ describe('buildChartOptionFromAggregated', () => {
 
     expect(option.series[0].data).toEqual([
       expect.objectContaining({
-        identityKey: 'MISSING:',
+        identityKey: 'MISSING:MISSING_REQUIRED:Legacy defect',
         resolutionStatus: 'MISSING',
       }),
       expect.objectContaining({
