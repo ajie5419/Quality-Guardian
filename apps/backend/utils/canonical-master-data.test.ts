@@ -1,3 +1,4 @@
+import { Decimal } from '@prisma/client/runtime/library';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -57,6 +58,18 @@ describe('masterDataGovernanceKernel', () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+  });
+
+  it.each([
+    ['Prisma Decimal', new Decimal(7), 7],
+    ['number', 6, 6],
+    ['bigint', 5n, 5],
+    ['numeric string', '4', 4],
+    ['null', null, 0],
+  ])('normalizes %s database count values', (_label, value, expected) => {
+    expect(__masterDataGovernanceTestHooks.toAffectedRows(value)).toBe(
+      expected,
+    );
   });
 
   it('accepts an active canonical ID with a matching name', async () => {

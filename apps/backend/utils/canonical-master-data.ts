@@ -12,9 +12,16 @@ import {
   listMasterDataGovernanceFields,
 } from './master-data-fields';
 
-type CountRow = { count: bigint | number | string };
+type DatabaseCount =
+  | bigint
+  | null
+  | number
+  | string
+  | undefined
+  | { toString(): string };
+type CountRow = { count: DatabaseCount };
 type DistinctValueRow = { value: null | string };
-type ValueCountRow = { count: bigint | number | string; value: null | string };
+type ValueCountRow = { count: DatabaseCount; value: null | string };
 
 type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
 
@@ -186,15 +193,18 @@ async function buildActiveRowWhereSql(tableName: string, alias = '') {
   return '1 = 1';
 }
 
-function toAffectedRows(value: bigint | number | string | undefined) {
+function toAffectedRows(value: DatabaseCount) {
   if (typeof value === 'bigint') {
     return Number(value);
   }
   if (typeof value === 'number') {
     return Number.isFinite(value) ? value : 0;
   }
-  if (typeof value === 'string' && value.length > 0) {
-    const parsed = Number(value);
+  if (
+    (typeof value === 'string' && value.length > 0) ||
+    (typeof value === 'object' && value !== null)
+  ) {
+    const parsed = Number(value.toString());
     return Number.isFinite(parsed) ? parsed : 0;
   }
   return 0;
@@ -585,9 +595,9 @@ async function readDistinctMissingCanonicalIdTargetNames(
 
 async function countCanonicalRows(canonical: MasterDataCanonicalRelation) {
   const tableName = quoteIdentifier(canonical.table);
-  const rows = await prisma.$queryRawUnsafe<
-    Array<{ count: bigint | number | string }>
-  >(`SELECT COUNT(*) AS count FROM ${tableName}`);
+  const rows = await prisma.$queryRawUnsafe<CountRow[]>(
+    `SELECT COUNT(*) AS count FROM ${tableName}`,
+  );
   return toAffectedRows(rows[0]?.count);
 }
 
@@ -856,6 +866,7 @@ export const __masterDataGovernanceTestHooks = {
   countCanonicalRows,
   readDistinctMissingCanonicalIdTargetNames,
   seedCanonicalByNames,
+  toAffectedRows,
   resetCaches() {
     TABLE_COLUMN_CACHE.clear();
     TABLE_PRIMARY_KEY_CACHE.clear();
@@ -1280,8 +1291,8 @@ export const MasterDataGovernanceKernel = {
       const activeRowWhere = await buildActiveRowWhereSql(target.table);
       const rows = await prisma.$queryRawUnsafe<
         Array<{
-          missingCanonicalId: bigint | number | string;
-          totalWithName: bigint | number | string;
+          missingCanonicalId: DatabaseCount;
+          totalWithName: DatabaseCount;
         }>
       >(
         `SELECT
@@ -1327,8 +1338,8 @@ export const MasterDataGovernanceKernel = {
       const activeRowWhere = await buildActiveRowWhereSql(target.table, 't');
       const rows = await prisma.$queryRawUnsafe<
         Array<{
-          invalidCanonicalId: bigint | number | string;
-          mismatchedCanonicalName: bigint | number | string;
+          invalidCanonicalId: DatabaseCount;
+          mismatchedCanonicalName: DatabaseCount;
         }>
       >(
         `SELECT
