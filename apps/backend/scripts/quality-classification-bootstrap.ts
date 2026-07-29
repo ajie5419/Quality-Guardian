@@ -2,7 +2,7 @@ import type { QualityClassificationScope } from '@qgs/shared';
 
 import { createId } from '@paralleldrive/cuid2';
 import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
-import { VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY } from '~/modules/quality-classification';
+import { VEHICLE_PRODUCT_CLASSIFICATION_IDENTITY } from '~/modules/quality-classification/quality-classification-identities';
 import prisma from '~/utils/prisma';
 
 interface ClassificationSeed {
