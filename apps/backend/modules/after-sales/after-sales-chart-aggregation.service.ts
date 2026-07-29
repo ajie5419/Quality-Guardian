@@ -6,6 +6,7 @@ import type {
   AfterSalesChartMetric,
 } from './after-sales-analytics.service';
 import type { AfterSalesDateMode } from './after-sales-query';
+import type { AfterSalesStatisticsIdentity } from './after-sales-statistics-identity';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -21,6 +22,11 @@ import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 import { buildAfterSalesDateRange } from './after-sales-query';
+import {
+  getAfterSalesStatisticsIdentityKey,
+  getAfterSalesStatisticsSnapshotFields,
+  resolveAfterSalesStatisticsIdentity,
+} from './after-sales-statistics-identity';
 
 const CHART_DIMENSION_CONFIG: Record<
   Exclude<AfterSalesChartDimension, 'reportMonth'>,
@@ -209,27 +215,49 @@ export const AfterSalesChartAggregationService = {
     const sumPayload: Record<string, true> = {};
     for (const field of conf.sumFields) sumPayload[field] = true;
 
+    const snapshotFields = getAfterSalesStatisticsSnapshotFields(dimension);
     const grouped = await prisma.after_sales.groupBy({
-      by: [byField],
+      by: [byField, ...snapshotFields],
       where,
       ...(conf.count ? { _count: { id: true } } : {}),
       ...(conf.sumFields.length > 0 ? { _sum: sumPayload } : {}),
     });
+    const aggregateMap = new Map<
+      string,
+      {
+        identity: AfterSalesStatisticsIdentity | null;
+        rawId: null | string;
+        value: number;
+      }
+    >();
+    for (const item of grouped) {
+      const source = item as Record<string, unknown>;
+      const identity = resolveAfterSalesStatisticsIdentity(dimension, source);
+      const rawId = source[byField] ? String(source[byField]) : null;
+      const key = identity
+        ? getAfterSalesStatisticsIdentityKey(identity)
+        : rawId || '';
+      const current = aggregateMap.get(key);
+      aggregateMap.set(key, {
+        identity,
+        rawId,
+        value:
+          (current?.value || 0) + getMetricValueFromGroupedItem(metric, source),
+      });
+    }
+    const aggregateRows = [...aggregateMap.values()];
+
     let canonicalNames = dimensionConfig.governanceKey
       ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-          canonicalIds: grouped.map((item) => {
-            const source = item as Record<string, unknown>;
-            return source[byField] ? String(source[byField]) : null;
-          }),
+          canonicalIds: aggregateRows.map(
+            (item) => item.identity?.id || item.rawId,
+          ),
           configKey: dimensionConfig.governanceKey,
         })
       : new Map<string, null | string>();
     if (dimensionConfig.classification) {
-      const ids = grouped
-        .map((item) => {
-          const source = item as Record<string, unknown>;
-          return source[byField] ? String(source[byField]) : null;
-        })
+      const ids = aggregateRows
+        .map((item) => item.identity?.id || item.rawId)
         .filter(Boolean);
       canonicalNames =
         dimensionConfig.classification.level === 'category'
@@ -243,17 +271,17 @@ export const AfterSalesChartAggregationService = {
             );
     }
 
-    return grouped
+    return aggregateRows
       .map((item) => {
-        const source = item as Record<string, unknown>;
-        const rawId = source[byField] ? String(source[byField]) : null;
-        const value = getMetricValueFromGroupedItem(metric, source);
-        const roundedValue = Number(value.toFixed(2));
+        const rawId = item.identity?.id || item.rawId;
+        const roundedValue = Number(item.value.toFixed(2));
         return dimensionConfig.governanceKey || dimensionConfig.classification
           ? createIdentityAggregateItem({
               canonicalName: rawId ? canonicalNames.get(rawId) : null,
               id: rawId,
-              missingName: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+              missingName: item.identity?.missingName,
+              rawName: item.identity?.rawName,
+              resolutionReason: item.identity?.resolutionReason,
               value: roundedValue,
             })
           : createResolvedAggregateItem({

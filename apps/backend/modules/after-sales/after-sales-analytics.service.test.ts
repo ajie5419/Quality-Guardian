@@ -356,8 +356,8 @@ describe('after-sales-analytics.service', () => {
       },
       {
         id: null,
-        name: '数据待治理',
-        resolutionReason: 'MISSING_REQUIRED',
+        name: '未关联供应商',
+        resolutionReason: 'NOT_APPLICABLE',
         resolutionStatus: 'MISSING',
         value: 1,
       },

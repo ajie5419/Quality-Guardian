@@ -163,6 +163,8 @@ function formatStatsResponse(input: {
           (s.supplierBrandId && input.supplierNames.get(s.supplierBrandId)) ||
           null,
         id: s.supplierBrandId,
+        missingName: '未关联供应商',
+        resolutionReason: s.supplierBrandId ? undefined : 'NOT_APPLICABLE',
         value: s._count.id,
       }),
     ),

@@ -1,4 +1,3 @@
-import { QMS_DEFAULT_VALUES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('~/utils/prisma', () => ({
@@ -115,7 +114,7 @@ describe('after-sales-chart-aggregation.service', () => {
       },
     ]);
     expect(prisma.after_sales.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ by: ['defectCategoryId'] }),
+      expect.objectContaining({ by: ['defectCategoryId', 'defectType'] }),
     );
   });
 
@@ -170,7 +169,7 @@ describe('after-sales-chart-aggregation.service', () => {
       },
     ]);
     expect(prisma.after_sales.groupBy).toHaveBeenCalledWith(
-      expect.objectContaining({ by: ['respDeptId'] }),
+      expect.objectContaining({ by: ['respDeptId', 'respDept'] }),
     );
   });
 
@@ -283,7 +282,59 @@ describe('after-sales-chart-aggregation.service', () => {
     });
   });
 
-  it('should handle null field values as UNCLASSIFIED', async () => {
+  it('should merge renamed snapshots by canonical ID', async () => {
+    const { AfterSalesChartAggregationService } = await import(
+      '~/modules/after-sales/after-sales-chart-aggregation.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const { QualityClassificationService } = await import(
+      '~/modules/quality-classification'
+    );
+
+    (prisma.after_sales.groupBy as any).mockResolvedValue([
+      {
+        defectCategoryId: 'defect-a',
+        defectType: 'Old defect name',
+        _count: { id: 3 },
+      },
+      {
+        defectCategoryId: 'defect-a',
+        defectType: 'New defect name',
+        _count: { id: 2 },
+      },
+    ]);
+    vi.mocked(QualityClassificationService.listForManagement).mockResolvedValue(
+      [
+        {
+          code: 'A',
+          id: 'defect-a',
+          name: 'Canonical defect',
+          scope: 'AFTER_SALES_DEFECT',
+          sort: 0,
+          status: 1,
+          subcategories: [],
+        },
+      ],
+    );
+
+    const result = await AfterSalesChartAggregationService.getChartAggregation({
+      dimension: 'defectType',
+      metric: 'count',
+      year: 2026,
+    });
+
+    expect(result).toEqual([
+      {
+        id: 'defect-a',
+        name: 'Canonical defect',
+        resolutionStatus: 'RESOLVED',
+        value: 5,
+      },
+    ]);
+  });
+
+  it('should expose unresolved snapshot evidence instead of Unknown', async () => {
     const { AfterSalesChartAggregationService } = await import(
       '~/modules/after-sales/after-sales-chart-aggregation.service'
     );
@@ -291,7 +342,11 @@ describe('after-sales-chart-aggregation.service', () => {
     const prisma = prismaModule.default;
 
     (prisma.after_sales.groupBy as any).mockResolvedValue([
-      { defectCategoryId: null, _count: { id: 4 } },
+      {
+        defectCategoryId: null,
+        defectType: 'Legacy defect',
+        _count: { id: 4 },
+      },
     ]);
 
     const result = await AfterSalesChartAggregationService.getChartAggregation({
@@ -302,10 +357,43 @@ describe('after-sales-chart-aggregation.service', () => {
 
     expect(result[0]).toEqual({
       id: null,
-      name: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+      name: '数据待治理：Legacy defect',
+      rawName: 'Legacy defect',
       resolutionReason: 'MISSING_REQUIRED',
       resolutionStatus: 'MISSING',
       value: 4,
     });
+  });
+
+  it('should mark an empty supplier identity as not applicable', async () => {
+    const { AfterSalesChartAggregationService } = await import(
+      '~/modules/after-sales/after-sales-chart-aggregation.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    (prisma.after_sales.groupBy as any).mockResolvedValue([
+      {
+        supplierBrand: null,
+        supplierBrandId: null,
+        _count: { id: 2 },
+      },
+    ]);
+
+    const result = await AfterSalesChartAggregationService.getChartAggregation({
+      dimension: 'supplierBrand',
+      metric: 'count',
+      year: 2026,
+    });
+
+    expect(result).toEqual([
+      {
+        id: null,
+        name: '未关联供应商',
+        resolutionReason: 'NOT_APPLICABLE',
+        resolutionStatus: 'MISSING',
+        value: 2,
+      },
+    ]);
   });
 });
