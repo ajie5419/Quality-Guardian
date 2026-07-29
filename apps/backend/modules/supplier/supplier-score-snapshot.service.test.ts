@@ -198,7 +198,7 @@ describe('supplierScoreSnapshotService openEngineeringCount open-status definiti
     const data = (prisma.supplier_score_snapshots.upsert as any).mock
       .calls[0][0].create;
     expect(data.incomingQualifiedRate).toBe(0);
-    expect(data.scoringModel).toBe('SUPPLIER_V3');
+    expect(data.scoringModel).toBe('SUPPLIER_V4');
   });
 
   it('excludes NA batches and keeps conditional batches in the denominator', async () => {

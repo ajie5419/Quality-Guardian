@@ -224,4 +224,26 @@ export const MetricRefreshQueue = {
       },
     });
   },
+
+  /**
+   * Release maintenance runs while application writes are stopped, so every
+   * outstanding lease can be reclaimed immediately instead of waiting for a
+   * crashed process lease or retry backoff to expire.
+   */
+  async resetOutstandingSupplierScoreJobsForMaintenance(now = new Date()) {
+    const result = await prisma.metric_refresh_jobs.updateMany({
+      where: {
+        isDeleted: false,
+        metricType: metric_refresh_type.SUPPLIER_SCORE,
+        status: { not: metric_refresh_status.COMPLETED },
+      },
+      data: {
+        availableAt: now,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: metric_refresh_status.PENDING,
+      },
+    });
+    return { reset: result.count };
+  },
 };

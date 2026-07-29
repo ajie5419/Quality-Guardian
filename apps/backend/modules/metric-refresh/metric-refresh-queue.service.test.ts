@@ -128,6 +128,31 @@ describe('metric refresh queue', () => {
     expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledTimes(2);
   });
 
+  it('reclaims every outstanding supplier job during exclusive maintenance', async () => {
+    const now = new Date('2026-07-29T00:00:00.000Z');
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 3 });
+
+    const result =
+      await MetricRefreshQueue.resetOutstandingSupplierScoreJobsForMaintenance(
+        now,
+      );
+
+    expect(result).toEqual({ reset: 3 });
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        metricType: 'SUPPLIER_SCORE',
+        status: { not: 'COMPLETED' },
+      },
+      data: {
+        availableAt: now,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: 'PENDING',
+      },
+    });
+  });
+
   it('returns failed jobs to the queue with a persisted retry time', async () => {
     const now = new Date('2026-07-29T00:00:00.000Z');
     prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 1 });

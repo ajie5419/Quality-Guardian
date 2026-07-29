@@ -19,6 +19,7 @@
 - `MetricRefreshQueue.completeSupplierScoreJobs(jobIds, workerId)` — 确认当前 Worker 持有的任务已完成。
 - `MetricRefreshQueue.failSupplierScoreJobs(jobs, workerId, error)` — 记录失败并按尝试次数延迟重试。
 - `MetricRefreshQueue.countOutstandingSupplierScoreJobs()` — 返回发布门禁需要清零的任务数。
+- `MetricRefreshQueue.resetOutstandingSupplierScoreJobsForMaintenance()` — 在应用停止写入的发布维护窗口立即回收遗留租约和失败任务。
 
 ## 依赖
 

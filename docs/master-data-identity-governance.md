@@ -59,11 +59,11 @@ after-sales、supervision 的在线供应商写入也已要求显式 ID，服务
 - 受控统计桶统一返回 `id + name + value + resolutionStatus`；`RESOLVED` 表示 ID 已解析，`MISSING` 表示历史记录缺少 ID，`INVALID` 表示保留了无法解析的非空 ID。
 - 下游和前端必须以 `id` 作为身份与渲染键，不得再次按 `name` 合并、映射或猜测归属。
 
-### 事件
+### 派生指标任务
 
-- 事件载荷使用 `supplierIds`、`teamIds` 等规范 ID 集合驱动下游刷新。
-- 名称集合只能作为日志和过渡期诊断信息。
-- 事件携带受控名称时必须同时携带对应 ID；不允许新增 name-only 事件。
+- 影响派生指标的源数据写入必须在同一数据库事务内追加持久化任务，任务实体键只能使用 canonical ID。
+- TEAM 等跨域身份必须先通过显式映射转换为目标 canonical ID，再写入任务；名称不能作为任务键或转换依据。
+- Worker 以租约方式抢占任务，重算成功后确认，失败后持久化错误并重试。发布维护必须同步消费遗留任务并以任务清零作为硬门禁。
 
 ## 跨身份域映射
 
@@ -127,7 +127,7 @@ Canonical bootstrap is an initialization operation, not an ongoing name resolver
 当前代码合并门禁覆盖：
 
 - `B-ID1`：阻断受控选择器新增 `valueKey: 'name'`。
-- `B-ID2`：阻断 `after_sales.changed`、`inspection_issue.changed`、`inspection_record.changed` 携带名称但缺少对应 ID 集合。
+- `B-ID2`：阻断遗留领域事件携带名称但缺少对应 ID 集合；供应商评分在线链路已不再使用这些事件。
 - `B-ID3`：阻断 `inspections`、`quality_records` 的 Prisma 写入只写 `supplierName` 而不写 `supplierId`。
 - `B-ID4`：阻断供应商画像售后查询和评分聚合重新使用名称关联，以及按名称推导 TEAM ID。
 - `B-ID5`：阻断未审核业务代码启用 legacy 名称转 ID 模式，只允许精确文件级 import adapter 白名单。
@@ -161,7 +161,7 @@ Canonical bootstrap is an initialization operation, not an ongoing name resolver
 
 ## 已知运行限制与未完成治理面
 
-- 当前 `EventEmitter` 是单进程、fire-and-forget 实现；监听器失败只记录日志，没有持久化队列、跨实例广播或自动重试。扩容前必须替换为可靠事件机制。
+- 供应商评分已使用数据库持久化任务替代单进程 `EventEmitter`；源事务、租约重试、幂等重算和发布清零门禁构成完整一致性链路。
 - `unresolved_master_data_refs` 已用于回填审计，并在系统设置中提供统一治理清单。不合格项缺陷分类、售后产品分类和售后缺陷分类支持人工选择 canonical 父子分类后事务化修复；其他类型只读展示。`OPEN` 记录不得被视为已解决。
 - `supplier_identity_links` 已有系统管理员 API，但尚无前端管理界面；TEAM 映射维护仍依赖受控管理入口。
 - 以上限制不影响本 wave 的 ID 查询契约，但必须在发布验收和后续治理计划中显式跟踪。

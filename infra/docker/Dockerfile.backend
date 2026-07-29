@@ -76,7 +76,7 @@ RUN test -x /app/apps/backend/node_modules/.bin/tsx \
     && test -f /app/apps/backend/scripts/merge-team-identities.ts \
     && test -f /app/apps/backend/scripts/run-release-maintenance.sh \
     && test -f /app/apps/backend/scripts/backfill-quality-record-supplier-identities.ts \
-    && test -f /app/apps/backend/scripts/backfill-supplier-score-snapshots.ts \
+    && test -f /app/apps/backend/scripts/reconcile-supplier-score-snapshots.ts \
     && test -f /app/apps/backend/scripts/backfill-inspection-issue-divisions.ts \
     && test -f /app/apps/backend/scripts/backfill-inspection-issue-responsibilities.ts \
     && test -f /app/apps/backend/scripts/backfill-quality-classifications.ts
