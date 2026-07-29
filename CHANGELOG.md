@@ -25,6 +25,31 @@
 
 ## 执行记录
 
+### 2026-07-29 发布维护进程生命周期隔离修复
+
+**执行内容：**
+
+- 定位 `qgs-v0.20.2` 生产发布回滚根因：质量分类 bootstrap 为读取纯常量加载了运行时模块 barrel，间接创建 Redis 长连接；业务任务完成后 Node 进程未退出，导致后续供应商评分重算从未启动并最终触发 600 秒维护门禁。
+- 将质量分类 bootstrap 改为直接依赖纯身份常量文件，维护脚本不再加载权限、RBAC、Redis 等在线运行时依赖。
+- 增加发布 bootstrap 依赖边界测试，禁止重新引入运行时模块 barrel。
+
+**验证结果：**
+
+- 隔离导入诊断：显式配置不可用 Redis 时，bootstrap 输出 14 条种子并立即退出，未创建 Redis 长连接。
+- 定向测试：`1/1` 文件、`6/6` 测试通过。
+- Backend full suite：`244/244` 文件、`2282/2282` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+
+**commit：**
+
+- `486e8551` `fix: isolate quality classification release bootstrap`
+
+**遗留问题：**
+
+- `qgs-v0.20.2` 已创建但生产部署失败并自动回滚；必须发布后续修复版本，并以维护脚本正常退出、供应商评分任务清零和健康检查全部通过作为完成条件。
+
 ## [0.20.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.1...qgs-v0.20.2) (2026-07-29)
 
 

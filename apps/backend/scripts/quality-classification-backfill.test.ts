@@ -1,3 +1,7 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -90,5 +94,20 @@ describe('quality classification backfill', () => {
         scope: 'AFTER_SALES_PRODUCT',
       }),
     );
+  });
+
+  it('keeps release bootstrap isolated from runtime module barrels', () => {
+    const source = readFileSync(
+      resolve(
+        dirname(fileURLToPath(import.meta.url)),
+        'quality-classification-bootstrap.ts',
+      ),
+      'utf8',
+    );
+
+    expect(source).toContain(
+      "from '~/modules/quality-classification/quality-classification-identities'",
+    );
+    expect(source).not.toContain("from '~/modules/quality-classification'");
   });
 });
