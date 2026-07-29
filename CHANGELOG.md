@@ -25,6 +25,38 @@
 
 ## 执行记录
 
+### 2026-07-29 供应商与外协评分一致性最终重构
+
+**执行内容：**
+
+- 新增数据库持久化 `metric_refresh_jobs` 及 Prisma migration，建立任务追加、租约抢占、完成确认、失败重试和发布清零能力。
+- 检验记录、不合格项、售后记录、质量损失、供应商档案和 TEAM 映射的写路径，统一在源数据事务内按 canonical supplier ID 追加评分任务；删除进程内 `EventEmitter`、提交后 fire-and-forget 刷新和按名称刷新入口。
+- 新增幂等供应商评分 Worker，按供应商 ID 聚合 `inspections`、`quality_records`、`after_sales` 和 TEAM 显式映射，成功后确认任务，失败时保留错误和重试时间。
+- 评分模型升级为 V4。发布维护在应用停止写入期间为无 V4 快照或旧模型快照建立明确 ID 任务，同步消费所有线上遗留任务；任务未清零即终止发布。
+- 删除健康检查后的异步快照补数容器和旧 `backfill-supplier-score-snapshots.ts`，替换为发布前同步 `reconcile-supplier-score-snapshots.ts`。
+- 拆分供应商写服务，删除检验模块三层无业务逻辑的转发门面并消除隐性加载循环。
+- 更新 supplier、inspection、after-sales、metric-refresh 及主数据身份治理架构文档；未启动前端 dev/build 服务，未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`332/332` 文件、`2852/2852` 测试通过。
+- Backend full suite：`243/243` 文件、`2278/2278` 测试通过。
+- `pnpm lint`：通过，格式和 ESLint 均无错误。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- `prisma validate`：通过。
+- 发布维护脚本与部署脚本 shell 语法检查：通过。
+
+**commits：**
+
+- `4f1bc272` `refactor: add durable metric refresh queue`
+- `d4015f43` `refactor: make supplier score refresh durable`
+- `4f8489dc` `refactor: enforce supplier score reconciliation gate`
+
+**遗留问题：**
+
+- 生产数据库未在本次会话中访问；migration 与 V4 历史快照校准将在正常发布维护阶段执行，并由任务清零门禁决定是否允许启动新版本。
+
 ### 2026-07-29 车辆故障率历史产品快照兼容修复
 
 **执行内容：**
