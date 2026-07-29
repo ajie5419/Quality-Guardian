@@ -25,6 +25,40 @@
 
 ## 执行记录
 
+### 2026-07-29 统计身份重构与主数据治理闭环
+
+**执行内容：**
+
+- 建立统一统计身份契约，区分 `RESOLVED`、`MISSING`、`INVALID`，并以 `MISSING_REQUIRED`、`INVALID_REFERENCE`、`NOT_APPLICABLE`、`CONFLICTED` 解释原因。
+- 不合格项和售后动态图表按 canonical ID 聚合；缺少 ID 时按治理原因与原始快照分桶，同一 ID 的改名前后快照重新合并。
+- 售后无供应商记录明确标记为“不涉及/未关联供应商”，不再与真正缺失的供应商身份混合。
+- 统一质量概览、日报周报、车辆故障率、质量损失和工单聚合的身份显示，消除业务统计中的 `Unknown`；质量损失不同历史部门快照不再错误合并。
+- 系统设置新增主数据治理清单、分页筛选、权限和分类处置页面；不合格项缺陷分类、售后产品分类和售后缺陷分类支持选择 canonical 父子分类。
+- 处置服务由业务所属模块校验分类，并在同一事务内更新业务 ID、名称快照和 unresolved 审计；使用 `OPEN` compare-and-set 防止重复处置和并发覆盖。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`334/334` 文件、`2852/2852` 测试通过。
+- Backend full suite：`245/245` 文件、`2278/2278` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- 浏览器验证：本地 `5666` 前端可访问，但浏览器无登录态；未绕过认证提交治理操作。
+
+**commits：**
+
+- `73c2e322` `refactor(project): define governed statistics identities`
+- `72876374` `refactor(project): expose governed issue statistics`
+- `b887e8bc` `refactor(@qgs/backend): govern after-sales statistics`
+- `c5636b53` `refactor(project): unify governed reporting identities`
+- `14a98bd2` `feat(project): add master data governance workflow`
+
+**遗留问题：**
+
+- 本机容器运行时当前不可用，浏览器也没有管理员登录态，因此本地 `ISS-2026-_O7D0ZBC` 分类审计仍保持 `OPEN`。治理入口已完成，恢复本地容器或管理员登录后应通过该入口选择正确父子分类，禁止直接改库或虚假结案。
+- 当前治理页只对三类质量分类提供在线处置；其他 unresolved 类型继续只读展示，待各业务模块提供可校验、事务化的修复能力。
+
 ### 2026-07-29 主数据治理后的质量统计与报表修复
 
 **执行内容：**

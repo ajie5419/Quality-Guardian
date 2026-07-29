@@ -2,11 +2,11 @@
 
 ## 当前状态
 
-- 最新变更: 已修复班组、工序、项目、责任部门和质量分类治理对质量概览、统计图表、质量损失及周报的影响；补齐报表身份回填、合格率 ID 绑定和治理审计计数，并在本地 Apple Container 数据库完成真实数据验证。生产环境未访问、未修改。
-- 测试状态: 全仓单元测试 `327/327` files and `2834/2834` tests passed；Backend full suite `238/238` files and `2261/2261` tests passed。
+- 最新变更: 统计身份已统一为 canonical ID、解析状态、治理原因和原始证据；不合格项、售后、质量概览、日报周报、质量损失和工单统计不再输出 `Unknown`。系统设置新增主数据治理清单和质量分类事务化处置入口。生产环境未访问、未修改。
+- 测试状态: 全仓单元测试 `334/334` files and `2852/2852` tests passed；Backend full suite `245/245` files and `2278/2278` tests passed。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 552（含测试）
+- 模块 TS 文件数: 568（含测试）
 - 当前版本: `0.19.1`
 
 ## 已完成
@@ -63,6 +63,8 @@
 - [x] 质量二级分类开放配置（不合格项缺陷、售后产品、售后缺陷），含 Web/小程序接入、canonical ID 统计、发布初始化和历史回填
 - [x] 质量分类 migration 的 MySQL 长索引名修复、自动化门禁与本地容器数据库恢复
 - [x] 主数据治理后的质量统计与报表修复（概览、过程合格率、售后、质量损失、周报、项目排行及历史身份回填）
+- [x] 统计身份状态统一（已解析、待治理、主数据失效、不适用），保留原始证据并消除业务图表中的 `Unknown`
+- [x] 系统设置主数据治理清单与分类处置闭环（不合格项缺陷、售后产品、售后缺陷）
 - [ ] 后端业务模块逐功能测试覆盖补齐（进行中）
 
 ## 当前架构
@@ -85,7 +87,8 @@ apps/backend/
 - [ ] 人工处置事业部回填遗留的 124 条工单和不合格项侧 8 个无法解析计数
 - [x] 完成 supplier identity wave 的 PR、release-please、部署、migration、回填和健康检查
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题、进货合格率和完整历史项目
-- [ ] 为 `unresolved_master_data_refs` 增加人工处置 API/UI，并为 `supplier_identity_links` 增加管理 UI
+- [ ] 为 `supplier_identity_links` 增加管理 UI
+- [ ] 在本地管理员登录态或容器恢复后，通过主数据治理页处置 `ISS-2026-_O7D0ZBC` 的缺陷分类审计；当前保持 `OPEN`，未绕过认证或直接改库
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`
 - [ ] 按生产 V1/V2 流量和 `missing_id_count` 指标删除报检/工单要求 V1 迁移协议
@@ -98,8 +101,8 @@ apps/backend/
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 552（含测试）
-- utils TS 文件数: 41
-- 测试文件数: 208（modules 内）；后端总计 236
+- 模块 TS 文件数: 568（含测试）
+- utils TS 文件数: 44
+- 后端测试文件数: 245
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/
