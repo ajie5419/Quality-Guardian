@@ -23,8 +23,7 @@ describe('supplier score worker', () => {
     vi.clearAllMocks();
     vi.mocked(MetricRefreshQueue.claimSupplierScoreJobs)
       .mockResolvedValueOnce([
-        { attempts: 1, entityId: 'supplier-1', id: 'job-1' },
-        { attempts: 1, entityId: 'supplier-1', id: 'job-2' },
+        { attempts: 1, entityId: 'supplier-1', jobCount: 4 },
       ])
       .mockResolvedValueOnce([]);
     vi.mocked(MetricRefreshQueue.completeSupplierScoreJobs).mockResolvedValue({
@@ -41,7 +40,7 @@ describe('supplier score worker', () => {
       SupplierScoreSnapshotService.refreshBySupplierIds,
     ).toHaveBeenCalledWith(['supplier-1']);
     expect(MetricRefreshQueue.completeSupplierScoreJobs).toHaveBeenCalledWith(
-      ['job-1', 'job-2'],
+      ['supplier-1'],
       'worker-test',
     );
     expect(result).toEqual({ batches: 1, processed: 2 });
@@ -57,10 +56,7 @@ describe('supplier score worker', () => {
       SupplierScoreWorkerService.drain({ workerId: 'worker-test' }),
     ).rejects.toBe(error);
     expect(MetricRefreshQueue.failSupplierScoreJobs).toHaveBeenCalledWith(
-      [
-        { attempts: 1, entityId: 'supplier-1', id: 'job-1' },
-        { attempts: 1, entityId: 'supplier-1', id: 'job-2' },
-      ],
+      [{ attempts: 1, entityId: 'supplier-1', jobCount: 4 }],
       'worker-test',
       error,
     );

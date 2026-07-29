@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { SupplierScoreReconciliationService } from '~/modules/supplier';
+import { SupplierScoreReconciliationService } from '~/modules/supplier/supplier-score-reconciliation.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
