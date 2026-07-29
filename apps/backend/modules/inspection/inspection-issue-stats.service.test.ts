@@ -49,6 +49,7 @@ function mockIssueGroupBy(
     typeRows?: Array<{
       _count: { id: number };
       defectCategoryId: null | string;
+      defectType?: null | string;
     }>;
   } = {},
 ) {
@@ -120,8 +121,21 @@ describe('inspectionIssueStatsService', () => {
       (prisma.quality_records.count as any).mockResolvedValue(0);
       mockIssueGroupBy({
         typeRows: [
-          { defectCategoryId: 'defect-1', _count: { id: 2 } },
-          { defectCategoryId: null, _count: { id: 1 } },
+          {
+            defectCategoryId: 'defect-1',
+            defectType: 'Old Welding Defect',
+            _count: { id: 1 },
+          },
+          {
+            defectCategoryId: 'defect-1',
+            defectType: 'Renamed Welding Defect',
+            _count: { id: 1 },
+          },
+          {
+            defectCategoryId: null,
+            defectType: 'Legacy Machining Defect',
+            _count: { id: 1 },
+          },
         ],
       });
       (
@@ -141,13 +155,14 @@ describe('inspectionIssueStatsService', () => {
       });
       expect(stats.pieData).toContainEqual({
         id: null,
-        name: '数据待治理',
+        name: '数据待治理：Legacy Machining Defect',
+        rawName: 'Legacy Machining Defect',
         resolutionReason: 'MISSING_REQUIRED',
         resolutionStatus: 'MISSING',
         value: 1,
       });
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ by: ['defectCategoryId'] }),
+        expect.objectContaining({ by: ['defectCategoryId', 'defectType'] }),
       );
     });
 
@@ -223,7 +238,7 @@ describe('inspectionIssueStatsService', () => {
         },
       ]);
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ by: ['defectCategoryId'] }),
+        expect.objectContaining({ by: ['defectCategoryId', 'defectType'] }),
       );
     });
 

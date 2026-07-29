@@ -22,6 +22,14 @@ export interface InspectionIssueStatisticsIdentity {
   resolutionReason?: Exclude<IdentityResolutionReason, 'INVALID_REFERENCE'>;
 }
 
+export type InspectionIssueStatisticsDimension =
+  | 'defectSubtype'
+  | 'defectType'
+  | 'division'
+  | 'projectName'
+  | 'responsibleDepartment'
+  | 'supplierName';
+
 function normalizeText(value: null | string | undefined) {
   return String(value || '').trim() || null;
 }
@@ -36,7 +44,7 @@ function joinClassificationEvidence(
 }
 
 export function resolveInspectionIssueStatisticsIdentity(
-  dimension: string,
+  dimension: InspectionIssueStatisticsDimension | string,
   row: InspectionIssueStatisticsRow,
 ): InspectionIssueStatisticsIdentity | null {
   switch (dimension) {
@@ -86,6 +94,23 @@ export function resolveInspectionIssueStatisticsIdentity(
       return null;
     }
   }
+}
+
+export function getInspectionIssueStatisticsSnapshotFields(
+  dimension: InspectionIssueStatisticsDimension,
+) {
+  const fields: Record<
+    InspectionIssueStatisticsDimension,
+    Array<keyof InspectionIssueStatisticsRow>
+  > = {
+    defectSubtype: ['defectType', 'defectSubtype'],
+    defectType: ['defectType'],
+    division: ['division'],
+    projectName: ['projectName'],
+    responsibleDepartment: ['responsibleDepartment'],
+    supplierName: ['supplierName'],
+  };
+  return fields[dimension];
 }
 
 export function getInspectionIssueStatisticsIdentityKey(

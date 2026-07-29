@@ -23,6 +23,7 @@ import { buildInspectionIssueDateRange } from './inspection-issue';
 import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
 import {
   getInspectionIssueStatisticsIdentityKey,
+  getInspectionIssueStatisticsSnapshotFields,
   resolveInspectionIssueStatisticsIdentity,
 } from './inspection-issue-statistics-identity';
 
@@ -121,10 +122,12 @@ export const InspectionIssueStatsService = {
 
       // 2. Defect Type Distribution
       const typeStats = await prisma.quality_records.groupBy({
-        by: ['defectCategoryId'],
+        by: [
+          'defectCategoryId',
+          ...getInspectionIssueStatisticsSnapshotFields('defectType'),
+        ],
         where,
         _count: { id: true },
-        orderBy: { _count: { id: 'desc' } },
       });
       const defectTypeNames =
         await QualityClassificationService.resolveCategoryNamesByIds(
@@ -132,15 +135,35 @@ export const InspectionIssueStatsService = {
           typeStats.map((item) => item.defectCategoryId),
         );
 
-      const pieData: PieDataItem[] = typeStats.map((s) =>
-        createIdentityAggregateItem({
-          canonicalName: s.defectCategoryId
-            ? defectTypeNames.get(s.defectCategoryId)
-            : null,
-          id: s.defectCategoryId,
-          value: s._count.id,
-        }),
-      );
+      const typeGroups = new Map<
+        string,
+        { identity: InspectionIssueStatisticsIdentity; value: number }
+      >();
+      for (const row of typeStats) {
+        const identity = resolveInspectionIssueStatisticsIdentity(
+          'defectType',
+          row,
+        );
+        if (!identity) continue;
+        const key = getInspectionIssueStatisticsIdentityKey(identity);
+        const current = typeGroups.get(key);
+        typeGroups.set(key, {
+          identity,
+          value: (current?.value || 0) + row._count.id,
+        });
+      }
+      const pieData: PieDataItem[] = [...typeGroups.values()]
+        .map(({ identity, value }) =>
+          createIdentityAggregateItem({
+            canonicalName: identity.id
+              ? defectTypeNames.get(identity.id)
+              : null,
+            id: identity.id,
+            rawName: identity.rawName,
+            value,
+          }),
+        )
+        .sort((a, b) => b.value - a.value);
       let cumulativeCount = 0;
       const pareto: ParetoDataItem[] = pieData.map((item) => {
         cumulativeCount += item.value;

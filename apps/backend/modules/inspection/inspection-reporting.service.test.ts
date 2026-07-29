@@ -496,7 +496,24 @@ describe('inspectionReportingService', () => {
   describe('getReportTopRiskProjects', () => {
     it('should return top 5 risk projects', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { projectId: 'project-1', _count: 5, _sum: { lossAmount: 1000 } },
+        {
+          projectId: 'project-1',
+          projectName: 'Old P1',
+          _count: 3,
+          _sum: { lossAmount: 700 },
+        },
+        {
+          projectId: 'project-1',
+          projectName: 'Renamed P1',
+          _count: 2,
+          _sum: { lossAmount: 300 },
+        },
+        {
+          projectId: null,
+          projectName: 'Legacy Project',
+          _count: 1,
+          _sum: { lossAmount: 200 },
+        },
       ]);
       (
         MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
@@ -507,10 +524,12 @@ describe('inspectionReportingService', () => {
         start: new Date('2024-06-01'),
       });
 
-      expect(result).toHaveLength(1);
+      expect(result).toHaveLength(2);
       expect(result[0].projectName).toBe('P1');
+      expect(result[0]._count).toBe(5);
+      expect(result[1].projectName).toBe('数据待治理：Legacy Project');
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
-        expect.objectContaining({ by: ['projectId'], take: 5 }),
+        expect.objectContaining({ by: ['projectId', 'projectName'] }),
       );
     });
   });
@@ -518,7 +537,16 @@ describe('inspectionReportingService', () => {
   describe('getReportSupplierPerformance', () => {
     it('should return supplier performance grouped data', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { supplierId: 'supplier-1', _count: 3 },
+        {
+          supplierId: 'supplier-1',
+          supplierName: 'Old Supplier',
+          _count: 3,
+        },
+        {
+          supplierId: null,
+          supplierName: 'Legacy Supplier',
+          _count: 2,
+        },
       ]);
       (
         MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
@@ -530,11 +558,12 @@ describe('inspectionReportingService', () => {
           start: new Date('2024-06-01'),
         });
 
-      expect(result).toHaveLength(1);
+      expect(result).toHaveLength(2);
       expect(result[0].supplierName).toBe('Supplier A');
+      expect(result[1].supplierName).toBe('数据待治理：Legacy Supplier');
       expect(prisma.quality_records.groupBy).toHaveBeenCalledWith(
         expect.objectContaining({
-          by: ['supplierId'],
+          by: ['supplierId', 'supplierName'],
           where: expect.objectContaining({ supplierName: { not: null } }),
         }),
       );
@@ -620,8 +649,21 @@ describe('inspectionReportingService', () => {
         });
       (prisma.quality_records.count as any).mockResolvedValue(8);
       (prisma.quality_records.groupBy as any).mockResolvedValue([
-        { defectCategoryId: 'defect-a', _count: { id: 3 } },
-        { defectCategoryId: null, _count: { id: 1 } },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Old A',
+          _count: { id: 2 },
+        },
+        {
+          defectCategoryId: 'defect-a',
+          defectType: 'Renamed A',
+          _count: { id: 1 },
+        },
+        {
+          defectCategoryId: null,
+          defectType: 'Legacy Defect',
+          _count: { id: 1 },
+        },
       ]);
       (
         QualityClassificationService.resolveCategoryNamesByIds as any
@@ -641,7 +683,7 @@ describe('inspectionReportingService', () => {
         value: 3,
       });
       expect(result.issueDistribution).toContainEqual({
-        type: '数据待治理',
+        type: '数据待治理：Legacy Defect',
         value: 1,
       });
     });
