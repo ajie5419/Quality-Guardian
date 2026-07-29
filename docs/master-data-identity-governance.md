@@ -162,6 +162,6 @@ Canonical bootstrap is an initialization operation, not an ongoing name resolver
 ## 已知运行限制与未完成治理面
 
 - 当前 `EventEmitter` 是单进程、fire-and-forget 实现；监听器失败只记录日志，没有持久化队列、跨实例广播或自动重试。扩容前必须替换为可靠事件机制。
-- `unresolved_master_data_refs` 已用于回填审计，但当前没有人工处置 API/UI；`OPEN` 记录不得被视为已解决。
+- `unresolved_master_data_refs` 已用于回填审计，并在系统设置中提供统一治理清单。不合格项缺陷分类、售后产品分类和售后缺陷分类支持人工选择 canonical 父子分类后事务化修复；其他类型只读展示。`OPEN` 记录不得被视为已解决。
 - `supplier_identity_links` 已有系统管理员 API，但尚无前端管理界面；TEAM 映射维护仍依赖受控管理入口。
 - 以上限制不影响本 wave 的 ID 查询契约，但必须在发布验收和后续治理计划中显式跟踪。

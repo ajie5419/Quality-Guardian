@@ -47,5 +47,27 @@ export const systemModule: ModuleDeclaration = {
         },
       ],
     },
+    {
+      key: 'system-master-data-governance',
+      parentPath: '/system',
+      path: '/system/master-data-governance',
+      name: 'SystemMasterDataGovernance',
+      component: 'system/master-data-governance/index',
+      authCode: 'System:MasterDataGovernance:List',
+      order: 8,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:data-check',
+        title: '主数据治理',
+      },
+      buttons: [
+        {
+          authCode: 'System:MasterDataGovernance:Edit',
+          name: 'SystemMasterDataGovernanceEdit',
+          order: 1,
+          title: '处置治理项',
+        },
+      ],
+    },
   ],
 };

@@ -1,0 +1,15 @@
+import { z } from 'zod';
+
+export const masterDataGovernanceQuerySchema = z.object({
+  entityType: z.string().trim().optional(),
+  fieldName: z.string().trim().optional(),
+  page: z.coerce.number().int().min(1).default(1),
+  pageSize: z.coerce.number().int().min(1).max(100).default(20),
+  status: z.enum(['IGNORED', 'OPEN', 'RESOLVED']).default('OPEN'),
+});
+
+export const masterDataGovernanceResolutionSchema = z.object({
+  categoryId: z.string().trim().min(1),
+  note: z.string().trim().max(1000).default(''),
+  subcategoryId: z.string().trim().min(1),
+});
