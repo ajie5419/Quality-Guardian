@@ -303,6 +303,7 @@ describe('after-sales-chart-aggregation.service', () => {
     expect(result[0]).toEqual({
       id: null,
       name: QMS_DEFAULT_VALUES.UNCLASSIFIED,
+      resolutionReason: 'MISSING_REQUIRED',
       resolutionStatus: 'MISSING',
       value: 4,
     });

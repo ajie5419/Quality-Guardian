@@ -189,13 +189,15 @@ describe('reportSummaryService', () => {
       },
       {
         id: 'invalid-id',
-        name: 'Unknown (invalid-id)',
+        name: '主数据已失效',
+        resolutionReason: 'INVALID_REFERENCE',
         resolutionStatus: 'INVALID',
         value: 1,
       },
       {
         id: null,
         name: '未分类',
+        resolutionReason: 'MISSING_REQUIRED',
         resolutionStatus: 'MISSING',
         value: 1,
       },

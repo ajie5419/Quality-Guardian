@@ -141,7 +141,8 @@ describe('inspectionIssueStatsService', () => {
       });
       expect(stats.pieData).toContainEqual({
         id: null,
-        name: 'Unknown',
+        name: '数据待治理',
+        resolutionReason: 'MISSING_REQUIRED',
         resolutionStatus: 'MISSING',
         value: 1,
       });
@@ -246,13 +247,15 @@ describe('inspectionIssueStatsService', () => {
       expect(stats.pieData).toEqual([
         {
           id: null,
-          name: 'Unknown',
+          name: '数据待治理',
+          resolutionReason: 'MISSING_REQUIRED',
           resolutionStatus: 'MISSING',
           value: 1,
         },
         {
           id: 'deleted-defect',
-          name: 'Unknown (deleted-defect)',
+          name: '主数据已失效',
+          resolutionReason: 'INVALID_REFERENCE',
           resolutionStatus: 'INVALID',
           value: 1,
         },
@@ -665,7 +668,7 @@ describe('inspectionIssueStatsService', () => {
       expect(result).toHaveLength(15);
     });
 
-    it('should default to 未分类 for missing dimension values', async () => {
+    it('should expose missing dimension evidence instead of Unknown', async () => {
       (prisma.quality_records.findMany as any).mockResolvedValue([
         {
           date: new Date('2024-01-15'),
@@ -673,7 +676,7 @@ describe('inspectionIssueStatsService', () => {
           defectCategoryId: null,
           defectSubtype: '',
           defectType: '',
-          division: '',
+          division: '车辆 OBU',
           isClaim: false,
           lossAmount: 0,
           projectName: '',
@@ -696,7 +699,49 @@ describe('inspectionIssueStatsService', () => {
       expect(result).toEqual([
         {
           id: null,
-          name: 'Unknown',
+          name: '数据待治理：车辆 OBU',
+          rawName: '车辆 OBU',
+          resolutionReason: 'MISSING_REQUIRED',
+          resolutionStatus: 'MISSING',
+          value: 1,
+        },
+      ]);
+    });
+
+    it('should mark an empty supplier identity as not applicable', async () => {
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        {
+          date: new Date('2024-01-15'),
+          defectSubcategoryId: null,
+          defectCategoryId: null,
+          defectSubtype: '',
+          defectType: '',
+          division: '',
+          isClaim: false,
+          lossAmount: 0,
+          projectName: '',
+          quantity: 0,
+          responsibleDepartment: '',
+          severity: '',
+          status: 'OPEN',
+          supplierId: null,
+          supplierName: null,
+        },
+      ]);
+
+      const result = await InspectionIssueStatsService.getIssueChartAggregation(
+        {
+          dimension: 'supplierName',
+          metric: 'count',
+          year: 2024,
+        },
+      );
+
+      expect(result).toEqual([
+        {
+          id: null,
+          name: '不涉及供应商',
+          resolutionReason: 'NOT_APPLICABLE',
           resolutionStatus: 'MISSING',
           value: 1,
         },

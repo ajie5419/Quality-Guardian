@@ -257,6 +257,7 @@ describe('workOrderService', () => {
         {
           id: null,
           name: '未分配',
+          resolutionReason: 'MISSING_REQUIRED',
           resolutionStatus: 'MISSING',
           value: 1,
         },

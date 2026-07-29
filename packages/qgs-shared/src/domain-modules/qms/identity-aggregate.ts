@@ -34,7 +34,7 @@ export function formatIdentityResolutionName(params: {
   if (params.reason === 'NOT_APPLICABLE') {
     return IDENTITY_RESOLUTION_LABELS.notApplicable;
   }
-  let prefix = IDENTITY_RESOLUTION_LABELS.missing;
+  let prefix: string = IDENTITY_RESOLUTION_LABELS.missing;
   if (params.reason === 'CONFLICTED') {
     prefix = IDENTITY_RESOLUTION_LABELS.conflicted;
   } else if (params.reason === 'INVALID_REFERENCE') {

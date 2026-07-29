@@ -208,14 +208,16 @@ describe('vehicleFailureRateService', () => {
       }),
       expect.objectContaining({
         count: 1,
-        defectType: 'Unknown (bad-id)',
+        defectType: '主数据已失效',
         id: 'bad-id',
+        resolutionReason: 'INVALID_REFERENCE',
         resolutionStatus: 'INVALID',
       }),
       expect.objectContaining({
         count: 1,
         defectType: '未分类',
         id: null,
+        resolutionReason: 'MISSING_REQUIRED',
         resolutionStatus: 'MISSING',
       }),
     ]);

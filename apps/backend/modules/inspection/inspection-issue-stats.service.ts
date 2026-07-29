@@ -5,6 +5,7 @@ import type {
 
 import type { InspectionIssueDateMode } from './inspection-issue';
 import type { InspectionIssueUserContext } from './inspection-issue-access.service';
+import type { InspectionIssueStatisticsIdentity } from './inspection-issue-statistics-identity';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -20,6 +21,10 @@ import prisma from '~/utils/prisma';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
 import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
+import {
+  getInspectionIssueStatisticsIdentityKey,
+  resolveInspectionIssueStatisticsIdentity,
+} from './inspection-issue-statistics-identity';
 
 const logger = createModuleLogger('InspectionService');
 
@@ -205,15 +210,21 @@ export const InspectionIssueStatsService = {
         date: true,
         defectCategoryId: true,
         defectSubcategoryId: true,
+        defectSubtype: true,
+        defectType: true,
+        division: true,
         divisionId: true, // governance-allow-direct-name-id
         isClaim: true,
         lossAmount: true,
         projectId: true, // governance-allow-direct-name-id
+        projectName: true,
         quantity: true,
+        responsibleDepartment: true,
         responsibleDepartmentId: true, // governance-allow-direct-name-id
         severity: true,
         status: true,
         supplierId: true, // governance-allow-direct-name-id
+        supplierName: true,
       },
     });
 
@@ -223,11 +234,19 @@ export const InspectionIssueStatsService = {
       params.dimension === 'defectType' || params.dimension === 'defectSubtype';
     const aggregateMap = new Map<
       string,
-      { id: null | string; name: string; value: number }
+      {
+        identity: InspectionIssueStatisticsIdentity | null;
+        name: string;
+        value: number;
+      }
     >();
     for (const row of rows) {
       let canonicalId: null | string = null;
       let name = '未分类';
+      const identity = resolveInspectionIssueStatisticsIdentity(
+        params.dimension,
+        row,
+      );
       switch (params.dimension) {
         case 'claim': {
           name = row.isClaim ? 'Yes' : 'No';
@@ -280,18 +299,24 @@ export const InspectionIssueStatsService = {
       const normalizedId = String(canonicalId || '').trim() || null;
       let key = `value:${name}`;
       if (controlledConfigKey || classificationDimension) {
-        key = normalizedId ? `id:${normalizedId}` : 'missing:';
+        if (identity) {
+          key = getInspectionIssueStatisticsIdentityKey(identity);
+        } else {
+          key = normalizedId
+            ? `id:${normalizedId}`
+            : 'missing:MISSING_REQUIRED:';
+        }
       }
       const current = aggregateMap.get(key);
       aggregateMap.set(key, {
-        id: normalizedId,
+        identity,
         name,
         value: (current?.value || 0) + value,
       });
     }
 
     const aggregateRows = [...aggregateMap.values()];
-    const canonicalIds = aggregateRows.map((item) => item.id);
+    const canonicalIds = aggregateRows.map((item) => item.identity?.id || null);
     let canonicalNames = new Map<string, null | string>();
     if (params.dimension === 'defectType') {
       canonicalNames =
@@ -318,8 +343,13 @@ export const InspectionIssueStatsService = {
         const value = Math.round(item.value * 100) / 100;
         return controlledConfigKey || classificationDimension
           ? createIdentityAggregateItem({
-              canonicalName: item.id ? canonicalNames.get(item.id) : null,
-              id: item.id,
+              canonicalName: item.identity?.id
+                ? canonicalNames.get(item.identity.id)
+                : null,
+              id: item.identity?.id,
+              missingName: item.identity?.missingName,
+              rawName: item.identity?.rawName,
+              resolutionReason: item.identity?.resolutionReason,
               value,
             })
           : createResolvedAggregateItem({
