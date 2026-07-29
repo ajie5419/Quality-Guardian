@@ -25,6 +25,14 @@
 
 ## 执行记录
 
+## [0.20.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.2...qgs-v0.20.3) (2026-07-29)
+
+
+### Bug Fixes
+
+* isolate quality classification release bootstrap ([486e855](https://github.com/ajie5419/Quality-Guardian/commit/486e8551527402a28f4dfdf6b68c6e7605ecb44f))
+* **project:** isolate quality classification release bootstrap ([685ffd2](https://github.com/ajie5419/Quality-Guardian/commit/685ffd28ef824b374901a1d4f2ffddd99497c515))
+
 ### 2026-07-29 发布维护进程生命周期隔离修复
 
 **执行内容：**
