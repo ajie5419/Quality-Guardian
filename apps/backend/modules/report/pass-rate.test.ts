@@ -17,12 +17,16 @@ vi.mock('~/utils/prisma', () => ({
       aggregate: vi.fn(),
       findMany: vi.fn(),
     },
+    system_settings: {
+      findUnique: vi.fn(),
+    },
   },
 }));
 
 describe('pass-rate quantity rule', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.system_settings.findUnique as any).mockResolvedValue(null);
   });
 
   it('calculates pass rate only by quantity and unqualifiedQuantity', async () => {
@@ -66,21 +70,25 @@ describe('pass-rate quantity rule', () => {
       {
         category: 'PROCESS',
         incomingType: null,
+        processId: 'process-weld',
         processName: '焊接',
         qualifiedQuantity: 100,
         quantity: 100,
         result: 'PASS',
         team: '外协结构',
+        teamId: 'team-outsourcing-structure',
         unqualifiedQuantity: 0,
       },
       {
         category: 'INCOMING',
         incomingType: '外购件',
+        processId: null,
         processName: null,
         qualifiedQuantity: 200,
         quantity: 200,
         result: 'PASS',
         team: null,
+        teamId: null,
         unqualifiedQuantity: 0,
       },
     ]);
@@ -126,5 +134,43 @@ describe('pass-rate quantity rule', () => {
         }),
       ]),
     );
+  });
+
+  it('uses canonical identity bindings when process and team names change', async () => {
+    (prisma.system_settings.findUnique as any).mockResolvedValue({
+      value: JSON.stringify({
+        processIds: { 'process-paint': '外协涂装' },
+        teamIds: { 'team-assembly': '组装BU' },
+      }),
+    });
+    (prisma.inspections.findMany as any).mockResolvedValue([
+      {
+        category: 'PROCESS',
+        incomingType: null,
+        process: { name: 'Renamed Paint Process' },
+        processId: 'process-paint',
+        processName: 'Legacy Paint Process',
+        qualifiedQuantity: 10,
+        quantity: 10,
+        result: 'PASS',
+        team: 'Legacy Assembly Team',
+        teamId: 'team-assembly',
+        unqualifiedQuantity: 0,
+      },
+    ]);
+
+    const drillDown = await getPassRateDrillDownByRange(
+      new Date('2026-04-01'),
+      new Date('2026-04-30'),
+      () => 99.85,
+    );
+
+    expect(drillDown).toEqual([
+      expect.objectContaining({
+        passCount: 10,
+        process: '外协涂装',
+        totalCount: 10,
+      }),
+    ]);
   });
 });

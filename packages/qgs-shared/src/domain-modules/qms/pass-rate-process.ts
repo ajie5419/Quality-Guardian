@@ -13,6 +13,11 @@ export const PROCESS_PASS_RATE_TARGET_ORDER = [
 export type ProcessPassRateTargetKey =
   (typeof PROCESS_PASS_RATE_TARGET_ORDER)[number];
 
+export interface PassRateIdentityBindings {
+  processIds: Record<string, ProcessPassRateTargetKey>;
+  teamIds: Record<string, ProcessPassRateTargetKey>;
+}
+
 export const DEFAULT_PROCESS_PASS_RATE_TARGETS: Record<
   ProcessPassRateTargetKey,
   number
@@ -118,8 +123,41 @@ export function buildCanonicalProcessPassRateTargets(
   return canonicalTargets;
 }
 
-export function isProcessPassRateTargetKey(key: string) {
+export function isProcessPassRateTargetKey(
+  key: string,
+): key is ProcessPassRateTargetKey {
   return TARGET_KEY_SET.has(key);
+}
+
+function parseIdentityBindingMap(
+  raw: unknown,
+): Record<string, ProcessPassRateTargetKey> {
+  if (!raw || typeof raw !== 'object') return {};
+  const result: Record<string, ProcessPassRateTargetKey> = {};
+  for (const [id, bucket] of Object.entries(raw as Record<string, unknown>)) {
+    const normalizedId = id.trim();
+    if (
+      normalizedId &&
+      typeof bucket === 'string' &&
+      isProcessPassRateTargetKey(bucket)
+    ) {
+      result[normalizedId] = bucket;
+    }
+  }
+  return result;
+}
+
+export function parsePassRateIdentityBindings(
+  raw: unknown,
+): PassRateIdentityBindings {
+  if (!raw || typeof raw !== 'object') {
+    return { processIds: {}, teamIds: {} };
+  }
+  const input = raw as Record<string, unknown>;
+  return {
+    processIds: parseIdentityBindingMap(input.processIds),
+    teamIds: parseIdentityBindingMap(input.teamIds),
+  };
 }
 
 function normalizeProcessText(value: string) {
@@ -222,4 +260,35 @@ export function mapInspectionToPassRateBucket(input: {
   }
 
   return teamBucket;
+}
+
+/**
+ * Resolve report buckets from immutable master-data IDs. Name mapping remains
+ * only as a compatibility fallback until release maintenance binds legacy IDs.
+ */
+export function mapIdentityToPassRateBucket(
+  input: {
+    processId?: null | string;
+    processName: null | string;
+    team: null | string;
+    teamId?: null | string;
+  },
+  bindings: PassRateIdentityBindings,
+): ProcessPassRateTargetKey | undefined {
+  const processId = String(input.processId || '').trim();
+  const teamId = String(input.teamId || '').trim();
+  const processBucket = processId ? bindings.processIds[processId] : undefined;
+  const teamBucket = teamId ? bindings.teamIds[teamId] : undefined;
+
+  if (processBucket === '外协涂装') return processBucket;
+  if (
+    processBucket === '外协结构' &&
+    teamBucket !== '结构BU1' &&
+    teamBucket !== '结构BU2'
+  ) {
+    return processBucket;
+  }
+  if (teamBucket) return teamBucket;
+  if (processBucket) return processBucket;
+  return mapInspectionToPassRateBucket(input);
 }

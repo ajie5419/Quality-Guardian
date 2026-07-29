@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { mapInspectionToPassRateBucket } from './pass-rate-process';
+import {
+  mapIdentityToPassRateBucket,
+  mapInspectionToPassRateBucket,
+  parsePassRateIdentityBindings,
+} from './pass-rate-process';
 
 describe('pass-rate process bucket mapping', () => {
   it('maps spray and sand process to 外协涂装', () => {
@@ -67,5 +71,51 @@ describe('pass-rate process bucket mapping', () => {
         team: '模具 BU',
       }),
     ).toBe('模具 BU');
+  });
+
+  it('keeps identity bindings stable after names are changed', () => {
+    const bindings = parsePassRateIdentityBindings({
+      processIds: { 'process-paint': '外协涂装' },
+      teamIds: { 'team-assembly': '组装BU' },
+    });
+
+    expect(
+      mapIdentityToPassRateBucket(
+        {
+          processId: 'process-paint',
+          processName: 'Renamed Process',
+          team: 'Renamed Team',
+          teamId: 'team-assembly',
+        },
+        bindings,
+      ),
+    ).toBe('外协涂装');
+    expect(
+      mapIdentityToPassRateBucket(
+        {
+          processId: 'process-other',
+          processName: 'Renamed Process',
+          team: 'Renamed Team',
+          teamId: 'team-assembly',
+        },
+        bindings,
+      ),
+    ).toBe('组装BU');
+  });
+
+  it('drops invalid identity binding entries', () => {
+    expect(
+      parsePassRateIdentityBindings({
+        processIds: {
+          '': '外协结构',
+          'process-1': 'Unsupported',
+          'process-2': '外协机加',
+        },
+        teamIds: null,
+      }),
+    ).toEqual({
+      processIds: { 'process-2': '外协机加' },
+      teamIds: {},
+    });
   });
 });
