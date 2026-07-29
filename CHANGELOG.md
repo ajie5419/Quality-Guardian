@@ -25,6 +25,34 @@
 
 ## 执行记录
 
+### 2026-07-29 供应商评分发布维护竞态与任务放大修复
+
+**执行内容：**
+
+- 修正 `appleboy/ssh-action` 默认 10 分钟总命令上限，使外层 45 分钟执行包络覆盖 migration、维护、服务启动和健康检查的全部显式内层上限；各阶段失败门禁和回滚逻辑保持不变。
+- 删除 `supplier.module.ts` 加载时启动后台 Worker 的副作用，将在线消费者迁入 Nitro 运行时插件；发布维护脚本直接加载 reconciliation service，不再与在线消费者竞态抢占同一队列。
+- 将供应商评分任务从按事件行消费改为按 canonical supplier ID 合并领取；一次幂等快照重算成功后确认该供应商当前租约下的全部事件，避免重复事件和失败发布持续放大重算次数。
+- 增加覆盖任务数、重置任务数、批次完成数和剩余任务数结构化日志，发布清零门禁可观测。
+- 新增模块声明无副作用、同供应商事件合并领取和批量确认测试。
+
+**验证结果：**
+
+- Backend full suite：`244/244` 文件、`2281/2281` 测试通过。
+- 定向测试：`4/4` 文件、`12/12` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- 隔离维护入口验证：发布脚本只启动 reconciliation，不再并发启动在线 `SupplierScoreWorker`。
+
+**commits：**
+
+- `4089dd19` `fix: align deploy command timeout with release maintenance`
+- `48d3e76` `fix: isolate and coalesce supplier score workers`
+
+**遗留问题：**
+
+- `qgs-v0.20.2` 尚未完成生产发布；必须以 migration、release maintenance、供应商评分任务清零和健康检查全部通过作为完成条件。
+
 ## [0.20.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.0...qgs-v0.20.1) (2026-07-29)
 
 
