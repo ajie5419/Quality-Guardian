@@ -25,6 +25,37 @@
 
 ## 执行记录
 
+### 2026-07-29 历史统计兼容与 ID 写入契约加固
+
+**执行内容：**
+
+- 售后质量概览、不合格项统计和检验质量概览改为“canonical ID 优先、历史名称快照兜底”：同一 ID 的改名前后数据合并，无 ID 的旧数据按原始名称保留并标记待治理。
+- 项目风险、供应商排行、周报、日报和车辆故障率补齐历史身份兼容；已停用的车辆产品分类仍用于历史报表过滤，避免旧记录退出统计。
+- 售后旧记录允许只修改非分类字段；新建记录及分类变更继续要求完整父子分类 ID，名称快照只由服务端根据 ID 写入。
+- 主数据治理页只提供启用的父子分类；治理处置在同一事务内完成分类校验、条件更新和审计关闭，并在并发编辑发生时拒绝覆盖。
+- 核对质量损失统计已使用 ID 聚合和历史部门快照兜底，无需重复改造。
+- 未启动前端 dev/build 服务；未访问或修改生产环境。
+
+**验证结果：**
+
+- 全仓单元测试：`334/334` 文件、`2859/2859` 测试通过。
+- Backend full suite：`245/245` 文件、`2284/2284` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+
+**commits：**
+
+- `2cc39688` `fix(@qgs/backend): preserve legacy after-sales statistics`
+- `e46a4cdf` `fix(@qgs/backend): retain legacy inspection aggregates`
+- `9e45ceaf` `fix(@qgs/backend): preserve legacy report identities`
+- `0beb64f9` `fix(project): harden classification governance writes`
+- `71eead15` `fix(@qgs/backend): hydrate daily report identities`
+
+**遗留问题：**
+
+- 生产环境未访问、未修改；现有 unresolved 分类记录仍需管理员在系统设置的主数据治理页人工选择正确父子分类。
+
 ### 2026-07-29 统计身份重构与主数据治理闭环
 
 **执行内容：**
