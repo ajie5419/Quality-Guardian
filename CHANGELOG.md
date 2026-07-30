@@ -25,6 +25,15 @@
 
 ## 执行记录
 
+## [0.21.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.3...qgs-v0.21.0) (2026-07-30)
+
+
+### Features
+
+* add material approval workflow ([e7aed51](https://github.com/ajie5419/Quality-Guardian/commit/e7aed516ef537e0998cfa60439a6f46aea04cb1b))
+* **project:** add governed material input and bulk resolution ([2da4bb1](https://github.com/ajie5419/Quality-Guardian/commit/2da4bb12ebef07a6cb5b31fe5ad27350de73748a))
+* **project:** add governed material input and bulk resolution ([0dcf2f6](https://github.com/ajie5419/Quality-Guardian/commit/0dcf2f6c3a03ec5b853c2a9f05fcc31776c3900f))
+
 ### 2026-07-30 主数据治理页面中文化
 
 **执行内容：**
