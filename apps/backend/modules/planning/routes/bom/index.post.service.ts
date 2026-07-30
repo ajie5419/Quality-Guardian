@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3';
 
+import { PlanningBomService } from '~/modules/planning';
 import {
   buildProjectBomCreateData,
   mapProjectBomItem,
@@ -16,10 +17,7 @@ import {
   upsertPlanningProjectByWorkOrder,
 } from '~/modules/planning/planning-project';
 import { logApiError } from '~/utils/api-logger';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/governed-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 
@@ -80,16 +78,20 @@ export async function bom_index_post(event: H3Event) {
       'project_boms',
       newItemPayload,
     );
-    const canonicalBomPayload = await buildGovernedCanonicalWritePairForTable(
-      'project_boms',
-      { ...governedBomPayload, partId: body.partId },
-    );
     const newItem = await prisma.$transaction(async (tx) => {
+      const partIdentity = await PlanningBomService.resolvePartIdentityForWrite(
+        {
+          partId: body.partId,
+          partName: newItemPayload.part_name,
+        },
+        tx,
+      );
       const created = await tx.project_boms.create({
         data: {
           ...newItemPayload,
           ...governedBomPayload,
-          ...canonicalBomPayload,
+          partId: partIdentity.id,
+          part_name: partIdentity.name,
         },
         select: { id: true },
       });

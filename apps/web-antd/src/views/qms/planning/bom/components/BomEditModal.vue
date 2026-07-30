@@ -43,6 +43,7 @@ const requiredProcessSelectionTouched = ref(false);
 const formState = reactive<
   Partial<QmsPlanningApi.BomItem> & { workOrderNumber?: string }
 >({
+  partId: null,
   partName: '',
   partNumber: '',
   quantity: 1,
@@ -84,6 +85,7 @@ watch(
     if (val) {
       requiredProcessSelectionTouched.value = false;
       Object.assign(formState, {
+        partId: props.initialData.partId || null,
         partName: props.initialData.partName || '',
         partNumber: props.initialData.partNumber || '',
         quantity: props.initialData.quantity || 1,

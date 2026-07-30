@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const tx = {
   after_sales: {
     findFirst: vi.fn(),
+    findMany: vi.fn(),
     updateMany: vi.fn(),
   },
 };
@@ -26,15 +27,20 @@ vi.mock('~/modules/quality-classification', () => ({
 
 vi.mock('~/modules/supplier-identity', () => ({
   MasterDataResolutionAuditService: {
+    findMatchingOpenBatch: vi.fn(),
     get: vi.fn(),
-    resolve: vi.fn(),
+    resolveMany: vi.fn(),
   },
 }));
 
 describe('after-sales classification resolution service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    tx.after_sales.updateMany.mockResolvedValue({ count: 1 });
+    tx.after_sales.findMany.mockResolvedValue([
+      { id: 'after-sales-1' },
+      { id: 'after-sales-2' },
+    ]);
+    tx.after_sales.updateMany.mockResolvedValue({ count: 2 });
   });
 
   it('resolves a product classification without touching defect fields', async () => {
@@ -49,29 +55,49 @@ describe('after-sales classification resolution service', () => {
       entityType: 'after_sales',
       fieldName: 'productClassification',
       id: 'audit-1',
+      rawId: null,
+      rawName: 'On-board product/Vehicle OBU',
       status: 'OPEN',
     } as never);
+    vi.mocked(MasterDataResolutionAuditService.findMatchingOpenBatch)
+      .mockResolvedValueOnce([
+        { entityId: 'after-sales-1', id: 'audit-1' },
+        { entityId: 'after-sales-2', id: 'audit-2' },
+      ])
+      .mockResolvedValueOnce([]);
+    vi.mocked(MasterDataResolutionAuditService.resolveMany).mockResolvedValue({
+      count: 2,
+    });
     tx.after_sales.findFirst.mockResolvedValue({
       defectCategoryId: null,
       defectSubcategoryId: null,
       id: 'after-sales-1',
       productCategoryId: null,
       productSubcategoryId: null,
+      productSubtype: 'Vehicle OBU',
+      productType: 'On-board product',
     });
 
-    await AfterSalesClassificationResolutionService.resolve({
+    const result = await AfterSalesClassificationResolutionService.resolve({
       auditId: 'audit-1',
       categoryId: 'category-1',
       note: 'Confirmed',
       subcategoryId: 'subcategory-1',
     });
 
+    expect(result).toMatchObject({
+      affectedCount: 2,
+      resolvedAuditCount: 2,
+    });
+
     expect(tx.after_sales.updateMany).toHaveBeenCalledWith({
       where: {
-        id: 'after-sales-1',
+        id: { in: ['after-sales-1', 'after-sales-2'] },
         isDeleted: false,
         productCategoryId: null,
         productSubcategoryId: null,
+        productSubtype: 'Vehicle OBU',
+        productType: 'On-board product',
       },
       data: {
         productCategoryId: 'category-1',
@@ -80,9 +106,9 @@ describe('after-sales classification resolution service', () => {
         productType: 'On-board product',
       },
     });
-    expect(MasterDataResolutionAuditService.resolve).toHaveBeenCalledWith(
+    expect(MasterDataResolutionAuditService.resolveMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'audit-1',
+        ids: ['audit-1', 'audit-2'],
         resolvedId: 'subcategory-1',
       }),
       tx,
@@ -101,6 +127,8 @@ describe('after-sales classification resolution service', () => {
       entityType: 'after_sales',
       fieldName: 'productClassification',
       id: 'audit-1',
+      rawId: null,
+      rawName: 'On-board product/Vehicle OBU',
       status: 'OPEN',
     } as never);
     tx.after_sales.findFirst.mockResolvedValue({
@@ -109,7 +137,13 @@ describe('after-sales classification resolution service', () => {
       id: 'after-sales-1',
       productCategoryId: null,
       productSubcategoryId: null,
+      productSubtype: 'Vehicle OBU',
+      productType: 'On-board product',
     });
+    vi.mocked(
+      MasterDataResolutionAuditService.findMatchingOpenBatch,
+    ).mockResolvedValueOnce([{ entityId: 'after-sales-1', id: 'audit-1' }]);
+    tx.after_sales.findMany.mockResolvedValue([{ id: 'after-sales-1' }]);
     tx.after_sales.updateMany.mockResolvedValue({ count: 0 });
 
     await expect(
@@ -123,6 +157,6 @@ describe('after-sales classification resolution service', () => {
       code: 'MASTER_DATA_REFERENCE_CHANGED',
       httpStatus: 409,
     });
-    expect(MasterDataResolutionAuditService.resolve).not.toHaveBeenCalled();
+    expect(MasterDataResolutionAuditService.resolveMany).not.toHaveBeenCalled();
   });
 });

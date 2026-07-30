@@ -33,6 +33,7 @@ const props = defineProps<{
   checkResultOptions: Array<{ label: string; value: string }>;
   entryCopy: EntryCopy;
   isIncomingEntry: boolean;
+  partSearchLoading: boolean;
   processOptions: Array<{
     label: string;
     processName: string;
@@ -58,6 +59,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   attachmentChange: [info: UploadChangeParam<UploadFile>];
+  partSearch: [keyword: string];
   responsibleUnitSearch: [keyword: string];
   workOrderSearch: [keyword: string];
 }>();
@@ -72,7 +74,9 @@ const form = defineModel<{
   processName: string;
   quantity: number;
   reporter: string;
+  requestedPartName: string;
   requestInfo: string;
+  requestNewPart: boolean;
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection: null | StationSelection;
   supplierId: string;
@@ -145,6 +149,10 @@ function handlePartIdentityChange(
     option && typeof option === 'object' && 'partName' in option
       ? String((option as { partName?: unknown }).partName || '').trim()
       : '';
+  if (form.value.partId) {
+    form.value.requestedPartName = '';
+    form.value.requestNewPart = false;
+  }
 }
 
 function handleProcessIdentityChange(
@@ -211,17 +219,39 @@ function handleProcessIdentityChange(
     />
   </Form.Item>
   <Form.Item :label="props.entryCopy.partLabel" required>
-    <Select
-      :value="form.partId"
-      :options="props.bomPartOptions"
-      :loading="props.bomPartsLoading"
-      :disabled="!form.workOrderNumber"
-      class="w-full"
-      :placeholder="props.entryCopy.partPlaceholder"
-      show-search
-      allow-clear
-      @change="handlePartIdentityChange"
-    />
+    <template v-if="props.isIncomingEntry && form.requestNewPart">
+      <Input
+        v-model:value="form.requestedPartName"
+        class="w-full"
+        :maxlength="100"
+        placeholder="请输入申请物料名称"
+        allow-clear
+      />
+    </template>
+    <template v-else>
+      <Select
+        :value="form.partId"
+        :filter-option="props.isIncomingEntry ? false : undefined"
+        :options="props.bomPartOptions"
+        :loading="props.bomPartsLoading || props.partSearchLoading"
+        :disabled="!props.isIncomingEntry && !form.workOrderNumber"
+        class="w-full"
+        :placeholder="props.entryCopy.partPlaceholder"
+        show-search
+        allow-clear
+        @change="handlePartIdentityChange"
+        @search="
+          (value) => {
+            if (props.isIncomingEntry) emit('partSearch', value);
+          }
+        "
+      />
+      <div v-if="props.isIncomingEntry" class="mt-1">
+        <span class="text-xs text-gray-500">
+          优先推荐 BOM 物料，也可搜索全部已启用物料。
+        </span>
+      </div>
+    </template>
   </Form.Item>
   <Form.Item
     v-if="props.requiresComponentName"

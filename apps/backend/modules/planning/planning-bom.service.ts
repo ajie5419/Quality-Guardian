@@ -1,11 +1,24 @@
 import { Prisma } from '@prisma/client';
+import { PartMasterService } from '~/modules/part-master';
 import prisma from '~/utils/prisma';
+
+type PlanningBomClient = Pick<Prisma.TransactionClient, 'master_parts'>;
 
 function normalizeText(value: unknown) {
   return String(value ?? '').trim();
 }
 
 export const PlanningBomService = {
+  async resolvePartIdentityForWrite(
+    input: { partId?: null | string; partName: string },
+    db: PlanningBomClient = prisma,
+  ) {
+    return PartMasterService.resolveOrCreateActive(
+      { name: normalizeText(input.partName), partId: input.partId },
+      db,
+    );
+  },
+
   async findPartReference(params: {
     partId?: null | string;
     partName: string;

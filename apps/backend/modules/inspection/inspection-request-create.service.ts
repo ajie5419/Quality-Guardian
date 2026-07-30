@@ -2,12 +2,13 @@ import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { PartMasterService } from '~/modules/part-master';
 import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { SystemService } from '~/modules/system';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WxSubscribeMessageService } from '~/modules/user';
 import { BusinessError } from '~/utils/business-error';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
@@ -53,7 +54,11 @@ export const InspectionRequestCreateService = {
         'legacy inspection request identity contract used',
       );
     }
-    const payload = await buildCreateRequestPayload(body, identityContract);
+    const payload = await buildCreateRequestPayload(
+      body,
+      identityContract,
+      isPublic,
+    );
     await assertWorkOrdersExist(prisma, payload.workOrderNumbers);
 
     const created = await retryOnRequestNoConflict(() =>
@@ -69,8 +74,6 @@ export const InspectionRequestCreateService = {
             mutualCheckResult: normalizeInspectionRequestCheckResult(
               body.mutualCheckResult,
             ),
-            partId: payload.partId,
-            partName: payload.partName,
             processId: payload.processId,
             supplierId: payload.supplierId,
             teamId: payload.teamId,
@@ -88,6 +91,15 @@ export const InspectionRequestCreateService = {
             ),
             ...payload.governedFields,
             ...payload.governedCanonicalIds,
+            partId: payload.partId,
+            partName: payload.partName,
+            ...(payload.requestedPartName
+              ? {
+                  materialRequest: {
+                    create: { requestedName: payload.requestedPartName },
+                  },
+                }
+              : {}),
             workOrderNumber: payload.workOrderNumber,
             workOrders: {
               create: payload.workOrderNumbers.map(
@@ -102,6 +114,9 @@ export const InspectionRequestCreateService = {
             dispatcher: { select: { realName: true, username: true } },
             inspector: { select: { realName: true, username: true } },
             process: { select: { name: true } },
+            materialRequest: {
+              select: { requestedName: true, status: true },
+            },
             workOrders: inspectionRequestWorkOrdersInclude,
           },
         });
@@ -120,35 +135,18 @@ export const InspectionRequestCreateService = {
       await auditRequestCreate(event, userinfo, created);
     }
     publishInspectionRequestCreated(mapped);
-    void WxSubscribeMessageService.sendPendingDispatchCreated({
-      partName: mapped.partName,
-      reporter: mapped.reporter,
-      requestNo: mapped.requestNo,
-      workOrderNumber: mapped.workOrderNumber,
-    });
-    void notifyTelegramNewRequest(mapped);
+    if (!payload.requestedPartName) {
+      void WxSubscribeMessageService.sendPendingDispatchCreated({
+        partName: mapped.partName,
+        reporter: mapped.reporter,
+        requestNo: mapped.requestNo,
+        workOrderNumber: mapped.workOrderNumber,
+      });
+      void notifyTelegramNewRequest(mapped);
+    }
     return mapped;
   },
 };
-
-async function resolveV2CanonicalIdentity(
-  configKey: 'partName',
-  canonicalId: string,
-) {
-  const canonicalName =
-    await MasterDataGovernanceKernel.resolveCanonicalNameById({
-      canonicalId,
-      configKey,
-      fallbackName: null,
-    });
-  if (!canonicalName) {
-    throw new BusinessError(
-      'INVALID_CANONICAL_ID',
-      `${configKey} identity does not exist or is inactive`,
-    );
-  }
-  return canonicalName;
-}
 
 async function resolveV2ProcessIdentity(
   processId: string,
@@ -176,6 +174,7 @@ function normalizeV2Category(value: unknown): 'INCOMING' | 'PROCESS' {
 async function buildCreateRequestPayload(
   body: RequestBody,
   identityContract: 'V1' | 'V2',
+  _isPublic: boolean,
 ) {
   const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
   const workOrderNumber =
@@ -183,6 +182,9 @@ async function buildCreateRequestPayload(
     workOrderNumbers[0] ||
     '';
   const partId = normalizeInspectionRequestText(body.partId);
+  const requestedPartName = normalizeInspectionRequestText(
+    body.requestedPartName,
+  );
   const processId = normalizeInspectionRequestText(body.processId);
   const legacyPartName = normalizeInspectionRequestText(body.partName);
   const legacyProcessName = normalizeInspectionRequestText(body.processName);
@@ -194,13 +196,45 @@ async function buildCreateRequestPayload(
       ? 'INCOMING'
       : 'PROCESS';
   }
-  const [partName, processName] =
+  if (
+    identityContract === 'V2' &&
+    ((category === 'PROCESS' && (!partId || requestedPartName)) ||
+      (category === 'INCOMING' &&
+        Boolean(partId) === Boolean(requestedPartName)))
+  ) {
+    throw new BusinessError(
+      'INVALID_MATERIAL_IDENTITY',
+      'Process requests require partId; incoming requests require exactly one of partId or requestedPartName',
+      400,
+    );
+  }
+  if (identityContract === 'V2' && category === 'INCOMING') {
+    const freeInputEnabled =
+      await SystemService.isIncomingMaterialFreeInputEnabled();
+    if (
+      (freeInputEnabled && (!requestedPartName || partId)) ||
+      (!freeInputEnabled && (!partId || requestedPartName))
+    ) {
+      throw new BusinessError(
+        'MATERIAL_INPUT_MODE_MISMATCH',
+        freeInputEnabled
+          ? 'Incoming inspection requests require requestedPartName while free material input is enabled'
+          : 'Incoming inspection requests require partId while free material input is disabled',
+        400,
+      );
+    }
+  }
+  const [partIdentity, processName] =
     identityContract === 'V2'
       ? await Promise.all([
-          resolveV2CanonicalIdentity('partName', partId),
+          partId ? PartMasterService.assertActive(partId) : null,
           resolveV2ProcessIdentity(processId, category),
         ])
-      : [legacyPartName, legacyProcessName];
+      : [null, legacyProcessName];
+  const partName =
+    identityContract === 'V2'
+      ? partIdentity?.name || requestedPartName
+      : legacyPartName;
   const skipsComponentName =
     category === 'INCOMING' || isInspectionRequestAssemblyProcess(processName);
   const componentName = skipsComponentName
@@ -262,11 +296,12 @@ async function buildCreateRequestPayload(
   );
   if (
     identityContract === 'V2' &&
-    (!governedCanonicalIds.partId || !governedCanonicalIds.processId)
+    (!governedCanonicalIds.processId ||
+      (category === 'PROCESS' && !partIdentity))
   ) {
     throw new BusinessError(
       'INSPECTION_REQUEST_IDENTITY_REQUIRED',
-      'partId and processId must resolve to active canonical identities',
+      'Required identities must resolve to active canonical records',
     );
   }
 
@@ -276,12 +311,17 @@ async function buildCreateRequestPayload(
     componentName,
     governedCanonicalIds,
     governedFields,
-    partId: governedCanonicalIds.partId || null,
-    partName: governedCanonicalIds.partName || partName,
+    partId: requestedPartName
+      ? null
+      : partIdentity?.id || governedCanonicalIds.partId || null,
+    partName: requestedPartName
+      ? partName
+      : partIdentity?.name || governedCanonicalIds.partName || partName,
     processId: governedCanonicalIds.processId || null,
     processName: governedCanonicalIds.processName || processName,
     quantity,
     reporter,
+    requestedPartName: partIdentity ? '' : requestedPartName,
     stationSelection,
     supplierId: supplier?.id || null,
     teamId: teamIdentity?.id || null,

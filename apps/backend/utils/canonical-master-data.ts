@@ -5,6 +5,7 @@ import type {
 } from './master-data-fields';
 
 import { createId } from '@paralleldrive/cuid2';
+import { PartMasterService } from '~/modules/part-master';
 import prisma from '~/utils/prisma';
 
 import {
@@ -479,10 +480,10 @@ async function seedCanonicalByNames(
   names: string[],
 ) {
   let insertedRows = 0;
-  if (
-    canonical.table === 'master_projects' ||
-    canonical.table === 'master_parts'
-  ) {
+  if (canonical.table === 'master_parts') {
+    return PartMasterService.seedMissingNames(names);
+  }
+  if (canonical.table === 'master_projects') {
     const table = quoteIdentifier(canonical.table);
     const nameColumn = quoteIdentifier(canonical.nameColumn);
     for (const [sort, name] of names.entries()) {

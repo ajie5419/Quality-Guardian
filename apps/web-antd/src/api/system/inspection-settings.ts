@@ -1,10 +1,14 @@
-import { requestClient } from '#/api/request';
+import { publicRequestClient, requestClient } from '#/api/request';
 
 export namespace InspectionSettingsApi {
   export type ProcessCategory = 'INCOMING' | 'PROCESS';
 
   export interface ManualCreateSetting {
     enabled: boolean;
+  }
+
+  export interface IncomingMaterialInputSetting {
+    incomingMaterialFreeInputEnabled: boolean;
   }
 
   export interface ProcessItem {
@@ -15,6 +19,21 @@ export namespace InspectionSettingsApi {
     sort: number;
     status: number;
   }
+}
+
+export function getPublicIncomingMaterialInputSettingApi() {
+  return publicRequestClient.get<InspectionSettingsApi.IncomingMaterialInputSetting>(
+    '/qms/public/inspection/requests/settings',
+  );
+}
+
+export function updateIncomingMaterialInputSettingApi(data: {
+  enabled: boolean;
+}) {
+  return requestClient.post(
+    '/system/settings/incoming-material-free-input',
+    data,
+  );
 }
 
 /**

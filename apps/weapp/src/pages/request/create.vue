@@ -3,6 +3,8 @@ import { computed, reactive, ref } from 'vue';
 
 import {
   getBomParts,
+  getInspectionRequestSettings,
+  getPartOptions,
   getProcesses,
   getSuppliers,
   getTeams,
@@ -33,6 +35,11 @@ interface ProcessItem {
   processName: string;
 }
 
+interface PartOptionItem {
+  id: string;
+  name: string;
+}
+
 interface TeamItem {
   group: string;
   label: string;
@@ -56,6 +63,7 @@ interface FormState {
   team: string;
   teamId: string;
   reporter: string;
+  requestedPartName: string;
   selfCheckResult: string;
   supplierId: string;
   mutualCheckResult: string;
@@ -78,6 +86,7 @@ const form = reactive<FormState>({
   team: '',
   teamId: '',
   reporter: '',
+  requestedPartName: '',
   selfCheckResult: '',
   supplierId: '',
   mutualCheckResult: '',
@@ -101,6 +110,14 @@ const workOrderResults = ref<WorkOrderItem[]>([]);
 const showWorkOrderDropdown = ref(false);
 const searchingWorkOrder = ref(false);
 let searchTimer: null | ReturnType<typeof setTimeout> = null;
+const incomingPartKeyword = ref('');
+const canonicalPartList = ref<PartOptionItem[]>([]);
+const showPartDropdown = ref(false);
+const searchingPart = ref(false);
+const incomingMaterialFreeInputEnabled = ref(false);
+const requestNewPart = ref(false);
+let partSearchTimer: null | ReturnType<typeof setTimeout> = null;
+let partSearchSequence = 0;
 
 // Cascade data
 const processList = ref<ProcessItem[]>([]);
@@ -118,6 +135,19 @@ const mutualCheckIndex = ref(-1);
 const bomPartLabels = computed(() =>
   bomPartList.value.map((p) => `${p.partName} (${p.partNumber})`),
 );
+const incomingPartOptions = computed(() => {
+  const parts = new Map<string, PartOptionItem>();
+  for (const item of canonicalPartList.value) {
+    parts.set(item.id, item);
+  }
+  for (const item of bomPartList.value) {
+    const id = String(item.partId || '').trim();
+    if (id) {
+      parts.set(id, { id, name: `BOM · ${item.partName}` });
+    }
+  }
+  return [...parts.values()];
+});
 const processLabels = computed(() =>
   processList.value.map((item) => item.processName),
 );
@@ -147,8 +177,20 @@ onLoad(async () => {
   if (userStore.userInfo?.realName) {
     form.reporter = userStore.userInfo.realName;
   }
-  await loadTeams();
+  const [settings] = await Promise.all([
+    getInspectionRequestSettings(),
+    loadTeams(),
+  ]);
+  incomingMaterialFreeInputEnabled.value =
+    settings.code === 0 &&
+    settings.data?.incomingMaterialFreeInputEnabled === true;
+  syncMaterialInputMode();
 });
+
+function syncMaterialInputMode() {
+  requestNewPart.value =
+    form.category === 'INCOMING' && incomingMaterialFreeInputEnabled.value;
+}
 
 async function loadTeams() {
   const res = await getTeams();
@@ -221,6 +263,9 @@ async function selectWorkOrder(item: WorkOrderItem) {
   form.componentName = '';
   form.partName = '';
   form.partId = '';
+  form.requestedPartName = '';
+  incomingPartKeyword.value = '';
+  syncMaterialInputMode();
   form.supplierId = '';
   form.teamId = '';
   form.team = '';
@@ -254,12 +299,19 @@ function onProcessChange(e: { detail: { value: string } }) {
   form.componentName = '';
   form.partId = '';
   form.partName = '';
+  form.requestedPartName = '';
+  incomingPartKeyword.value = '';
+  syncMaterialInputMode();
   form.supplierId = '';
   form.teamId = '';
   form.team = '';
   teamIndex.value = -1;
   bomPartIndex.value = -1;
-  void (form.category === 'INCOMING' ? loadSuppliers() : loadTeams());
+  if (form.category === 'INCOMING') {
+    void loadSuppliers();
+  } else {
+    void loadTeams();
+  }
 }
 
 function onBomPartChange(e: { detail: { value: string } }) {
@@ -272,6 +324,51 @@ function onBomPartChange(e: { detail: { value: string } }) {
     form.partName = part.partName;
     errors.componentName = false;
   }
+}
+
+async function loadPartOptions(keyword = '') {
+  const sequence = ++partSearchSequence;
+  const normalizedKeyword = keyword.trim();
+  if (!normalizedKeyword) {
+    canonicalPartList.value = [];
+    showPartDropdown.value = incomingPartOptions.value.length > 0;
+    searchingPart.value = false;
+    return;
+  }
+  searchingPart.value = true;
+  try {
+    const res = await getPartOptions(normalizedKeyword);
+    if (form.category !== 'INCOMING' || sequence !== partSearchSequence) return;
+    canonicalPartList.value =
+      res.code === 0 && Array.isArray(res.data) ? res.data : [];
+    showPartDropdown.value = incomingPartOptions.value.length > 0;
+  } catch {
+    if (sequence !== partSearchSequence) return;
+    canonicalPartList.value = [];
+  } finally {
+    if (sequence === partSearchSequence) searchingPart.value = false;
+  }
+}
+
+function onIncomingPartInput(e: { detail: { value: string } }) {
+  const keyword = e.detail.value;
+  incomingPartKeyword.value = keyword;
+  form.partId = '';
+  form.partName = '';
+  errors.componentName = false;
+  if (partSearchTimer !== null) clearTimeout(partSearchTimer);
+  partSearchTimer = setTimeout(() => {
+    void loadPartOptions(keyword);
+  }, 350);
+}
+
+function selectIncomingPart(item: PartOptionItem) {
+  form.partId = item.id;
+  form.partName = item.name.replace(/^BOM · /, '');
+  form.requestedPartName = '';
+  incomingPartKeyword.value = form.partName;
+  showPartDropdown.value = false;
+  errors.componentName = false;
 }
 
 function onTeamChange(e: { detail: { value: string } }) {
@@ -298,6 +395,7 @@ function onMutualCheckChange(e: { detail: { value: string } }) {
 
 function dismissDropdown() {
   showWorkOrderDropdown.value = false;
+  showPartDropdown.value = false;
 }
 
 async function handleAddPhoto() {
@@ -345,7 +443,10 @@ function validate(): boolean {
   errors.workOrderNumber = !form.workOrderNumber;
   errors.processName = !form.category || !form.processId || !form.processName;
   errors.componentName =
-    !form.partId || (componentRequired.value && !form.componentName);
+    (isIncoming.value
+      ? !form.partId && !form.requestedPartName.trim()
+      : !form.partId) ||
+    (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
   errors.team = isIncoming.value ? !form.supplierId : !form.teamId;
   errors.attachments = form.attachments.length === 0;
@@ -371,11 +472,14 @@ async function handleSubmit() {
     const payload: Record<string, unknown> = {
       category: form.category,
       workOrderNumber: form.workOrderNumber,
-      partId: form.partId,
       processId: form.processId,
       reporter: form.reporter.trim(),
       attachments: form.attachments,
     };
+    if (form.partId) payload.partId = form.partId;
+    if (isIncoming.value && !form.partId) {
+      payload.requestedPartName = form.requestedPartName.trim();
+    }
     if (isIncoming.value) payload.supplierId = form.supplierId;
     else payload.teamId = form.teamId;
     if (form.quantity !== null) payload.quantity = form.quantity;
@@ -468,14 +572,56 @@ async function handleSubmit() {
           </picker>
         </view>
 
-        <!-- 部件名称 -->
+        <!-- Material identity -->
         <view class="form-item" :class="{ error: errors.componentName }">
           <view class="label-wrap">
-            <text v-if="componentRequired" class="required-star">*</text>
+            <text v-if="isIncoming || componentRequired" class="required-star">
+              *
+            </text>
             <text v-else class="label-spacer" />
-            <text class="label">部件名称</text>
+            <text class="label">
+              {{ isIncoming ? '物料名称' : '部件名称' }}
+            </text>
           </view>
+          <template v-if="isIncoming">
+            <view class="material-input-wrap">
+              <view v-if="requestNewPart" class="material-request-wrap">
+                <input
+                  v-model="form.requestedPartName"
+                  class="input"
+                  placeholder="请输入申请物料名称"
+                  placeholder-class="input-placeholder"
+                  @input="errors.componentName = false"
+                />
+              </view>
+              <view v-else class="search-wrap">
+                <input
+                  class="input"
+                  :value="incomingPartKeyword"
+                  placeholder="搜索 BOM 或已启用物料"
+                  placeholder-class="input-placeholder"
+                  @focus="showPartDropdown = incomingPartOptions.length > 0"
+                  @input="onIncomingPartInput"
+                  @tap.stop
+                />
+                <view v-if="searchingPart" class="search-loading">
+                  <text class="search-loading-text">搜索中...</text>
+                </view>
+                <view v-if="showPartDropdown" class="dropdown" @tap.stop>
+                  <view
+                    v-for="item in incomingPartOptions"
+                    :key="item.id"
+                    class="dropdown-item"
+                    @tap="selectIncomingPart(item)"
+                  >
+                    <text class="dropdown-item-title">{{ item.name }}</text>
+                  </view>
+                </view>
+              </view>
+            </view>
+          </template>
           <picker
+            v-else
             class="picker"
             mode="selector"
             :range="bomPartLabels"
@@ -784,6 +930,21 @@ async function handleSubmit() {
 .search-wrap {
   position: relative;
   flex: 1;
+}
+
+.material-request-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 12rpx 0;
+}
+
+.material-input-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12rpx 0;
 }
 
 .search-loading {

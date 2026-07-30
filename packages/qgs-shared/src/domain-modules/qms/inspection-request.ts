@@ -326,6 +326,10 @@ export interface InspectionRequestRecordLike {
   linkedIssueId?: null | string;
   linkedIssueNo?: null | string;
   linkedIssueStatus?: null | string;
+  materialRequest?: null | {
+    requestedName?: null | string;
+    status?: null | string;
+  };
   qualifiedQuantity?: null | number;
   qualityRecords?: unknown;
   stationSelection?: unknown;
@@ -340,13 +344,19 @@ export function mapInspectionRequestRecord<
 ): T & {
   attachments: InspectionRequestAttachment[];
   closeAttachments: InspectionRequestAttachment[];
+  dispatchBlockedReason:
+    | 'MATERIAL_APPROVAL_PENDING'
+    | 'MATERIAL_APPROVAL_REJECTED'
+    | null;
   dispatcherName: null | string;
   inspectionResult: string;
   inspectorName: null | string;
   linkedIssueId: null | string;
   linkedIssueNo: null | string;
   linkedIssueStatus: null | string;
+  materialApprovalStatus: 'APPROVED' | 'PENDING' | 'REJECTED' | null;
   qualifiedQuantity: null | number;
+  requestedPartName: null | string;
   stationSelection: NormalizedInspectionStationSelection | null;
   unqualifiedQuantity: null | number;
   workOrderNumbers: string[];
@@ -359,6 +369,9 @@ export function mapInspectionRequestRecord<
           !(item as { isDeleted?: unknown }).isDeleted,
       ) as InspectionRequestIssueLike | undefined)
     : undefined;
+  const materialApprovalStatus = normalizeMaterialApprovalStatus(
+    record.materialRequest?.status,
+  );
 
   return {
     ...record,
@@ -368,6 +381,9 @@ export function mapInspectionRequestRecord<
     ),
     dispatcherName:
       record.dispatcher?.realName || record.dispatcher?.username || null,
+    dispatchBlockedReason: resolveMaterialDispatchBlockedReason(
+      materialApprovalStatus,
+    ),
     inspectionResult:
       record.inspectionResult || record.inspection?.result || 'PASS',
     inspectorName:
@@ -375,8 +391,12 @@ export function mapInspectionRequestRecord<
     linkedIssueId: record.linkedIssueId || issue?.id || null,
     linkedIssueNo: record.linkedIssueNo || issue?.nonConformanceNumber || null,
     linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,
+    materialApprovalStatus,
     qualifiedQuantity:
       record.qualifiedQuantity ?? record.inspection?.qualifiedQuantity ?? null,
+    requestedPartName:
+      normalizeInspectionRequestText(record.materialRequest?.requestedName) ||
+      null,
     stationSelection: normalizeInspectionStationSelection(
       record.stationSelection,
       (record as { quantity?: unknown }).quantity,
@@ -388,6 +408,28 @@ export function mapInspectionRequestRecord<
       null,
     workOrderNumbers: normalizeInspectionRequestWorkOrderNumbers(record),
   };
+}
+
+function resolveMaterialDispatchBlockedReason(
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | null,
+) {
+  if (status === 'PENDING') return 'MATERIAL_APPROVAL_PENDING' as const;
+  if (status === 'REJECTED') return 'MATERIAL_APPROVAL_REJECTED' as const;
+  return null;
+}
+
+function normalizeMaterialApprovalStatus(
+  value: unknown,
+): 'APPROVED' | 'PENDING' | 'REJECTED' | null {
+  const normalized = normalizeInspectionRequestText(value).toUpperCase();
+  if (
+    normalized === 'APPROVED' ||
+    normalized === 'PENDING' ||
+    normalized === 'REJECTED'
+  ) {
+    return normalized;
+  }
+  return null;
 }
 
 function normalizeInspectionRequestWorkOrderNumbers(

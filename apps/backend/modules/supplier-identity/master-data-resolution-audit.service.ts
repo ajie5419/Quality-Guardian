@@ -10,6 +10,13 @@ type ResolutionAuditClient = Pick<
   'unresolved_master_data_refs'
 >;
 
+type MatchingReference = {
+  entityType: string;
+  fieldName: string;
+  rawId: null | string;
+  rawName: null | string;
+};
+
 function normalizeValue(value: unknown) {
   return String(value || '').trim();
 }
@@ -82,5 +89,49 @@ export const MasterDataResolutionAuditService = {
         409,
       );
     }
+  },
+
+  async findMatchingOpenBatch(
+    params: MatchingReference & { afterId?: string; take: number },
+    client: ResolutionAuditClient = prisma,
+  ) {
+    return client.unresolved_master_data_refs.findMany({
+      where: {
+        entityType: normalizeValue(params.entityType),
+        fieldName: normalizeValue(params.fieldName),
+        ...(params.afterId ? { id: { gt: params.afterId } } : {}),
+        isDeleted: false,
+        rawId: params.rawId,
+        rawName: params.rawName,
+        status: 'OPEN',
+      },
+      orderBy: { id: 'asc' },
+      select: { entityId: true, id: true },
+      take: Math.min(Math.max(params.take, 1), 500),
+    });
+  },
+
+  async resolveMany(
+    params: {
+      ids: string[];
+      note: string;
+      resolvedId: string;
+    },
+    client: ResolutionAuditClient = prisma,
+  ) {
+    if (params.ids.length === 0) return { count: 0 };
+    return client.unresolved_master_data_refs.updateMany({
+      where: {
+        id: { in: params.ids },
+        isDeleted: false,
+        status: 'OPEN',
+      },
+      data: {
+        resolutionNote: params.note.trim(),
+        resolvedAt: new Date(),
+        resolvedId: normalizeValue(params.resolvedId),
+        status: 'RESOLVED',
+      },
+    });
   },
 };

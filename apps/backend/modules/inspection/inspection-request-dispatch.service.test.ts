@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
+import { PartMasterService } from '~/modules/part-master';
 import { UserService, WxSubscribeMessageService } from '~/modules/user';
 import prisma from '~/utils/prisma';
 
@@ -26,6 +27,12 @@ vi.mock('~/modules/rbac/rbac.service', () => ({
     getUserPermissionCodes: vi
       .fn()
       .mockResolvedValue(['QMS:Inspection:Requests:Dispatch']),
+  },
+}));
+
+vi.mock('~/modules/part-master', () => ({
+  PartMasterService: {
+    assertActive: vi.fn(),
   },
 }));
 
@@ -59,11 +66,16 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       id: 'inspector-1',
       wxOpenId: 'openid-1',
     } as never);
+    vi.mocked(PartMasterService.assertActive).mockResolvedValue({
+      id: 'part-1',
+      name: 'Part A',
+    });
   });
 
   it('rejects dispatch when the request is already closed', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       id: 'req-1',
+      partId: 'part-1',
       status: 'CLOSED',
     } as never);
 
@@ -79,9 +91,88 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
+  it('rejects dispatch while material approval is pending', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      id: 'req-1',
+      materialRequest: { status: 'PENDING' },
+      partId: null,
+      status: 'SUBMITTED',
+    } as never);
+
+    await expect(
+      InspectionRequestDispatchService.dispatchRequest(
+        event,
+        'req-1',
+        { inspectorId: 'inspector-1' },
+        userinfo,
+      ),
+    ).rejects.toMatchObject({ code: 'MATERIAL_APPROVAL_PENDING' });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      code: 'MATERIAL_APPROVAL_REJECTED',
+      materialRequest: { status: 'REJECTED' },
+      partId: null,
+    },
+    {
+      code: 'MATERIAL_ID_REQUIRED',
+      materialRequest: null,
+      partId: null,
+    },
+  ])('rejects dispatch with $code', async (scenario) => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      id: 'req-1',
+      materialRequest: scenario.materialRequest,
+      partId: scenario.partId,
+      status: 'SUBMITTED',
+    } as never);
+
+    await expect(
+      InspectionRequestDispatchService.dispatchRequest(
+        event,
+        'req-1',
+        { inspectorId: 'inspector-1' },
+        userinfo,
+      ),
+    ).rejects.toMatchObject({ code: scenario.code });
+
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it.each(['inactive', 'soft-deleted'])(
+    'rejects dispatch when the material is %s',
+    async () => {
+      vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+        id: 'req-1',
+        materialRequest: null,
+        partId: 'part-1',
+        status: 'SUBMITTED',
+      } as never);
+      vi.mocked(PartMasterService.assertActive).mockRejectedValue(
+        new Error('The selected material is not active'),
+      );
+
+      await expect(
+        InspectionRequestDispatchService.dispatchRequest(
+          event,
+          'req-1',
+          { inspectorId: 'inspector-1' },
+          userinfo,
+        ),
+      ).rejects.toThrow('The selected material is not active');
+
+      expect(PartMasterService.assertActive).toHaveBeenCalledWith('part-1');
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects inside the transaction when a concurrent dispatch already won', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       id: 'req-1',
+      partId: 'part-1',
       work_order: { projectName: 'Project A' },
       status: 'SUBMITTED',
       requestNo: 'IR-1',
@@ -117,6 +208,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
   it('creates the dispatch record only after winning the conditional update', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       id: 'req-1',
+      partId: 'part-1',
       status: 'SUBMITTED',
       requestNo: 'IR-1',
       work_order: { projectName: 'Project A' },
@@ -150,6 +242,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       userinfo,
     );
 
+    expect(PartMasterService.assertActive).toHaveBeenCalledWith('part-1');
     expect(UserService.findEligibleInspector).toHaveBeenCalledWith(
       'inspector-1',
     );

@@ -35,6 +35,8 @@
   "inspectionSettings": {
     "title": "报检与检验设置",
     "recordSettings": "检验记录",
+    "requestSettings": "报检设置",
+    "incomingMaterialFreeInputLabel": "进货报检使用自由输入物料",
     "manualCreateLabel": "允许手动创建检验记录",
     "manualCreateDesc": "关闭后，用户将无法通过“新增”按钮手动创建进货、过程、发货检验记录；由报检任务关闭等流程自动生成的记录不受影响。",
     "processSettings": "报检工序",

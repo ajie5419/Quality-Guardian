@@ -32,6 +32,7 @@ export const inspectionRequestCreateBodySchema = z.object({
   processName: z.string().optional(),
   quantity: z.union([z.number(), z.string()]).optional(),
   reporter: z.string().optional(),
+  requestedPartName: z.string().trim().optional(),
   requestInfo: z.string().optional(),
   selfCheckResult: z.string().optional(),
   supplierId: z.string().trim().optional(),
@@ -48,11 +49,40 @@ export const inspectionRequestCreateBodySchema = z.object({
 });
 
 export const inspectionRequestCreateV2BodySchema =
-  inspectionRequestCreateBodySchema.extend({
-    category: z.enum(['INCOMING', 'PROCESS']),
-    partId: z.string().trim().min(1),
-    processId: z.string().trim().min(1),
-  });
+  inspectionRequestCreateBodySchema
+    .extend({
+      category: z.enum(['INCOMING', 'PROCESS']),
+      partId: z.string().trim().min(1).optional(),
+      processId: z.string().trim().min(1),
+      requestedPartName: z.string().trim().min(1).max(191).optional(),
+    })
+    .superRefine((body, context) => {
+      const hasPartId = Boolean(body.partId);
+      const hasRequestedName = Boolean(body.requestedPartName);
+      if (body.category === 'PROCESS' && !hasPartId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'partId is required for process inspection requests',
+          path: ['partId'],
+        });
+      }
+      if (body.category === 'PROCESS' && hasRequestedName) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'requestedPartName is only allowed for incoming inspection requests',
+          path: ['requestedPartName'],
+        });
+      }
+      if (body.category === 'INCOMING' && hasPartId === hasRequestedName) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'Incoming inspection requests require exactly one of partId or requestedPartName',
+          path: ['partId'],
+        });
+      }
+    });
 
 export type InspectionRequestCreateBody = z.infer<
   typeof inspectionRequestCreateBodySchema
@@ -116,11 +146,15 @@ export function validateInspectionRequestCreateV2Body(
   const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
   const attachments = normalizeInspectionRequestAttachments(body.attachments);
   const isIncoming = body.category === 'INCOMING';
+  const hasPartIdentity = isIncoming
+    ? Boolean(normalizeInspectionRequestText(body.partId)) !==
+      Boolean(normalizeInspectionRequestText(body.requestedPartName))
+    : Boolean(normalizeInspectionRequestText(body.partId));
   return {
     attachments,
     isValid:
       workOrderNumbers.length > 0 &&
-      Boolean(normalizeInspectionRequestText(body.partId)) &&
+      hasPartIdentity &&
       Boolean(normalizeInspectionRequestText(body.processId)) &&
       Boolean(normalizeInspectionRequestText(body.reporter)) &&
       Boolean(

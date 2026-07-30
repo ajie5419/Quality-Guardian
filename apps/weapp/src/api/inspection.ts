@@ -158,6 +158,21 @@ export function getBomParts(workOrderNumber: string) {
   });
 }
 
+export function getPartOptions(keyword: string) {
+  return request<Array<{ id: string; name: string }>>({
+    url: '/api/qms/public/inspection/requests/part-options',
+    method: 'GET',
+    data: { keyword },
+  });
+}
+
+export function getInspectionRequestSettings() {
+  return request<{ incomingMaterialFreeInputEnabled: boolean }>({
+    url: '/api/qms/public/inspection/requests/settings',
+    method: 'GET',
+  });
+}
+
 // Get team list
 export function getTeams(keyword?: string) {
   return request<Array<{ group: string; label: string; value: string }>>({

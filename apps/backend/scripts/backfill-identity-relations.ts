@@ -3,6 +3,7 @@ import process from 'node:process';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 import {
   backfillBomRequiredProcessIdentities,
@@ -68,6 +69,7 @@ async function run() {
     process.exitCode = 1;
   } finally {
     await prisma.$disconnect();
+    redis.disconnect();
   }
 }
 

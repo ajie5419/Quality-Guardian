@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { isIncomingInspectionRequestProcess } from '~/modules/inspection/inspection-request';
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
+import { PartMasterService } from '~/modules/part-master';
 import { ProcessMasterService } from '~/modules/process-master';
+import { SystemService } from '~/modules/system';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -13,6 +15,18 @@ vi.mock('~/utils/prisma', () => ({
 vi.mock('~/modules/process-master', () => ({
   ProcessMasterService: {
     assertInspectionRequestOption: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/part-master', () => ({
+  PartMasterService: {
+    assertActive: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/system', () => ({
+  SystemService: {
+    isIncomingMaterialFreeInputEnabled: vi.fn().mockResolvedValue(false),
   },
 }));
 
@@ -114,6 +128,10 @@ describe('inspectionRequestCreateService', () => {
       id: 'process-1',
       name: 'Canonical Process',
     });
+    vi.mocked(PartMasterService.assertActive).mockResolvedValue({
+      id: 'part-1',
+      name: 'Canonical Part',
+    });
   });
 
   it('rejects a V2 process that is hidden for the requested category', async () => {
@@ -208,6 +226,61 @@ describe('inspectionRequestCreateService', () => {
         }),
       }),
     );
+  });
+
+  it('creates a pending material application in the request transaction', async () => {
+    vi.mocked(
+      SystemService.isIncomingMaterialFreeInputEnabled,
+    ).mockResolvedValueOnce(true);
+    const { WxSubscribeMessageService } = await import('~/modules/user');
+    const { buildGovernedCanonicalWritePairForTable } = await import(
+      '~/utils/governed-write'
+    );
+    vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValueOnce({
+      processId: 'process-1',
+      processName: 'Incoming inspection',
+    });
+    const create = vi.fn().mockResolvedValue({
+      ...mockRequest,
+      materialRequest: {
+        requestedName: 'Unregistered bearing',
+        status: 'PENDING',
+      },
+      partName: 'Unregistered bearing',
+    });
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      null,
+      {
+        category: 'INCOMING',
+        processId: 'process-1',
+        reporter: 'Workshop',
+        requestedPartName: 'Unregistered bearing',
+        supplierId: 'supplier-1',
+        workOrderNumber: 'WO-001',
+      },
+      true,
+      'V2',
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          materialRequest: {
+            create: { requestedName: 'Unregistered bearing' },
+          },
+          partId: null,
+          partName: 'Unregistered bearing',
+        }),
+      }),
+    );
+    expect(
+      WxSubscribeMessageService.sendPendingDispatchCreated,
+    ).not.toHaveBeenCalled();
   });
 
   it.each([

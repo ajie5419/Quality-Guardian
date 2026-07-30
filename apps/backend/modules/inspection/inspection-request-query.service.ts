@@ -125,6 +125,9 @@ const requestQueryInclude = {
     },
   },
   inspector: { select: { realName: true, username: true } },
+  materialRequest: {
+    select: { requestedName: true, status: true },
+  },
   process: { select: { name: true } },
 };
 

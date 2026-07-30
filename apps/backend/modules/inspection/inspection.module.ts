@@ -63,13 +63,41 @@ export const inspectionModule: ModuleDeclaration = {
       ],
     },
     {
+      key: 'inspection-material-requests',
+      parentPath: '/qms/inspection',
+      path: '/qms/inspection/material-requests',
+      name: 'QMSInspectionMaterialRequests',
+      component: 'qms/inspection/material-requests/index',
+      authCode: 'QMS:Inspection:MaterialRequests:List',
+      order: 4,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:request-quote',
+        title: '物料申请',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Inspection:MaterialRequests:Approve',
+          name: 'QMSInspectionMaterialRequestsApprove',
+          order: 1,
+          title: '审核通过',
+        },
+        {
+          authCode: 'QMS:Inspection:MaterialRequests:Reject',
+          name: 'QMSInspectionMaterialRequestsReject',
+          order: 2,
+          title: '驳回',
+        },
+      ],
+    },
+    {
       key: 'inspection-issues',
       parentPath: '/qms/inspection',
       path: '/qms/inspection/issues',
       name: 'QMSInspectionIssues',
       component: 'qms/inspection/issues/index',
       authCode: INSPECTION_ISSUE_PERMISSION_CODES.LIST,
-      order: 4,
+      order: 5,
       type: 'menu',
       meta: {
         icon: 'carbon:warning-alt',
@@ -132,6 +160,16 @@ export const inspectionModule: ModuleDeclaration = {
     selfFields: ['inspector', 'lastEditor'],
   },
   audit: {
+    materialRequestApprove: {
+      action: 'UPDATE',
+      targetType: 'inspection_material_request',
+      detailsTemplate: '审核通过物料申请：{{requestNo}}',
+    },
+    materialRequestReject: {
+      action: 'UPDATE',
+      targetType: 'inspection_material_request',
+      detailsTemplate: '驳回物料申请：{{requestNo}}',
+    },
     requestCreate: {
       action: 'CREATE',
       targetType: 'inspection_request',

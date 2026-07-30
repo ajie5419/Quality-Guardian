@@ -30,6 +30,15 @@ import {
   resolveMasterDataReferenceApi,
 } from '#/api/system/master-data-governance';
 
+import {
+  getGovernanceEntityLabel,
+  getGovernanceFieldLabel,
+  getGovernanceReasonLabel,
+  getGovernanceStatusLabel,
+  governanceEntityOptions,
+  governanceFieldOptions,
+} from './governance-labels';
+
 type Reference = MasterDataGovernanceApi.Reference;
 type Scope = QualityClassificationScope;
 
@@ -64,13 +73,13 @@ const selectedCategory = computed(() =>
 );
 
 const columns = [
-  { dataIndex: 'status', key: 'status', title: 'Status', width: 110 },
-  { dataIndex: 'entityType', key: 'entityType', title: 'Entity', width: 150 },
-  { dataIndex: 'entityId', key: 'entityId', title: 'Record ID', width: 210 },
-  { dataIndex: 'fieldName', key: 'fieldName', title: 'Field', width: 190 },
-  { dataIndex: 'rawName', key: 'rawName', title: 'Original value' },
-  { dataIndex: 'reason', key: 'reason', title: 'Reason', width: 210 },
-  { key: 'actions', title: 'Actions', width: 110 },
+  { dataIndex: 'status', key: 'status', title: '状态', width: 110 },
+  { dataIndex: 'entityType', key: 'entityType', title: '业务类型', width: 150 },
+  { dataIndex: 'entityId', key: 'entityId', title: '记录编号', width: 210 },
+  { dataIndex: 'fieldName', key: 'fieldName', title: '治理字段', width: 190 },
+  { dataIndex: 'rawName', key: 'rawName', title: '原始值' },
+  { dataIndex: 'reason', key: 'reason', title: '待治理原因', width: 240 },
+  { key: 'actions', title: '操作', width: 110 },
 ];
 
 function classificationScope(record: Reference): null | Scope {
@@ -115,7 +124,7 @@ async function load() {
     items.value = result.items;
     total.value = result.total;
   } catch {
-    message.error('Failed to load master data references');
+    message.error('主数据治理记录加载失败');
   } finally {
     loading.value = false;
   }
@@ -134,7 +143,7 @@ async function openResolution(record: Reference) {
     categories.value = await getQualityClassificationOptionsApi(scope);
     modalOpen.value = true;
   } catch {
-    message.error('Failed to load classification options');
+    message.error('分类选项加载失败');
   }
 }
 
@@ -149,17 +158,19 @@ function handleCategoryChange() {
 
 async function saveResolution() {
   if (!current.value || !draft.categoryId || !draft.subcategoryId) {
-    message.warning('Select both classification levels');
+    message.warning('请选择一级和二级分类');
     return;
   }
   saving.value = true;
   try {
-    await resolveMasterDataReferenceApi(current.value.id, draft);
-    message.success('Reference resolved');
+    const result = await resolveMasterDataReferenceApi(current.value.id, draft);
+    message.success(
+      `已批量更新 ${result.affectedCount} 条业务记录，解决 ${result.resolvedAuditCount} 个治理项`,
+    );
     modalOpen.value = false;
     await load();
   } catch {
-    message.error('Failed to resolve reference');
+    message.error('治理项处置失败');
   } finally {
     saving.value = false;
   }
@@ -186,10 +197,10 @@ onMounted(load);
 </script>
 
 <template>
-  <Page title="Master Data Governance">
+  <Page title="主数据治理">
     <Alert
       class="mb-4"
-      message="Statistics keep unresolved records visible. Resolve supported classification references here after confirming the correct master data."
+      message="未解析数据会持续显示在业务统计中。请核对原始值后，在此关联正确的主数据。"
       show-icon
       type="info"
     />
@@ -198,9 +209,9 @@ onMounted(load);
       <Select
         v-model:value="query.status"
         :options="[
-          { label: 'Open', value: 'OPEN' },
-          { label: 'Resolved', value: 'RESOLVED' },
-          { label: 'Ignored', value: 'IGNORED' },
+          { label: '待处置', value: 'OPEN' },
+          { label: '已解决', value: 'RESOLVED' },
+          { label: '已忽略', value: 'IGNORED' },
         ]"
         style="width: 140px"
         @change="
@@ -208,22 +219,24 @@ onMounted(load);
           load();
         "
       />
-      <Input
+      <Select
         v-model:value="query.entityType"
+        :options="governanceEntityOptions"
         allow-clear
-        placeholder="Entity type"
+        placeholder="业务类型"
+        show-search
         style="width: 180px"
-        @press-enter="load"
       />
-      <Input
+      <Select
         v-model:value="query.fieldName"
+        :options="governanceFieldOptions"
         allow-clear
-        placeholder="Field name"
+        placeholder="治理字段"
+        show-search
         style="width: 190px"
-        @press-enter="load"
       />
-      <Button type="primary" @click="load">Search</Button>
-      <Button @click="resetFilters">Reset</Button>
+      <Button type="primary" @click="load">查询</Button>
+      <Button @click="resetFilters">重置</Button>
     </Space>
 
     <Table
@@ -251,10 +264,19 @@ onMounted(load);
                 : 'default'
           "
         >
-          {{ record.status }}
+          {{ getGovernanceStatusLabel(record.status) }}
         </Tag>
+        <span v-else-if="column.key === 'entityType'">
+          {{ getGovernanceEntityLabel(record.entityType) }}
+        </span>
+        <span v-else-if="column.key === 'fieldName'">
+          {{ getGovernanceFieldLabel(record.fieldName) }}
+        </span>
         <span v-else-if="column.key === 'rawName'">
           {{ record.rawName || record.rawId || '—' }}
+        </span>
+        <span v-else-if="column.key === 'reason'">
+          {{ getGovernanceReasonLabel(record.reason) }}
         </span>
         <Button
           v-else-if="column.key === 'actions' && canResolveById(record.id)"
@@ -262,7 +284,7 @@ onMounted(load);
           type="link"
           @click="openResolutionById(record.id)"
         >
-          Resolve
+          处置
         </Button>
         <span v-else-if="column.key === 'actions'">—</span>
       </template>
@@ -271,17 +293,18 @@ onMounted(load);
     <Modal
       v-model:open="modalOpen"
       :confirm-loading="saving"
-      title="Resolve classification reference"
+      title="处置分类治理项"
       @ok="saveResolution"
     >
       <Alert
         class="mb-4"
-        :message="current?.rawName || current?.rawId || 'No original value'"
+        :message="current?.rawName || current?.rawId || '无原始值'"
+        description="确认后，系统会一次处置业务类型、治理字段和原始值都相同的全部记录。"
         show-icon
         type="warning"
       />
       <Form layout="vertical">
-        <Form.Item label="Primary classification" required>
+        <Form.Item label="一级分类" required>
           <Select
             v-model:value="draft.categoryId"
             :options="
@@ -293,7 +316,7 @@ onMounted(load);
             @change="handleCategoryChange"
           />
         </Form.Item>
-        <Form.Item label="Secondary classification" required>
+        <Form.Item label="二级分类" required>
           <Select
             v-model:value="draft.subcategoryId"
             :disabled="!draft.categoryId"
@@ -305,7 +328,7 @@ onMounted(load);
             "
           />
         </Form.Item>
-        <Form.Item label="Resolution note">
+        <Form.Item label="处置备注">
           <Input.TextArea v-model:value="draft.note" :rows="3" />
         </Form.Item>
       </Form>

@@ -19,6 +19,7 @@ import { inspectionModule } from '~/modules/inspection/inspection.module';
 import { knowledgeModule } from '~/modules/knowledge/knowledge.module';
 import { metricRefreshModule } from '~/modules/metric-refresh/metric-refresh.module';
 import { metrologyModule } from '~/modules/metrology/metrology.module';
+import { partMasterModule } from '~/modules/part-master/part-master.module';
 import { planningModule } from '~/modules/planning/planning.module';
 import { processMasterModule } from '~/modules/process-master/process-master.module';
 import { qualityClassificationModule } from '~/modules/quality-classification/quality-classification.module';
@@ -52,6 +53,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   knowledgeModule,
   metricRefreshModule,
   metrologyModule,
+  partMasterModule,
   planningModule,
   processMasterModule,
   qualityClassificationModule,
@@ -189,7 +191,7 @@ async function ensureButton(
   if (existing.parentId !== parentId) nextData.parentId = parentId;
   if (existing.type !== 'button') nextData.type = 'button';
   if (!existing.authCode) nextData.authCode = button.authCode;
-  if (!existing.meta) nextData.meta = meta;
+  if (existing.meta !== meta) nextData.meta = meta;
 
   if (Object.keys(nextData).length === 0) {
     return false;

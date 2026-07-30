@@ -111,6 +111,15 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 - 工序选项返回 `processes.id`；工序字典 `dictionaries.id` 与工序主数据不是同一 ID 空间。
 - Web 和微信小程序均使用 V2。V1 旧路由只返回 `410 INSPECTION_REQUEST_V2_REQUIRED`，不得再进入创建服务或接受 name-only 写入。
 
+### Incoming material request workflow
+
+- V2 `INCOMING` submissions use `partId` or `requestedPartName` exclusively according to the administrator-controlled incoming material input setting. `PROCESS` submissions always require an active canonical `partId`.
+- A submission with `requestedPartName` creates the inspection request and its `qms_inspection_material_requests` application in one transaction. The inspection request remains `SUBMITTED`, keeps the raw material snapshot, and has a null `partId`.
+- Pending applications are reviewed only in the authenticated back-office material request queue. Public request entry does not expose review status or review controls.
+- Approval uses either `LINK_EXISTING` or `CREATE`. Both operations go through `PartMasterService` in the same database transaction, then backfill the canonical `partId/partName` and mark the application `APPROVED`.
+- Dispatch always verifies that `partId` is present and no pending material application exists. Approval publishes the normal pending-dispatch notification only after the canonical identity has been committed.
+- Rejection records the reviewer remark, marks the application `REJECTED`, and cancels the linked inspection request. A rejected request cannot be dispatched.
+
 `inspections.partId/partName` 是检验记录的正式部件身份。`level1Component/level2Component/materialName` 是历史业务快照，不得再用于部件关联或聚合。回填优先继承关联报检的确定 ID；冲突、重名、无匹配进入 `unresolved_master_data_refs`，不猜测。回填只补 ID，已有历史名称快照不被覆盖。
 
 项目身份在发布维护中先执行空表限定的 canonical bootstrap，再对 `inspections` 和 `quality_records` 等报表及质量损失源表执行唯一精确回填。已存在项目主数据后不再从历史快照创建新身份；无法匹配的项目名称保留原值并进入 unresolved 审计。

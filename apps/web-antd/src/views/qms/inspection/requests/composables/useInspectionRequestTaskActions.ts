@@ -291,6 +291,10 @@ export function useInspectionRequestTaskActions(
       message.warning('无派单权限');
       return;
     }
+    if (record.dispatchBlockedReason) {
+      message.warning('Dispatch is unavailable');
+      return;
+    }
     currentRequest.value = record;
     dispatchForm.dispatchRemark = '';
     dispatchForm.inspectorId = record.inspectorId || '';
@@ -329,6 +333,10 @@ export function useInspectionRequestTaskActions(
     }
     if (!currentRequest.value || !dispatchForm.inspectorId) {
       message.warning('请选择检验员');
+      return;
+    }
+    if (currentRequest.value.dispatchBlockedReason) {
+      message.warning('Dispatch is unavailable');
       return;
     }
 

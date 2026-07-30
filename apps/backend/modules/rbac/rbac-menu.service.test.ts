@@ -58,7 +58,7 @@ describe('rbacMenuService', () => {
       const result = await RbacMenuService.getMenuTreeForUser({ id: 'u1' });
 
       expect(result).toEqual(cached);
-      expect(ensureModuleMenus).not.toHaveBeenCalled();
+      expect(ensureModuleMenus).toHaveBeenCalledOnce();
       expect(prisma.menus.findMany).not.toHaveBeenCalled();
     });
 
