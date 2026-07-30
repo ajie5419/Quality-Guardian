@@ -31,6 +31,7 @@ import { getProcessMasterOptionsApi } from '#/api/qms/process-master';
 import { getQualityClassificationOptionsApi } from '#/api/qms/quality-classification';
 import { getDeptList } from '#/api/system/dept';
 import {
+  getMasterDataReferenceOptionsApi,
   getMasterDataReferencesApi,
   resolveMasterDataReferenceApi,
 } from '#/api/system/master-data-governance';
@@ -69,7 +70,10 @@ const current = ref<null | Reference>(null);
 const categories = ref<QualityClassificationCategory[]>([]);
 const departments = ref<Dept[]>([]);
 const processes = ref<DictionaryOptionItem[]>([]);
+const identityOptions = ref<Array<{ label: string; value: string }>>([]);
+const identityMultiple = ref(false);
 const draft = reactive({
+  canonicalIds: [] as string[],
   categoryId: '',
   departmentId: '',
   note: '',
@@ -127,13 +131,39 @@ function isProcessReference(record: Reference) {
   );
 }
 
+const identityFields: Record<string, Set<string>> = {
+  inspections: new Set([
+    'incomingTypeId',
+    'materialNameId',
+    'partId',
+    'processId',
+    'projectId',
+    'supplierId',
+    'teamId',
+  ]),
+  project_boms: new Set(['partId', 'requiredProcessIds']),
+  supplier_identity_links: new Set(['supplierId']),
+  work_order_requirements: new Set([
+    'partId',
+    'processId',
+    'requirementId',
+    'responsibleTeamId',
+  ]),
+  work_orders: new Set(['customerNameId', 'divisionId', 'projectId']),
+};
+
+function isIdentityReference(record: Reference) {
+  return identityFields[record.entityType]?.has(record.fieldName) === true;
+}
+
 function canResolve(record: Reference) {
   return (
     canEdit.value &&
     record.status === 'OPEN' &&
     (classificationScope(record) !== null ||
       isDepartmentReference(record) ||
-      isProcessReference(record))
+      isProcessReference(record) ||
+      isIdentityReference(record))
   );
 }
 
@@ -155,10 +185,24 @@ async function load() {
   }
 }
 
+async function loadIdentityOptions(keyword = '') {
+  if (!current.value) return;
+  const result = await getMasterDataReferenceOptionsApi(
+    current.value.id,
+    keyword,
+  );
+  identityMultiple.value = result.multiple;
+  identityOptions.value = result.items.map((item) => ({
+    label: item.name,
+    value: item.id,
+  }));
+}
+
 async function openResolution(record: Reference) {
   const scope = classificationScope(record);
   current.value = record;
   Object.assign(draft, {
+    canonicalIds: [],
     categoryId: '',
     departmentId: '',
     note: '',
@@ -166,7 +210,9 @@ async function openResolution(record: Reference) {
     subcategoryId: '',
   });
   try {
-    if (scope) {
+    if (isIdentityReference(record)) {
+      await loadIdentityOptions();
+    } else if (scope) {
       categories.value = await getQualityClassificationOptionsApi(scope);
     } else if (isDepartmentReference(record)) {
       departments.value = await getDeptList();
@@ -194,6 +240,11 @@ async function saveResolution() {
   if (!current.value) return;
   const departmentReference = isDepartmentReference(current.value);
   const processReference = isProcessReference(current.value);
+  const identityReference = isIdentityReference(current.value);
+  if (identityReference && draft.canonicalIds.length === 0) {
+    message.warning('请选择规范主数据');
+    return;
+  }
   if (departmentReference && !draft.departmentId) {
     message.warning('请选择规范责任部门');
     return;
@@ -203,6 +254,7 @@ async function saveResolution() {
     return;
   }
   if (
+    !identityReference &&
     !departmentReference &&
     !processReference &&
     (!draft.categoryId || !draft.subcategoryId)
@@ -211,7 +263,13 @@ async function saveResolution() {
     return;
   }
   let resolution: Parameters<typeof resolveMasterDataReferenceApi>[1];
-  if (departmentReference) {
+  if (identityReference) {
+    resolution = {
+      canonicalIds: draft.canonicalIds,
+      note: draft.note,
+      resolutionType: 'IDENTITY',
+    };
+  } else if (departmentReference) {
     resolution = {
       departmentId: draft.departmentId,
       note: draft.note,
@@ -371,7 +429,9 @@ onMounted(load);
           ? '处置责任部门治理项'
           : current && isProcessReference(current)
             ? '处置报检工序治理项'
-            : '处置分类治理项'
+            : current && isIdentityReference(current)
+              ? `处置${getGovernanceFieldLabel(current.fieldName)}治理项`
+              : '处置分类治理项'
       "
       @ok="saveResolution"
     >
@@ -384,7 +444,34 @@ onMounted(load);
       />
       <Form layout="vertical">
         <Form.Item
-          v-if="current && isDepartmentReference(current)"
+          v-if="current && isIdentityReference(current)"
+          :label="`规范${getGovernanceFieldLabel(current.fieldName)}`"
+          required
+        >
+          <Select
+            :value="
+              identityMultiple ? draft.canonicalIds : draft.canonicalIds[0]
+            "
+            :mode="identityMultiple ? 'multiple' : undefined"
+            :options="identityOptions"
+            allow-clear
+            :filter-option="false"
+            option-filter-prop="label"
+            show-search
+            @search="loadIdentityOptions"
+            @change="
+              (value) => {
+                draft.canonicalIds = Array.isArray(value)
+                  ? value.map((item) => String(item))
+                  : value
+                    ? [String(value)]
+                    : [];
+              }
+            "
+          />
+        </Form.Item>
+        <Form.Item
+          v-else-if="current && isDepartmentReference(current)"
           label="规范责任部门"
           required
         >
@@ -431,7 +518,9 @@ onMounted(load);
         <Form.Item
           v-if="
             !current ||
-            (!isDepartmentReference(current) && !isProcessReference(current))
+            (!isIdentityReference(current) &&
+              !isDepartmentReference(current) &&
+              !isProcessReference(current))
           "
           label="二级分类"
           required

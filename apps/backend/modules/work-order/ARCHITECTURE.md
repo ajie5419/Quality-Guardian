@@ -13,6 +13,10 @@ work-order 负责工单主数据、工单要求、聚合看板和进度查询。
 
 Historical requirements keep their original `processName` snapshots. Ordered release maintenance bootstraps an empty process identity space once, then fills only null `processId` values with compare-and-set updates. Existing IDs and names are never overwritten; missing or ambiguous matches are written to `unresolved_master_data_refs`.
 
+## Governance resolution
+
+Open governance audits for work order project, division, and customer identities and requirement process, part, requirement-name, and responsible-TEAM identities can be resolved online. Resolution validates the selected canonical identity through its owning service, applies the same raw ID/name mapping in bounded batches, and uses compare-and-set updates. The canonical ID is repaired while the historical name snapshot remains unchanged. Only audits whose source records were actually updated are closed; deleted or concurrently changed records remain open.
+
 ## 聚合身份契约
 
 - 要求和检验只在 `partId + processId` 同时相等时匹配。

@@ -4,6 +4,7 @@ export {
   MASTER_DATA_GOVERNANCE_LIST_PERMISSION,
 } from './master-data-governance-access';
 export {
+  masterDataGovernanceOptionsQuerySchema,
   masterDataGovernanceQuerySchema,
   masterDataGovernanceResolutionSchema,
 } from './master-data-governance.schema';

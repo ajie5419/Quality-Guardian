@@ -875,6 +875,34 @@ export const __masterDataGovernanceTestHooks = {
 };
 
 export const MasterDataGovernanceKernel = {
+  async listCanonicalOptions(options: {
+    configKey: string;
+    keyword?: string;
+    take?: number;
+  }) {
+    const field = getFieldOrThrow(options.configKey);
+    if (!field.canonical) return [];
+    const canonical = field.canonical;
+    const table = quoteIdentifier(canonical.table);
+    const idColumn = quoteIdentifier(canonical.idColumn);
+    const nameColumn = quoteIdentifier(canonical.nameColumn);
+    const keyword = normalizeValue(options.keyword);
+    const activeWhere = canonical.activeWhere
+      ? ` AND ${qualifyActiveWhereClause(canonical.activeWhere, '')}`
+      : '';
+    const take = Math.min(Math.max(options.take || 100, 1), 100);
+    return prisma.$queryRawUnsafe<Array<{ id: string; name: string }>>(
+      `SELECT ${idColumn} AS id, ${nameColumn} AS name
+       FROM ${table}
+       WHERE (? = '' OR ${nameColumn} LIKE ?)${activeWhere}
+       ORDER BY ${nameColumn} ASC, ${idColumn} ASC
+       LIMIT ?`,
+      keyword,
+      `%${keyword}%`,
+      take,
+    );
+  },
+
   isConfigKey(configKey: string) {
     return Boolean(getMasterDataGovernanceField(configKey));
   },

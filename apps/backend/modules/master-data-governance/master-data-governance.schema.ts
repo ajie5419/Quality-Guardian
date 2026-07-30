@@ -12,6 +12,11 @@ export const masterDataGovernanceResolutionSchema = z.discriminatedUnion(
   'resolutionType',
   [
     z.object({
+      canonicalIds: z.array(z.string().trim().min(1)).min(1).max(100),
+      note: z.string().trim().max(1000).default(''),
+      resolutionType: z.literal('IDENTITY'),
+    }),
+    z.object({
       categoryId: z.string().trim().min(1),
       note: z.string().trim().max(1000).default(''),
       resolutionType: z.literal('CLASSIFICATION'),
@@ -29,3 +34,7 @@ export const masterDataGovernanceResolutionSchema = z.discriminatedUnion(
     }),
   ],
 );
+
+export const masterDataGovernanceOptionsQuerySchema = z.object({
+  keyword: z.string().trim().max(100).default(''),
+});
