@@ -22,6 +22,12 @@ vi.mock('ant-design-vue', async () => {
     { TextArea: SlotComponent },
   );
   return {
+    Button: defineComponent({
+      inheritAttrs: false,
+      setup(_, { attrs, slots }) {
+        return () => h('button', attrs, slots.default?.());
+      },
+    }),
     Form: Object.assign(SlotComponent, { Item: SlotComponent }),
     Input: InputComponent,
     InputNumber: InputComponent,
@@ -58,6 +64,8 @@ function createForm() {
     processName: '',
     quantity: 1,
     reporter: '',
+    requestedPartName: '',
+    requestNewPart: false,
     requestInfo: '',
     selfCheckResult: 'PASS' as const,
     stationSelection: null,
@@ -89,6 +97,7 @@ function mountFields(isIncomingEntry: boolean) {
       },
       form,
       isIncomingEntry,
+      partSearchLoading: false,
       processOptions: [],
       requiresComponentName: false,
       requiresStationSelection: false,
@@ -142,5 +151,24 @@ describe('inspection request entry responsible unit identity', () => {
       team: 'Assembly Team',
       teamId: 'team-1',
     });
+  });
+});
+
+describe('inspection request entry material identity', () => {
+  it('allows incoming inspection to request a material without a canonical ID', async () => {
+    const { form, wrapper } = mountFields(true);
+    const button = wrapper
+      .findAll('button')
+      .find((item) => item.text() === 'Request new material');
+
+    expect(button).toBeDefined();
+    await button?.trigger('click');
+
+    expect(form).toMatchObject({
+      partId: '',
+      partName: '',
+      requestNewPart: true,
+    });
+    expect(wrapper.text()).toContain('Select existing material');
   });
 });

@@ -124,6 +124,7 @@ const {
   statusOptions,
   visibleInspectorStatus,
   checkResultLabel,
+  canShowDispatchAction,
   directClosedClass,
   displayDispatcher,
   displayDispatchTime,
@@ -156,6 +157,7 @@ const {
 const listCardProps = computed(() => ({
   canDelete: canDelete.value,
   canDispatch: canDispatch.value,
+  canShowDispatchAction,
   checkResultLabel,
   directClosedClass,
   displayDispatchTime,

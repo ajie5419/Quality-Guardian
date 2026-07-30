@@ -171,6 +171,21 @@ export async function getPublicInspectionRequestBomParts(params: {
   );
 }
 
+export interface PublicInspectionRequestPartOption {
+  id: string;
+  name: string;
+}
+
+export async function getPublicInspectionRequestPartOptions(params: {
+  keyword: string;
+  take?: number;
+}) {
+  return publicRequestClient.get<PublicInspectionRequestPartOption[]>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_PART_OPTIONS,
+    { params },
+  );
+}
+
 export async function getPublicInspectionRequestTeams(params?: {
   keyword?: string;
 }) {
@@ -268,4 +283,57 @@ export async function closeInspectionRequest(
 
 export async function deleteInspectionRequest(id: string) {
   return requestClient.delete(`${QMS_API.INSPECTION_REQUESTS}/${id}`);
+}
+
+export type MaterialRequestStatus = 'APPROVED' | 'PENDING' | 'REJECTED';
+
+export interface InspectionMaterialRequest {
+  id: string;
+  inspectionRequestId: string;
+  requestNo: string;
+  requestedName: string;
+  reporter: string;
+  resolvedPartId?: null | string;
+  resolvedPartName?: null | string;
+  reviewRemark?: null | string;
+  reviewedAt?: null | string;
+  status: MaterialRequestStatus;
+  submittedAt: string;
+  supplierName?: null | string;
+  workOrderNumber: string;
+}
+
+export async function getInspectionMaterialRequests(params?: {
+  keyword?: string;
+  page?: number;
+  pageSize?: number;
+  status?: MaterialRequestStatus;
+}) {
+  const raw = await requestClient.get<{
+    items: InspectionMaterialRequest[];
+    total: number;
+  }>(QMS_API.INSPECTION_MATERIAL_REQUESTS, { params });
+  return normalizeListResponse<InspectionMaterialRequest>(raw);
+}
+
+export async function approveInspectionMaterialRequest(
+  id: string,
+  data:
+    | { mode: 'CREATE'; name?: string; remark?: string }
+    | { mode: 'LINK_EXISTING'; partId: string; remark?: string },
+) {
+  return requestClient.post<InspectionRequest>(
+    `${QMS_API.INSPECTION_MATERIAL_REQUESTS}/${id}/approve`,
+    data,
+  );
+}
+
+export async function rejectInspectionMaterialRequest(
+  id: string,
+  data: { remark: string },
+) {
+  return requestClient.post<{ id: string; status: 'REJECTED' }>(
+    `${QMS_API.INSPECTION_MATERIAL_REQUESTS}/${id}/reject`,
+    data,
+  );
 }

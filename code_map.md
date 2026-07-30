@@ -17,6 +17,7 @@
 - **knowledge/** — 质量知识库：文档分类与知识条目
 - **metric-refresh/** — 派生指标刷新任务与重试
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
+- **part-master/** — Canonical material master data management
 - **planning/** — 质量策划：BOM、DFMEA、ITP、项目文档管理
 - **process-master/** — 全局工序主数据与报检场景配置
 - **quality-classification/** — 质量分类树主数据维护

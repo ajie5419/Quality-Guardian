@@ -73,6 +73,8 @@ const userinfo = { id: 'admin-1', userId: 'admin-1', username: 'admin' } as any;
 function makeSubmittedRequest(overrides: Record<string, unknown> = {}) {
   return {
     id: 'req-1',
+    materialRequest: null,
+    partId: 'part-1',
     requestNo: 'IR-20260612-001',
     status: 'SUBMITTED',
     updatedAt: new Date('2026-06-12T08:00:00.000Z'),

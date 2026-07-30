@@ -238,6 +238,10 @@ export function useInspectionRequestPresentation(
   }
 
   function isDispatchable(record: InspectionRequest) {
+    return canShowDispatchAction(record) && !record.dispatchBlockedReason;
+  }
+
+  function canShowDispatchAction(record: InspectionRequest) {
     return record.status === 'SUBMITTED' || record.status === 'DISPATCHED';
   }
 
@@ -319,6 +323,7 @@ export function useInspectionRequestPresentation(
     visibleInspectorStatus,
     actionMenuKeys,
     checkResultLabel,
+    canShowDispatchAction,
     directClosedClass,
     displayDispatcher,
     displayDispatchTime,

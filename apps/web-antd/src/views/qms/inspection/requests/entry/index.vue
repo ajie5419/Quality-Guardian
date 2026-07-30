@@ -13,7 +13,6 @@ import { Form, message } from 'ant-design-vue';
 import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
 import {
   createPublicInspectionRequest,
-  getPublicInspectionRequestBomParts,
   getPublicInspectionRequestProcesses,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
@@ -36,10 +35,10 @@ import {
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
   isIncomingInspectionEntryPath,
-  mapInspectionRequestEntryBomPartOptions,
   mapInspectionRequestEntryWorkOrderOptions,
 } from './entry-mode';
 import { useInspectionRequestIdentityOptions } from './useInspectionRequestIdentityOptions';
+import { useInspectionRequestPartOptions } from './useInspectionRequestPartOptions';
 import { useInspectionRequestStationSelection } from './useInspectionRequestStationSelection';
 
 import './index.css';
@@ -50,10 +49,6 @@ const route = useRoute();
 const router = useRouter();
 const submitting = ref(false);
 const attachmentFileList = ref<UploadFile[]>([]);
-const bomPartsLoading = ref(false);
-const bomPartOptions = ref<
-  Array<{ label: string; partName: string; value: string }>
->([]);
 const workOrderLoading = ref(false);
 const workOrderOptions = ref<
   Array<{
@@ -86,6 +81,8 @@ const requestForm = reactive({
   processName: '',
   quantity: 1,
   reporter: '',
+  requestedPartName: '',
+  requestNewPart: false,
   requestInfo: '',
   selfCheckResult: 'PASS' as InspectionRequestCheckResult,
   stationSelection: null as null | {
@@ -102,6 +99,20 @@ const requestForm = reactive({
 const isIncomingEntry = computed(() =>
   isIncomingInspectionEntryPath(String(route.path || '')),
 );
+
+const {
+  bomPartOptions,
+  bomPartsLoading,
+  loadBomPartOptions,
+  partOptions,
+  partSearchLoading,
+  searchCanonicalPartOptions,
+} = useInspectionRequestPartOptions({
+  handleApiError,
+  isIncomingEntry,
+  requestForm,
+  showError: message.error,
+});
 
 const {
   clearResponsibleUnitIdentity,
@@ -144,6 +155,8 @@ function applyRoutePrefill() {
     ? INCOMING_INSPECTION_PROCESS_NAME
     : String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
+  requestForm.requestedPartName = '';
+  requestForm.requestNewPart = false;
   requestForm.team = String(route.query.team || '');
   clearResponsibleUnitIdentity();
 }
@@ -161,6 +174,8 @@ function resetRequestForm() {
     : '';
   requestForm.quantity = 1;
   requestForm.reporter = '';
+  requestForm.requestedPartName = '';
+  requestForm.requestNewPart = false;
   requestForm.requestInfo = '';
   requestForm.selfCheckResult = 'PASS';
   requestForm.mutualCheckResult = 'PASS';
@@ -221,40 +236,6 @@ async function handleBeforeUpload(file: File) {
   return compressImage(file);
 }
 
-async function loadBomPartOptions(workOrderNumber: string) {
-  const normalized = (workOrderNumber || '').trim();
-  if (!normalized) {
-    bomPartOptions.value = [];
-    requestForm.partId = '';
-    requestForm.partName = '';
-    return;
-  }
-
-  bomPartsLoading.value = true;
-  try {
-    const list = await getPublicInspectionRequestBomParts({
-      workOrderNumber: normalized,
-    });
-    if (requestForm.workOrderNumber.trim() !== normalized) return;
-
-    bomPartOptions.value = mapInspectionRequestEntryBomPartOptions(list || []);
-
-    if (
-      requestForm.partId &&
-      !bomPartOptions.value.some((item) => item.value === requestForm.partId)
-    ) {
-      requestForm.partId = '';
-      requestForm.partName = '';
-    }
-  } catch {
-    bomPartOptions.value = [];
-  } finally {
-    if (requestForm.workOrderNumber.trim() === normalized) {
-      bomPartsLoading.value = false;
-    }
-  }
-}
-
 async function loadWorkOrderProcessOptions(workOrderNumber: string) {
   const normalized = workOrderNumber.trim();
   if (!normalized) {
@@ -312,8 +293,9 @@ async function submitRequest() {
     !requestForm.workOrderNumber ||
     requestForm.workOrderNumbers.length === 0 ||
     (isIncomingEntry.value && !requestForm.incomingType) ||
-    !requestForm.partId ||
-    !requestForm.partName ||
+    (isIncomingEntry.value
+      ? !requestForm.partId && !requestForm.requestedPartName.trim()
+      : !requestForm.partId || !requestForm.partName) ||
     !requestForm.processId ||
     !requestForm.processName ||
     (requiresComponentName.value && !requestForm.componentName) ||
@@ -349,10 +331,14 @@ async function submitRequest() {
         ? requestForm.componentName
         : '',
       mutualCheckResult: requestForm.mutualCheckResult,
-      partId: requestForm.partId,
+      partId: requestForm.partId || undefined,
       processId: requestForm.processId,
       quantity: requestForm.quantity,
       reporter: requestForm.reporter,
+      requestedPartName:
+        isIncomingEntry.value && !requestForm.partId
+          ? requestForm.requestedPartName.trim()
+          : undefined,
       requestInfo: isIncomingEntry.value
         ? buildIncomingInspectionRequestInfo({
             incomingType: requestForm.incomingType,
@@ -394,12 +380,17 @@ watch(
 );
 
 watch(
+  () => requestForm.workOrderNumbers.join('\0'),
+  () => {
+    void loadBomPartOptions(requestForm.workOrderNumbers);
+  },
+  { immediate: true },
+);
+
+watch(
   () => requestForm.workOrderNumber,
   (workOrderNumber) => {
-    void Promise.all([
-      loadBomPartOptions(workOrderNumber),
-      loadWorkOrderProcessOptions(workOrderNumber),
-    ]);
+    void loadWorkOrderProcessOptions(workOrderNumber);
   },
   { immediate: true },
 );
@@ -421,11 +412,12 @@ watch(
         v-model:attachment-file-list="attachmentFileList"
         :upload-action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"
         :before-upload="handleBeforeUpload"
-        :bom-part-options="bomPartOptions"
+        :bom-part-options="isIncomingEntry ? partOptions : bomPartOptions"
         :bom-parts-loading="bomPartsLoading"
         :check-result-options="inspectionRequestEntryCheckResultOptions"
         :entry-copy="entryCopy"
         :is-incoming-entry="isIncomingEntry"
+        :part-search-loading="partSearchLoading"
         :process-options="processOptions"
         :requires-component-name="requiresComponentName"
         :requires-station-selection="requiresStationSelection"
@@ -437,6 +429,7 @@ watch(
         :work-order-options="workOrderOptions"
         :work-order-processes-loading="workOrderProcessesLoading"
         @attachment-change="handleAttachmentUploadChange"
+        @part-search="searchCanonicalPartOptions"
         @responsible-unit-search="loadResponsibleUnitOptions"
         @work-order-search="loadWorkOrderOptions"
       />

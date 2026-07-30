@@ -15,6 +15,17 @@ export type InspectionRequestInspectionResult =
   | 'NA'
   | 'PASS';
 
+export type InspectionMaterialApprovalStatus =
+  | 'APPROVED'
+  | 'PENDING'
+  | 'REJECTED';
+
+export type InspectionMaterialResolutionMode = 'CREATE' | 'LINK_EXISTING';
+
+export type InspectionRequestDispatchBlockedReason =
+  | 'MATERIAL_APPROVAL_PENDING'
+  | 'MATERIAL_APPROVAL_REJECTED';
+
 export type InspectionStationSelectionMode = 'ALL' | 'PARTIAL';
 
 export interface InspectionRequestAttachment {
@@ -44,6 +55,7 @@ export interface InspectionRequest {
   closeRemark?: null | string;
   componentName?: null | string;
   createdAt: string;
+  dispatchBlockedReason?: InspectionRequestDispatchBlockedReason | null;
   dispatchedAt?: null | string;
   dispatcherId?: null | string;
   dispatcherName?: null | string;
@@ -58,6 +70,7 @@ export interface InspectionRequest {
   linkedIssueId?: null | string;
   linkedIssueNo?: null | string;
   linkedIssueStatus?: null | string;
+  materialApprovalStatus?: InspectionMaterialApprovalStatus | null;
   mutualCheckResult: InspectionRequestCheckResult;
   partId?: null | string;
   partName: string;
@@ -67,6 +80,7 @@ export interface InspectionRequest {
   qualifiedQuantity?: null | number;
   quantity: number;
   reporter: string;
+  requestedPartName?: null | string;
   requestInfo?: null | string;
   requestNo: string;
   selfCheckResult: InspectionRequestCheckResult;
@@ -87,10 +101,11 @@ export interface CreateInspectionRequestParams {
   category: 'INCOMING' | 'PROCESS';
   componentName?: string;
   mutualCheckResult?: InspectionRequestCheckResult;
-  partId: string;
+  partId?: string;
   processId: string;
   quantity: number;
   reporter: string;
+  requestedPartName?: string;
   requestInfo?: string;
   selfCheckResult?: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection;
@@ -99,6 +114,33 @@ export interface CreateInspectionRequestParams {
   teamId?: string;
   workOrderNumber: string;
   workOrderNumbers?: string[];
+}
+
+export interface InspectionMaterialRequestListItem {
+  id: string;
+  inspectionRequestId: string;
+  reporter: string;
+  requestedName: string;
+  requestNo: string;
+  resolvedPartId: null | string;
+  resolvedPartName?: null | string;
+  reviewedAt: null | string;
+  reviewRemark: null | string;
+  status: InspectionMaterialApprovalStatus;
+  submittedAt: string;
+  supplierName: null | string;
+  workOrderNumber: string;
+}
+
+export interface ApproveInspectionMaterialRequestParams {
+  mode: InspectionMaterialResolutionMode;
+  name?: string;
+  partId?: string;
+  remark?: string;
+}
+
+export interface RejectInspectionMaterialRequestParams {
+  remark: string;
 }
 
 export interface DispatchInspectionRequestParams {

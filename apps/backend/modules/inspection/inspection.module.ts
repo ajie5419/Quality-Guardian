@@ -63,13 +63,41 @@ export const inspectionModule: ModuleDeclaration = {
       ],
     },
     {
+      key: 'inspection-material-requests',
+      parentPath: '/qms/inspection',
+      path: '/qms/inspection/material-requests',
+      name: 'QMSInspectionMaterialRequests',
+      component: 'qms/inspection/material-requests/index',
+      authCode: 'QMS:Inspection:MaterialRequests:List',
+      order: 4,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:request-quote',
+        title: 'Material Requests',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Inspection:MaterialRequests:Approve',
+          name: 'QMSInspectionMaterialRequestsApprove',
+          order: 1,
+          title: 'Approve',
+        },
+        {
+          authCode: 'QMS:Inspection:MaterialRequests:Reject',
+          name: 'QMSInspectionMaterialRequestsReject',
+          order: 2,
+          title: 'Reject',
+        },
+      ],
+    },
+    {
       key: 'inspection-issues',
       parentPath: '/qms/inspection',
       path: '/qms/inspection/issues',
       name: 'QMSInspectionIssues',
       component: 'qms/inspection/issues/index',
       authCode: INSPECTION_ISSUE_PERMISSION_CODES.LIST,
-      order: 4,
+      order: 5,
       type: 'menu',
       meta: {
         icon: 'carbon:warning-alt',
@@ -132,6 +160,16 @@ export const inspectionModule: ModuleDeclaration = {
     selfFields: ['inspector', 'lastEditor'],
   },
   audit: {
+    materialRequestApprove: {
+      action: 'UPDATE',
+      targetType: 'inspection_material_request',
+      detailsTemplate: 'Approved material request: {{requestNo}}',
+    },
+    materialRequestReject: {
+      action: 'UPDATE',
+      targetType: 'inspection_material_request',
+      detailsTemplate: 'Rejected material request: {{requestNo}}',
+    },
     requestCreate: {
       action: 'CREATE',
       targetType: 'inspection_request',

@@ -5,12 +5,43 @@ import {
   formatInspectionStationSelection,
   INCOMING_INSPECTION_PROCESS_NAME,
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  mapInspectionRequestRecord,
   mergeInspectionProcessNames,
   normalizeInspectionIssueResponsibilityType,
   normalizeInspectionStationSelection,
   resolveInspectionIssueResponsibilityTypeFromDepartment,
   resolveInspectionRequestIssueResponsibility,
 } from './inspection-request';
+
+describe('mapInspectionRequestRecord', () => {
+  it('maps pending material approval without exposing internal review data', () => {
+    const mapped = mapInspectionRequestRecord({
+      materialRequest: {
+        requestedName: 'Unregistered bearing',
+        status: 'PENDING',
+      },
+      workOrderNumber: 'WO-001',
+    });
+
+    expect(mapped).toMatchObject({
+      dispatchBlockedReason: 'MATERIAL_APPROVAL_PENDING',
+      materialApprovalStatus: 'PENDING',
+      requestedPartName: 'Unregistered bearing',
+    });
+  });
+
+  it('clears dispatch blocking after material approval', () => {
+    const mapped = mapInspectionRequestRecord({
+      materialRequest: {
+        requestedName: 'Unregistered bearing',
+        status: 'APPROVED',
+      },
+    });
+
+    expect(mapped.dispatchBlockedReason).toBeNull();
+    expect(mapped.materialApprovalStatus).toBe('APPROVED');
+  });
+});
 
 describe('inspection process options', () => {
   it('preserves source order and removes duplicates', () => {

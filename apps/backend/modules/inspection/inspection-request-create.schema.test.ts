@@ -50,6 +50,34 @@ describe('inspection request create schema', () => {
     ).toThrow();
   });
 
+  it('accepts a public incoming request with a pending material name', () => {
+    const parsed = inspectionRequestCreateV2BodySchema.parse({
+      ...buildValidPayload(),
+      category: 'INCOMING',
+      componentName: undefined,
+      partId: undefined,
+      processId: 'incoming-process-1',
+      requestedPartName: 'Unregistered bearing',
+      supplierId: 'supplier-1',
+      teamId: undefined,
+    });
+
+    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  });
+
+  it('rejects an incoming request with both material identity forms', () => {
+    expect(() =>
+      inspectionRequestCreateV2BodySchema.parse({
+        ...buildValidPayload(),
+        category: 'INCOMING',
+        partId: 'part-1',
+        processId: 'incoming-process-1',
+        requestedPartName: 'Unregistered bearing',
+        supplierId: 'supplier-1',
+      }),
+    ).toThrow();
+  });
+
   it('accepts the current create payload shape', () => {
     const parsed = inspectionRequestCreateBodySchema.parse(buildValidPayload());
     const validation = validateInspectionRequestCreateBody(parsed);

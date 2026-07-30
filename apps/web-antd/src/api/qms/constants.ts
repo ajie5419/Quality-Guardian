@@ -28,6 +28,7 @@ export const QMS_API = {
   INSPECTION_RECORDS_BATCH_DELETE: '/qms/inspection/records/batch-delete',
   INSPECTION_REQUESTS: '/qms/inspection/requests',
   INSPECTION_REQUESTS_V2: '/qms/inspection/requests/v2',
+  INSPECTION_MATERIAL_REQUESTS: '/qms/inspection/material-requests',
   INSPECTION_REQUESTS_STATS: '/qms/inspection/requests/stats',
   PUBLIC_INSPECTION_REQUESTS: '/qms/public/inspection/requests',
   PUBLIC_INSPECTION_REQUESTS_V2: '/qms/public/inspection/requests/v2',
@@ -37,6 +38,8 @@ export const QMS_API = {
     '/qms/public/inspection/requests/process-dictionary-options',
   PUBLIC_INSPECTION_REQUEST_BOM_PARTS:
     '/qms/public/inspection/requests/bom-parts',
+  PUBLIC_INSPECTION_REQUEST_PART_OPTIONS:
+    '/qms/public/inspection/requests/part-options',
   PUBLIC_INSPECTION_REQUEST_SUPPLIERS:
     '/qms/public/inspection/requests/suppliers',
   PUBLIC_INSPECTION_REQUEST_TEAMS: '/qms/public/inspection/requests/teams',

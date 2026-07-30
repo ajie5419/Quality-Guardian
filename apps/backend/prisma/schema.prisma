@@ -1403,32 +1403,33 @@ model user_preferences {
 }
 
 model users {
-  id                                                String                    @id
-  username                                          String                    @unique
+  id                                                String                             @id
+  username                                          String                             @unique
   password                                          String
   email                                             String?
   realName                                          String?
   wechatWorkId                                      String?
-  wxOpenId                                          String?                   @unique
+  wxOpenId                                          String?                            @unique
   phone                                             String?
   roleId                                            String
   department                                        String
-  status                                            users_status              @default(ACTIVE)
+  status                                            users_status                       @default(ACTIVE)
   avatar                                            String?
-  isDeleted                                         Boolean                   @default(false)
-  createdAt                                         DateTime                  @default(now())
-  updatedAt                                         DateTime                  @updatedAt
-  version                                           Int                       @default(1)
+  isDeleted                                         Boolean                            @default(false)
+  createdAt                                         DateTime                           @default(now())
+  updatedAt                                         DateTime                           @updatedAt
+  version                                           Int                                @default(1)
   audit_logs                                        audit_logs[]
-  qms_inspection_requests_dispatcher                qms_inspection_requests[] @relation("qms_inspection_requests_dispatcherIdTousers")
-  qms_inspection_requests_inspector                 qms_inspection_requests[] @relation("qms_inspection_requests_inspectorIdTousers")
+  qms_inspection_requests_dispatcher                qms_inspection_requests[]          @relation("qms_inspection_requests_dispatcherIdTousers")
+  qms_inspection_requests_inspector                 qms_inspection_requests[]          @relation("qms_inspection_requests_inspectorIdTousers")
+  qms_inspection_material_requests_reviewed         qms_inspection_material_requests[] @relation("qms_inspection_material_requests_reviewedByIdTousers")
   user_preferences                                  user_preferences[]
-  qms_task_dispatches_assignee                      qms_task_dispatches[]     @relation("qms_task_dispatches_assigneeIdTousers")
-  qms_task_dispatches_assignor                      qms_task_dispatches[]     @relation("qms_task_dispatches_assignorIdTousers")
-  quality_records_quality_records_inspectorTousers  quality_records[]         @relation("quality_records_inspectorTousers")
-  quality_records_quality_records_lastEditorTousers quality_records[]         @relation("quality_records_lastEditorTousers")
+  qms_task_dispatches_assignee                      qms_task_dispatches[]              @relation("qms_task_dispatches_assigneeIdTousers")
+  qms_task_dispatches_assignor                      qms_task_dispatches[]              @relation("qms_task_dispatches_assignorIdTousers")
+  quality_records_quality_records_inspectorTousers  quality_records[]                  @relation("quality_records_inspectorTousers")
+  quality_records_quality_records_lastEditorTousers quality_records[]                  @relation("quality_records_lastEditorTousers")
   rbac_user_roles                                   rbac_user_roles[]
-  roles                                             roles                     @relation(fields: [roleId], references: [id])
+  roles                                             roles                              @relation(fields: [roleId], references: [id])
 
   @@index([roleId], map: "users_roleId_fkey")
   @@index([wechatWorkId])
@@ -1592,6 +1593,7 @@ model qms_inspection_requests {
   inspection          inspections?                         @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
   workOrders          qms_inspection_request_work_orders[]
   inspectionLinks     qms_inspection_request_inspections[]
+  materialRequest     qms_inspection_material_requests?
 
   @@index([workOrderNumber])
   @@index([status])
@@ -1605,6 +1607,30 @@ model qms_inspection_requests {
   @@index([teamId])
   @@index([partId])
   @@index([componentId])
+}
+
+// @module inspection
+model qms_inspection_material_requests {
+  id                  String                               @id @default(cuid())
+  inspectionRequestId String                               @unique
+  requestedName       String
+  status              inspection_material_request_status   @default(PENDING)
+  resolutionMode      inspection_material_resolution_mode?
+  resolvedPartId      String?
+  resolvedPartName    String?
+  reviewRemark        String?                              @db.Text
+  reviewedById        String?
+  submittedAt         DateTime                             @default(now())
+  reviewedAt          DateTime?
+  createdAt           DateTime                             @default(now())
+  updatedAt           DateTime                             @updatedAt
+  inspectionRequest   qms_inspection_requests              @relation(fields: [inspectionRequestId], references: [id], onDelete: Cascade)
+  reviewedBy          users?                               @relation("qms_inspection_material_requests_reviewedByIdTousers", fields: [reviewedById], references: [id], onDelete: SetNull)
+
+  @@index([status, submittedAt])
+  @@index([requestedName])
+  @@index([resolvedPartId])
+  @@index([reviewedById])
 }
 
 // @module inspection
@@ -1831,6 +1857,7 @@ model master_projects {
   @@index([name])
 }
 
+// @module part-master
 model master_parts {
   id        String   @id @default(cuid())
   name      String   @unique
@@ -1847,6 +1874,17 @@ enum inspection_category {
   INCOMING
   PROCESS
   SHIPMENT
+}
+
+enum inspection_material_request_status {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum inspection_material_resolution_mode {
+  CREATE
+  LINK_EXISTING
 }
 
 enum supplier_identity_type {

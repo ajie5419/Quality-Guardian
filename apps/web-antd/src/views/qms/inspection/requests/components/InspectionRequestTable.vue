@@ -42,6 +42,7 @@ export interface InspectionRequestTableProps {
   displayDispatchTime: (record: InspectionRequest) => string;
   formatDateTime: (value?: null | string) => string;
   checkResultLabel: (result: InspectionRequest['selfCheckResult']) => string;
+  canShowDispatchAction: (record: InspectionRequest) => boolean;
   isDispatchable: (record: InspectionRequest) => boolean;
   isCompletable: (record: InspectionRequest) => boolean;
   isClosed: (record: InspectionRequest) => boolean;
@@ -215,14 +216,16 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
             </template>
             详情
           </Button>
-          <Button
-            v-if="props.canDispatch && props.isDispatchable(record)"
-            size="small"
-            @click="emit('dispatch', record)"
-          >
-            <template #icon><IconifyIcon icon="lucide:send" /></template>
-            {{ record.status === 'DISPATCHED' ? '改派' : '派单' }}
-          </Button>
+          <span v-if="props.canDispatch && props.canShowDispatchAction(record)">
+            <Button
+              :disabled="!props.isDispatchable(record)"
+              size="small"
+              @click="emit('dispatch', record)"
+            >
+              <template #icon><IconifyIcon icon="lucide:send" /></template>
+              {{ record.status === 'DISPATCHED' ? '改派' : '派单' }}
+            </Button>
+          </span>
           <Button
             v-if="props.isCompletable(record)"
             size="small"
@@ -346,14 +349,16 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
           </template>
           详情
         </Button>
-        <Button
-          v-if="props.canDispatch && props.isDispatchable(record)"
-          size="small"
-          @click="emit('dispatch', record)"
-        >
-          <template #icon><IconifyIcon icon="lucide:send" /></template>
-          {{ record.status === 'DISPATCHED' ? '改派' : '派单' }}
-        </Button>
+        <span v-if="props.canDispatch && props.canShowDispatchAction(record)">
+          <Button
+            :disabled="!props.isDispatchable(record)"
+            size="small"
+            @click="emit('dispatch', record)"
+          >
+            <template #icon><IconifyIcon icon="lucide:send" /></template>
+            {{ record.status === 'DISPATCHED' ? '改派' : '派单' }}
+          </Button>
+        </span>
         <Button
           v-if="props.isCompletable(record)"
           size="small"

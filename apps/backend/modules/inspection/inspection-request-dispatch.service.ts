@@ -74,7 +74,10 @@ export const InspectionRequestDispatchService = {
 
     const [request, inspector] = await Promise.all([
       prisma.qms_inspection_requests.findFirst({
-        include: { work_order: { select: { projectName: true } } },
+        include: {
+          materialRequest: { select: { status: true } },
+          work_order: { select: { projectName: true } },
+        },
         where: { id, isDeleted: false },
       }),
       UserService.findEligibleInspector(inspectorId),
@@ -89,6 +92,27 @@ export const InspectionRequestDispatchService = {
         '该报检任务当前状态不可派单或改派，请刷新后重试',
         400,
       );
+    if (request.materialRequest?.status === 'PENDING') {
+      throw new BusinessError(
+        'MATERIAL_APPROVAL_PENDING',
+        'The material request is pending approval',
+        409,
+      );
+    }
+    if (request.materialRequest?.status === 'REJECTED') {
+      throw new BusinessError(
+        'MATERIAL_APPROVAL_REJECTED',
+        'The material request was rejected',
+        409,
+      );
+    }
+    if (!request.partId) {
+      throw new BusinessError(
+        'MATERIAL_ID_REQUIRED',
+        'The inspection request does not have a canonical material identity',
+        409,
+      );
+    }
     if (!inspector) throw new BusinessError('BAD_REQUEST', '检验员不存在', 400);
 
     const priority = parseInspectionRequestPriority(body.priority);
@@ -129,6 +153,9 @@ export const InspectionRequestDispatchService = {
         include: {
           dispatcher: { select: { realName: true, username: true } },
           inspector: { select: { realName: true, username: true } },
+          materialRequest: {
+            select: { requestedName: true, status: true },
+          },
           process: { select: { name: true } },
         },
         where: { id },

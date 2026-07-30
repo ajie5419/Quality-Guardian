@@ -37,7 +37,7 @@ export const inspectionRequestCreateV2Handler = defineEventHandler(
     if (!validateInspectionRequestCreateV2Body(body).isValid) {
       return badRequestResponse(
         event,
-        'workOrderNumber, category, partId, processId, responsible identity, reporter and attachments are required',
+        'workOrderNumber, category, material identity, processId, responsible identity, reporter and attachments are required',
       );
     }
     try {

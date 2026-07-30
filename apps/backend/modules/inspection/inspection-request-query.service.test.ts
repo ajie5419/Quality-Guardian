@@ -99,6 +99,43 @@ describe('inspection request query service', () => {
     });
   });
 
+  it('maps material approval state from the request relation', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([
+      {
+        attachments: null,
+        closeAttachments: null,
+        dispatcher: null,
+        inspection: null,
+        inspectionId: null,
+        inspector: null,
+        linkedIssueId: null,
+        materialRequest: {
+          requestedName: 'Unregistered bearing',
+          status: 'PENDING',
+        },
+        partId: null,
+        partName: 'Unregistered bearing',
+        process: { name: 'Incoming inspection' },
+        requestNo: 'IR-1',
+        workOrderNumber: 'WO-001',
+        workOrders: [],
+      },
+    ] as any);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(1);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    const result = await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1' } as any,
+      {},
+    );
+
+    expect(result.items[0]).toMatchObject({
+      dispatchBlockedReason: 'MATERIAL_APPROVAL_PENDING',
+      materialApprovalStatus: 'PENDING',
+      requestedPartName: 'Unregistered bearing',
+    });
+  });
+
   it('falls back to legacy request list query when work order link table is not migrated', async () => {
     vi.mocked(prisma.qms_inspection_requests.findMany)
       .mockRejectedValueOnce({ code: 'P2021' })
