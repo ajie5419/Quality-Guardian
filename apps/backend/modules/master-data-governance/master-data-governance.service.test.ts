@@ -14,6 +14,9 @@ vi.mock('~/modules/inspection', () => ({
   InspectionDepartmentResolutionService: {
     resolve: vi.fn(),
   },
+  InspectionProcessResolutionService: {
+    resolve: vi.fn(),
+  },
 }));
 
 vi.mock('~/modules/after-sales', () => ({
@@ -113,6 +116,38 @@ describe('master data governance service', () => {
     await MasterDataGovernanceService.resolve(input);
 
     expect(InspectionDepartmentResolutionService.resolve).toHaveBeenCalledWith(
+      input,
+    );
+  });
+
+  it('routes inspection request process references to the owning domain', async () => {
+    const { MasterDataGovernanceService } = await import(
+      './master-data-governance.service'
+    );
+    const { InspectionProcessResolutionService } = await import(
+      '~/modules/inspection'
+    );
+    const { MasterDataResolutionAuditService } = await import(
+      '~/modules/supplier-identity'
+    );
+    vi.mocked(MasterDataResolutionAuditService.get).mockResolvedValue({
+      entityType: 'qms_inspection_requests',
+      fieldName: 'processId',
+      id: 'audit-process',
+    } as never);
+    vi.mocked(InspectionProcessResolutionService.resolve).mockResolvedValue({
+      auditId: 'audit-process',
+    } as never);
+    const input = {
+      auditId: 'audit-process',
+      note: '',
+      processId: 'process-incoming',
+      resolutionType: 'PROCESS' as const,
+    };
+
+    await MasterDataGovernanceService.resolve(input);
+
+    expect(InspectionProcessResolutionService.resolve).toHaveBeenCalledWith(
       input,
     );
   });

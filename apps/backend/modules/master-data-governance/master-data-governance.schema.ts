@@ -22,5 +22,10 @@ export const masterDataGovernanceResolutionSchema = z.discriminatedUnion(
       note: z.string().trim().max(1000).default(''),
       resolutionType: z.literal('DEPARTMENT'),
     }),
+    z.object({
+      note: z.string().trim().max(1000).default(''),
+      processId: z.string().trim().min(1),
+      resolutionType: z.literal('PROCESS'),
+    }),
   ],
 );

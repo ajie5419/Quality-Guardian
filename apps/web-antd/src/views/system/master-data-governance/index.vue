@@ -5,6 +5,7 @@ import type {
   QualityClassificationScope,
 } from '@qgs/shared';
 
+import type { DictionaryOptionItem } from '#/api/system/dictionary';
 import type { MasterDataGovernanceApi } from '#/api/system/master-data-governance';
 
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -26,6 +27,7 @@ import {
   TreeSelect,
 } from 'ant-design-vue';
 
+import { getProcessMasterOptionsApi } from '#/api/qms/process-master';
 import { getQualityClassificationOptionsApi } from '#/api/qms/quality-classification';
 import { getDeptList } from '#/api/system/dept';
 import {
@@ -66,10 +68,12 @@ const modalOpen = ref(false);
 const current = ref<null | Reference>(null);
 const categories = ref<QualityClassificationCategory[]>([]);
 const departments = ref<Dept[]>([]);
+const processes = ref<DictionaryOptionItem[]>([]);
 const draft = reactive({
   categoryId: '',
   departmentId: '',
   note: '',
+  processId: '',
   subcategoryId: '',
 });
 
@@ -116,11 +120,20 @@ function isDepartmentReference(record: Reference) {
   );
 }
 
+function isProcessReference(record: Reference) {
+  return (
+    record.entityType === 'qms_inspection_requests' &&
+    record.fieldName === 'processId'
+  );
+}
+
 function canResolve(record: Reference) {
   return (
     canEdit.value &&
     record.status === 'OPEN' &&
-    (classificationScope(record) !== null || isDepartmentReference(record))
+    (classificationScope(record) !== null ||
+      isDepartmentReference(record) ||
+      isProcessReference(record))
   );
 }
 
@@ -149,6 +162,7 @@ async function openResolution(record: Reference) {
     categoryId: '',
     departmentId: '',
     note: '',
+    processId: '',
     subcategoryId: '',
   });
   try {
@@ -156,6 +170,8 @@ async function openResolution(record: Reference) {
       categories.value = await getQualityClassificationOptionsApi(scope);
     } else if (isDepartmentReference(record)) {
       departments.value = await getDeptList();
+    } else if (isProcessReference(record)) {
+      processes.value = await getProcessMasterOptionsApi();
     } else {
       return;
     }
@@ -177,30 +193,49 @@ function handleCategoryChange() {
 async function saveResolution() {
   if (!current.value) return;
   const departmentReference = isDepartmentReference(current.value);
+  const processReference = isProcessReference(current.value);
   if (departmentReference && !draft.departmentId) {
     message.warning('请选择规范责任部门');
     return;
   }
-  if (!departmentReference && (!draft.categoryId || !draft.subcategoryId)) {
+  if (processReference && !draft.processId) {
+    message.warning('请选择规范工序');
+    return;
+  }
+  if (
+    !departmentReference &&
+    !processReference &&
+    (!draft.categoryId || !draft.subcategoryId)
+  ) {
     message.warning('请选择一级和二级分类');
     return;
+  }
+  let resolution: Parameters<typeof resolveMasterDataReferenceApi>[1];
+  if (departmentReference) {
+    resolution = {
+      departmentId: draft.departmentId,
+      note: draft.note,
+      resolutionType: 'DEPARTMENT',
+    };
+  } else if (processReference) {
+    resolution = {
+      note: draft.note,
+      processId: draft.processId,
+      resolutionType: 'PROCESS',
+    };
+  } else {
+    resolution = {
+      categoryId: draft.categoryId,
+      note: draft.note,
+      resolutionType: 'CLASSIFICATION',
+      subcategoryId: draft.subcategoryId,
+    };
   }
   saving.value = true;
   try {
     const result = await resolveMasterDataReferenceApi(
       current.value.id,
-      departmentReference
-        ? {
-            departmentId: draft.departmentId,
-            note: draft.note,
-            resolutionType: 'DEPARTMENT',
-          }
-        : {
-            categoryId: draft.categoryId,
-            note: draft.note,
-            resolutionType: 'CLASSIFICATION',
-            subcategoryId: draft.subcategoryId,
-          },
+      resolution,
     );
     message.success(
       `已批量更新 ${result.affectedCount} 条业务记录，解决 ${result.resolvedAuditCount} 个治理项`,
@@ -334,7 +369,9 @@ onMounted(load);
       :title="
         current && isDepartmentReference(current)
           ? '处置责任部门治理项'
-          : '处置分类治理项'
+          : current && isProcessReference(current)
+            ? '处置报检工序治理项'
+            : '处置分类治理项'
       "
       @ok="saveResolution"
     >
@@ -361,6 +398,24 @@ onMounted(load);
             tree-node-filter-prop="name"
           />
         </Form.Item>
+        <Form.Item
+          v-else-if="current && isProcessReference(current)"
+          label="规范工序"
+          required
+        >
+          <Select
+            v-model:value="draft.processId"
+            :options="
+              processes.map((item) => ({
+                label: item.dictValue || item.dictKey,
+                value: item.id,
+              }))
+            "
+            allow-clear
+            option-filter-prop="label"
+            show-search
+          />
+        </Form.Item>
         <Form.Item v-else label="一级分类" required>
           <Select
             v-model:value="draft.categoryId"
@@ -374,7 +429,10 @@ onMounted(load);
           />
         </Form.Item>
         <Form.Item
-          v-if="!current || !isDepartmentReference(current)"
+          v-if="
+            !current ||
+            (!isDepartmentReference(current) && !isProcessReference(current))
+          "
           label="二级分类"
           required
         >

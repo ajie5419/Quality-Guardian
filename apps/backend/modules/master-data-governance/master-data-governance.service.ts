@@ -4,9 +4,12 @@ import { AfterSalesClassificationResolutionService } from '~/modules/after-sales
 import {
   InspectionClassificationResolutionService,
   InspectionDepartmentResolutionService,
+  InspectionProcessResolutionService,
 } from '~/modules/inspection';
 import { MasterDataResolutionAuditService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
+
+import { masterDataGovernanceResolutionSchema } from './master-data-governance.schema';
 
 export const MasterDataGovernanceService = {
   async list(params: {
@@ -20,6 +23,11 @@ export const MasterDataGovernanceService = {
       ...params,
       status: params.status || 'OPEN',
     });
+  },
+
+  async resolveRequest(auditId: string, input: unknown) {
+    const body = masterDataGovernanceResolutionSchema.parse(input);
+    return this.resolve({ auditId, ...body });
   },
 
   async resolve(
@@ -36,6 +44,12 @@ export const MasterDataGovernanceService = {
           departmentId: string;
           note: string;
           resolutionType: 'DEPARTMENT';
+        }
+      | {
+          auditId: string;
+          note: string;
+          processId: string;
+          resolutionType: 'PROCESS';
         },
   ) {
     const audit = await MasterDataResolutionAuditService.get(params.auditId);
@@ -52,6 +66,13 @@ export const MasterDataGovernanceService = {
       params.resolutionType === 'DEPARTMENT'
     ) {
       return InspectionDepartmentResolutionService.resolve(params);
+    }
+    if (
+      audit.entityType === 'qms_inspection_requests' &&
+      audit.fieldName === 'processId' &&
+      params.resolutionType === 'PROCESS'
+    ) {
+      return InspectionProcessResolutionService.resolve(params);
     }
     if (params.resolutionType !== 'CLASSIFICATION') {
       throw new BusinessError(

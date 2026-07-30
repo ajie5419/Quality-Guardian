@@ -25,20 +25,7 @@ export default defineValidatedHandler(
       const auditId = String(getRouterParam(event, 'id') || '').trim();
       if (!auditId) return badRequestResponse(event, 'Missing audit ID');
       return useResponseSuccess(
-        await MasterDataGovernanceService.resolve({
-          auditId,
-          note: String(body.note || ''),
-          ...(body.resolutionType === 'DEPARTMENT'
-            ? {
-                departmentId: body.departmentId,
-                resolutionType: body.resolutionType,
-              }
-            : {
-                categoryId: body.categoryId,
-                resolutionType: body.resolutionType,
-                subcategoryId: body.subcategoryId,
-              }),
-        }),
+        await MasterDataGovernanceService.resolveRequest(auditId, body),
       );
     } catch (error: unknown) {
       logApiError('master-data-governance-resolve', error, undefined, event);

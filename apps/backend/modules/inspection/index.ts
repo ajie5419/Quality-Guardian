@@ -5,4 +5,5 @@ export {
   INSPECTION_MATERIAL_PERMISSION_CODES,
   InspectionMaterialRequestService,
 } from './inspection-material-request.service';
+export { InspectionProcessResolutionService } from './inspection-process-resolution.service';
 export { InspectionService } from './inspection.service';

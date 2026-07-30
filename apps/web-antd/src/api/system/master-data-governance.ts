@@ -57,6 +57,11 @@ export function resolveMasterDataReferenceApi(
         departmentId: string;
         note: string;
         resolutionType: 'DEPARTMENT';
+      }
+    | {
+        note: string;
+        processId: string;
+        resolutionType: 'PROCESS';
       },
 ) {
   return requestClient.put<{
