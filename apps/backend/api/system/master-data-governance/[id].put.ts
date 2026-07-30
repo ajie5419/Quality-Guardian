@@ -10,7 +10,7 @@ import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
   badRequestResponse,
-  internalServerErrorResponse,
+  internalServerErrorResponse as errorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -25,20 +25,25 @@ export default defineValidatedHandler(
       const auditId = String(getRouterParam(event, 'id') || '').trim();
       if (!auditId) return badRequestResponse(event, 'Missing audit ID');
       return useResponseSuccess(
-        await MasterDataGovernanceService.resolveClassification({
+        await MasterDataGovernanceService.resolve({
           auditId,
-          categoryId: String(body.categoryId),
           note: String(body.note || ''),
-          subcategoryId: String(body.subcategoryId),
+          ...(body.resolutionType === 'DEPARTMENT'
+            ? {
+                departmentId: body.departmentId,
+                resolutionType: body.resolutionType,
+              }
+            : {
+                categoryId: body.categoryId,
+                resolutionType: body.resolutionType,
+                subcategoryId: body.subcategoryId,
+              }),
         }),
       );
     } catch (error: unknown) {
       logApiError('master-data-governance-resolve', error, undefined, event);
       if (isBusinessError(error)) return businessErrorResponse(event, error);
-      return internalServerErrorResponse(
-        event,
-        'Failed to resolve master data reference',
-      );
+      return errorResponse(event, 'Master data resolution failed');
     }
   },
 );

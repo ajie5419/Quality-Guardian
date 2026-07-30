@@ -8,8 +8,19 @@ export const masterDataGovernanceQuerySchema = z.object({
   status: z.enum(['IGNORED', 'OPEN', 'RESOLVED']).default('OPEN'),
 });
 
-export const masterDataGovernanceResolutionSchema = z.object({
-  categoryId: z.string().trim().min(1),
-  note: z.string().trim().max(1000).default(''),
-  subcategoryId: z.string().trim().min(1),
-});
+export const masterDataGovernanceResolutionSchema = z.discriminatedUnion(
+  'resolutionType',
+  [
+    z.object({
+      categoryId: z.string().trim().min(1),
+      note: z.string().trim().max(1000).default(''),
+      resolutionType: z.literal('CLASSIFICATION'),
+      subcategoryId: z.string().trim().min(1),
+    }),
+    z.object({
+      departmentId: z.string().trim().min(1),
+      note: z.string().trim().max(1000).default(''),
+      resolutionType: z.literal('DEPARTMENT'),
+    }),
+  ],
+);

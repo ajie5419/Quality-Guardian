@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type {
+  Dept,
   QualityClassificationCategory,
   QualityClassificationScope,
 } from '@qgs/shared';
@@ -22,9 +23,11 @@ import {
   Space,
   Table,
   Tag,
+  TreeSelect,
 } from 'ant-design-vue';
 
 import { getQualityClassificationOptionsApi } from '#/api/qms/quality-classification';
+import { getDeptList } from '#/api/system/dept';
 import {
   getMasterDataReferencesApi,
   resolveMasterDataReferenceApi,
@@ -62,8 +65,10 @@ const query = reactive<MasterDataGovernanceApi.Query>({
 const modalOpen = ref(false);
 const current = ref<null | Reference>(null);
 const categories = ref<QualityClassificationCategory[]>([]);
+const departments = ref<Dept[]>([]);
 const draft = reactive({
   categoryId: '',
+  departmentId: '',
   note: '',
   subcategoryId: '',
 });
@@ -104,11 +109,18 @@ function classificationScope(record: Reference): null | Scope {
   return null;
 }
 
+function isDepartmentReference(record: Reference) {
+  return (
+    record.entityType === 'quality_records' &&
+    record.fieldName === 'responsibleDepartmentId'
+  );
+}
+
 function canResolve(record: Reference) {
   return (
     canEdit.value &&
     record.status === 'OPEN' &&
-    classificationScope(record) !== null
+    (classificationScope(record) !== null || isDepartmentReference(record))
   );
 }
 
@@ -132,18 +144,24 @@ async function load() {
 
 async function openResolution(record: Reference) {
   const scope = classificationScope(record);
-  if (!scope) return;
   current.value = record;
   Object.assign(draft, {
     categoryId: '',
+    departmentId: '',
     note: '',
     subcategoryId: '',
   });
   try {
-    categories.value = await getQualityClassificationOptionsApi(scope);
+    if (scope) {
+      categories.value = await getQualityClassificationOptionsApi(scope);
+    } else if (isDepartmentReference(record)) {
+      departments.value = await getDeptList();
+    } else {
+      return;
+    }
     modalOpen.value = true;
   } catch {
-    message.error('分类选项加载失败');
+    message.error('主数据选项加载失败');
   }
 }
 
@@ -157,13 +175,33 @@ function handleCategoryChange() {
 }
 
 async function saveResolution() {
-  if (!current.value || !draft.categoryId || !draft.subcategoryId) {
+  if (!current.value) return;
+  const departmentReference = isDepartmentReference(current.value);
+  if (departmentReference && !draft.departmentId) {
+    message.warning('请选择规范责任部门');
+    return;
+  }
+  if (!departmentReference && (!draft.categoryId || !draft.subcategoryId)) {
     message.warning('请选择一级和二级分类');
     return;
   }
   saving.value = true;
   try {
-    const result = await resolveMasterDataReferenceApi(current.value.id, draft);
+    const result = await resolveMasterDataReferenceApi(
+      current.value.id,
+      departmentReference
+        ? {
+            departmentId: draft.departmentId,
+            note: draft.note,
+            resolutionType: 'DEPARTMENT',
+          }
+        : {
+            categoryId: draft.categoryId,
+            note: draft.note,
+            resolutionType: 'CLASSIFICATION',
+            subcategoryId: draft.subcategoryId,
+          },
+    );
     message.success(
       `已批量更新 ${result.affectedCount} 条业务记录，解决 ${result.resolvedAuditCount} 个治理项`,
     );
@@ -293,7 +331,11 @@ onMounted(load);
     <Modal
       v-model:open="modalOpen"
       :confirm-loading="saving"
-      title="处置分类治理项"
+      :title="
+        current && isDepartmentReference(current)
+          ? '处置责任部门治理项'
+          : '处置分类治理项'
+      "
       @ok="saveResolution"
     >
       <Alert
@@ -304,7 +346,22 @@ onMounted(load);
         type="warning"
       />
       <Form layout="vertical">
-        <Form.Item label="一级分类" required>
+        <Form.Item
+          v-if="current && isDepartmentReference(current)"
+          label="规范责任部门"
+          required
+        >
+          <TreeSelect
+            v-model:value="draft.departmentId"
+            :field-names="{ children: 'children', label: 'name', value: 'id' }"
+            :tree-data="departments"
+            allow-clear
+            show-search
+            tree-default-expand-all
+            tree-node-filter-prop="name"
+          />
+        </Form.Item>
+        <Form.Item v-else label="一级分类" required>
           <Select
             v-model:value="draft.categoryId"
             :options="
@@ -316,7 +373,11 @@ onMounted(load);
             @change="handleCategoryChange"
           />
         </Form.Item>
-        <Form.Item label="二级分类" required>
+        <Form.Item
+          v-if="!current || !isDepartmentReference(current)"
+          label="二级分类"
+          required
+        >
           <Select
             v-model:value="draft.subcategoryId"
             :disabled="!draft.categoryId"

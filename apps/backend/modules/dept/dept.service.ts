@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type { DeptTreeNode } from '~/modules/dept/dept-tree';
 
 import { createId } from '@paralleldrive/cuid2';
@@ -7,6 +8,8 @@ import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
 const logger = createModuleLogger('DeptService');
+
+type DepartmentReadClient = Pick<Prisma.TransactionClient, 'departments'>;
 
 export interface CreateDeptDto {
   businessUnit?: string;
@@ -38,6 +41,13 @@ interface DeptItem {
 }
 
 export const DeptService = {
+  async findActiveById(id: string, client: DepartmentReadClient = prisma) {
+    return client.departments.findFirst({
+      where: { id: id.trim(), isDeleted: false, status: 1 },
+      select: { businessUnit: true, id: true, name: true },
+    });
+  },
+
   /**
    * Get all departments as a tree
    */

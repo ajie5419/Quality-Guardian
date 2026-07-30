@@ -11,6 +11,9 @@ vi.mock('~/modules/inspection', () => ({
   InspectionClassificationResolutionService: {
     resolve: vi.fn(),
   },
+  InspectionDepartmentResolutionService: {
+    resolve: vi.fn(),
+  },
 }));
 
 vi.mock('~/modules/after-sales', () => ({
@@ -69,10 +72,48 @@ describe('master data governance service', () => {
       note: '',
       subcategoryId: 'subcategory-1',
     };
-    await MasterDataGovernanceService.resolveClassification(input);
+    await MasterDataGovernanceService.resolve({
+      ...input,
+      resolutionType: 'CLASSIFICATION',
+    });
 
     expect(
       InspectionClassificationResolutionService.resolve,
-    ).toHaveBeenCalledWith(input);
+    ).toHaveBeenCalledWith({
+      ...input,
+      resolutionType: 'CLASSIFICATION',
+    });
+  });
+
+  it('routes inspection department references to the owning domain', async () => {
+    const { MasterDataGovernanceService } = await import(
+      './master-data-governance.service'
+    );
+    const { InspectionDepartmentResolutionService } = await import(
+      '~/modules/inspection'
+    );
+    const { MasterDataResolutionAuditService } = await import(
+      '~/modules/supplier-identity'
+    );
+    vi.mocked(MasterDataResolutionAuditService.get).mockResolvedValue({
+      entityType: 'quality_records',
+      fieldName: 'responsibleDepartmentId',
+      id: 'audit-department',
+    } as never);
+    vi.mocked(InspectionDepartmentResolutionService.resolve).mockResolvedValue({
+      auditId: 'audit-department',
+    } as never);
+    const input = {
+      auditId: 'audit-department',
+      departmentId: 'dept-production',
+      note: '',
+      resolutionType: 'DEPARTMENT' as const,
+    };
+
+    await MasterDataGovernanceService.resolve(input);
+
+    expect(InspectionDepartmentResolutionService.resolve).toHaveBeenCalledWith(
+      input,
+    );
   });
 });

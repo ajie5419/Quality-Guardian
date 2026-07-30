@@ -46,11 +46,18 @@ export function getMasterDataReferencesApi(
 
 export function resolveMasterDataReferenceApi(
   id: string,
-  data: {
-    categoryId: string;
-    note: string;
-    subcategoryId: string;
-  },
+  data:
+    | {
+        categoryId: string;
+        note: string;
+        resolutionType: 'CLASSIFICATION';
+        subcategoryId: string;
+      }
+    | {
+        departmentId: string;
+        note: string;
+        resolutionType: 'DEPARTMENT';
+      },
 ) {
   return requestClient.put<{
     affectedCount: number;

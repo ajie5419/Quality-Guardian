@@ -11,6 +11,7 @@ inspection 是 QMS 的检验域模块，覆盖检验记录、检验表模板、�
 - `inspection.service.ts`、`inspection-core.service.ts`：检验记录兼容入口与核心门面。
 - `inspection-record-*.service.ts`：检验记录查询、创建、更新、删除、导入导出与同步。
 - `inspection-issue-*.service.ts`：不合格品项查询、写入、统计、编号、导入与图表聚合。
+- `inspection-*-resolution.service.ts`：主数据治理处置，按审计原始值批量回填分类或规范责任部门，并使用字段级并发校验。
 - `inspection-template-*.service.ts`：检验模板与模板绑定。
 - `inspection-archive-*.service.ts`：归档任务与归档同步。
 - `inspection-request*.service.ts`：报检任务创建、列表、派工、关闭、统计与实时事件。
