@@ -4,6 +4,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { TASK_DISPATCH_STATUS } from '@qgs/shared';
 import { z } from 'zod';
+import { PartMasterService } from '~/modules/part-master';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { UserService, WxSubscribeMessageService } from '~/modules/user';
@@ -113,6 +114,7 @@ export const InspectionRequestDispatchService = {
         409,
       );
     }
+    await PartMasterService.assertActive(request.partId);
     if (!inspector) throw new BusinessError('BAD_REQUEST', '检验员不存在', 400);
 
     const priority = parseInspectionRequestPriority(body.priority);

@@ -52,5 +52,8 @@ export function resolveMasterDataReferenceApi(
     subcategoryId: string;
   },
 ) {
-  return requestClient.put(`${BASE_URL}/${id}`, data);
+  return requestClient.put<{
+    affectedCount: number;
+    resolvedAuditCount: number;
+  }>(`${BASE_URL}/${id}`, data);
 }

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
+import { PartMasterService } from '~/modules/part-master';
 import { UserService } from '~/modules/user';
 import prisma from '~/utils/prisma';
 
@@ -26,6 +27,12 @@ vi.mock('~/modules/rbac/rbac.service', () => ({
     getUserPermissionCodes: vi
       .fn()
       .mockResolvedValue(['QMS:Inspection:Requests:Dispatch']),
+  },
+}));
+
+vi.mock('~/modules/part-master', () => ({
+  PartMasterService: {
+    assertActive: vi.fn(),
   },
 }));
 
@@ -128,6 +135,10 @@ function setupTransactionMocks(
 describe('adversarial: dispatchRequest state machine', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(PartMasterService.assertActive).mockResolvedValue({
+      id: 'part-1',
+      name: 'Part A',
+    });
     vi.mocked(UserService.findEligibleInspector).mockResolvedValue(
       makeInspector(),
     );

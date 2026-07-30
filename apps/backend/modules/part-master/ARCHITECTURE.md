@@ -13,6 +13,7 @@ Business modules consume material identities through `index.ts`. They must not q
 - Renaming, disabling, or deleting a material does not rewrite historical business records.
 - Disabled and soft-deleted materials are excluded from option search.
 - `assertActive` is the write-contract guard for modules that persist a material reference.
+- BOM writes resolve an active material by `partId` or exact name through this module. Exact names reuse the global identity across work orders; new names create one identity before the BOM row is committed.
 
 ## API boundaries
 

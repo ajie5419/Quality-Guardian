@@ -73,20 +73,20 @@ export const inspectionModule: ModuleDeclaration = {
       type: 'menu',
       meta: {
         icon: 'carbon:request-quote',
-        title: 'Material Requests',
+        title: '物料申请',
       },
       buttons: [
         {
           authCode: 'QMS:Inspection:MaterialRequests:Approve',
           name: 'QMSInspectionMaterialRequestsApprove',
           order: 1,
-          title: 'Approve',
+          title: '审核通过',
         },
         {
           authCode: 'QMS:Inspection:MaterialRequests:Reject',
           name: 'QMSInspectionMaterialRequestsReject',
           order: 2,
-          title: 'Reject',
+          title: '驳回',
         },
       ],
     },
@@ -163,12 +163,12 @@ export const inspectionModule: ModuleDeclaration = {
     materialRequestApprove: {
       action: 'UPDATE',
       targetType: 'inspection_material_request',
-      detailsTemplate: 'Approved material request: {{requestNo}}',
+      detailsTemplate: '审核通过物料申请：{{requestNo}}',
     },
     materialRequestReject: {
       action: 'UPDATE',
       targetType: 'inspection_material_request',
-      detailsTemplate: 'Rejected material request: {{requestNo}}',
+      detailsTemplate: '驳回物料申请：{{requestNo}}',
     },
     requestCreate: {
       action: 'CREATE',

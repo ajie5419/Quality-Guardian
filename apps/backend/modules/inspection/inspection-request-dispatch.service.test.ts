@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRequestDispatchService } from '~/modules/inspection/inspection-request-dispatch.service';
+import { PartMasterService } from '~/modules/part-master';
 import { UserService, WxSubscribeMessageService } from '~/modules/user';
 import prisma from '~/utils/prisma';
 
@@ -26,6 +27,12 @@ vi.mock('~/modules/rbac/rbac.service', () => ({
     getUserPermissionCodes: vi
       .fn()
       .mockResolvedValue(['QMS:Inspection:Requests:Dispatch']),
+  },
+}));
+
+vi.mock('~/modules/part-master', () => ({
+  PartMasterService: {
+    assertActive: vi.fn(),
   },
 }));
 
@@ -59,6 +66,10 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       id: 'inspector-1',
       wxOpenId: 'openid-1',
     } as never);
+    vi.mocked(PartMasterService.assertActive).mockResolvedValue({
+      id: 'part-1',
+      name: 'Part A',
+    });
   });
 
   it('rejects dispatch when the request is already closed', async () => {
@@ -130,6 +141,33 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
 
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it.each(['inactive', 'soft-deleted'])(
+    'rejects dispatch when the material is %s',
+    async () => {
+      vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+        id: 'req-1',
+        materialRequest: null,
+        partId: 'part-1',
+        status: 'SUBMITTED',
+      } as never);
+      vi.mocked(PartMasterService.assertActive).mockRejectedValue(
+        new Error('The selected material is not active'),
+      );
+
+      await expect(
+        InspectionRequestDispatchService.dispatchRequest(
+          event,
+          'req-1',
+          { inspectorId: 'inspector-1' },
+          userinfo,
+        ),
+      ).rejects.toThrow('The selected material is not active');
+
+      expect(PartMasterService.assertActive).toHaveBeenCalledWith('part-1');
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects inside the transaction when a concurrent dispatch already won', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
@@ -204,6 +242,7 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
       userinfo,
     );
 
+    expect(PartMasterService.assertActive).toHaveBeenCalledWith('part-1');
     expect(UserService.findEligibleInspector).toHaveBeenCalledWith(
       'inspector-1',
     );

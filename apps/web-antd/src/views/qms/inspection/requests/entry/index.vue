@@ -16,6 +16,7 @@ import {
   getPublicInspectionRequestProcesses,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
+import { getPublicIncomingMaterialInputSettingApi } from '#/api/system/inspection-settings';
 import { useImageCompress } from '#/composables/useImageCompress';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
@@ -95,6 +96,7 @@ const requestForm = reactive({
   workOrderNumber: '',
   workOrderNumbers: [] as string[],
 });
+const incomingMaterialFreeInputEnabled = ref(false);
 
 const isIncomingEntry = computed(() =>
   isIncomingInspectionEntryPath(String(route.path || '')),
@@ -156,7 +158,8 @@ function applyRoutePrefill() {
     : String(route.query.processName || '');
   requestForm.reporter = String(route.query.reporter || '');
   requestForm.requestedPartName = '';
-  requestForm.requestNewPart = false;
+  requestForm.requestNewPart =
+    isIncomingEntry.value && incomingMaterialFreeInputEnabled.value;
   requestForm.team = String(route.query.team || '');
   clearResponsibleUnitIdentity();
 }
@@ -175,7 +178,8 @@ function resetRequestForm() {
   requestForm.quantity = 1;
   requestForm.reporter = '';
   requestForm.requestedPartName = '';
-  requestForm.requestNewPart = false;
+  requestForm.requestNewPart =
+    isIncomingEntry.value && incomingMaterialFreeInputEnabled.value;
   requestForm.requestInfo = '';
   requestForm.selfCheckResult = 'PASS';
   requestForm.mutualCheckResult = 'PASS';
@@ -366,8 +370,24 @@ async function submitRequest() {
   }
 }
 
-onMounted(() => {
+onMounted(async () => {
   applyRoutePrefill();
+  if (isIncomingEntry.value) {
+    try {
+      const setting = await getPublicIncomingMaterialInputSettingApi();
+      incomingMaterialFreeInputEnabled.value =
+        setting.incomingMaterialFreeInputEnabled;
+      requestForm.requestNewPart = incomingMaterialFreeInputEnabled.value;
+      if (requestForm.requestNewPart) {
+        requestForm.partId = '';
+        requestForm.partName = '';
+      } else {
+        requestForm.requestedPartName = '';
+      }
+    } catch {
+      requestForm.requestNewPart = false;
+    }
+  }
   void loadWorkOrderOptions(requestForm.workOrderNumber);
   void loadResponsibleUnitOptions(requestForm.team);
 });

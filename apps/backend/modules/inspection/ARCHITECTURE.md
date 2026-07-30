@@ -113,7 +113,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 ### Incoming material request workflow
 
-- Public V2 `INCOMING` submissions provide exactly one of `partId` or `requestedPartName`. `PROCESS` submissions still require an active canonical `partId`.
+- V2 `INCOMING` submissions use `partId` or `requestedPartName` exclusively according to the administrator-controlled incoming material input setting. `PROCESS` submissions always require an active canonical `partId`.
 - A submission with `requestedPartName` creates the inspection request and its `qms_inspection_material_requests` application in one transaction. The inspection request remains `SUBMITTED`, keeps the raw material snapshot, and has a null `partId`.
 - Pending applications are reviewed only in the authenticated back-office material request queue. Public request entry does not expose review status or review controls.
 - Approval uses either `LINK_EXISTING` or `CREATE`. Both operations go through `PartMasterService` in the same database transaction, then backfill the canonical `partId/partName` and mark the application `APPROVED`.

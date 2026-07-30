@@ -153,6 +153,31 @@ export const PartMasterService = {
     return part;
   },
 
+  async resolveOrCreateActive(
+    input: { name: string; partId?: null | string },
+    db: PartMasterClient = prisma,
+  ) {
+    const partId = input.partId?.trim();
+    if (partId) return this.assertActive(partId, db);
+
+    const name = input.name.trim();
+    const existing = await db.master_parts.findUnique({
+      where: { name },
+      select: { id: true, isDeleted: true, name: true, status: true },
+    });
+    if (existing && !existing.isDeleted && existing.status === 1) {
+      return { id: existing.id, name: existing.name };
+    }
+    if (existing && !existing.isDeleted) {
+      throw new BusinessError(
+        'PART_NOT_AVAILABLE',
+        'The existing material is not active',
+        400,
+      );
+    }
+    return createWithClient(db, { name, sort: 0 });
+  },
+
   async listForManagement(query: PartMasterManagementQuery) {
     const where: Prisma.master_partsWhereInput = {
       isDeleted: false,

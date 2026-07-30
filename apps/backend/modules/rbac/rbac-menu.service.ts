@@ -113,10 +113,9 @@ export const RbacMenuService = {
   }) {
     const userId = userinfo.id ?? userinfo.userId;
     const cacheKey = `qms:menu:${userId}`;
+    await ensureModuleMenus();
     const cached = await redis.get(cacheKey);
     if (cached) return cached;
-
-    await ensureModuleMenus();
 
     const allDbMenus = (await prisma.menus.findMany({
       where: { isDeleted: false, status: 1 },

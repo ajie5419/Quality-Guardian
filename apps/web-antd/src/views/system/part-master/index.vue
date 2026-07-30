@@ -62,10 +62,10 @@ const draft = reactive({
 });
 
 const columns = [
-  { dataIndex: 'name', key: 'name', title: 'Material name' },
-  { dataIndex: 'sort', key: 'sort', title: 'Sort order', width: 120 },
-  { key: 'status', title: 'Enabled', width: 110 },
-  { key: 'actions', title: 'Actions', width: 160 },
+  { dataIndex: 'name', key: 'name', title: '物料名称' },
+  { dataIndex: 'sort', key: 'sort', title: '排序', width: 120 },
+  { key: 'status', title: '启用状态', width: 110 },
+  { key: 'actions', title: '操作', width: 160 },
 ];
 
 async function load() {
@@ -80,7 +80,7 @@ async function load() {
     items.value = result.items;
     total.value = result.total;
   } catch (error: unknown) {
-    handleApiError(error, 'Load Material Master');
+    handleApiError(error, '加载物料主数据');
   } finally {
     loading.value = false;
   }
@@ -101,7 +101,7 @@ function openEdit(item: PartMasterItem) {
 async function save() {
   const name = draft.name.trim();
   if (!name) {
-    message.warning('Material name is required');
+    message.warning('请输入物料名称');
     return;
   }
   saving.value = true;
@@ -111,15 +111,15 @@ async function save() {
         name,
         sort: draft.sort,
       });
-      message.success('Material updated');
+      message.success('物料已更新');
     } else {
       await createPartMasterApi({ name, sort: draft.sort });
-      message.success('Material created');
+      message.success('物料已创建');
     }
     modalOpen.value = false;
     await load();
   } catch (error: unknown) {
-    handleApiError(error, 'Save Material Master');
+    handleApiError(error, '保存物料主数据');
   } finally {
     saving.value = false;
   }
@@ -130,10 +130,10 @@ async function toggleStatus(item: PartMasterItem, checked: boolean) {
   item.status = checked ? 1 : 0;
   try {
     await updatePartMasterApi(item.id, { status: item.status });
-    message.success(checked ? 'Material enabled' : 'Material disabled');
+    message.success(checked ? '物料已启用' : '物料已停用');
   } catch (error: unknown) {
     item.status = previous;
-    handleApiError(error, 'Update Material Status');
+    handleApiError(error, '更新物料状态');
   }
 }
 
@@ -150,10 +150,10 @@ async function toggleStatusById(id: unknown, checked: boolean) {
 async function remove(item: PartMasterItem) {
   try {
     await deletePartMasterApi(item.id);
-    message.success('Material deleted');
+    message.success('物料已删除');
     await load();
   } catch (error: unknown) {
-    handleApiError(error, 'Delete Material');
+    handleApiError(error, '删除物料');
   }
 }
 
@@ -182,11 +182,11 @@ onMounted(load);
 </script>
 
 <template>
-  <Page title="Material Master">
+  <Page title="物料主数据">
     <Alert
       v-if="!canEdit"
       class="mb-4"
-      message="You have read-only access to material master data."
+      message="当前账号仅可查看物料主数据。"
       show-icon
       type="info"
     />
@@ -196,7 +196,7 @@ onMounted(load);
         <Input.Search
           v-model:value="query.keyword"
           allow-clear
-          placeholder="Search material name"
+          placeholder="搜索物料名称"
           style="width: 280px"
           @search="
             query.page = 1;
@@ -206,21 +206,21 @@ onMounted(load);
         <Select
           v-model:value="query.status"
           :options="[
-            { label: 'Enabled', value: 1 },
-            { label: 'Disabled', value: 0 },
+            { label: '已启用', value: 1 },
+            { label: '已停用', value: 0 },
           ]"
           allow-clear
-          placeholder="All statuses"
+          placeholder="全部状态"
           style="width: 150px"
           @change="
             query.page = 1;
             load();
           "
         />
-        <Button @click="resetFilters">Reset</Button>
+        <Button @click="resetFilters">重置</Button>
       </Space>
       <Button :disabled="!canEdit" type="primary" @click="openCreate">
-        Add material
+        新增物料
       </Button>
     </div>
 
@@ -251,7 +251,7 @@ onMounted(load);
             "
           />
           <Tag v-else :color="record.status === 1 ? 'success' : 'default'">
-            {{ record.status === 1 ? 'Enabled' : 'Disabled' }}
+            {{ record.status === 1 ? '已启用' : '已停用' }}
           </Tag>
         </template>
         <Space v-else-if="column.key === 'actions'">
@@ -261,15 +261,15 @@ onMounted(load);
             type="link"
             @click="openEditById(record.id)"
           >
-            Edit
+            编辑
           </Button>
           <Popconfirm
-            title="Delete this material?"
-            ok-text="Delete"
+            title="确认删除该物料？"
+            ok-text="删除"
             @confirm="removeById(record.id)"
           >
             <Button :disabled="!canEdit" danger size="small" type="link">
-              Delete
+              删除
             </Button>
           </Popconfirm>
         </Space>
@@ -279,14 +279,14 @@ onMounted(load);
     <Modal
       v-model:open="modalOpen"
       :confirm-loading="saving"
-      :title="editingId ? 'Edit material' : 'Add material'"
+      :title="editingId ? '编辑物料' : '新增物料'"
       @ok="save"
     >
       <Form layout="vertical">
-        <Form.Item label="Material name" required>
+        <Form.Item label="物料名称" required>
           <Input v-model:value="draft.name" :maxlength="100" />
         </Form.Item>
-        <Form.Item label="Sort order">
+        <Form.Item label="排序">
           <InputNumber
             v-model:value="draft.sort"
             :min="0"

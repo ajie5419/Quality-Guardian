@@ -5,6 +5,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { PartMasterService } from '~/modules/part-master';
 import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { SystemService } from '~/modules/system';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { WxSubscribeMessageService } from '~/modules/user';
 import { BusinessError } from '~/utils/business-error';
@@ -173,7 +174,7 @@ function normalizeV2Category(value: unknown): 'INCOMING' | 'PROCESS' {
 async function buildCreateRequestPayload(
   body: RequestBody,
   identityContract: 'V1' | 'V2',
-  isPublic: boolean,
+  _isPublic: boolean,
 ) {
   const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
   const workOrderNumber =
@@ -207,12 +208,21 @@ async function buildCreateRequestPayload(
       400,
     );
   }
-  if (identityContract === 'V2' && requestedPartName && !isPublic) {
-    throw new BusinessError(
-      'MATERIAL_REQUEST_PUBLIC_ONLY',
-      'Pending material approval is only available to public incoming inspection requests',
-      400,
-    );
+  if (identityContract === 'V2' && category === 'INCOMING') {
+    const freeInputEnabled =
+      await SystemService.isIncomingMaterialFreeInputEnabled();
+    if (
+      (freeInputEnabled && (!requestedPartName || partId)) ||
+      (!freeInputEnabled && (!partId || requestedPartName))
+    ) {
+      throw new BusinessError(
+        'MATERIAL_INPUT_MODE_MISMATCH',
+        freeInputEnabled
+          ? 'Incoming inspection requests require requestedPartName while free material input is enabled'
+          : 'Incoming inspection requests require partId while free material input is disabled',
+        400,
+      );
+    }
   }
   const [partIdentity, processName] =
     identityContract === 'V2'

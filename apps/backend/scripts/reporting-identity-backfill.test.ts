@@ -225,6 +225,7 @@ describe('reporting identity backfill', () => {
     expect(wrapper).toContain(
       'backfillQualityLossSourceDepartmentIdentities()',
     );
+    expect(wrapper).toContain('redis.disconnect()');
     expect(maintenance).toContain('scripts/backfill-identity-relations.ts');
     expect(deploy).toContain('scripts/backfill-quality-loss-index.ts');
     expect(wrapper).not.toContain('quality_loss_index');

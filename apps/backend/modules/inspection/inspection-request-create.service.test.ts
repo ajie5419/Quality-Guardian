@@ -3,6 +3,7 @@ import { isIncomingInspectionRequestProcess } from '~/modules/inspection/inspect
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
 import { PartMasterService } from '~/modules/part-master';
 import { ProcessMasterService } from '~/modules/process-master';
+import { SystemService } from '~/modules/system';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -20,6 +21,12 @@ vi.mock('~/modules/process-master', () => ({
 vi.mock('~/modules/part-master', () => ({
   PartMasterService: {
     assertActive: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/system', () => ({
+  SystemService: {
+    isIncomingMaterialFreeInputEnabled: vi.fn().mockResolvedValue(false),
   },
 }));
 
@@ -222,6 +229,9 @@ describe('inspectionRequestCreateService', () => {
   });
 
   it('creates a pending material application in the request transaction', async () => {
+    vi.mocked(
+      SystemService.isIncomingMaterialFreeInputEnabled,
+    ).mockResolvedValueOnce(true);
     const { WxSubscribeMessageService } = await import('~/modules/user');
     const { buildGovernedCanonicalWritePairForTable } = await import(
       '~/utils/governed-write'

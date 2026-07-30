@@ -1,5 +1,6 @@
 import type { H3Event } from 'h3';
 
+import { PlanningBomService } from '~/modules/planning';
 import {
   buildProjectBomMutableData,
   mapProjectBomItem,
@@ -11,10 +12,7 @@ import {
   resolveBomRequiredProcessIdentities,
 } from '~/modules/planning/bom-process-identities';
 import { logApiError } from '~/utils/api-logger';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/governed-write';
+import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { awaitMockDelay } from '~/utils/index';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -52,17 +50,27 @@ export async function bom_id_put(event: H3Event) {
       'project_boms',
       mutablePayload,
     );
-    const canonicalBomPayload = await buildGovernedCanonicalWritePairForTable(
-      'project_boms',
-      { ...governedBomPayload, partId: body.partId },
-    );
     const updated = await prisma.$transaction(async (tx) => {
+      const existing = await tx.project_boms.findUniqueOrThrow({
+        where: { id },
+        select: { partId: true, part_name: true },
+      });
+      const partIdentity = await PlanningBomService.resolvePartIdentityForWrite(
+        {
+          partId: body.partId || existing.partId,
+          partName: mutablePayload.part_name || existing.part_name,
+        },
+        tx,
+      );
       await tx.project_boms.update({
         where: { id },
         data: {
           ...mutablePayload,
           ...governedBomPayload,
-          ...canonicalBomPayload,
+          partId: partIdentity.id,
+          part_name:
+            mutablePayload.part_name ||
+            (existing.partId ? existing.part_name : partIdentity.name),
         },
         select: { id: true },
       });

@@ -110,6 +110,36 @@ describe('part master service', () => {
     ).rejects.toMatchObject({ code: 'PART_NOT_AVAILABLE' });
   });
 
+  it('reuses an active material with the same name', async () => {
+    vi.mocked(prisma.master_parts.findUnique).mockResolvedValue({
+      id: 'part-1',
+      isDeleted: false,
+      name: 'Frame',
+      status: 1,
+    } as never);
+
+    await expect(
+      PartMasterService.resolveOrCreateActive({ name: ' Frame ' }),
+    ).resolves.toEqual({ id: 'part-1', name: 'Frame' });
+    expect(prisma.master_parts.create).not.toHaveBeenCalled();
+  });
+
+  it('creates a canonical material when a BOM name is new', async () => {
+    vi.mocked(prisma.master_parts.findUnique)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null);
+    vi.mocked(prisma.master_parts.create).mockResolvedValue({
+      id: 'part-new',
+      name: 'Reducer',
+      sort: 0,
+      status: 1,
+    } as never);
+
+    await expect(
+      PartMasterService.resolveOrCreateActive({ name: 'Reducer' }),
+    ).resolves.toMatchObject({ id: 'part-new', name: 'Reducer' });
+  });
+
   it('paginates management queries in the database', async () => {
     vi.mocked(prisma.master_parts.findMany).mockResolvedValue([
       { id: 'part-1', name: 'Frame', sort: 2, status: 1 },

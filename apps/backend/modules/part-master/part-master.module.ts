@@ -14,14 +14,14 @@ export const partMasterModule: ModuleDeclaration = {
       type: 'menu',
       meta: {
         icon: 'carbon:product',
-        title: 'Material Master',
+        title: '物料主数据',
       },
       buttons: [
         {
           authCode: 'System:PartMaster:Edit',
           name: 'SystemPartMasterEdit',
           order: 1,
-          title: 'Edit Materials',
+          title: '编辑物料',
         },
       ],
     },

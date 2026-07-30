@@ -6,7 +6,7 @@ import type {
   UploadFile,
 } from 'ant-design-vue';
 
-import { Button, Form, Input, InputNumber, Select } from 'ant-design-vue';
+import { Form, Input, InputNumber, Select } from 'ant-design-vue';
 
 import { incomingInspectionTypeOptions } from '../entry-mode';
 import InspectionRequestEntryUploadActions from './InspectionRequestEntryUploadActions.vue';
@@ -155,17 +155,6 @@ function handlePartIdentityChange(
   }
 }
 
-function startMaterialRequest() {
-  form.value.partId = '';
-  form.value.partName = '';
-  form.value.requestNewPart = true;
-}
-
-function cancelMaterialRequest() {
-  form.value.requestedPartName = '';
-  form.value.requestNewPart = false;
-}
-
 function handleProcessIdentityChange(
   value: SelectProps['value'],
   option: unknown,
@@ -235,14 +224,9 @@ function handleProcessIdentityChange(
         v-model:value="form.requestedPartName"
         class="w-full"
         :maxlength="100"
-        placeholder="Enter the requested material name"
+        placeholder="请输入申请物料名称"
         allow-clear
       />
-      <div class="mt-1 flex justify-end">
-        <Button size="small" type="link" @click="cancelMaterialRequest">
-          Select existing material
-        </Button>
-      </div>
     </template>
     <template v-else>
       <Select
@@ -262,17 +246,10 @@ function handleProcessIdentityChange(
           }
         "
       />
-      <div
-        v-if="props.isIncomingEntry"
-        class="mt-1 flex items-center justify-between gap-2"
-      >
+      <div v-if="props.isIncomingEntry" class="mt-1">
         <span class="text-xs text-gray-500">
-          BOM materials are recommended first; search covers all active
-          materials.
+          优先推荐 BOM 物料，也可搜索全部已启用物料。
         </span>
-        <Button size="small" type="link" @click="startMaterialRequest">
-          Request new material
-        </Button>
       </div>
     </template>
   </Form.Item>

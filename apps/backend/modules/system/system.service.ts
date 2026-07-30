@@ -111,4 +111,11 @@ export const SystemService = {
     );
     return value === 'true' || value === null;
   },
+
+  async isIncomingMaterialFreeInputEnabled(): Promise<boolean> {
+    const value = await this.getSettingValue(
+      'INCOMING_MATERIAL_FREE_INPUT_ENABLED',
+    );
+    return value === 'true';
+  },
 };

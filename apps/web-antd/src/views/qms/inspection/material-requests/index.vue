@@ -77,31 +77,37 @@ const partOptionsLoading = ref(false);
 let partSearchSequence = 0;
 
 const columns = [
-  { dataIndex: 'status', key: 'status', title: 'Status', width: 110 },
+  { dataIndex: 'status', key: 'status', title: '状态', width: 110 },
   {
     dataIndex: 'requestedName',
     key: 'requestedName',
-    title: 'Requested material',
+    title: '申请物料',
     width: 220,
   },
-  { dataIndex: 'requestNo', key: 'requestNo', title: 'Request', width: 170 },
+  { dataIndex: 'requestNo', key: 'requestNo', title: '报检单号', width: 170 },
   {
     dataIndex: 'workOrderNumber',
     key: 'workOrderNumber',
-    title: 'Work order',
+    title: '工单号',
     width: 170,
   },
-  { dataIndex: 'supplierName', key: 'supplierName', title: 'Supplier' },
-  { dataIndex: 'reporter', key: 'reporter', title: 'Reporter', width: 130 },
+  { dataIndex: 'supplierName', key: 'supplierName', title: '供应商' },
+  { dataIndex: 'reporter', key: 'reporter', title: '报检人', width: 130 },
   {
     dataIndex: 'submittedAt',
     key: 'submittedAt',
-    title: 'Submitted',
+    title: '提交时间',
     width: 180,
   },
-  { key: 'resolution', title: 'Resolution', width: 220 },
-  { key: 'actions', title: 'Actions', fixed: 'right' as const, width: 150 },
+  { key: 'resolution', title: '处理结果', width: 220 },
+  { key: 'actions', title: '操作', fixed: 'right' as const, width: 150 },
 ];
+
+function statusLabel(status: MaterialRequestStatus) {
+  if (status === 'APPROVED') return '已通过';
+  if (status === 'REJECTED') return '已驳回';
+  return '待审核';
+}
 
 function statusColor(status: MaterialRequestStatus) {
   if (status === 'APPROVED') return 'success';
@@ -113,7 +119,7 @@ function formatDateTime(value?: null | string) {
   if (!value) return '—';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '—';
-  return new Intl.DateTimeFormat('en-GB', {
+  return new Intl.DateTimeFormat('zh-CN', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);
@@ -131,7 +137,7 @@ async function load() {
     items.value = result.items;
     total.value = result.total;
   } catch (error: unknown) {
-    handleApiError(error, 'Load Material Requests');
+    handleApiError(error, '加载物料申请');
   } finally {
     loading.value = false;
   }
@@ -159,7 +165,7 @@ async function searchPartOptions(keyword = '') {
   } catch (error: unknown) {
     if (sequence !== partSearchSequence) return;
     partOptions.value = [];
-    handleApiError(error, 'Search Material Master');
+    handleApiError(error, '搜索物料主数据');
   } finally {
     if (sequence === partSearchSequence) {
       partOptionsLoading.value = false;
@@ -192,7 +198,7 @@ async function submitReview() {
   if (!current.value) return;
   if (reviewDraft.decision === 'REJECT') {
     if (!reviewDraft.remark.trim()) {
-      message.warning('A rejection reason is required');
+      message.warning('请填写驳回原因');
       return;
     }
   } else if (
@@ -200,9 +206,7 @@ async function submitReview() {
     (reviewDraft.mode === 'CREATE' && !reviewDraft.name.trim())
   ) {
     message.warning(
-      reviewDraft.mode === 'CREATE'
-        ? 'Enter the canonical material name'
-        : 'Select an existing material',
+      reviewDraft.mode === 'CREATE' ? '请输入规范物料名称' : '请选择已有物料',
     );
     return;
   }
@@ -213,26 +217,26 @@ async function submitReview() {
       await rejectInspectionMaterialRequest(current.value.id, {
         remark: reviewDraft.remark.trim(),
       });
-      message.success('Material request rejected');
+      message.success('物料申请已驳回');
     } else if (reviewDraft.mode === 'CREATE') {
       await approveInspectionMaterialRequest(current.value.id, {
         mode: 'CREATE',
         name: reviewDraft.name.trim(),
         remark: reviewDraft.remark.trim() || undefined,
       });
-      message.success('Canonical material created and request approved');
+      message.success('已创建规范物料并通过申请');
     } else {
       await approveInspectionMaterialRequest(current.value.id, {
         mode: 'LINK_EXISTING',
         partId: reviewDraft.partId,
         remark: reviewDraft.remark.trim() || undefined,
       });
-      message.success('Request linked to the existing material');
+      message.success('已关联已有物料并通过申请');
     }
     reviewOpen.value = false;
     await load();
   } catch (error: unknown) {
-    handleApiError(error, 'Review Material Request');
+    handleApiError(error, '审核物料申请');
   } finally {
     saving.value = false;
   }
@@ -258,10 +262,10 @@ onMounted(load);
 </script>
 
 <template>
-  <Page title="Material Requests">
+  <Page title="物料申请">
     <Alert
       class="mb-4"
-      message="Inspection requests remain queued here until a canonical material is created or linked. Approval immediately unblocks dispatch."
+      message="新物料需审核创建或关联规范物料后，对应报检任务才可派单。"
       show-icon
       type="info"
     />
@@ -270,12 +274,12 @@ onMounted(load);
       <Select
         v-model:value="query.status"
         :options="[
-          { label: 'Pending', value: 'PENDING' },
-          { label: 'Approved', value: 'APPROVED' },
-          { label: 'Rejected', value: 'REJECTED' },
+          { label: '待审核', value: 'PENDING' },
+          { label: '已通过', value: 'APPROVED' },
+          { label: '已驳回', value: 'REJECTED' },
         ]"
         allow-clear
-        placeholder="All statuses"
+        placeholder="全部状态"
         style="width: 150px"
         @change="
           query.page = 1;
@@ -285,14 +289,14 @@ onMounted(load);
       <Input.Search
         v-model:value="query.keyword"
         allow-clear
-        placeholder="Material, request, work order, or reporter"
+        placeholder="搜索物料、报检单号、工单号或报检人"
         style="width: 320px"
         @search="
           query.page = 1;
           load();
         "
       />
-      <Button @click="resetFilters">Reset</Button>
+      <Button @click="resetFilters">重置</Button>
     </Space>
 
     <Table
@@ -311,7 +315,7 @@ onMounted(load);
     >
       <template #bodyCell="{ column, record }">
         <Tag v-if="column.key === 'status'" :color="statusColor(record.status)">
-          {{ record.status }}
+          {{ statusLabel(record.status) }}
         </Tag>
         <span v-else-if="column.key === 'submittedAt'">
           {{ formatDateTime(record.submittedAt) }}
@@ -336,7 +340,7 @@ onMounted(load);
               type="link"
               @click="openReviewById(record.id, 'APPROVE')"
             >
-              Review
+              审核
             </Button>
             <Button
               v-if="canReject"
@@ -345,7 +349,7 @@ onMounted(load);
               type="link"
               @click="openReviewById(record.id, 'REJECT')"
             >
-              Reject
+              驳回
             </Button>
           </template>
           <span v-else>—</span>
@@ -359,34 +363,32 @@ onMounted(load);
       :ok-button-props="{
         danger: reviewDraft.decision === 'REJECT',
       }"
-      :ok-text="reviewDraft.decision === 'REJECT' ? 'Reject' : 'Approve'"
+      :ok-text="reviewDraft.decision === 'REJECT' ? '驳回' : '通过'"
       :title="
-        reviewDraft.decision === 'REJECT'
-          ? 'Reject material request'
-          : 'Approve material request'
+        reviewDraft.decision === 'REJECT' ? '驳回物料申请' : '审核物料申请'
       "
       @ok="submitReview"
     >
       <Alert
         class="mb-4"
-        :message="current?.requestedName || 'No requested name'"
+        :message="current?.requestedName || '未填写申请物料名称'"
         show-icon
         type="warning"
       />
       <Form layout="vertical">
         <template v-if="reviewDraft.decision === 'APPROVE'">
-          <Form.Item label="Resolution" required>
+          <Form.Item label="处理方式" required>
             <Select
               v-model:value="reviewDraft.mode"
               :options="[
-                { label: 'Link existing material', value: 'LINK_EXISTING' },
-                { label: 'Create canonical material', value: 'CREATE' },
+                { label: '关联已有物料', value: 'LINK_EXISTING' },
+                { label: '创建规范物料', value: 'CREATE' },
               ]"
             />
           </Form.Item>
           <Form.Item
             v-if="reviewDraft.mode === 'LINK_EXISTING'"
-            label="Existing material"
+            label="已有物料"
             required
           >
             <Select
@@ -394,21 +396,17 @@ onMounted(load);
               :filter-option="false"
               :loading="partOptionsLoading"
               :options="partOptions"
-              placeholder="Search active materials"
+              placeholder="搜索已启用物料"
               show-search
               @search="searchPartOptions"
             />
           </Form.Item>
-          <Form.Item v-else label="Canonical material name" required>
+          <Form.Item v-else label="规范物料名称" required>
             <Input v-model:value="reviewDraft.name" :maxlength="100" />
           </Form.Item>
         </template>
         <Form.Item
-          :label="
-            reviewDraft.decision === 'REJECT'
-              ? 'Rejection reason'
-              : 'Review remark'
-          "
+          :label="reviewDraft.decision === 'REJECT' ? '驳回原因' : '审核备注'"
           :required="reviewDraft.decision === 'REJECT'"
         >
           <Input.TextArea

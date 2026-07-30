@@ -166,6 +166,13 @@ export function getPartOptions(keyword: string) {
   });
 }
 
+export function getInspectionRequestSettings() {
+  return request<{ incomingMaterialFreeInputEnabled: boolean }>({
+    url: '/api/qms/public/inspection/requests/settings',
+    method: 'GET',
+  });
+}
+
 // Get team list
 export function getTeams(keyword?: string) {
   return request<Array<{ group: string; label: string; value: string }>>({

@@ -6,6 +6,7 @@ import {
   inferImportErrorField,
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
+import { PlanningBomService } from '~/modules/planning';
 import {
   buildProjectBomCreateData,
   normalizeBomText,
@@ -58,16 +59,23 @@ export async function bom_import_post(event: H3Event) {
             ),
           },
         );
-        const {
-          canonicalFields: canonicalBomPayload,
-          governedFields: governedBomPayload,
-        } = await buildBomImportGovernedFields(createPayload);
+        const { governedFields: governedBomPayload } =
+          await buildBomImportGovernedFields(createPayload);
         return prisma.$transaction(async (tx) => {
+          const partIdentity =
+            await PlanningBomService.resolvePartIdentityForWrite(
+              {
+                partId: normalizeBomText(item.partId) || undefined,
+                partName: createPayload.part_name,
+              },
+              tx,
+            );
           const created = await tx.project_boms.create({
             data: {
               ...createPayload,
               ...governedBomPayload,
-              ...canonicalBomPayload,
+              partId: partIdentity.id,
+              part_name: partIdentity.name,
             },
             select: { id: true },
           });

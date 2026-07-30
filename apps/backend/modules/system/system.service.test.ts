@@ -191,4 +191,19 @@ describe('systemService', () => {
       ).resolves.toBe(false);
     });
   });
+
+  describe('isIncomingMaterialFreeInputEnabled', () => {
+    it('defaults to false and only enables on an explicit true value', async () => {
+      (prisma.system_settings.findUnique as any)
+        .mockResolvedValueOnce(null)
+        .mockResolvedValueOnce({ value: 'true' });
+
+      await expect(
+        SystemService.isIncomingMaterialFreeInputEnabled(),
+      ).resolves.toBe(false);
+      await expect(
+        SystemService.isIncomingMaterialFreeInputEnabled(),
+      ).resolves.toBe(true);
+    });
+  });
 });

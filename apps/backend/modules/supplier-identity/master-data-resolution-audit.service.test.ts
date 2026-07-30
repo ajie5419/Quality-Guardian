@@ -67,4 +67,55 @@ describe('master data resolution audit service', () => {
       }),
     );
   });
+
+  it('pages matching open references and resolves only explicit audit IDs', async () => {
+    const { MasterDataResolutionAuditService } = await import(
+      './master-data-resolution-audit.service'
+    );
+    const { default: prisma } = await import('~/utils/prisma');
+    vi.mocked(prisma.unresolved_master_data_refs.findMany).mockResolvedValue(
+      [] as never,
+    );
+    vi.mocked(prisma.unresolved_master_data_refs.updateMany).mockResolvedValue({
+      count: 2,
+    });
+
+    await MasterDataResolutionAuditService.findMatchingOpenBatch({
+      afterId: 'audit-100',
+      entityType: 'quality_records',
+      fieldName: 'defectClassification',
+      rawId: null,
+      rawName: 'Manufacturing defect/Machining accuracy',
+      take: 500,
+    });
+    await MasterDataResolutionAuditService.resolveMany({
+      ids: ['audit-101', 'audit-102'],
+      note: 'Confirmed',
+      resolvedId: 'subcategory-1',
+    });
+
+    expect(prisma.unresolved_master_data_refs.findMany).toHaveBeenCalledWith({
+      orderBy: { id: 'asc' },
+      select: { entityId: true, id: true },
+      take: 500,
+      where: {
+        entityType: 'quality_records',
+        fieldName: 'defectClassification',
+        id: { gt: 'audit-100' },
+        isDeleted: false,
+        rawId: null,
+        rawName: 'Manufacturing defect/Machining accuracy',
+        status: 'OPEN',
+      },
+    });
+    expect(prisma.unresolved_master_data_refs.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          id: { in: ['audit-101', 'audit-102'] },
+          isDeleted: false,
+          status: 'OPEN',
+        },
+      }),
+    );
+  });
 });

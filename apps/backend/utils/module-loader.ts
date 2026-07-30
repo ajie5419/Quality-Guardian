@@ -191,7 +191,7 @@ async function ensureButton(
   if (existing.parentId !== parentId) nextData.parentId = parentId;
   if (existing.type !== 'button') nextData.type = 'button';
   if (!existing.authCode) nextData.authCode = button.authCode;
-  if (!existing.meta) nextData.meta = meta;
+  if (existing.meta !== meta) nextData.meta = meta;
 
   if (Object.keys(nextData).length === 0) {
     return false;

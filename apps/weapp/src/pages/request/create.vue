@@ -3,6 +3,7 @@ import { computed, reactive, ref } from 'vue';
 
 import {
   getBomParts,
+  getInspectionRequestSettings,
   getPartOptions,
   getProcesses,
   getSuppliers,
@@ -113,6 +114,7 @@ const incomingPartKeyword = ref('');
 const canonicalPartList = ref<PartOptionItem[]>([]);
 const showPartDropdown = ref(false);
 const searchingPart = ref(false);
+const incomingMaterialFreeInputEnabled = ref(false);
 const requestNewPart = ref(false);
 let partSearchTimer: null | ReturnType<typeof setTimeout> = null;
 let partSearchSequence = 0;
@@ -175,8 +177,20 @@ onLoad(async () => {
   if (userStore.userInfo?.realName) {
     form.reporter = userStore.userInfo.realName;
   }
-  await loadTeams();
+  const [settings] = await Promise.all([
+    getInspectionRequestSettings(),
+    loadTeams(),
+  ]);
+  incomingMaterialFreeInputEnabled.value =
+    settings.code === 0 &&
+    settings.data?.incomingMaterialFreeInputEnabled === true;
+  syncMaterialInputMode();
 });
+
+function syncMaterialInputMode() {
+  requestNewPart.value =
+    form.category === 'INCOMING' && incomingMaterialFreeInputEnabled.value;
+}
 
 async function loadTeams() {
   const res = await getTeams();
@@ -251,7 +265,7 @@ async function selectWorkOrder(item: WorkOrderItem) {
   form.partId = '';
   form.requestedPartName = '';
   incomingPartKeyword.value = '';
-  requestNewPart.value = false;
+  syncMaterialInputMode();
   form.supplierId = '';
   form.teamId = '';
   form.team = '';
@@ -287,7 +301,7 @@ function onProcessChange(e: { detail: { value: string } }) {
   form.partName = '';
   form.requestedPartName = '';
   incomingPartKeyword.value = '';
-  requestNewPart.value = false;
+  syncMaterialInputMode();
   form.supplierId = '';
   form.teamId = '';
   form.team = '';
@@ -355,19 +369,6 @@ function selectIncomingPart(item: PartOptionItem) {
   incomingPartKeyword.value = form.partName;
   showPartDropdown.value = false;
   errors.componentName = false;
-}
-
-function startMaterialRequest() {
-  form.partId = '';
-  form.partName = '';
-  incomingPartKeyword.value = '';
-  requestNewPart.value = true;
-  showPartDropdown.value = false;
-}
-
-function cancelMaterialRequest() {
-  form.requestedPartName = '';
-  requestNewPart.value = false;
 }
 
 function onTeamChange(e: { detail: { value: string } }) {
@@ -583,44 +584,40 @@ async function handleSubmit() {
             </text>
           </view>
           <template v-if="isIncoming">
-            <view v-if="requestNewPart" class="material-request-wrap">
-              <input
-                v-model="form.requestedPartName"
-                class="input"
-                placeholder="Enter the requested material name"
-                placeholder-class="input-placeholder"
-                @input="errors.componentName = false"
-              />
-              <text class="material-action" @tap="cancelMaterialRequest">
-                Select existing material
-              </text>
-            </view>
-            <view v-else class="search-wrap">
-              <input
-                class="input"
-                :value="incomingPartKeyword"
-                placeholder="Search BOM or active materials"
-                placeholder-class="input-placeholder"
-                @focus="showPartDropdown = incomingPartOptions.length > 0"
-                @input="onIncomingPartInput"
-                @tap.stop
-              />
-              <view v-if="searchingPart" class="search-loading">
-                <text class="search-loading-text">Searching...</text>
+            <view class="material-input-wrap">
+              <view v-if="requestNewPart" class="material-request-wrap">
+                <input
+                  v-model="form.requestedPartName"
+                  class="input"
+                  placeholder="请输入申请物料名称"
+                  placeholder-class="input-placeholder"
+                  @input="errors.componentName = false"
+                />
               </view>
-              <view v-if="showPartDropdown" class="dropdown" @tap.stop>
-                <view
-                  v-for="item in incomingPartOptions"
-                  :key="item.id"
-                  class="dropdown-item"
-                  @tap="selectIncomingPart(item)"
-                >
-                  <text class="dropdown-item-title">{{ item.name }}</text>
+              <view v-else class="search-wrap">
+                <input
+                  class="input"
+                  :value="incomingPartKeyword"
+                  placeholder="搜索 BOM 或已启用物料"
+                  placeholder-class="input-placeholder"
+                  @focus="showPartDropdown = incomingPartOptions.length > 0"
+                  @input="onIncomingPartInput"
+                  @tap.stop
+                />
+                <view v-if="searchingPart" class="search-loading">
+                  <text class="search-loading-text">搜索中...</text>
+                </view>
+                <view v-if="showPartDropdown" class="dropdown" @tap.stop>
+                  <view
+                    v-for="item in incomingPartOptions"
+                    :key="item.id"
+                    class="dropdown-item"
+                    @tap="selectIncomingPart(item)"
+                  >
+                    <text class="dropdown-item-title">{{ item.name }}</text>
+                  </view>
                 </view>
               </view>
-              <text class="material-action" @tap="startMaterialRequest">
-                Request new material
-              </text>
             </view>
           </template>
           <picker
@@ -942,11 +939,12 @@ async function handleSubmit() {
   padding: 12rpx 0;
 }
 
-.material-action {
-  align-self: flex-end;
-  padding: 8rpx;
-  font-size: 24rpx;
-  color: $primary-color;
+.material-input-wrap {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12rpx 0;
 }
 
 .search-loading {

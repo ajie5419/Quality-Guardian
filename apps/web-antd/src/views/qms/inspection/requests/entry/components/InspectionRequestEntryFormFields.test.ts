@@ -155,20 +155,10 @@ describe('inspection request entry responsible unit identity', () => {
 });
 
 describe('inspection request entry material identity', () => {
-  it('allows incoming inspection to request a material without a canonical ID', async () => {
+  it('does not expose a material input mode control', () => {
     const { form, wrapper } = mountFields(true);
-    const button = wrapper
-      .findAll('button')
-      .find((item) => item.text() === 'Request new material');
-
-    expect(button).toBeDefined();
-    await button?.trigger('click');
-
-    expect(form).toMatchObject({
-      partId: '',
-      partName: '',
-      requestNewPart: true,
-    });
-    expect(wrapper.text()).toContain('Select existing material');
+    expect(form.requestNewPart).toBe(false);
+    expect(wrapper.text()).not.toContain('自由输入');
+    expect(wrapper.text()).not.toContain('规范物料');
   });
 });

@@ -29,6 +29,8 @@ import {
   deleteInspectionProcessApi,
   getInspectionManualCreateSettingApi,
   getInspectionProcessesApi,
+  getPublicIncomingMaterialInputSettingApi,
+  updateIncomingMaterialInputSettingApi,
   updateInspectionManualCreateSettingApi,
   updateInspectionProcessApi,
   updateInspectionProcessSelectionApi,
@@ -48,9 +50,11 @@ const canEdit = computed(
 
 const loading = ref(false);
 const savingManualSetting = ref(false);
+const savingMaterialInputSetting = ref(false);
 const savingSelection = ref(false);
 const savingProcess = ref(false);
 const manualCreateEnabled = ref(true);
+const incomingMaterialFreeInputEnabled = ref(false);
 const processRows = ref<ProcessItem[]>([]);
 const processProcessIds = ref(new Set<string>());
 const incomingProcessIds = ref(new Set<string>());
@@ -104,11 +108,14 @@ const columns = computed(() => [
 async function loadSettings() {
   loading.value = true;
   try {
-    const [manualSetting, processes] = await Promise.all([
+    const [manualSetting, materialInputSetting, processes] = await Promise.all([
       getInspectionManualCreateSettingApi(),
+      getPublicIncomingMaterialInputSettingApi(),
       getInspectionProcessesApi(),
     ]);
     manualCreateEnabled.value = manualSetting.enabled;
+    incomingMaterialFreeInputEnabled.value =
+      materialInputSetting.incomingMaterialFreeInputEnabled;
     processRows.value = processes;
     processProcessIds.value = new Set(
       processes
@@ -139,6 +146,20 @@ async function handleManualToggle(checked: boolean) {
     message.error(t('common.saveFailed'));
   } finally {
     savingManualSetting.value = false;
+  }
+}
+
+async function handleMaterialInputToggle(checked: boolean) {
+  const previous = !checked;
+  savingMaterialInputSetting.value = true;
+  try {
+    await updateIncomingMaterialInputSettingApi({ enabled: checked });
+    message.success(t('common.saveSuccess'));
+  } catch {
+    incomingMaterialFreeInputEnabled.value = previous;
+    message.error(t('common.saveFailed'));
+  } finally {
+    savingMaterialInputSetting.value = false;
   }
 }
 
@@ -290,6 +311,23 @@ onMounted(loadSettings);
             :disabled="!canEdit || savingManualSetting"
             :loading="savingManualSetting"
             @change="(checked) => handleManualToggle(checked as boolean)"
+          />
+        </div>
+      </section>
+
+      <section class="border-border border-b pb-6">
+        <h2 class="mb-4 text-base font-semibold">
+          {{ t('sys.inspectionSettings.requestSettings') }}
+        </h2>
+        <div class="flex items-center justify-between gap-4">
+          <span>{{
+            t('sys.inspectionSettings.incomingMaterialFreeInputLabel')
+          }}</span>
+          <Switch
+            v-model:checked="incomingMaterialFreeInputEnabled"
+            :disabled="!canEdit || savingMaterialInputSetting"
+            :loading="savingMaterialInputSetting"
+            @change="(checked) => handleMaterialInputToggle(checked as boolean)"
           />
         </div>
       </section>
