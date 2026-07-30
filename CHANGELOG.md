@@ -25,6 +25,36 @@
 
 ## 执行记录
 
+### 2026-07-30 物料新增申请、审核与规范 ID 闭环
+
+**执行内容：**
+
+- 新增独立 `part-master` 领域模块，统一拥有 `master_parts` 写入，提供启用物料搜索、规范 ID 校验、后台管理 CRUD、软删除和同名恢复原 ID；停用物料不再通过通用 canonical 有效性校验。
+- 新增 `qms_inspection_material_requests` 及 Prisma migration。公开 V2 进货报检支持 `partId` 或 `requestedPartName` 严格二选一，并在同一事务内创建报检任务和物料申请。
+- 新增后台物料申请队列及独立 List/Approve/Reject 权限。审核支持创建规范物料或关联已有物料，在同一事务内回填报检 `partId/partName`；拒绝会取消关联报检。
+- 派单接口强制校验规范物料 ID 和申请状态；待审核时不发送派单通知，审核通过提交规范身份后才通知调度。
+- Web 与微信小程序进货报检接入 BOM 推荐、全局规范物料搜索和申请新增物料；公开页面不展示审核状态或卡滞信息。后台新增物料审核页与物料主数据管理页。
+- 增加搜索防抖、异步竞态保护、多工单 BOM 合并、选中项标签保留、规范 ID 展示及相关 schema、service、mapper、API 和页面测试。
+
+**验证结果：**
+
+- 全仓单元测试：`340/340` 文件、`2893/2893` 测试通过。
+- Backend full suite：`246/246` 文件、`2304/2304` 测试通过。
+- 定向测试：`16/16` 文件、`123/123` 测试通过。
+- `pnpm lint`：通过，0 error / 0 warning。
+- `pnpm run check:type`：通过，3/3 workspace tasks。
+- `pnpm run check:qms-arch`：通过，0 violations。
+- Prisma schema validate、format、generate 与 migration 标识符检查通过。
+- 浏览器验收：公开进货报检可在规范物料选择和申请新增模式间切换，页面未显示审核卡滞信息；全局搜索正常触发。后台路由正确要求登录，当前浏览器无管理员会话，未执行登录态点击验收。
+
+**commit：**
+
+- `e7aed516` `feat: add material approval workflow`
+
+**遗留问题：**
+
+- 新 migration 尚未部署到生产环境；必须通过既有发布流程执行 `prisma migrate deploy`，禁止手工改表。
+
 ## [0.20.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.20.2...qgs-v0.20.3) (2026-07-29)
 
 
