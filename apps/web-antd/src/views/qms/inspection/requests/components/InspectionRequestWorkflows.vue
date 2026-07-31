@@ -104,6 +104,7 @@ const props = defineProps<Props>();
 
 const emit = defineEmits<{
   loadInspectorStatusTasks: [item: InspectorStatusItem];
+  materialApproved: [request: InspectionRequest];
   openClose: [];
   openInspectionRecord: [record: InspectionRequest];
   submitClose: [];
@@ -122,6 +123,7 @@ const emit = defineEmits<{
 <template>
   <DispatchTaskModal
     :open="props.dispatchOpen"
+    :request="props.currentRequest"
     :title="
       props.currentRequest?.status === 'DISPATCHED'
         ? '改派检验任务'
@@ -133,6 +135,7 @@ const emit = defineEmits<{
     @update:open="(value) => emit('updateDispatchOpen', value)"
     @update:form="(value) => emit('updateDispatchForm', value)"
     @submit="emit('submitDispatch')"
+    @material-approved="(request) => emit('materialApproved', request)"
   />
 
   <DispatchDetailDrawer

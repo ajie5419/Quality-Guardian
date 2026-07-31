@@ -21,6 +21,7 @@ vi.mock('~/modules/process-master', () => ({
 vi.mock('~/modules/part-master', () => ({
   PartMasterService: {
     assertActive: vi.fn(),
+    findActiveByExactName: vi.fn(),
   },
 }));
 
@@ -132,6 +133,7 @@ describe('inspectionRequestCreateService', () => {
       id: 'part-1',
       name: 'Canonical Part',
     });
+    vi.mocked(PartMasterService.findActiveByExactName).mockResolvedValue(null);
   });
 
   it('rejects a V2 process that is hidden for the requested category', async () => {
@@ -281,6 +283,64 @@ describe('inspectionRequestCreateService', () => {
     expect(
       WxSubscribeMessageService.sendPendingDispatchCreated,
     ).not.toHaveBeenCalled();
+  });
+
+  it('auto-links an active material for an exact free-input name', async () => {
+    vi.mocked(
+      SystemService.isIncomingMaterialFreeInputEnabled,
+    ).mockResolvedValueOnce(true);
+    vi.mocked(PartMasterService.findActiveByExactName).mockResolvedValueOnce({
+      id: 'part-1',
+      name: 'Bearing',
+    });
+    vi.mocked(
+      ProcessMasterService.assertInspectionRequestOption,
+    ).mockResolvedValueOnce({
+      id: 'process-1',
+      name: 'Incoming inspection',
+    });
+    const { buildGovernedCanonicalWritePairForTable } = await import(
+      '~/utils/governed-write'
+    );
+    vi.mocked(buildGovernedCanonicalWritePairForTable).mockResolvedValueOnce({
+      processId: 'process-1',
+      processName: 'Incoming inspection',
+    });
+    const create = vi.fn().mockResolvedValue({
+      ...mockRequest,
+      partId: 'part-1',
+      partName: 'Bearing',
+      materialRequest: null,
+    });
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      null,
+      {
+        category: 'INCOMING',
+        processId: 'process-1',
+        requestedPartName: ' Bearing ',
+        supplierId: 'supplier-1',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          partId: 'part-1',
+          partName: 'Bearing',
+        }),
+      }),
+    );
+    expect(create.mock.calls[0]?.[0].data).not.toHaveProperty(
+      'materialRequest',
+    );
   });
 
   it.each([

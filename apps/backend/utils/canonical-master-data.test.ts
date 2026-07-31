@@ -8,6 +8,7 @@ import {
 
 const {
   executeRawUnsafe,
+  queryRaw,
   queryRawUnsafe,
   transaction,
   unresolvedFindMany,
@@ -15,8 +16,10 @@ const {
   unresolvedUpsert,
 } = vi.hoisted(() => {
   const queryRawUnsafe = vi.fn();
+  const queryRaw = vi.fn();
   return {
     executeRawUnsafe: vi.fn(),
+    queryRaw,
     queryRawUnsafe,
     transaction: vi.fn(
       async (
@@ -32,6 +35,7 @@ const {
 vi.mock('~/utils/prisma', () => ({
   default: {
     $executeRawUnsafe: executeRawUnsafe,
+    $queryRaw: queryRaw,
     $queryRawUnsafe: queryRawUnsafe,
     $transaction: transaction,
     unresolved_master_data_refs: {
@@ -49,6 +53,7 @@ vi.mock('@paralleldrive/cuid2', () => ({
 describe('masterDataGovernanceKernel', () => {
   beforeEach(() => {
     queryRawUnsafe.mockReset();
+    queryRaw.mockReset();
     executeRawUnsafe.mockReset();
     transaction.mockClear();
     unresolvedFindMany.mockReset();
@@ -116,6 +121,26 @@ describe('masterDataGovernanceKernel', () => {
 
     expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('isDeleted = 0');
     expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('status = 1');
+  });
+
+  it('requires project identities to be enabled', () => {
+    expect(
+      MasterDataGovernanceKernel.getField('projectName').canonical?.activeWhere,
+    ).toBe('isDeleted = 0 AND status = 1');
+  });
+
+  it('lists canonical options through the structured query API', async () => {
+    queryRaw.mockResolvedValue([{ id: 'project-1', name: 'Project A' }]);
+
+    await expect(
+      MasterDataGovernanceKernel.listCanonicalOptions({
+        configKey: 'projectName',
+        keyword: 'Project',
+      }),
+    ).resolves.toEqual([{ id: 'project-1', name: 'Project A' }]);
+
+    expect(queryRaw).toHaveBeenCalledOnce();
+    expect(queryRawUnsafe).not.toHaveBeenCalled();
   });
 
   it('creates bootstrapped process identities with cuid IDs', async () => {

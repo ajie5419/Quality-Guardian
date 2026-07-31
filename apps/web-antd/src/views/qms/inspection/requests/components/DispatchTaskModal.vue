@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { reactive, watch } from 'vue';
+import type { InspectionRequest } from '@qgs/shared';
+
+import { reactive, ref, watch } from 'vue';
 
 import { Form, Input, InputNumber, Modal, Select } from 'ant-design-vue';
 
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
+import DispatchMaterialReview from './DispatchMaterialReview.vue';
+
 interface Props {
   title?: string;
   open: boolean;
+  request?: InspectionRequest;
   submitting: boolean;
   userOptions: Array<{ label: string; value: string }>;
   form: {
@@ -19,11 +24,17 @@ interface Props {
 
 const props = defineProps<Props>();
 const emit = defineEmits<{
+  materialApproved: [request: InspectionRequest];
   submit: [];
   'update:form': [value: Props['form']];
   'update:open': [value: boolean];
 }>();
 const { modalWidth, modalWrapClassName } = useAdaptivePopup();
+const materialReviewRef = ref<InstanceType<typeof DispatchMaterialReview>>();
+const materialReviewSaving = ref(false);
+
+const requiresMaterialReview = () =>
+  props.request?.dispatchBlockedReason === 'MATERIAL_APPROVAL_PENDING';
 
 const localForm = reactive({
   dispatchRemark: '',
@@ -64,6 +75,10 @@ function handleUpdateOpen(value: boolean) {
 }
 
 function handleSubmit() {
+  if (requiresMaterialReview()) {
+    void materialReviewRef.value?.approve();
+    return;
+  }
   emit('update:form', {
     dispatchRemark: localForm.dispatchRemark,
     inspectorId: localForm.inspectorId,
@@ -79,11 +94,19 @@ function handleSubmit() {
     :title="props.title || '派发检验任务'"
     :width="modalWidth"
     :wrap-class-name="modalWrapClassName"
-    :confirm-loading="props.submitting"
+    :confirm-loading="props.submitting || materialReviewSaving"
+    :ok-text="requiresMaterialReview() ? '审核并继续' : '确定派单'"
     @ok="handleSubmit"
     @update:open="handleUpdateOpen"
   >
-    <Form layout="vertical">
+    <DispatchMaterialReview
+      v-if="props.request && requiresMaterialReview()"
+      ref="materialReviewRef"
+      :request="props.request"
+      @approved="(request) => emit('materialApproved', request)"
+      @saving="(value) => (materialReviewSaving = value)"
+    />
+    <Form v-else layout="vertical">
       <Form.Item label="检验员" required>
         <Select
           v-model:value="localForm.inspectorId"

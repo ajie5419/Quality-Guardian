@@ -110,6 +110,32 @@ describe('part master service', () => {
     ).rejects.toMatchObject({ code: 'PART_NOT_AVAILABLE' });
   });
 
+  it('finds one active material by its normalized exact name', async () => {
+    vi.mocked(prisma.master_parts.findMany).mockResolvedValue([
+      { id: 'part-1', name: 'Frame' },
+    ] as never);
+
+    await expect(
+      PartMasterService.findActiveByExactName(' Frame '),
+    ).resolves.toEqual({ id: 'part-1', name: 'Frame' });
+    expect(prisma.master_parts.findMany).toHaveBeenCalledWith({
+      where: { name: 'Frame', isDeleted: false, status: 1 },
+      select: { id: true, name: true },
+      take: 2,
+    });
+  });
+
+  it('does not resolve an ambiguous material name', async () => {
+    vi.mocked(prisma.master_parts.findMany).mockResolvedValue([
+      { id: 'part-1', name: 'Frame' },
+      { id: 'part-2', name: 'Frame' },
+    ] as never);
+
+    await expect(
+      PartMasterService.findActiveByExactName('Frame'),
+    ).resolves.toBeNull();
+  });
+
   it('reuses an active material with the same name', async () => {
     vi.mocked(prisma.master_parts.findUnique).mockResolvedValue({
       id: 'part-1',

@@ -1,8 +1,8 @@
 import { getRouterParam } from 'h3';
 import {
   assertMasterDataGovernancePermission,
-  MASTER_DATA_GOVERNANCE_EDIT_PERMISSION,
-  masterDataGovernanceResolutionSchema,
+  MASTER_DATA_GOVERNANCE_LIST_PERMISSION,
+  masterDataGovernanceOptionsQuerySchema,
   MasterDataGovernanceService,
 } from '~/modules/master-data-governance';
 import { logApiError } from '~/utils/api-logger';
@@ -10,27 +10,27 @@ import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
   badRequestResponse,
-  internalServerErrorResponse as errorResponse,
+  internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineValidatedHandler(
-  masterDataGovernanceResolutionSchema,
-  async (event, body) => {
+  masterDataGovernanceOptionsQuerySchema,
+  async (event, query) => {
     try {
       await assertMasterDataGovernancePermission(
         event,
-        MASTER_DATA_GOVERNANCE_EDIT_PERMISSION,
+        MASTER_DATA_GOVERNANCE_LIST_PERMISSION,
       );
       const auditId = String(getRouterParam(event, 'id') || '').trim();
       if (!auditId) return badRequestResponse(event, 'Missing audit ID');
       return useResponseSuccess(
-        await MasterDataGovernanceService.resolveRequest(auditId, body),
+        await MasterDataGovernanceService.listOptions(auditId, query.keyword),
       );
     } catch (error: unknown) {
-      logApiError('master-data-governance-resolve', error, undefined, event);
+      logApiError('master-data-governance-options', error, undefined, event);
       if (isBusinessError(error)) return businessErrorResponse(event, error);
-      return errorResponse(event, 'Master data resolution failed');
+      return internalServerErrorResponse(event, 'Master data options failed');
     }
   },
 );

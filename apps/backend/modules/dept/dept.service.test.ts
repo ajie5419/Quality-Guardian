@@ -11,6 +11,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     departments: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
     },
@@ -40,6 +41,21 @@ describe('deptService', () => {
     expect(result).toEqual(cached);
     expect(prisma.departments.findMany).not.toHaveBeenCalled();
     expect(redis.set).not.toHaveBeenCalled();
+  });
+
+  it('finds only an active department by canonical ID', async () => {
+    vi.mocked(prisma.departments.findFirst).mockResolvedValue({
+      businessUnit: 'Manufacturing',
+      id: 'dept-1',
+      name: 'Production',
+    } as never);
+
+    await DeptService.findActiveById(' dept-1 ');
+
+    expect(prisma.departments.findFirst).toHaveBeenCalledWith({
+      where: { id: 'dept-1', isDeleted: false, status: 1 },
+      select: { businessUnit: true, id: true, name: true },
+    });
   });
 
   it('builds and caches department tree when cache misses', async () => {

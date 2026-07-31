@@ -928,7 +928,7 @@ const MASTER_DATA_FIELDS: MasterDataGovernanceField[] = [
       table: 'master_projects',
       idColumn: 'id',
       nameColumn: 'name',
-      activeWhere: 'isDeleted = 0',
+      activeWhere: 'isDeleted = 0 AND status = 1',
     },
     targets: [
       {

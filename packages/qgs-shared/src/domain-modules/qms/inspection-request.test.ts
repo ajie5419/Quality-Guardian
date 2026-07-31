@@ -17,6 +17,7 @@ describe('mapInspectionRequestRecord', () => {
   it('maps pending material approval without exposing internal review data', () => {
     const mapped = mapInspectionRequestRecord({
       materialRequest: {
+        id: 'material-request-1',
         requestedName: 'Unregistered bearing',
         status: 'PENDING',
       },
@@ -26,6 +27,7 @@ describe('mapInspectionRequestRecord', () => {
     expect(mapped).toMatchObject({
       dispatchBlockedReason: 'MATERIAL_APPROVAL_PENDING',
       materialApprovalStatus: 'PENDING',
+      materialRequestId: 'material-request-1',
       requestedPartName: 'Unregistered bearing',
     });
   });

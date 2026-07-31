@@ -268,10 +268,13 @@ export const SupplierIdentityService = {
     return new Map(suppliers.map((supplier) => [supplier.id, supplier.name]));
   },
 
-  async resolveSupplierByTeamId(teamId: null | string | undefined) {
+  async resolveSupplierByTeamId(
+    teamId: null | string | undefined,
+    client: Pick<Prisma.TransactionClient, 'supplier_identity_links'> = prisma,
+  ) {
     const id = normalizeId(teamId);
     if (!id) return null;
-    const link = await prisma.supplier_identity_links.findFirst({
+    const link = await client.supplier_identity_links.findFirst({
       where: {
         identityId: id,
         identityType: 'TEAM',

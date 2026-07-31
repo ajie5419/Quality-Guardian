@@ -153,6 +153,17 @@ export const PartMasterService = {
     return part;
   },
 
+  async findActiveByExactName(name: string, db: PartMasterClient = prisma) {
+    const normalizedName = name.trim();
+    if (!normalizedName) return null;
+    const parts = await db.master_parts.findMany({
+      where: { name: normalizedName, isDeleted: false, status: 1 },
+      select: { id: true, name: true },
+      take: 2,
+    });
+    return parts.length === 1 ? parts[0] : null;
+  },
+
   async resolveOrCreateActive(
     input: { name: string; partId?: null | string },
     db: PartMasterClient = prisma,

@@ -55,6 +55,7 @@ describe('useInspectionRequestTaskActions', () => {
       buildRequestUrl: (params) => JSON.stringify(params),
       canDelete: ref(true),
       canDispatch: ref(true),
+      canApproveMaterial: ref(true),
       deptTreeData: ref([
         {
           children: [
@@ -118,6 +119,22 @@ describe('useInspectionRequestTaskActions', () => {
       priority: 2,
     });
     expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务已改派');
+  });
+
+  it('opens pending material approval in the dispatch workflow', () => {
+    const composable = createComposable();
+
+    composable.openDispatch({
+      dispatchBlockedReason: 'MATERIAL_APPROVAL_PENDING',
+      id: 'request-1',
+      materialRequestId: 'material-request-1',
+      partName: 'New bearing',
+      priority: 3,
+      status: 'SUBMITTED',
+    } as any);
+
+    expect(composable.dispatchOpen.value).toBe(true);
+    expect(mockMessageWarning).not.toHaveBeenCalled();
   });
 
   it('submits linked issue photos from upload response URLs when closing as failed', async () => {

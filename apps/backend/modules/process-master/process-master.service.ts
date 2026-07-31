@@ -13,6 +13,8 @@ import prisma from '~/utils/prisma';
 
 const INSPECTION_REQUEST_CATEGORIES = ['INCOMING', 'PROCESS'] as const;
 
+type ProcessReadClient = Pick<Prisma.TransactionClient, 'processes'>;
+
 function normalizeOptionalText(value: null | string | undefined) {
   if (value === undefined) return undefined;
   return value?.trim() || null;
@@ -83,6 +85,13 @@ async function replaceCategorySelection(
 }
 
 export const ProcessMasterService = {
+  async findActiveById(id: string, client: ProcessReadClient = prisma) {
+    return client.processes.findFirst({
+      where: { id: id.trim(), isDeleted: false, status: 1 },
+      select: { id: true, name: true },
+    });
+  },
+
   async listActiveOptions() {
     return prisma.processes.findMany({
       where: { isDeleted: false, status: 1 },

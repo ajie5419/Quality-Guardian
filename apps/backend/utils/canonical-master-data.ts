@@ -5,6 +5,7 @@ import type {
 } from './master-data-fields';
 
 import { createId } from '@paralleldrive/cuid2';
+import { Prisma } from '@prisma/client';
 import { PartMasterService } from '~/modules/part-master';
 import prisma from '~/utils/prisma';
 
@@ -875,6 +876,36 @@ export const __masterDataGovernanceTestHooks = {
 };
 
 export const MasterDataGovernanceKernel = {
+  async listCanonicalOptions(options: {
+    configKey: string;
+    keyword?: string;
+    take?: number;
+  }) {
+    const field = getFieldOrThrow(options.configKey);
+    if (!field.canonical) return [];
+    const canonical = field.canonical;
+    const table = quoteIdentifier(canonical.table);
+    const idColumn = quoteIdentifier(canonical.idColumn);
+    const nameColumn = quoteIdentifier(canonical.nameColumn);
+    const keyword = normalizeValue(options.keyword);
+    const activeWhere = canonical.activeWhere
+      ? Prisma.raw(
+          ` AND ${qualifyActiveWhereClause(canonical.activeWhere, '')}`,
+        )
+      : Prisma.empty;
+    const take = Math.min(Math.max(options.take || 100, 1), 100);
+    return prisma.$queryRaw<Array<{ id: string; name: string }>>(
+      Prisma.sql`
+        SELECT ${Prisma.raw(idColumn)} AS id, ${Prisma.raw(nameColumn)} AS name
+        FROM ${Prisma.raw(table)}
+        WHERE (${keyword} = '' OR ${Prisma.raw(nameColumn)} LIKE ${`%${keyword}%`})
+        ${activeWhere}
+        ORDER BY ${Prisma.raw(nameColumn)} ASC, ${Prisma.raw(idColumn)} ASC
+        LIMIT ${take}
+      `,
+    );
+  },
+
   isConfigKey(configKey: string) {
     return Boolean(getMasterDataGovernanceField(configKey));
   },

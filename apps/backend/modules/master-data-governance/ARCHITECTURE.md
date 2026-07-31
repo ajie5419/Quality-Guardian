@@ -7,7 +7,9 @@
 - 治理清单通过 `supplier-identity` 的公开审计服务读取 `unresolved_master_data_refs`。
 - 不合格项分类处置委托 `inspection`，售后产品/缺陷分类处置委托 `after-sales`。
 - 业务记录和审计状态必须在同一事务中更新；已被处理或在审计后发生冲突的记录返回并发冲突，不允许覆盖。
-- 当前仅开放三类有确定校验边界的分类引用：不合格项缺陷分类、售后产品分类、售后缺陷分类。其他治理项只读展示，等待所属业务模块提供安全处置能力。
+- Identity references are dispatched by the exact `entityType + fieldName` pair. Inspection records, BOM parts and required processes, supplier identity links, work-order requirements, and work orders expose canonical options and delegate writes to their owning modules.
+- Single-value identity resolution updates canonical IDs while preserving historical name snapshots. BOM required processes are the exception: resolution atomically creates the structured process relations and their ordered snapshots.
+- All resolution services use raw ID/name compare-and-set conditions and close only audits whose business records were actually updated.
 
 ## 权限
 

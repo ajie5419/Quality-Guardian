@@ -110,6 +110,7 @@ describe('inspection request query service', () => {
         inspector: null,
         linkedIssueId: null,
         materialRequest: {
+          id: 'material-request-1',
           requestedName: 'Unregistered bearing',
           status: 'PENDING',
         },
@@ -132,6 +133,7 @@ describe('inspection request query service', () => {
     expect(result.items[0]).toMatchObject({
       dispatchBlockedReason: 'MATERIAL_APPROVAL_PENDING',
       materialApprovalStatus: 'PENDING',
+      materialRequestId: 'material-request-1',
       requestedPartName: 'Unregistered bearing',
     });
   });

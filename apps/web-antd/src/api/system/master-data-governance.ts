@@ -44,13 +44,37 @@ export function getMasterDataReferencesApi(
   });
 }
 
+export function getMasterDataReferenceOptionsApi(id: string, keyword = '') {
+  return requestClient.get<{
+    items: Array<{ id: string; name: string }>;
+    multiple: boolean;
+  }>(`${BASE_URL}/${id}/options`, { params: { keyword } });
+}
+
 export function resolveMasterDataReferenceApi(
   id: string,
-  data: {
-    categoryId: string;
-    note: string;
-    subcategoryId: string;
-  },
+  data:
+    | {
+        canonicalIds: string[];
+        note: string;
+        resolutionType: 'IDENTITY';
+      }
+    | {
+        categoryId: string;
+        note: string;
+        resolutionType: 'CLASSIFICATION';
+        subcategoryId: string;
+      }
+    | {
+        departmentId: string;
+        note: string;
+        resolutionType: 'DEPARTMENT';
+      }
+    | {
+        note: string;
+        processId: string;
+        resolutionType: 'PROCESS';
+      },
 ) {
   return requestClient.put<{
     affectedCount: number;

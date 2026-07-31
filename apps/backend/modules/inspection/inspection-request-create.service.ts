@@ -224,13 +224,18 @@ async function buildCreateRequestPayload(
       );
     }
   }
-  const [partIdentity, processName] =
+  const [selectedPartIdentity, processName] =
     identityContract === 'V2'
       ? await Promise.all([
           partId ? PartMasterService.assertActive(partId) : null,
           resolveV2ProcessIdentity(processId, category),
         ])
       : [null, legacyProcessName];
+  const partIdentity =
+    selectedPartIdentity ||
+    (category === 'INCOMING' && requestedPartName
+      ? await PartMasterService.findActiveByExactName(requestedPartName)
+      : null);
   const partName =
     identityContract === 'V2'
       ? partIdentity?.name || requestedPartName
@@ -311,12 +316,14 @@ async function buildCreateRequestPayload(
     componentName,
     governedCanonicalIds,
     governedFields,
-    partId: requestedPartName
-      ? null
-      : partIdentity?.id || governedCanonicalIds.partId || null,
-    partName: requestedPartName
-      ? partName
-      : partIdentity?.name || governedCanonicalIds.partName || partName,
+    partId:
+      partIdentity?.id ||
+      (requestedPartName ? null : governedCanonicalIds.partId || null),
+    partName:
+      partIdentity?.name ||
+      (requestedPartName
+        ? partName
+        : governedCanonicalIds.partName || partName),
     processId: governedCanonicalIds.processId || null,
     processName: governedCanonicalIds.processName || processName,
     quantity,

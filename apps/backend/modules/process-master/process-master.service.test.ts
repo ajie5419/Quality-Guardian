@@ -50,6 +50,20 @@ describe('process master service', () => {
     });
   });
 
+  it('finds only an active process by canonical ID', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+      name: 'Incoming inspection',
+    } as never);
+
+    await ProcessMasterService.findActiveById(' process-1 ');
+
+    expect(prisma.processes.findFirst).toHaveBeenCalledWith({
+      where: { id: 'process-1', isDeleted: false, status: 1 },
+      select: { id: true, name: true },
+    });
+  });
+
   it('lists the same global process in both inspection categories', async () => {
     vi.mocked(prisma.processes.findMany).mockResolvedValue([
       {
