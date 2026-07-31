@@ -19,7 +19,13 @@ const FIELD_CONFIG = {
 } as const;
 
 type SupportedField = keyof typeof FIELD_CONFIG;
-type InspectionTx = Pick<Prisma.TransactionClient, 'inspections'>;
+type InspectionTx = Pick<
+  Prisma.TransactionClient,
+  | '$queryRaw'
+  | 'inspections'
+  | 'supplier_identity_links'
+  | 'team_identity_merge_participants'
+>;
 
 function supportedField(fieldName: string): null | SupportedField {
   return Object.prototype.hasOwnProperty.call(FIELD_CONFIG, fieldName)
@@ -111,9 +117,23 @@ async function assertSupplierConsistency(
     where: { category: 'PROCESS', id: { in: ids }, isDeleted: false },
     select: { id: true, teamId: true },
   });
+  if (processRows.some((row) => !row.teamId)) {
+    throw new BusinessError(
+      'SUPPLIER_TEAM_CONFLICT',
+      'The selected supplier requires an inspection TEAM',
+      409,
+    );
+  }
+  const teamIds = [
+    ...new Set(processRows.map((row) => String(row.teamId))),
+  ].sort();
+  for (const teamId of teamIds) {
+    await SupplierIdentityService.lockTeamForMutation(teamId, tx);
+  }
   for (const row of processRows) {
     const linked = await SupplierIdentityService.resolveSupplierByTeamId(
       row.teamId,
+      tx,
     );
     if (!linked || linked.id !== supplierId) {
       throw new BusinessError(

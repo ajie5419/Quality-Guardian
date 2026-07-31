@@ -63,6 +63,24 @@ describe('supplier identity service', () => {
     );
   });
 
+  it('uses the supplied transaction client for TEAM resolution', async () => {
+    const client = {
+      supplier_identity_links: { findFirst: vi.fn() },
+    };
+    client.supplier_identity_links.findFirst.mockResolvedValue({
+      id: 'link-1',
+      supplier: { id: 'supplier-1', isDeleted: false, name: 'Supplier A' },
+    });
+
+    await SupplierIdentityService.resolveSupplierByTeamId(
+      'team-1',
+      client as never,
+    );
+
+    expect(client.supplier_identity_links.findFirst).toHaveBeenCalledOnce();
+    expect(prisma.supplier_identity_links.findFirst).not.toHaveBeenCalled();
+  });
+
   it('resolves suppliers for TEAM IDs in one query', async () => {
     vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
       {

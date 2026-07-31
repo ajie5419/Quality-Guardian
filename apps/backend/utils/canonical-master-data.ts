@@ -5,6 +5,7 @@ import type {
 } from './master-data-fields';
 
 import { createId } from '@paralleldrive/cuid2';
+import { Prisma } from '@prisma/client';
 import { PartMasterService } from '~/modules/part-master';
 import prisma from '~/utils/prisma';
 
@@ -888,18 +889,20 @@ export const MasterDataGovernanceKernel = {
     const nameColumn = quoteIdentifier(canonical.nameColumn);
     const keyword = normalizeValue(options.keyword);
     const activeWhere = canonical.activeWhere
-      ? ` AND ${qualifyActiveWhereClause(canonical.activeWhere, '')}`
-      : '';
+      ? Prisma.raw(
+          ` AND ${qualifyActiveWhereClause(canonical.activeWhere, '')}`,
+        )
+      : Prisma.empty;
     const take = Math.min(Math.max(options.take || 100, 1), 100);
-    return prisma.$queryRawUnsafe<Array<{ id: string; name: string }>>(
-      `SELECT ${idColumn} AS id, ${nameColumn} AS name
-       FROM ${table}
-       WHERE (? = '' OR ${nameColumn} LIKE ?)${activeWhere}
-       ORDER BY ${nameColumn} ASC, ${idColumn} ASC
-       LIMIT ?`,
-      keyword,
-      `%${keyword}%`,
-      take,
+    return prisma.$queryRaw<Array<{ id: string; name: string }>>(
+      Prisma.sql`
+        SELECT ${Prisma.raw(idColumn)} AS id, ${Prisma.raw(nameColumn)} AS name
+        FROM ${Prisma.raw(table)}
+        WHERE (${keyword} = '' OR ${Prisma.raw(nameColumn)} LIKE ${`%${keyword}%`})
+        ${activeWhere}
+        ORDER BY ${Prisma.raw(nameColumn)} ASC, ${Prisma.raw(idColumn)} ASC
+        LIMIT ${take}
+      `,
     );
   },
 

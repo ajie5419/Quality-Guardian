@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const tx = { inspections: { findMany: vi.fn(), updateMany: vi.fn() } };
+const tx = {
+  $queryRaw: vi.fn(),
+  inspections: { findMany: vi.fn(), updateMany: vi.fn() },
+  supplier_identity_links: { findFirst: vi.fn() },
+  team_identity_merge_participants: { findUnique: vi.fn() },
+};
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -18,7 +23,10 @@ vi.mock('~/modules/supplier-identity', () => ({
     get: vi.fn(),
     resolveMany: vi.fn(),
   },
-  SupplierIdentityService: { resolveSupplierByTeamId: vi.fn() },
+  SupplierIdentityService: {
+    lockTeamForMutation: vi.fn(),
+    resolveSupplierByTeamId: vi.fn(),
+  },
 }));
 
 describe('inspection identity resolution service', () => {
@@ -105,5 +113,57 @@ describe('inspection identity resolution service', () => {
       }),
     ).rejects.toMatchObject({ code: 'MASTER_DATA_REFERENCE_CHANGED' });
     expect(MasterDataResolutionAuditService.resolveMany).not.toHaveBeenCalled();
+  });
+
+  it('locks TEAM mappings and resolves suppliers through the transaction', async () => {
+    const { MasterDataResolutionAuditService, SupplierIdentityService } =
+      await import('~/modules/supplier-identity');
+    const { MasterDataGovernanceKernel } = await import(
+      '~/utils/canonical-master-data'
+    );
+    const { InspectionIdentityResolutionService } = await import(
+      './inspection-identity-resolution.service'
+    );
+    vi.mocked(MasterDataResolutionAuditService.get).mockResolvedValue({
+      entityType: 'inspections',
+      fieldName: 'supplierId',
+      id: 'audit-1',
+      rawId: null,
+      rawName: 'Legacy supplier',
+      status: 'OPEN',
+    } as never);
+    vi.mocked(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+    ).mockResolvedValue(new Map([['supplier-1', 'Supplier']]));
+    vi.mocked(MasterDataResolutionAuditService.findMatchingOpenBatch)
+      .mockResolvedValueOnce([{ entityId: 'inspection-1', id: 'audit-1' }])
+      .mockResolvedValueOnce([]);
+    tx.inspections.findMany
+      .mockResolvedValueOnce([{ id: 'inspection-1' }])
+      .mockResolvedValueOnce([{ id: 'inspection-1', teamId: 'team-1' }]);
+    tx.inspections.updateMany.mockResolvedValue({ count: 1 });
+    vi.mocked(
+      SupplierIdentityService.resolveSupplierByTeamId,
+    ).mockResolvedValue({
+      id: 'supplier-1',
+      name: 'Supplier',
+    });
+    vi.mocked(MasterDataResolutionAuditService.resolveMany).mockResolvedValue({
+      count: 1,
+    });
+
+    await InspectionIdentityResolutionService.resolve({
+      auditId: 'audit-1',
+      canonicalId: 'supplier-1',
+      note: '',
+    });
+
+    expect(SupplierIdentityService.lockTeamForMutation).toHaveBeenCalledWith(
+      'team-1',
+      tx,
+    );
+    expect(
+      SupplierIdentityService.resolveSupplierByTeamId,
+    ).toHaveBeenCalledWith('team-1', tx);
   });
 });
