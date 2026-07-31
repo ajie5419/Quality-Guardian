@@ -327,6 +327,7 @@ export interface InspectionRequestRecordLike {
   linkedIssueNo?: null | string;
   linkedIssueStatus?: null | string;
   materialRequest?: null | {
+    id?: null | string;
     requestedName?: null | string;
     status?: null | string;
   };
@@ -355,6 +356,7 @@ export function mapInspectionRequestRecord<
   linkedIssueNo: null | string;
   linkedIssueStatus: null | string;
   materialApprovalStatus: 'APPROVED' | 'PENDING' | 'REJECTED' | null;
+  materialRequestId: null | string;
   qualifiedQuantity: null | number;
   requestedPartName: null | string;
   stationSelection: NormalizedInspectionStationSelection | null;
@@ -392,6 +394,8 @@ export function mapInspectionRequestRecord<
     linkedIssueNo: record.linkedIssueNo || issue?.nonConformanceNumber || null,
     linkedIssueStatus: issue?.status || record.linkedIssueStatus || null,
     materialApprovalStatus,
+    materialRequestId:
+      normalizeInspectionRequestText(record.materialRequest?.id) || null,
     qualifiedQuantity:
       record.qualifiedQuantity ?? record.inspection?.qualifiedQuantity ?? null,
     requestedPartName:

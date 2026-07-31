@@ -71,6 +71,7 @@ export interface InspectionRequest {
   linkedIssueNo?: null | string;
   linkedIssueStatus?: null | string;
   materialApprovalStatus?: InspectionMaterialApprovalStatus | null;
+  materialRequestId?: null | string;
   mutualCheckResult: InspectionRequestCheckResult;
   partId?: null | string;
   partName: string;

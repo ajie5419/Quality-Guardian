@@ -104,6 +104,11 @@ const canUseRequestAction = (action: 'Delete' | 'Dispatch') =>
   hasAccessByCodes([`QMS:Inspection:Requests:${action}`]);
 const canDelete = computed(() => canUseRequestAction('Delete'));
 const canDispatch = computed(() => canUseRequestAction('Dispatch'));
+const canApproveMaterial = computed(
+  () =>
+    hasAccessByCodes(['QMS:Inspection:MaterialRequests:Approve']) ||
+    hasAccessByRoles(['super', 'admin']),
+);
 const { loadInspectorOptions, userOptions } =
   useInspectionRequestInspectorOptions();
 
@@ -139,7 +144,7 @@ const {
   inspectionResultLabel,
   isClosed,
   isCompletable,
-  isDispatchable,
+  isDispatchable: isNormallyDispatchable,
   issueStatusColor,
   issueStatusLabel,
   minutesText,
@@ -153,6 +158,16 @@ const {
   checkResultOptions: inspectionRequestCheckResultOptions,
   requestStats,
 });
+
+function isDispatchable(record: InspectionRequest) {
+  return (
+    isNormallyDispatchable(record) ||
+    (canApproveMaterial.value &&
+      record.status === 'SUBMITTED' &&
+      record.dispatchBlockedReason === 'MATERIAL_APPROVAL_PENDING' &&
+      Boolean(record.materialRequestId))
+  );
+}
 
 const listCardProps = computed(() => ({
   canDelete: canDelete.value,
@@ -269,7 +284,9 @@ const {
   openDispatchDetailFromRoute,
   submitClose,
   submitDispatch,
+  handleMaterialApproved,
 } = useInspectionRequestTaskActions({
+  canApproveMaterial,
   canDelete,
   canDispatch,
   deptTreeData,
@@ -465,6 +482,7 @@ watch(
       @open-inspection-record="openInspectionRecord"
       @submit-close="submitClose"
       @submit-dispatch="submitDispatch"
+      @material-approved="handleMaterialApproved"
       @update-close-form="handleCloseFormUpdate"
       @update-close-open="(value) => (closeOpen = value)"
       @update-close-qr-open="(value) => (closeQrOpen = value)"

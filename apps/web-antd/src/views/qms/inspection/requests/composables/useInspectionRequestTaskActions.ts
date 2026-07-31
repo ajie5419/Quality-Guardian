@@ -86,6 +86,7 @@ export function resolveDivisionIdentity(
 interface UseInspectionRequestTaskActionsOptions {
   canDelete: Ref<boolean>;
   canDispatch: Ref<boolean>;
+  canApproveMaterial: Ref<boolean>;
   deptTreeData: Ref<TreeSelectNode[]>;
   onAfterMutation: () => Promise<void>;
   buildRequestUrl: (params: Record<string, string>, path?: string) => string;
@@ -103,6 +104,7 @@ export function useInspectionRequestTaskActions(
   const {
     canDelete,
     canDispatch,
+    canApproveMaterial,
     onAfterMutation,
     buildRequestUrl,
     getCurrentUserName,
@@ -291,8 +293,14 @@ export function useInspectionRequestTaskActions(
       message.warning('无派单权限');
       return;
     }
-    if (record.dispatchBlockedReason) {
-      message.warning('Dispatch is unavailable');
+    if (
+      record.dispatchBlockedReason &&
+      !(
+        record.dispatchBlockedReason === 'MATERIAL_APPROVAL_PENDING' &&
+        canApproveMaterial.value
+      )
+    ) {
+      message.warning('该报检任务当前不可派单');
       return;
     }
     currentRequest.value = record;
@@ -300,6 +308,11 @@ export function useInspectionRequestTaskActions(
     dispatchForm.inspectorId = record.inspectorId || '';
     dispatchForm.priority = record.priority || 3;
     dispatchOpen.value = true;
+  }
+
+  async function handleMaterialApproved(request: InspectionRequest) {
+    currentRequest.value = request;
+    await onAfterMutation();
   }
 
   function openDispatchDetail(record: InspectionRequest) {
@@ -569,6 +582,7 @@ export function useInspectionRequestTaskActions(
     openDispatchDetailFromRoute,
     submitClose,
     submitDispatch,
+    handleMaterialApproved,
     syncLinkedIssueQuantities,
   };
 }
