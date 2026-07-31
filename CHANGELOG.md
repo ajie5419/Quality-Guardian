@@ -25,6 +25,23 @@
 
 ## 执行记录
 
+## [0.22.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.21.0...qgs-v0.22.0) (2026-07-31)
+
+
+### Features
+
+* **project:** review materials during dispatch ([1ce860d](https://github.com/ajie5419/Quality-Guardian/commit/1ce860d73dc3e19cb1c7e14dfb0b1ded7e7c18e6))
+* **project:** streamline master data and material dispatch ([77d781a](https://github.com/ajie5419/Quality-Guardian/commit/77d781a35acbce9e0e56f1fb0794bf7079728f04))
+
+
+### Bug Fixes
+
+* **project:** address governance review findings ([a13c682](https://github.com/ajie5419/Quality-Guardian/commit/a13c6822f39e7450a8a51889884741bc0f292f7a))
+* **project:** auto-link existing material requests ([bb719b0](https://github.com/ajie5419/Quality-Guardian/commit/bb719b09dcd504db531a78310cb69ac8a86d2c5b))
+* **project:** complete master data governance resolution ([a8ada41](https://github.com/ajie5419/Quality-Guardian/commit/a8ada4108ae283e07d3ab3834ee7b8fe785b6475))
+* **project:** enable department governance resolution ([bcbe0fe](https://github.com/ajie5419/Quality-Guardian/commit/bcbe0feff49d478db2db6ef73590f2a625f44da9))
+* **project:** enable process governance resolution ([7a5383c](https://github.com/ajie5419/Quality-Guardian/commit/7a5383c7352afc5277c9a98e5dc78ea26f81c464))
+
 ### 2026-07-31 主数据治理审查问题修复
 
 **执行内容：**
