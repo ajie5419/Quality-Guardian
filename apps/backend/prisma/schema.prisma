@@ -1325,6 +1325,7 @@ model identity_reconciliation_runs {
   id                 String                              @id @default(cuid())
   consumerKey        String
   factEntityType     String
+  projectionGenerationId String?
   baselineChecksum   String
   cutoffKind         identity_reconciliation_cutoff_kind
   createdAtCutoff    DateTime?
@@ -1340,6 +1341,27 @@ model identity_reconciliation_runs {
 
   @@index([consumerKey, status, createdAt], map: "identity_reconciliation_consumer_idx")
   @@index([factEntityType, cutoffKind, status], map: "identity_reconciliation_fact_idx")
+  @@index([consumerKey, projectionGenerationId, status, createdAt], map: "identity_reconciliation_generation_idx")
+}
+
+// @module report
+// Durable rebuild work for the pass-rate projection. It is deliberately
+// separate from supplier score jobs because publication has different CAS and
+// recovery semantics.
+model pass_rate_projection_refresh_jobs {
+  id          String                              @id @default(cuid())
+  status      pass_rate_projection_refresh_status @default(PENDING)
+  reason      String?
+  requestedById String?
+  attempts    Int                                 @default(0)
+  leaseUntil  DateTime?
+  lastError   String?                             @db.Text
+  completedAt DateTime?
+  isDeleted   Boolean                             @default(false)
+  createdAt   DateTime                            @default(now())
+  updatedAt   DateTime                            @updatedAt
+
+  @@index([status, leaseUntil, isDeleted], map: "pass_rate_projection_refresh_status_idx")
 }
 
 // @module master-data-identity
@@ -2104,6 +2126,13 @@ enum identity_reconciliation_cutoff_kind {
   CREATED_AT
   ID_BOUNDARY
   SNAPSHOT_DESCRIPTOR
+}
+
+enum pass_rate_projection_refresh_status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
 }
 
 enum identity_reconciliation_run_status {

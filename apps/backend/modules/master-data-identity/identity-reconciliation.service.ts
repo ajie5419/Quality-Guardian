@@ -39,6 +39,7 @@ export const IdentityReconciliationService = {
     consumerKey: string;
     cutoff: ReconciliationCutoff;
     factEntityType: string;
+    projectionGenerationId?: null | string;
   }) {
     assertCutoff(params.cutoff);
     return prisma.identity_reconciliation_runs.create({
@@ -51,6 +52,8 @@ export const IdentityReconciliationService = {
             : null,
         cutoffKind: params.cutoff.kind,
         factEntityType: params.factEntityType.trim(),
+        projectionGenerationId:
+          String(params.projectionGenerationId || '').trim() || null,
         idCutoff:
           params.cutoff.kind === 'ID_BOUNDARY'
             ? params.cutoff.idCutoff.trim()

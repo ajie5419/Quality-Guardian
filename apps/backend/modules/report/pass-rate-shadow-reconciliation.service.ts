@@ -66,6 +66,7 @@ export const PassRateShadowReconciliationService = {
         },
       },
       factEntityType: 'inspections',
+      projectionGenerationId: active.activeGenerationId,
     });
     try {
       const targetResolver = await createPassRateTargetResolver();

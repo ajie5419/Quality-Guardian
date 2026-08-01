@@ -20,4 +20,5 @@ cd "$BACKEND_DIR"
 "$TSX_BIN" scripts/backfill-inspection-issue-responsibilities.ts --apply
 "$TSX_BIN" scripts/backfill-quality-classifications.ts --apply
 "$TSX_BIN" scripts/historical-identity-sidecar-bootstrap.ts --apply --rebuild
+"$TSX_BIN" scripts/bootstrap-master-data-identity-baseline.ts
 "$TSX_BIN" scripts/reconcile-supplier-score-snapshots.ts
