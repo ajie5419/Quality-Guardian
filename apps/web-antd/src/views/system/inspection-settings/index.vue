@@ -156,22 +156,37 @@ function formatProjectionDate(value: Date | null | string | undefined) {
 }
 
 function handleProjectionToggle(checked: boolean) {
-  const action = checked ? 'enable' : 'disable';
   Modal.confirm({
     content: checked
-      ? 'Projection reads will be enabled only after the server confirms every safety gate.'
-      : 'Reports will return to the legacy calculation immediately.',
-    okText: checked ? 'Enable' : 'Disable',
-    title: `${checked ? 'Enable' : 'Disable'} pass-rate projection`,
+      ? t('sys.inspectionSettings.projectionEnableConfirm')
+      : t('sys.inspectionSettings.projectionDisableConfirm'),
+    okText: checked
+      ? t('sys.inspectionSettings.enableProjection')
+      : t('sys.inspectionSettings.disableProjection'),
+    title: checked
+      ? t('sys.inspectionSettings.enableProjectionTitle')
+      : t('sys.inspectionSettings.disableProjectionTitle'),
     async onOk() {
       savingProjection.value = true;
       try {
         projectionStatus.value = await updatePassRateProjectionEnabledApi({
           enabled: checked,
         });
-        message.success(`Pass-rate projection ${action}d`);
+        message.success(
+          t(
+            checked
+              ? 'sys.inspectionSettings.projectionEnabled'
+              : 'sys.inspectionSettings.projectionDisabled',
+          ),
+        );
       } catch {
-        message.error(`Failed to ${action} pass-rate projection`);
+        message.error(
+          t(
+            checked
+              ? 'sys.inspectionSettings.projectionEnableFailed'
+              : 'sys.inspectionSettings.projectionDisableFailed',
+          ),
+        );
       } finally {
         savingProjection.value = false;
       }
@@ -181,20 +196,19 @@ function handleProjectionToggle(checked: boolean) {
 
 function requestProjectionRebuild() {
   Modal.confirm({
-    content:
-      'The report stays on the legacy calculation until a complete generation is published.',
-    okText: 'Queue rebuild',
-    title: 'Rebuild pass-rate projection',
+    content: t('sys.inspectionSettings.projectionRebuildConfirm'),
+    okText: t('sys.inspectionSettings.queueRebuild'),
+    title: t('sys.inspectionSettings.rebuildProjectionTitle'),
     async onOk() {
       rebuildingProjection.value = true;
       try {
         await rebuildPassRateProjectionApi({
           reason: 'Administrator requested retry',
         });
-        message.success('Pass-rate projection rebuild queued');
+        message.success(t('sys.inspectionSettings.projectionRebuildQueued'));
         projectionStatus.value = await getPassRateProjectionStatusApi();
       } catch {
-        message.error('Failed to queue pass-rate projection rebuild');
+        message.error(t('sys.inspectionSettings.projectionRebuildQueueFailed'));
       } finally {
         rebuildingProjection.value = false;
       }
@@ -386,11 +400,10 @@ onMounted(loadSettings);
         <div class="mb-4 flex items-center justify-between gap-4">
           <div>
             <h2 class="text-base font-semibold">
-              Pass-rate projection rollout
+              {{ t('sys.inspectionSettings.projectionRollout') }}
             </h2>
             <p class="text-muted-foreground mt-1 text-sm">
-              Historical facts remain unchanged. The switch is available only
-              after shadow reconciliation passes.
+              {{ t('sys.inspectionSettings.projectionRolloutDesc') }}
             </p>
           </div>
           <Space>
@@ -398,7 +411,7 @@ onMounted(loadSettings);
               :loading="rebuildingProjection"
               @click="requestProjectionRebuild"
             >
-              Rebuild
+              {{ t('sys.inspectionSettings.rebuild') }}
             </Button>
             <Switch
               :checked="projectionStatus?.enabled ?? false"
@@ -410,7 +423,7 @@ onMounted(loadSettings);
         </div>
         <Alert
           v-if="projectionStatus && !projectionStatus.rolloutReady"
-          message="Projection rollout is blocked until freshness, baseline, and shadow checks pass."
+          :message="t('sys.inspectionSettings.projectionBlocked')"
           type="warning"
           show-icon
         />
@@ -419,11 +432,11 @@ onMounted(loadSettings);
           class="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2"
         >
           <div>
-            Active generation:
+            {{ t('sys.inspectionSettings.activeGeneration') }}：
             {{ projectionStatus.activeGeneration?.id || '—' }}
           </div>
           <div>
-            Activated:
+            {{ t('sys.inspectionSettings.activatedAt') }}：
             {{
               formatProjectionDate(
                 projectionStatus.activeGeneration?.activatedAt,
@@ -431,26 +444,36 @@ onMounted(loadSettings);
             }}
           </div>
           <div>
-            Fresh: {{ projectionStatus.freshness?.isFresh ? 'Yes' : 'No' }}
+            {{ t('sys.inspectionSettings.fresh') }}：
+            {{
+              projectionStatus.freshness?.isFresh
+                ? t('sys.inspectionSettings.yes')
+                : t('sys.inspectionSettings.no')
+            }}
           </div>
           <div>
-            Baseline matched:
-            {{ projectionStatus.baselineMatch ? 'Yes' : 'No' }}
+            {{ t('sys.inspectionSettings.baselineMatched') }}：
+            {{
+              projectionStatus.baselineMatch
+                ? t('sys.inspectionSettings.yes')
+                : t('sys.inspectionSettings.no')
+            }}
           </div>
           <div>
-            Latest shadow:
+            {{ t('sys.inspectionSettings.latestShadow') }}：
             {{
               formatProjectionDate(projectionStatus.latestShadow?.completedAt)
             }}
           </div>
           <div>
-            Shadow differences: total
+            {{ t('sys.inspectionSettings.shadowDifferences') }}：
+            {{ t('sys.inspectionSettings.total') }}
             {{
               projectionStatus.latestShadow?.coreDifferences.TOTAL_COUNT ?? '—'
-            }}, pass
+            }}，{{ t('sys.inspectionSettings.pass') }}
             {{
               projectionStatus.latestShadow?.coreDifferences.PASS_COUNT ?? '—'
-            }}, rate
+            }}，{{ t('sys.inspectionSettings.rate') }}
             {{
               projectionStatus.latestShadow?.coreDifferences.PASS_RATE ?? '—'
             }}
