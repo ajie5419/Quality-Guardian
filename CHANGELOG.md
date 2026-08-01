@@ -25,6 +25,28 @@
 
 ## 执行记录
 
+### 2026-08-01 主数据身份治理 WP1：页面治理入口与旁路语义修复
+
+**执行内容：**
+
+- 将在线处置能力、canonical 选项来源和分类范围收敛到 `master-data-identity` registry；治理服务和 Web 页面不再各自维护字段白名单。
+- 治理列表接口返回每条工作项的处置能力，覆盖报检任务、检验不合格项、售后记录的受支持 canonical ID 字段；选项接口和提交接口均以同一 registry descriptor 校验。
+- 明确 `quality_records.defectClassification` 是 legacy 分类映射，只走分类处置，不能作为原始 canonical ID 字段。
+- 页面成功消息和弹窗说明改为“追加身份决策、更新身份投影、解决治理项”，不再错误声称批量更新业务记录。
+
+**验证结果：**
+
+- 定向服务测试：`2/2` 文件、`12/12` 测试通过，覆盖报检任务 `partId`、不合格项 `projectId`、售后 `projectId` 的 options 与 resolve 路径。
+- 后端全量测试：`255/255` 文件、`2360/2360` 测试通过。
+- 本地浏览器验收：管理员登录后，报检任务 `partId` 的治理项显示处置入口、可加载规范物料选项，弹窗明确历史事实不修改；未提交处置，测试数据保持不变。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- `project_boms.requiredProcessIds` 是集合字段，需要专用集合决策模型，当前不对外暴露单值在线处置入口。
+
 ### 2026-08-01 主数据身份治理 WP1：旁路台账与投影基础设施
 
 **执行内容：**

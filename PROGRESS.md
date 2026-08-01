@@ -2,8 +2,8 @@
 
 ## 当前状态
 
-- 最新变更: 主数据身份治理 WP1 已新增不可变旁路台账、可重建身份投影和对账 cutoff 合约；治理入口不再修改历史事实，只以队列 CAS 追加人工决策。migration 已仅部署到本地测试快照，生产环境未访问、未修改。
-- 测试状态: Backend full suite `254/254` files and `2352/2352` tests passed；全仓门禁在 WP1 提交前通过。
+- 最新变更: 主数据身份治理 WP1 已新增不可变旁路台账、可重建身份投影和对账 cutoff 合约；治理入口现在由身份注册表统一下发在线处置能力，不再修改历史事实，只以队列 CAS 追加人工决策。migration 已仅部署到本地测试快照，生产环境未访问、未修改。
+- 测试状态: Backend full suite `255/255` files and `2360/2360` tests passed；全仓门禁在 WP1 页面治理入口修复后通过。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 581（含测试）

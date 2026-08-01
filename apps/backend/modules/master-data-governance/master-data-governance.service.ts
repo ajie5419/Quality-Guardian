@@ -1,50 +1,27 @@
 import type { MasterDataResolutionStatus } from '~/modules/supplier-identity';
 
-import { HistoricalIdentityResolutionService } from '~/modules/master-data-identity';
+import {
+  getOnlineResolutionDescriptor,
+  HistoricalIdentityResolutionService,
+} from '~/modules/master-data-identity';
 import { MasterDataResolutionAuditService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
 import { masterDataGovernanceResolutionSchema } from './master-data-governance.schema';
 
-const IDENTITY_FIELDS = {
-  inspections: {
-    incomingTypeId: 'incomingType',
-    materialNameId: 'materialName',
-    partId: 'partName',
-    processId: 'processName',
-    projectId: 'projectName',
-    supplierId: 'supplierName',
-    teamId: 'team',
-  },
-  project_boms: { partId: 'partName', requiredProcessIds: 'processName' },
-  supplier_identity_links: { supplierId: 'supplierName' },
-  work_order_requirements: {
-    partId: 'partName',
-    processId: 'processName',
-    requirementId: 'requirementName',
-    responsibleTeamId: 'responsibleTeam',
-  },
-  work_orders: {
-    customerNameId: 'customerName',
-    divisionId: 'division',
-    projectId: 'projectName',
-  },
-} as const;
-
-function identityConfig(entityType: string, fieldName: string) {
-  const fields = IDENTITY_FIELDS[entityType as keyof typeof IDENTITY_FIELDS];
-  if (!fields || !Object.prototype.hasOwnProperty.call(fields, fieldName)) {
-    return null;
-  }
-  return fields[fieldName as keyof typeof fields];
-}
-
-function assertSingleId(canonicalIds: string[]) {
-  if (canonicalIds.length !== 1) {
+function assertCanonicalIdSelection(canonicalIds: string[], multiple: boolean) {
+  if (!multiple && canonicalIds.length !== 1) {
     throw new BusinessError(
       'MASTER_DATA_SINGLE_SELECTION_REQUIRED',
       'This governance field requires exactly one selection',
+      400,
+    );
+  }
+  if (multiple) {
+    throw new BusinessError(
+      'MASTER_DATA_MULTI_SELECTION_NOT_SUPPORTED',
+      'Multiple identity decisions must be submitted as separate references',
       400,
     );
   }
@@ -59,10 +36,20 @@ export const MasterDataGovernanceService = {
     pageSize?: number;
     status?: MasterDataResolutionStatus;
   }) {
-    return MasterDataResolutionAuditService.list({
+    const result = await MasterDataResolutionAuditService.list({
       ...params,
       status: params.status || 'OPEN',
     });
+    return {
+      ...result,
+      items: result.items.map((item) => ({
+        ...item,
+        resolution: getOnlineResolutionDescriptor(
+          item.entityType,
+          item.fieldName,
+        ),
+      })),
+    };
   },
 
   async listOptions(auditId: string, keyword = '') {
@@ -74,8 +61,11 @@ export const MasterDataGovernanceService = {
         404,
       );
     }
-    const configKey = identityConfig(audit.entityType, audit.fieldName);
-    if (!configKey) {
+    const descriptor = getOnlineResolutionDescriptor(
+      audit.entityType,
+      audit.fieldName,
+    );
+    if (!descriptor || descriptor.kind !== 'IDENTITY') {
       throw new BusinessError(
         'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
         'This reference does not provide canonical options',
@@ -84,12 +74,10 @@ export const MasterDataGovernanceService = {
     }
     return {
       items: await MasterDataGovernanceKernel.listCanonicalOptions({
-        configKey,
+        configKey: descriptor.configKey,
         keyword,
       }),
-      multiple:
-        audit.entityType === 'project_boms' &&
-        audit.fieldName === 'requiredProcessIds',
+      multiple: descriptor.multiple,
     };
   },
 
@@ -138,72 +126,61 @@ export const MasterDataGovernanceService = {
         404,
       );
     }
-    if (params.resolutionType === 'IDENTITY') {
-      if (!identityConfig(audit.entityType, audit.fieldName)) {
+    const descriptor = getOnlineResolutionDescriptor(
+      audit.entityType,
+      audit.fieldName,
+    );
+    if (descriptor?.kind === 'IDENTITY') {
+      let canonicalId: null | string = null;
+      switch (params.resolutionType) {
+        case 'CLASSIFICATION': {
+          break;
+        }
+        case 'DEPARTMENT': {
+          canonicalId = params.departmentId;
+          break;
+        }
+        case 'IDENTITY': {
+          canonicalId = assertCanonicalIdSelection(
+            params.canonicalIds,
+            descriptor.multiple,
+          );
+          break;
+        }
+        case 'PROCESS': {
+          canonicalId = params.processId;
+          break;
+        }
+      }
+      if (!canonicalId) {
         throw new BusinessError(
           'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
-          'This identity reference does not support online resolution',
+          'The selected resolution type does not match this reference',
           400,
         );
       }
       return HistoricalIdentityResolutionService.resolveManualWorkItem({
         actorId: params.actorId || '',
         auditId: params.auditId,
-        canonicalId: assertSingleId(params.canonicalIds),
+        canonicalId,
         note: params.note,
       });
     }
     if (
-      audit.entityType === 'quality_records' &&
-      audit.fieldName === 'responsibleDepartmentId' &&
-      params.resolutionType === 'DEPARTMENT'
+      descriptor?.kind !== 'CLASSIFICATION' ||
+      params.resolutionType !== 'CLASSIFICATION'
     ) {
-      return HistoricalIdentityResolutionService.resolveManualWorkItem({
-        actorId: params.actorId || '',
-        auditId: params.auditId,
-        canonicalId: params.departmentId,
-        note: params.note,
-      });
-    }
-    if (
-      audit.entityType === 'qms_inspection_requests' &&
-      audit.fieldName === 'processId' &&
-      params.resolutionType === 'PROCESS'
-    ) {
-      return HistoricalIdentityResolutionService.resolveManualWorkItem({
-        actorId: params.actorId || '',
-        auditId: params.auditId,
-        canonicalId: params.processId,
-        note: params.note,
-      });
-    }
-    if (params.resolutionType !== 'CLASSIFICATION') {
       throw new BusinessError(
         'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
         'The selected resolution type does not match this reference',
         400,
       );
     }
-    if (audit.entityType === 'quality_records') {
-      return HistoricalIdentityResolutionService.resolveManualWorkItem({
-        actorId: params.actorId || '',
-        auditId: params.auditId,
-        canonicalId: params.subcategoryId,
-        note: params.note,
-      });
-    }
-    if (audit.entityType === 'after_sales') {
-      return HistoricalIdentityResolutionService.resolveManualWorkItem({
-        actorId: params.actorId || '',
-        auditId: params.auditId,
-        canonicalId: params.subcategoryId,
-        note: params.note,
-      });
-    }
-    throw new BusinessError(
-      'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
-      'This reference type does not support online resolution yet',
-      400,
-    );
+    return HistoricalIdentityResolutionService.resolveManualWorkItem({
+      actorId: params.actorId || '',
+      auditId: params.auditId,
+      canonicalId: params.subcategoryId,
+      note: params.note,
+    });
   },
 };
