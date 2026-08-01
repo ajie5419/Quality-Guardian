@@ -5302,3 +5302,25 @@
 **遗留问题：**
 
 - 无。
+### 2026-08-01 主数据身份治理 WP2：合格率影子对账与原子投影发布
+
+**执行内容：**
+
+- 身份投影改为 generation + singleton pointer 的 CAS 发布；构建中的 generation 永不被报表读取，决策变更导致 CAS 失败时保留旧 generation。
+- 新增合格率工序窄投影，按 `processId` 聚合，名称仅用于展示；不再让合格率查询 join 通用身份旁路表。
+- 合格率默认继续使用 legacy 口径。`QMS_PASS_RATE_IDENTITY_PROJECTION_ENABLED=true` 才会显式读取新投影，设置读取失败也会安全回退 legacy。
+- 新增合格率影子对账脚本，legacy 与 projection 共享 `createdAt + inspectionId` 事实快照；对账结果写入既有运行/指标表，包含总量、合格数、合格率、分组清单和身份状态。
+- 因历史检验类别存在枚举外值，窄投影的旁路类别列改为字符串，完整保留历史事实而不影响源表。
+
+**验证结果：**
+
+- 本地 Prisma migration：51 个，新增 migration 仅修改旁路表，历史事实基线未写入。
+- 本地 generation `cmsab3wj200008zlhj6vb1l59`：扫描台账 50,293 条，合格率窄投影 9,554 条并原子发布。
+- 本地全期影子对账：legacy 与 projection 的总量均为 411,561、合格数均为 411,391、合格率均为 99.96，三项差异均为 0；身份状态 `RESOLVED=4,242`、`UNRESOLVED=5,312` 已入指标详情。
+- 定向测试 `4/4` 文件、`10/10` 测试与后端 TypeScript：通过。
+
+**commit:** `cab876f4 feat(@qgs/backend): publish identity projections atomically`、`48c072ed feat(@qgs/backend): shadow pass-rate identity metrics`
+
+**遗留问题：**
+
+- 开关保持关闭，待连续影子对账差异均可解释并完成页面验收后才允许切换合格率读取口径。

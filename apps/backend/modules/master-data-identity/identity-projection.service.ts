@@ -3,9 +3,11 @@ import type {
   Prisma,
 } from '@prisma/client';
 
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 const CONTROL_KEY = 'historical-identity';
+const logger = createModuleLogger('IdentityProjectionService');
 
 type ProjectionClient = Prisma.TransactionClient | typeof prisma;
 
@@ -132,6 +134,10 @@ export const IdentityProjectionService = {
         written: rows.length,
       };
     } catch (error: unknown) {
+      logger.error(
+        error,
+        'Failed to build staged identity projection generation',
+      );
       await prisma.identity_projection_generations.update({
         where: { id: generation.id },
         data: {

@@ -8,4 +8,5 @@
 - 在线人工处置只做队列 CAS、追加 `MANUAL_DECISION` 和更新投影，绝不更新历史事实 ID 或名称快照。
 - 对账运行必须固定事实集合 cutoff；WP2 读取该契约双跑，不在用户请求中执行双重聚合。
 - `quality_records.defectClassification` 仅是旧治理工作清单字段，不能作为事实表 canonical ID 扫描列。
-- 当前投影重建会先删除再批量写入；WP2 在任何报表改读投影前必须引入 generation/staging switch，避免读到重建中的空投影。
+- 投影重建先在独立 generation 中完成，再以 singleton pointer 的 CAS 一次发布；消费者通过 pointer 读取完整 generation，构建失败或期间有新决策时保留旧 generation。
+- `pass_rate_process_identity_projection` 是合格率的领域窄投影。它与通用 generation 一起完成构建后才允许发布，避免报表在通用旁路表上重复 join 或看到半成品。
