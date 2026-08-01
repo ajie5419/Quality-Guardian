@@ -1367,6 +1367,9 @@ model pass_rate_process_identity_projection {
   generationId       String
   inspectionId       String
   createdAtSnapshot  DateTime
+  // This watermark is copied from the source fact. It lets the feature-read
+  // guard reject a generation after an inspection is edited or soft-deleted.
+  updatedAtSnapshot  DateTime?
   inspectionDate     DateTime
   category           String                               @db.VarChar(32)
   incomingType       String?
@@ -1381,6 +1384,7 @@ model pass_rate_process_identity_projection {
 
   @@unique([generationId, inspectionId], map: "pass_rate_process_projection_generation_inspection_key")
   @@index([generationId, createdAtSnapshot, inspectionDate], map: "pass_rate_process_projection_snapshot_idx")
+  @@index([generationId, updatedAtSnapshot], map: "pass_rate_process_projection_freshness_idx")
   @@index([generationId, effectiveProcessId, state], map: "pass_rate_process_projection_identity_idx")
 }
 

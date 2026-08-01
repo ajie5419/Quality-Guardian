@@ -7,6 +7,17 @@ export type PassRateFactSnapshot = {
   idCutoff: string;
 };
 
+type PassRateFactChangeBoundary = {
+  idCutoff: string;
+  updatedAtCutoff: Date;
+};
+
+export type PassRateProjectionFreshness = {
+  isFresh: boolean;
+  projectionSnapshot: PassRateFactSnapshot;
+  reason: null | string;
+};
+
 export type ProjectedPassRateSummary = {
   passCount: number;
   passRate: number;
@@ -51,6 +62,123 @@ export async function capturePassRateFactSnapshot(): Promise<PassRateFactSnapsho
     createdAtCutoff: boundary?.createdAt || new Date(0),
     idCutoff: boundary?.id || '',
   };
+}
+
+/**
+ * A shadow run must use the active generation's last materialized fact, not
+ * the newest source fact. New backfills after a rebuild then stay outside both
+ * calculations instead of being mistaken for an identity-resolution drift.
+ */
+export async function capturePassRateProjectionSnapshot(
+  generationId: string,
+): Promise<PassRateFactSnapshot> {
+  const boundary = await prisma.pass_rate_process_identity_projection.findFirst(
+    {
+      where: { generationId },
+      orderBy: [{ createdAtSnapshot: 'desc' }, { inspectionId: 'desc' }],
+      select: { createdAtSnapshot: true, inspectionId: true },
+    },
+  );
+  return {
+    createdAtCutoff: boundary?.createdAtSnapshot || new Date(0),
+    idCutoff: boundary?.inspectionId || '',
+  };
+}
+
+async function capturePassRateFactChangeBoundary(): Promise<PassRateFactChangeBoundary> {
+  const boundary = await prisma.inspections.findFirst({
+    where: { isDeleted: false },
+    orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
+    select: { id: true, updatedAt: true },
+  });
+  return {
+    idCutoff: boundary?.id || '',
+    updatedAtCutoff: boundary?.updatedAt || new Date(0),
+  };
+}
+
+async function capturePassRateProjectionChangeBoundary(
+  generationId: string,
+): Promise<PassRateFactChangeBoundary> {
+  const boundary = await prisma.pass_rate_process_identity_projection.findFirst(
+    {
+      where: { generationId },
+      orderBy: [{ updatedAtSnapshot: 'desc' }, { inspectionId: 'desc' }],
+      select: { inspectionId: true, updatedAtSnapshot: true },
+    },
+  );
+  return {
+    idCutoff: boundary?.inspectionId || '',
+    updatedAtCutoff: boundary?.updatedAtSnapshot || new Date(0),
+  };
+}
+
+/**
+ * The read model is deliberately not dual-written from every inspection path.
+ * Before the feature flag can expose it, compare the full active fact set with
+ * the published generation. `updatedAt` catches edits, row counts catch soft
+ * deletes, and the boundaries make the common append case inexpensive to
+ * diagnose in logs. Any uncertainty fails closed to the legacy report.
+ */
+export async function getPassRateProjectionFreshness(
+  generationId: string,
+): Promise<PassRateProjectionFreshness> {
+  const [
+    sourceSnapshot,
+    projectionSnapshot,
+    sourceChangeBoundary,
+    projectionChangeBoundary,
+    sourceCount,
+    projectionCount,
+    staleSourceRows,
+  ] = await Promise.all([
+    capturePassRateFactSnapshot(),
+    capturePassRateProjectionSnapshot(generationId),
+    capturePassRateFactChangeBoundary(),
+    capturePassRateProjectionChangeBoundary(generationId),
+    prisma.inspections.count({ where: { isDeleted: false } }),
+    prisma.pass_rate_process_identity_projection.count({
+      where: { generationId },
+    }),
+    prisma.$queryRaw<Array<{ id: string }>>`
+      SELECT i.id
+      FROM inspections i
+      LEFT JOIN pass_rate_process_identity_projection p
+        ON p.generationId = ${generationId}
+        AND p.inspectionId = i.id
+      WHERE i.isDeleted = 0
+        AND (
+          p.inspectionId IS NULL
+          OR p.updatedAtSnapshot IS NULL
+          OR p.updatedAtSnapshot <> i.updatedAt
+        )
+      LIMIT 1
+    `,
+  ]);
+  const sameSnapshot =
+    sourceSnapshot.createdAtCutoff.getTime() ===
+      projectionSnapshot.createdAtCutoff.getTime() &&
+    sourceSnapshot.idCutoff === projectionSnapshot.idCutoff;
+  const sameChangeBoundary =
+    sourceChangeBoundary.updatedAtCutoff.getTime() ===
+      projectionChangeBoundary.updatedAtCutoff.getTime() &&
+    sourceChangeBoundary.idCutoff === projectionChangeBoundary.idCutoff;
+  const isFresh =
+    sameSnapshot &&
+    sameChangeBoundary &&
+    sourceCount === projectionCount &&
+    staleSourceRows.length === 0;
+  const reason = isFresh
+    ? null
+    : [
+        sameSnapshot ? null : 'CREATED_FACT_BOUNDARY_CHANGED',
+        sameChangeBoundary ? null : 'UPDATED_FACT_BOUNDARY_CHANGED',
+        sourceCount === projectionCount ? null : 'ACTIVE_FACT_COUNT_CHANGED',
+        staleSourceRows.length === 0 ? null : 'SOURCE_FACT_MISSING_OR_UPDATED',
+      ]
+        .filter(Boolean)
+        .join(',');
+  return { isFresh, projectionSnapshot, reason };
 }
 
 export async function getProjectedPassRateSummaryByRange(

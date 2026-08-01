@@ -21,7 +21,6 @@ import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { getIssuePassRateSummaryByRange } from './pass-rate-issue-summary.service';
 import {
-  capturePassRateFactSnapshot,
   getProjectedPassRateDrillDownByRange,
   getProjectedPassRateSummaryByRange,
 } from './pass-rate-projection-query.service';
@@ -39,11 +38,7 @@ interface DrillDownItem {
 }
 
 async function getActivePassRateGeneration() {
-  if (!(await PassRateProjectionService.isEnabled())) return null;
-  return prisma.identity_projection_generation_pointer.findUnique({
-    where: { key: 'historical-identity' },
-    select: { activeGenerationId: true },
-  });
+  return PassRateProjectionService.getReadableGeneration();
 }
 
 interface NetPassRateSummary {
@@ -188,7 +183,7 @@ export async function getNetPassRateSummaryByRange(
       active.activeGenerationId,
       start,
       end,
-      await capturePassRateFactSnapshot(),
+      active.snapshot,
     );
   }
 
@@ -331,7 +326,7 @@ export async function getPassRateDrillDownByRange(
         active.activeGenerationId,
         start,
         end,
-        await capturePassRateFactSnapshot(),
+        active.snapshot,
         getTargetPassRate,
       );
     }

@@ -6,6 +6,8 @@ import type {
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
+import { getPassRateProjectionFreshness } from './pass-rate-projection-query.service';
+
 const PASS_RATE_FLAG_KEY = 'QMS_PASS_RATE_IDENTITY_PROJECTION_ENABLED';
 const IDENTITY_PROJECTION_CONTROL_KEY = 'historical-identity';
 const logger = createModuleLogger('PassRateProjectionService');
@@ -60,6 +62,7 @@ async function buildRowsForGeneration(generationId: string) {
         qualifiedQuantity: true,
         quantity: true,
         result: true,
+        updatedAt: true,
         unqualifiedQuantity: true,
       },
     });
@@ -101,6 +104,7 @@ async function buildRowsForGeneration(generationId: string) {
       return {
         category: item.category,
         createdAtSnapshot: item.createdAt,
+        updatedAtSnapshot: item.updatedAt,
         effectiveProcessId:
           decision?.effectiveCanonicalId ?? fallback.effectiveProcessId,
         generationId,
@@ -145,6 +149,43 @@ export const PassRateProjectionService = {
     } catch (error: unknown) {
       logger.error(error, 'Failed to read pass-rate projection feature flag');
       return false;
+    }
+  },
+
+  /**
+   * A generation is only readable while it exactly represents the active fact
+   * set. New records, edits and soft deletes otherwise fall back to legacy
+   * rather than exposing a stale projection while the next rebuild is pending.
+   */
+  async getReadableGeneration() {
+    if (!(await this.isEnabled())) return null;
+    try {
+      const pointer =
+        await prisma.identity_projection_generation_pointer.findUnique({
+          where: { key: IDENTITY_PROJECTION_CONTROL_KEY },
+          select: { activeGenerationId: true },
+        });
+      if (!pointer?.activeGenerationId) return null;
+      const freshness = await getPassRateProjectionFreshness(
+        pointer.activeGenerationId,
+      );
+      if (!freshness.isFresh) {
+        logger.warn(
+          {
+            generationId: pointer.activeGenerationId,
+            reason: freshness.reason,
+          },
+          'Pass-rate projection is stale; using legacy report',
+        );
+        return null;
+      }
+      return {
+        activeGenerationId: pointer.activeGenerationId,
+        snapshot: freshness.projectionSnapshot,
+      };
+    } catch (error: unknown) {
+      logger.error(error, 'Failed to validate pass-rate projection freshness');
+      return null;
     }
   },
 
@@ -193,6 +234,7 @@ export const PassRateProjectionService = {
         qualifiedQuantity: true,
         quantity: true,
         result: true,
+        updatedAt: true,
         unqualifiedQuantity: true,
       },
     });
@@ -207,6 +249,7 @@ export const PassRateProjectionService = {
       create: {
         category: inspection.category,
         createdAtSnapshot: inspection.createdAt,
+        updatedAtSnapshot: inspection.updatedAt,
         effectiveProcessId: decision.canonicalId,
         generationId,
         incomingType: inspection.incomingType,
@@ -223,6 +266,7 @@ export const PassRateProjectionService = {
         effectiveProcessId: decision.canonicalId,
         resolutionId: decision.id,
         state: decision.state,
+        updatedAtSnapshot: inspection.updatedAt,
       },
     });
   },

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const createRun = vi.fn();
 const completeRun = vi.fn();
-const captureSnapshot = vi.fn();
+const captureProjectionSnapshot = vi.fn();
 const getProjectedSummary = vi.fn();
 const getProjectedDrillDown = vi.fn();
 const getLegacySummary = vi.fn();
@@ -22,7 +22,7 @@ vi.mock('~/modules/master-data-identity', () => ({
   IdentityReconciliationService: { completeRun, createRun },
 }));
 vi.mock('./pass-rate-projection-query.service', () => ({
-  capturePassRateFactSnapshot: captureSnapshot,
+  capturePassRateProjectionSnapshot: captureProjectionSnapshot,
   getProjectedPassRateDrillDownByRange: getProjectedDrillDown,
   getProjectedPassRateSummaryByRange: getProjectedSummary,
 }));
@@ -35,7 +35,7 @@ vi.mock('./pass-rate', () => ({
 describe('pass-rate shadow reconciliation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    captureSnapshot.mockResolvedValue({
+    captureProjectionSnapshot.mockResolvedValue({
       createdAtCutoff: new Date('2026-08-01T08:00:00.000Z'),
       idCutoff: 'inspection-boundary',
     });
@@ -110,5 +110,14 @@ describe('pass-rate shadow reconciliation', () => {
       generationId: 'generation-1',
       runId: 'run-1',
     });
+    expect(
+      prismaMock.pass_rate_process_identity_projection.groupBy,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          inspectionDate: { gte: start, lte: end },
+        }),
+      }),
+    );
   });
 });

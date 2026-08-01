@@ -11,7 +11,7 @@ import {
   getLegacyPassRateDrillDownByRange,
 } from './pass-rate';
 import {
-  capturePassRateFactSnapshot,
+  capturePassRateProjectionSnapshot,
   getProjectedPassRateDrillDownByRange,
   getProjectedPassRateSummaryByRange,
 } from './pass-rate-projection-query.service';
@@ -40,7 +40,21 @@ function numberMetric(
  */
 export const PassRateShadowReconciliationService = {
   async run(params: { baselineChecksum: string; end: Date; start: Date }) {
-    const snapshot = await capturePassRateFactSnapshot();
+    const active =
+      await prisma.identity_projection_generation_pointer.findUnique({
+        where: { key: 'historical-identity' },
+        select: { activeGenerationId: true },
+      });
+    if (!active?.activeGenerationId) {
+      throw new BusinessError(
+        'PASS_RATE_PROJECTION_UNAVAILABLE',
+        'Pass-rate identity projection has not been published',
+        409,
+      );
+    }
+    const snapshot = await capturePassRateProjectionSnapshot(
+      active.activeGenerationId,
+    );
     const run = await IdentityReconciliationService.createRun({
       baselineChecksum: params.baselineChecksum,
       consumerKey: 'pass-rate',
@@ -54,18 +68,6 @@ export const PassRateShadowReconciliationService = {
       factEntityType: 'inspections',
     });
     try {
-      const active =
-        await prisma.identity_projection_generation_pointer.findUnique({
-          where: { key: 'historical-identity' },
-          select: { activeGenerationId: true },
-        });
-      if (!active?.activeGenerationId) {
-        throw new BusinessError(
-          'PASS_RATE_PROJECTION_UNAVAILABLE',
-          'Pass-rate identity projection has not been published',
-          409,
-        );
-      }
       const targetResolver = await createPassRateTargetResolver();
       const [legacy, projected, legacyDrillDown, projectedDrillDown, states] =
         await Promise.all([
@@ -98,6 +100,7 @@ export const PassRateShadowReconciliationService = {
             by: ['state'],
             where: {
               generationId: active.activeGenerationId,
+              inspectionDate: { gte: params.start, lte: params.end },
               OR: [
                 { createdAtSnapshot: { lt: snapshot.createdAtCutoff } },
                 {
