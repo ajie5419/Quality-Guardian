@@ -145,6 +145,24 @@ describe('pass-rate projection rollout gate', () => {
     );
   });
 
+  it('queues rebuild work without running it inside the web process', async () => {
+    db.pass_rate_projection_refresh_jobs.findFirst.mockResolvedValue(null);
+    db.pass_rate_projection_refresh_jobs.create.mockResolvedValue({
+      id: 'job-1',
+      status: 'PENDING',
+    });
+    const { PassRateProjectionRolloutService } = await import(
+      './pass-rate-projection-rollout.service'
+    );
+
+    await expect(
+      PassRateProjectionRolloutService.requestRebuild({
+        requestedById: 'admin-1',
+      }),
+    ).resolves.toMatchObject({ enqueued: true });
+    expect(createStagedGeneration).not.toHaveBeenCalled();
+  });
+
   it('keeps legacy fallback available when a queued rebuild fails', async () => {
     db.pass_rate_projection_refresh_jobs.findFirst.mockResolvedValue({
       id: 'job-1',

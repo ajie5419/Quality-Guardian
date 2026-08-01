@@ -207,13 +207,10 @@ export const PassRateProjectionRolloutService = {
   },
 
   async requestRebuild(params: { reason?: string; requestedById?: string }) {
-    const queued = await this.enqueueRebuild(params);
-    if (queued.enqueued) {
-      // The HTTP request only persists the work. Rebuild execution happens
-      // after the response path and remains retryable from the durable queue.
-      void this.processNextRebuild();
-    }
-    return queued;
+    // Rebuilds are intentionally consumed by the dedicated worker script.
+    // Running the write-heavy projection build inside the web process can
+    // exhaust a small database and take authentication down with it.
+    return this.enqueueRebuild(params);
   },
 
   async processNextRebuild() {
