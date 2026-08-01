@@ -5325,3 +5325,21 @@
 **遗留问题：**
 
 - 开关保持关闭，待连续影子对账差异均可解释并完成页面验收后才允许切换合格率读取口径。
+
+### 2026-08-01 主数据身份治理 WP2：影子快照与新鲜度保护修正
+
+**执行内容：**
+
+- 新增旁路字段 `updatedAtSnapshot` 与对应索引；新 migration 只修改可重建的合格率投影表，不修改任何历史事实。
+- 影子对账先读取 active generation，再从该 generation 的窄投影捕获 `createdAt + inspectionId` cutoff；补录事实不会再造成非身份原因的伪差异。
+- `IDENTITY_STATE:*` 指标已与总量、合格数使用相同的业务日期窗口和事实 cutoff。
+- 报表开关打开时，数据库端比较源事实与投影的创建/更新边界、活跃行数及 `LIMIT 1` 的逐行不匹配存在性；任何新建、编辑、软删除或查询失败都会记录原因并安全回退 legacy，不全量加载投影。
+
+**验证结果：**
+
+- 本地 Prisma migration：52 个；generation `cmsabvogh00008z3e2pqnnlt4` 扫描 50,293 条、写入 9,554 条并原子发布。
+- 本地全期影子对账 run `cmsabvtyq00008z47jc5hrgfo`：legacy 与 projection 总量均为 411,561、合格数均为 411,391、合格率均为 99.96，三项差异均为 0；窗口内身份状态 `RESOLVED=4,234`、`UNRESOLVED=5,287`。
+- 只读基线 checksum 复核一致：`95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 定向 `4/4` 文件、`13/13` 用例；全仓 Vitest `259/259` 文件、`2371/2371` 用例；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`git diff --check` 全部通过。
+
+**commit:** `45487a76 fix(@qgs/backend): guard stale pass-rate projections`

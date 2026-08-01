@@ -10,3 +10,4 @@
 - `quality_records.defectClassification` 仅是旧治理工作清单字段，不能作为事实表 canonical ID 扫描列。
 - 投影重建先在独立 generation 中完成，再以 singleton pointer 的 CAS 一次发布；消费者通过 pointer 读取完整 generation，构建失败或期间有新决策时保留旧 generation。
 - `pass_rate_process_identity_projection` 是合格率的领域窄投影。它与通用 generation 一起完成构建后才允许发布，避免报表在通用旁路表上重复 join 或看到半成品。
+- 合格率开关开启后仍须先验证 projection 新鲜度：数据库只执行边界、计数和 `LIMIT 1` 的不匹配存在性查询，不把投影加载到应用内存；新增、编辑或软删除检验事实时一律回退 legacy，等待下一次 generation 重建。
