@@ -415,7 +415,10 @@ onMounted(loadSettings);
             </Button>
             <Switch
               :checked="projectionStatus?.enabled ?? false"
-              :disabled="savingProjection || !projectionStatus?.rolloutReady"
+              :disabled="
+                savingProjection ||
+                (!projectionStatus?.rolloutReady && !projectionStatus?.enabled)
+              "
               :loading="savingProjection"
               @change="(checked) => handleProjectionToggle(checked as boolean)"
             />
