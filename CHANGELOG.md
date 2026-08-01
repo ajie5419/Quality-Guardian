@@ -32,15 +32,16 @@
 - 新增只增不改的历史身份决策台账、可删除重建的身份投影、影子对账运行和指标四张旁路表；migration 未触碰历史事实表。
 - 新增 `master-data-identity` 模块，注册受控字段的 canonical 类型；人工决定必须有认证操作人，纠错仅能生成 successor 决策。
 - 将系统设置人工治理入口改为“工作清单 CAS + 台账追加 + 投影更新”，不再调用会回写事实 ID 或名称快照的旧领域修复路径。
-- 新增默认 dry-run 的旁路初始化脚本；本地仅执行 `--apply --limit=10` 小范围集成验证，未加入 release maintenance。
+- 新增默认 dry-run 的旁路初始化脚本；本地完成全量旁路初始化，未加入 release maintenance。
 
 **验证结果：**
 
 - 本地 Prisma migration：49 个，Schema 最新。
 - migration 前后历史身份基线 `contentChecksum` 均为 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 全量旁路结果：台账 38,397 条、投影 38,336 条（`RESOLVED=29,766`、`UNRESOLVED=5,514`、`UNKNOWN_PROVENANCE=3,056`）。
 - 定向服务测试 `2/2` 文件、`8/8` 测试通过；后端全量 `254/254` 文件、`2352/2352` 测试通过。
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
-- 未访问或修改生产数据库；旁路表的 10 条验证决策可随测试库重建而丢弃，不影响事实快照。
+- 未访问或修改生产数据库；旁路表可随测试库重建而丢弃，不影响事实快照。
 
 **commit:** `015bede6 feat(@qgs/backend): add historical identity sidecar`
 
