@@ -41,7 +41,7 @@
 - 本地浏览器验收：管理员登录后，报检任务 `partId` 的治理项显示处置入口、可加载规范物料选项，弹窗明确历史事实不修改；未提交处置，测试数据保持不变。
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
 
-**commit:** 待提交。
+**commit:** `5bfcb91a fix(project): align governance identity resolution`
 
 **遗留问题：**
 
