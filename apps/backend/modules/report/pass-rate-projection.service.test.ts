@@ -6,6 +6,7 @@ const prismaMock = {
 };
 
 const getFreshness = vi.fn();
+const requestRebuild = vi.fn();
 
 vi.mock('~/utils/prisma', () => ({ default: prismaMock }));
 vi.mock('~/utils/logger', () => ({
@@ -13,6 +14,9 @@ vi.mock('~/utils/logger', () => ({
 }));
 vi.mock('./pass-rate-projection-query.service', () => ({
   getPassRateProjectionFreshness: getFreshness,
+}));
+vi.mock('./pass-rate-projection-rollout.service', () => ({
+  PassRateProjectionRolloutService: { requestRebuild },
 }));
 
 describe('pass-rate projection feature flag', () => {
@@ -58,6 +62,11 @@ describe('pass-rate projection feature flag', () => {
     await expect(
       PassRateProjectionService.getReadableGeneration(),
     ).resolves.toBeNull();
+    await vi.waitFor(() => {
+      expect(requestRebuild).toHaveBeenCalledWith({
+        reason: 'CREATED_FACT_BOUNDARY_CHANGED,SOURCE_FACT_MISSING_OR_UPDATED',
+      });
+    });
     expect(getFreshness).toHaveBeenCalledWith('generation-1');
   });
 });

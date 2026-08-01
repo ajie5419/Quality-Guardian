@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const getFreshness = vi.fn();
+const buildGeneration = vi.fn();
+const createStagedGeneration = vi.fn();
+const publishStagedGeneration = vi.fn();
 const db = {
   identity_projection_generation_pointer: { findUnique: vi.fn() },
   identity_projection_generations: { findMany: vi.fn() },
@@ -20,9 +23,13 @@ vi.mock('~/utils/logger', () => ({
 }));
 vi.mock('~/modules/master-data-identity', () => ({
   IdentityProjectionService: {
-    createStagedGeneration: vi.fn(),
-    publishStagedGeneration: vi.fn(),
+    createStagedGeneration,
+    publishStagedGeneration,
   },
+}));
+vi.mock('./pass-rate-projection.service', () => ({
+  PASS_RATE_FLAG_KEY: 'QMS_PASS_RATE_IDENTITY_PROJECTION_ENABLED',
+  PassRateProjectionService: { buildGeneration },
 }));
 vi.mock('./pass-rate-projection-query.service', () => ({
   getPassRateProjectionFreshness: getFreshness,
@@ -134,6 +141,28 @@ describe('pass-rate projection rollout gate', () => {
         where: expect.objectContaining({
           createdAt: { gte: new Date('2026-08-01T00:00:00.000Z') },
         }),
+      }),
+    );
+  });
+
+  it('keeps legacy fallback available when a queued rebuild fails', async () => {
+    db.pass_rate_projection_refresh_jobs.findFirst.mockResolvedValue({
+      id: 'job-1',
+    });
+    db.pass_rate_projection_refresh_jobs.updateMany.mockResolvedValue({
+      count: 1,
+    });
+    createStagedGeneration.mockRejectedValue(new Error('projection failed'));
+    const { PassRateProjectionRolloutService } = await import(
+      './pass-rate-projection-rollout.service'
+    );
+
+    await expect(
+      PassRateProjectionRolloutService.processNextRebuild(),
+    ).resolves.toBeNull();
+    expect(db.pass_rate_projection_refresh_jobs.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: 'FAILED' }),
       }),
     );
   });

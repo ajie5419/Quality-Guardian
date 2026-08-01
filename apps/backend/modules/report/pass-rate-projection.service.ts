@@ -44,6 +44,19 @@ function resolveFallbackState(
   };
 }
 
+function scheduleStaleProjectionRebuild(reason: string) {
+  // This deliberately queues after the report request has already selected
+  // legacy. Rebuilding inside a read path would turn a safe fallback into an
+  // unbounded user-facing request.
+  void import('./pass-rate-projection-rollout.service')
+    .then(({ PassRateProjectionRolloutService }) =>
+      PassRateProjectionRolloutService.requestRebuild({ reason }),
+    )
+    .catch((error: unknown) => {
+      logger.error(error, 'Failed to queue stale pass-rate projection rebuild');
+    });
+}
+
 async function buildRowsForGeneration(generationId: string) {
   let afterId: string | undefined;
   let written = 0;
@@ -177,6 +190,9 @@ export const PassRateProjectionService = {
           },
           'Pass-rate projection is stale; using legacy report',
         );
+        scheduleStaleProjectionRebuild(
+          freshness.reason || 'PASS_RATE_PROJECTION_STALE',
+        );
         return null;
       }
       return {
@@ -185,6 +201,7 @@ export const PassRateProjectionService = {
       };
     } catch (error: unknown) {
       logger.error(error, 'Failed to validate pass-rate projection freshness');
+      scheduleStaleProjectionRebuild('PASS_RATE_PROJECTION_FRESHNESS_FAILED');
       return null;
     }
   },
