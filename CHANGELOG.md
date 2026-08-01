@@ -25,6 +25,32 @@
 
 ## 执行记录
 
+### 2026-08-01 主数据身份治理 WP3：合格率安全正式切换准备
+
+**执行内容：**
+
+- 新增独立的合格率投影重建任务表和管理接口；不复用供应商评分任务。开关启用实行 fail-closed 门禁：active generation、新鲜度、当前 generation 的已完成影子对账、三项核心差异、冻结基线 checksum 及发布后失败/构建 generation 均必须通过；禁用始终允许。
+- 为影子对账运行记录 `projectionGenerationId`，防止旧 generation 的成功对账被误用于当前 generation；发布维护会初始化受控基线 checksum。
+- 陈旧投影读取时立即安全回退 legacy，并在请求之外持久化、异步消费可重试重建任务；重启遗留任务可通过独立脚本或管理员入口重试，构建失败继续使用 legacy。
+- 系统“报检与检验设置”页新增仅管理员可见的合格率投影控制区，显示 generation、激活时间、新鲜度、基线、最近影子对账和三项差异；启用、禁用和重建均需要明确确认。
+- 对仍为 `UNRESOLVED` 的旁路记录只应用可证明规则：重新验证的 raw ID 自动转为 `RESOLVED`/`RETIRED`/`INVALID_ID`，仅非过程检验的 `processId` 可转 `NOT_APPLICABLE`，其余证据不足数据保持待治理。全程未修改事实表。
+- 新增并执行当月、上月、最近一周、跨月、无数据、历史补录六个固定 generation 的影子对账窗口；每个窗口独立持久化运行和指标。
+
+**验证结果：**
+
+- 本地 Prisma migration：53 个，新增 migration 仅增加 rollout 控制列和可重试任务表。
+- 本地 deterministic 分类新增 7 条 `RESOLVED` 决策；没有把未知引用强制分类。新 active generation `cmsadme9x000s8zlh5r8kbwrd` 已发布，合格率投影 9,554 行。
+- 六个影子窗口的总量、合格数、合格率差异均为 0；无数据窗口为 0/0/0。当前状态 gate：`rolloutReady=true`、`fresh=true`、`baselineMatch=true`、无 BUILDING/FAILED 阻断 generation。
+- 本地实际执行启用后再禁用：启用成功、门禁保持通过、最终恢复默认 legacy（`enabled=false`）。
+- 历史身份基线 checksum 保持 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 后端全量 Vitest：`262/262` 文件、`2380/2380` 测试通过；前端 `vue-tsc --noEmit`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+
+**commit:** `6cf722df feat(@qgs/backend): gate pass-rate projection rollout`、`ec5e9e16 feat(@qgs/backend): recover stale pass-rate projections`、`af8e3245 feat(@qgs/backend): reconcile pass-rate rollout windows`、`3fbb7f00 feat(@qgs/web-antd): manage pass-rate projection rollout`
+
+**遗留问题：**
+
+- 本轮没有启动前端 dev/build 服务，遵循项目约束；本地验收服务器未运行，因此实际页面点击验收需在下一次本地容器开发服务已启动时完成。
+
 ### 2026-08-01 主数据身份治理 WP1：页面治理入口与旁路语义修复
 
 **执行内容：**
