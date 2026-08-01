@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type { InspectionSettingsApi } from '#/api/system/inspection-settings';
+import type { PassRateProjectionApi } from '#/api/system/pass-rate-projection';
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -35,6 +36,11 @@ import {
   updateInspectionProcessApi,
   updateInspectionProcessSelectionApi,
 } from '#/api/system/inspection-settings';
+import {
+  getPassRateProjectionStatusApi,
+  rebuildPassRateProjectionApi,
+  updatePassRateProjectionEnabledApi,
+} from '#/api/system/pass-rate-projection';
 
 type ProcessCategory = InspectionSettingsApi.ProcessCategory;
 type ProcessItem = InspectionSettingsApi.ProcessItem;
@@ -53,6 +59,8 @@ const savingManualSetting = ref(false);
 const savingMaterialInputSetting = ref(false);
 const savingSelection = ref(false);
 const savingProcess = ref(false);
+const savingProjection = ref(false);
+const rebuildingProjection = ref(false);
 const manualCreateEnabled = ref(true);
 const incomingMaterialFreeInputEnabled = ref(false);
 const processRows = ref<ProcessItem[]>([]);
@@ -60,6 +68,7 @@ const processProcessIds = ref(new Set<string>());
 const incomingProcessIds = ref(new Set<string>());
 const selectionDirty = ref(false);
 const processModalOpen = ref(false);
+const projectionStatus = ref<null | PassRateProjectionApi.Status>(null);
 const editingProcessId = ref<null | string>(null);
 const processDraft = reactive<{
   categories: ProcessCategory[];
@@ -108,11 +117,15 @@ const columns = computed(() => [
 async function loadSettings() {
   loading.value = true;
   try {
-    const [manualSetting, materialInputSetting, processes] = await Promise.all([
-      getInspectionManualCreateSettingApi(),
-      getPublicIncomingMaterialInputSettingApi(),
-      getInspectionProcessesApi(),
-    ]);
+    const [manualSetting, materialInputSetting, processes, rollout] =
+      await Promise.all([
+        getInspectionManualCreateSettingApi(),
+        getPublicIncomingMaterialInputSettingApi(),
+        getInspectionProcessesApi(),
+        canEdit.value
+          ? getPassRateProjectionStatusApi()
+          : Promise.resolve(null),
+      ]);
     manualCreateEnabled.value = manualSetting.enabled;
     incomingMaterialFreeInputEnabled.value =
       materialInputSetting.incomingMaterialFreeInputEnabled;
@@ -128,11 +141,65 @@ async function loadSettings() {
         .map((item) => item.id),
     );
     selectionDirty.value = false;
+    projectionStatus.value = rollout;
   } catch {
     message.error(t('common.loadFailed'));
   } finally {
     loading.value = false;
   }
+}
+
+function formatProjectionDate(value: Date | null | string | undefined) {
+  if (!value) return '—';
+  const date = new Date(value);
+  return Number.isNaN(date.valueOf()) ? '—' : date.toLocaleString('zh-CN');
+}
+
+function handleProjectionToggle(checked: boolean) {
+  const action = checked ? 'enable' : 'disable';
+  Modal.confirm({
+    content: checked
+      ? 'Projection reads will be enabled only after the server confirms every safety gate.'
+      : 'Reports will return to the legacy calculation immediately.',
+    okText: checked ? 'Enable' : 'Disable',
+    title: `${checked ? 'Enable' : 'Disable'} pass-rate projection`,
+    async onOk() {
+      savingProjection.value = true;
+      try {
+        projectionStatus.value = await updatePassRateProjectionEnabledApi({
+          enabled: checked,
+        });
+        message.success(`Pass-rate projection ${action}d`);
+      } catch {
+        message.error(`Failed to ${action} pass-rate projection`);
+      } finally {
+        savingProjection.value = false;
+      }
+    },
+  });
+}
+
+function requestProjectionRebuild() {
+  Modal.confirm({
+    content:
+      'The report stays on the legacy calculation until a complete generation is published.',
+    okText: 'Queue rebuild',
+    title: 'Rebuild pass-rate projection',
+    async onOk() {
+      rebuildingProjection.value = true;
+      try {
+        await rebuildPassRateProjectionApi({
+          reason: 'Administrator requested retry',
+        });
+        message.success('Pass-rate projection rebuild queued');
+        projectionStatus.value = await getPassRateProjectionStatusApi();
+      } catch {
+        message.error('Failed to queue pass-rate projection rebuild');
+      } finally {
+        rebuildingProjection.value = false;
+      }
+    },
+  });
 }
 
 async function handleManualToggle(checked: boolean) {
@@ -312,6 +379,82 @@ onMounted(loadSettings);
             :loading="savingManualSetting"
             @change="(checked) => handleManualToggle(checked as boolean)"
           />
+        </div>
+      </section>
+
+      <section v-if="canEdit" class="border-border border-b pb-6">
+        <div class="mb-4 flex items-center justify-between gap-4">
+          <div>
+            <h2 class="text-base font-semibold">
+              Pass-rate projection rollout
+            </h2>
+            <p class="text-muted-foreground mt-1 text-sm">
+              Historical facts remain unchanged. The switch is available only
+              after shadow reconciliation passes.
+            </p>
+          </div>
+          <Space>
+            <Button
+              :loading="rebuildingProjection"
+              @click="requestProjectionRebuild"
+            >
+              Rebuild
+            </Button>
+            <Switch
+              :checked="projectionStatus?.enabled ?? false"
+              :disabled="savingProjection || !projectionStatus?.rolloutReady"
+              :loading="savingProjection"
+              @change="(checked) => handleProjectionToggle(checked as boolean)"
+            />
+          </Space>
+        </div>
+        <Alert
+          v-if="projectionStatus && !projectionStatus.rolloutReady"
+          message="Projection rollout is blocked until freshness, baseline, and shadow checks pass."
+          type="warning"
+          show-icon
+        />
+        <div
+          v-if="projectionStatus"
+          class="mt-4 grid grid-cols-1 gap-3 text-sm md:grid-cols-2"
+        >
+          <div>
+            Active generation:
+            {{ projectionStatus.activeGeneration?.id || '—' }}
+          </div>
+          <div>
+            Activated:
+            {{
+              formatProjectionDate(
+                projectionStatus.activeGeneration?.activatedAt,
+              )
+            }}
+          </div>
+          <div>
+            Fresh: {{ projectionStatus.freshness?.isFresh ? 'Yes' : 'No' }}
+          </div>
+          <div>
+            Baseline matched:
+            {{ projectionStatus.baselineMatch ? 'Yes' : 'No' }}
+          </div>
+          <div>
+            Latest shadow:
+            {{
+              formatProjectionDate(projectionStatus.latestShadow?.completedAt)
+            }}
+          </div>
+          <div>
+            Shadow differences: total
+            {{
+              projectionStatus.latestShadow?.coreDifferences.TOTAL_COUNT ?? '—'
+            }}, pass
+            {{
+              projectionStatus.latestShadow?.coreDifferences.PASS_COUNT ?? '—'
+            }}, rate
+            {{
+              projectionStatus.latestShadow?.coreDifferences.PASS_RATE ?? '—'
+            }}
+          </div>
         </div>
       </section>
 
