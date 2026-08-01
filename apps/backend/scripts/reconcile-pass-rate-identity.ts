@@ -24,17 +24,23 @@ export function parsePassRateReconciliationOptions(args: string[]) {
     new Date(),
   );
   if (start > end) throw new Error('INVALID_DATE_RANGE');
+  const label = String(
+    args.find((arg) => arg.startsWith('--label='))?.slice('--label='.length) ||
+      'custom',
+  ).trim();
+  if (!label || label.length > 80) throw new Error('INVALID_WINDOW_LABEL');
   if (
     args.some(
       (arg) =>
         arg !== '--apply' &&
         !arg.startsWith('--start=') &&
-        !arg.startsWith('--end='),
+        !arg.startsWith('--end=') &&
+        !arg.startsWith('--label='),
     )
   ) {
     throw new Error('UNKNOWN_ARGUMENT');
   }
-  return { end, start };
+  return { end, label, start };
 }
 
 async function readBaselineChecksum() {
@@ -54,6 +60,7 @@ export async function reconcilePassRateIdentity(args = process.argv.slice(2)) {
     baselineChecksum: await readBaselineChecksum(),
     end: options.end,
     start: options.start,
+    windowLabel: options.label,
   });
 }
 

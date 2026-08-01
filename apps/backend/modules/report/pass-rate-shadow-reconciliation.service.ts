@@ -39,7 +39,12 @@ function numberMetric(
  * not become false identity differences.
  */
 export const PassRateShadowReconciliationService = {
-  async run(params: { baselineChecksum: string; end: Date; start: Date }) {
+  async run(params: {
+    baselineChecksum: string;
+    end: Date;
+    start: Date;
+    windowLabel?: string;
+  }) {
     const active =
       await prisma.identity_projection_generation_pointer.findUnique({
         where: { key: 'historical-identity' },
@@ -114,6 +119,11 @@ export const PassRateShadowReconciliationService = {
           }),
         ]);
       const metrics = [
+        numberMetric('WINDOW_MARKER', 0, 0, {
+          end: params.end.toISOString(),
+          label: String(params.windowLabel || 'custom'),
+          start: params.start.toISOString(),
+        }),
         numberMetric('TOTAL_COUNT', legacy.totalCount, projected.totalCount),
         numberMetric('PASS_COUNT', legacy.passCount, projected.passCount),
         numberMetric('PASS_RATE', legacy.passRate, projected.passRate),
