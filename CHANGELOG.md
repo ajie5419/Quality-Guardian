@@ -38,12 +38,12 @@
 
 - 本地 Prisma migration：49 个，Schema 最新。
 - migration 前后历史身份基线 `contentChecksum` 均为 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
-- 全量旁路结果：台账 38,397 条、投影 38,336 条（`RESOLVED=29,766`、`UNRESOLVED=5,514`、`UNKNOWN_PROVENANCE=3,056`）。
+- 全量旁路结果：投影 48,983 条（`RESOLVED=40,089`、`RETIRED=141`、`UNRESOLVED=5,518`、`INVALID_ID=179`、`UNKNOWN_PROVENANCE=3,056`）；核心域台账为检验 36,849、报检任务 11,009、不合格品 1,778、售后 473。
 - 定向服务测试 `2/2` 文件、`8/8` 测试通过；后端全量 `254/254` 文件、`2352/2352` 测试通过。
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
 - 未访问或修改生产数据库；旁路表可随测试库重建而丢弃，不影响事实快照。
 
-**commit:** `015bede6 feat(@qgs/backend): add historical identity sidecar`
+**commit:** `015bede6 feat(@qgs/backend): add historical identity sidecar`、`b8a6e88 fix(@qgs/backend): batch identity sidecar rebuild`
 
 **遗留问题：**
 

@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 
 import { MasterDataResolutionAuditService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
+import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
@@ -11,6 +12,8 @@ import {
   getCanonicalIdentityState,
   getIdentityRegistryEntry,
 } from './identity-registry';
+
+const logger = createModuleLogger('HistoricalIdentityResolutionService');
 
 type ResolutionClient = Prisma.TransactionClient;
 
@@ -151,6 +154,7 @@ async function appendDecision(
       },
     });
   } catch (error: unknown) {
+    logger.error(error, 'Failed to append historical identity decision');
     if (isPrismaUniqueConstraintError(error)) {
       throw new BusinessError(
         'IDENTITY_RESOLUTION_CHANGED',

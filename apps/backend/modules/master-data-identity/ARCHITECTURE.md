@@ -7,3 +7,5 @@
 - `unresolved_master_data_refs` 仍由 `supplier-identity` 拥有，仅作为可变工作清单和证据来源，不参与统计真相。
 - 在线人工处置只做队列 CAS、追加 `MANUAL_DECISION` 和更新投影，绝不更新历史事实 ID 或名称快照。
 - 对账运行必须固定事实集合 cutoff；WP2 读取该契约双跑，不在用户请求中执行双重聚合。
+- `quality_records.defectClassification` 仅是旧治理工作清单字段，不能作为事实表 canonical ID 扫描列。
+- 当前投影重建会先删除再批量写入；WP2 在任何报表改读投影前必须引入 generation/staging switch，避免读到重建中的空投影。
