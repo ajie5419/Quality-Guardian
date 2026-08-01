@@ -1,3 +1,4 @@
+import { defineEventHandler } from 'h3';
 import { PassRateProjectionRolloutService } from '~/modules/report';
 import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';

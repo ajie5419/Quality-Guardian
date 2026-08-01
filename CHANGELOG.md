@@ -43,7 +43,7 @@
 - 六个影子窗口的总量、合格数、合格率差异均为 0；无数据窗口为 0/0/0。当前状态 gate：`rolloutReady=true`、`fresh=true`、`baselineMatch=true`、无 BUILDING/FAILED 阻断 generation。
 - 本地实际执行启用后再禁用：启用成功、门禁保持通过、最终恢复默认 legacy（`enabled=false`）。
 - 历史身份基线 checksum 保持 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
-- 后端全量 Vitest：`262/262` 文件、`2380/2380` 测试通过；前端 `vue-tsc --noEmit`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+- 后端全量 Vitest：`264/264` 文件、`2384/2384` 测试通过；前端 `vue-tsc --noEmit`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
 
 **commit:** `6cf722df feat(@qgs/backend): gate pass-rate projection rollout`、`ec5e9e16 feat(@qgs/backend): recover stale pass-rate projections`、`af8e3245 feat(@qgs/backend): reconcile pass-rate rollout windows`、`3fbb7f00 feat(@qgs/web-antd): manage pass-rate projection rollout`
 
