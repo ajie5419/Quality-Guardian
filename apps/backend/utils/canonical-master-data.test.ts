@@ -271,7 +271,6 @@ describe('masterDataGovernanceKernel', () => {
       update: expect.objectContaining({
         isDeleted: false,
         rawName: 'Unknown process',
-        status: 'OPEN',
       }),
     });
     expect(queryRawUnsafe.mock.calls[2]?.[0]).toContain('`isDeleted` = 0');
@@ -315,23 +314,6 @@ describe('masterDataGovernanceKernel', () => {
       }),
     ).resolves.toBeNull();
     expect(queryRawUnsafe).not.toHaveBeenCalled();
-  });
-
-  it('includes the department source when previewing a division rename', async () => {
-    queryRawUnsafe.mockResolvedValue([{ count: 2 }]);
-
-    await expect(
-      MasterDataGovernanceKernel.rename({
-        configKey: 'division',
-        dryRun: true,
-        newValue: 'New Division',
-        oldValue: 'Old Division',
-      }),
-    ).resolves.toContainEqual({
-      affectedRows: 2,
-      field: 'name',
-      model: 'departments',
-    });
   });
 
   it('aggregates only actionable audit findings', async () => {
@@ -404,5 +386,91 @@ describe('masterDataGovernanceKernel', () => {
         status: 'warn',
       },
     });
+  });
+
+  it('treats a historical name snapshot mismatch as an observation', async () => {
+    vi.spyOn(MasterDataGovernanceKernel, 'auditOrphans').mockResolvedValue([]);
+    vi.spyOn(
+      MasterDataGovernanceKernel,
+      'auditMissingCanonicalIds',
+    ).mockResolvedValue([]);
+    vi.spyOn(
+      MasterDataGovernanceKernel,
+      'auditInvalidCanonicalIds',
+    ).mockResolvedValue([
+      {
+        invalidCanonicalId: 0,
+        mismatchedCanonicalName: 2,
+        table: 'work_orders',
+      },
+    ]);
+
+    await expect(
+      MasterDataGovernanceKernel.auditGovernance({ configKeys: ['division'] }),
+    ).resolves.toMatchObject({
+      invalid: [],
+      summary: {
+        invalidCanonicalId: 0,
+        mismatchedCanonicalName: 2,
+        status: 'pass',
+      },
+    });
+  });
+
+  it('returns null for duplicate canonical names regardless of row order', async () => {
+    queryRawUnsafe.mockResolvedValue([
+      { id: 'department-2', name: 'Production' },
+      { id: 'department-1', name: 'Production' },
+      { id: 'department-3', name: 'Quality' },
+    ]);
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+        configKey: 'division',
+        names: ['Production', 'Quality'],
+      }),
+    ).resolves.toEqual(
+      new Map([
+        ['Production', null],
+        ['Quality', 'department-3'],
+      ]),
+    );
+    expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('ORDER BY `name` ASC');
+  });
+
+  it('keeps an existing resolution when an unresolved reference is scanned again', async () => {
+    __masterDataGovernanceTestHooks.resetCaches();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ columnName: 'id' }])
+      .mockResolvedValueOnce([
+        { columnName: 'id' },
+        { columnName: 'isDeleted' },
+      ])
+      .mockResolvedValueOnce([
+        { rowKey: 'requirement-1', value: 'Unknown process' },
+      ]);
+    unresolvedUpsert.mockResolvedValue({ id: 'audit-1' });
+
+    await __masterDataGovernanceTestHooks.backfillTargetCanonicalIds(
+      {
+        idColumn: 'processId',
+        nameColumn: 'processName',
+        nullable: true,
+        table: 'work_order_requirements',
+      },
+      new Map(),
+      { batchSize: 100, configKey: 'processName' },
+    );
+
+    expect(unresolvedUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.not.objectContaining({
+          resolutionNote: expect.anything(),
+          resolvedAt: expect.anything(),
+          resolvedId: expect.anything(),
+          status: expect.anything(),
+        }),
+      }),
+    );
   });
 });

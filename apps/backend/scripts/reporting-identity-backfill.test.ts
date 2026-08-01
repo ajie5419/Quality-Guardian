@@ -152,7 +152,7 @@ describe('reporting identity backfill', () => {
         respDept: 'dept-1',
         respDeptId: null,
       },
-      data: { respDept: 'Quality', respDeptId: 'dept-1' },
+      data: { respDeptId: 'dept-1' },
     });
   });
 

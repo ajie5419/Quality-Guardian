@@ -367,10 +367,6 @@ async function persistAudits(inputs: AuditInput[]) {
         rawId: input.rawId,
         rawName: input.rawName,
         reason: input.reason,
-        resolutionNote: null,
-        resolvedAt: null,
-        resolvedId: null,
-        status: 'OPEN',
       },
     });
   });
@@ -659,10 +655,8 @@ export async function backfillInspectionIssueResponsibilities(
               ...update.existing,
             },
             data: {
-              responsibleDepartment: update.department.name,
               responsibleDepartmentId: update.department.id,
               supplierId: update.supplier.id,
-              supplierName: update.supplier.name,
             },
           }),
         ),

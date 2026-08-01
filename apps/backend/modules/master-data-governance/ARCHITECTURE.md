@@ -10,6 +10,7 @@
 - Identity references are dispatched by the exact `entityType + fieldName` pair. Inspection records, BOM parts and required processes, supplier identity links, work-order requirements, and work orders expose canonical options and delegate writes to their owning modules.
 - Single-value identity resolution updates canonical IDs while preserving historical name snapshots. BOM required processes are the exception: resolution atomically creates the structured process relations and their ordered snapshots.
 - All resolution services use raw ID/name compare-and-set conditions and close only audits whose business records were actually updated.
+- Repeated scanners may refresh unresolved evidence but must not reopen a `RESOLVED` manual decision or erase its resolution fields. Snapshot-to-current-name differences are observations, not invalid identity references.
 
 ## 权限
 

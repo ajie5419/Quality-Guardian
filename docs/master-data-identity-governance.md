@@ -106,6 +106,8 @@ For legacy rows whose category has not yet been backfilled, a TEAM ID takes prec
 5. 回填成功后将对应未解析记录标记为 `RESOLVED`，保留完整追溯。
 6. migration 和回填在生产发布中连续自动执行，不依赖人工进容器操作。
 
+发布维护中的身份回填只能补 canonical ID、追加或更新未解析证据；不得把当前主数据名称回写到历史事实名称快照。重复扫描已 `RESOLVED` 的治理项时可以更新观测证据和最后发现时间，但不得清空人工的 `resolvedId`、说明或裁决状态。名称快照与当前主数据名称不同是 `name_mismatch_count` 观察指标，不是 ID 有效性错误或发布阻断条件。
+
 Canonical bootstrap is an initialization operation, not an ongoing name resolver. It may create identities from legacy snapshots only when the canonical table has zero rows and only for target rows whose canonical ID is null. After initialization, old snapshots produced by rename history must never create new identities; they are resolved through existing IDs or retained as unresolved evidence.
 
 当前身份回填覆盖 TEAM 映射、`qms_inspection_requests` 的 `teamId/supplierId`、`inspections`、`after_sales` 和 `quality_records`；其他表按后续治理 wave 单独评估，不得把未迁移表的名称解析结果当作本 wave 完成证明。
@@ -158,6 +160,8 @@ Canonical bootstrap is an initialization operation, not an ongoing name resolver
 - `identity_conflict_count`：多证据指向不同实体的记录数。
 
 发布后要核对已纳入 ID-required wave 的新写入 `missing_id_count = 0`，存量指标只能下降，不能增长。未迁移模块必须单独报告其 legacy 存量和退出进度。
+
+`name_mismatch_count` 用于发现改名和历史快照差异；它不会单独使治理审计失败，也不得驱动历史名称回写。
 
 ## 已知运行限制与未完成治理面
 

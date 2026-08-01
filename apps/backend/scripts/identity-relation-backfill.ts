@@ -45,7 +45,6 @@ async function recordUnresolved(params: {
       rawId: params.rawId,
       rawName: params.rawName,
       reason: params.reason,
-      status: 'OPEN',
     },
   });
 }

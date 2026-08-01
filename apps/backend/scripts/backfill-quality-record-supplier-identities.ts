@@ -232,7 +232,6 @@ async function main() {
             },
             data: {
               supplierId: item.candidate.id,
-              supplierName: item.candidate.name,
             },
           }),
         ),

@@ -132,7 +132,7 @@ export async function backfillInspectionRequestSupplierIdentities(
         });
         continue;
       }
-      if (row.supplierId === candidate.id && row.team === candidate.name) {
+      if (row.supplierId === candidate.id) {
         batchResolved.push({ entityId: row.id, resolvedId: candidate.id });
         continue;
       }
@@ -154,7 +154,6 @@ export async function backfillInspectionRequestSupplierIdentities(
             },
             data: {
               supplierId: item.candidate.id,
-              team: item.candidate.name,
             },
           }),
         ),
