@@ -7,6 +7,10 @@ const tx = {
     findUnique: vi.fn(),
   },
   identity_resolution_projection: { upsert: vi.fn() },
+  identity_projection_generation_pointer: {
+    update: vi.fn(),
+    upsert: vi.fn(),
+  },
 };
 
 vi.mock('~/utils/prisma', () => ({
@@ -35,6 +39,11 @@ describe('historical identity resolution service', () => {
     tx.identity_resolution_projection.upsert.mockResolvedValue({
       id: 'projection-1',
     });
+    tx.identity_projection_generation_pointer.upsert.mockResolvedValue({
+      activeGenerationId: null,
+      key: 'historical-identity',
+    });
+    tx.identity_projection_generation_pointer.update.mockResolvedValue({});
     tx.historical_identity_resolutions.create.mockImplementation(({ data }) =>
       Promise.resolve({ id: `decision-${data.decisionVersion}`, ...data }),
     );

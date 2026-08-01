@@ -2,12 +2,14 @@ import type { Prisma } from '@prisma/client';
 
 import { createHash } from 'node:crypto';
 
+import { PassRateProjectionService } from '~/modules/report';
 import { MasterDataResolutionAuditService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
+import { IdentityProjectionService } from './identity-projection.service';
 import {
   getCanonicalIdentityState,
   getIdentityRegistryEntry,
@@ -166,38 +168,6 @@ async function appendDecision(
   }
 }
 
-async function upsertProjection(
-  client: ResolutionClient,
-  decision: Awaited<ReturnType<typeof appendDecision>>,
-) {
-  return client.identity_resolution_projection.upsert({
-    where: {
-      entityType_entityId_fieldName: {
-        entityId: decision.entityId,
-        entityType: decision.entityType,
-        fieldName: decision.fieldName,
-      },
-    },
-    create: {
-      effectiveCanonicalId: decision.canonicalId,
-      entityId: decision.entityId,
-      entityType: decision.entityType,
-      fieldName: decision.fieldName,
-      resolutionId: decision.id,
-      sourceFingerprint: decision.sourceFingerprint,
-      state: decision.state,
-    },
-    update: {
-      effectiveCanonicalId: decision.canonicalId,
-      projectionVersion: { increment: 1 },
-      rebuiltAt: new Date(),
-      resolutionId: decision.id,
-      sourceFingerprint: decision.sourceFingerprint,
-      state: decision.state,
-    },
-  });
-}
-
 export const HistoricalIdentityResolutionService = {
   async append(
     params: IdentityReference & {
@@ -211,7 +181,11 @@ export const HistoricalIdentityResolutionService = {
     client: ResolutionClient,
   ) {
     const decision = await appendDecision(client, params);
-    const projection = await upsertProjection(client, decision);
+    const projection = await IdentityProjectionService.recordDecision(
+      client,
+      decision,
+    );
+    await PassRateProjectionService.syncDecision(client, decision);
     return { decision, projection };
   },
 

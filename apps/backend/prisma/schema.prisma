@@ -1272,6 +1272,7 @@ model historical_identity_resolutions {
 // Rebuildable current pointer derived from the immutable decision ledger.
 model identity_resolution_projection {
   id                   String                               @id @default(cuid())
+  generationId         String?
   entityType           String
   entityId             String
   fieldName            String
@@ -1281,10 +1282,41 @@ model identity_resolution_projection {
   resolutionId         String?
   projectionVersion    Int                                  @default(1)
   rebuiltAt            DateTime                             @default(now())
+  generation           identity_projection_generations?     @relation(fields: [generationId], references: [id], onDelete: Cascade)
 
-  @@unique([entityType, entityId, fieldName], map: "identity_projection_reference_key")
+  @@unique([generationId, entityType, entityId, fieldName], map: "identity_projection_generation_reference_key")
+  @@index([generationId, entityType, fieldName], map: "identity_projection_generation_lookup_idx")
   @@index([effectiveCanonicalId, state], map: "identity_projection_canonical_idx")
   @@index([state, entityType, fieldName], map: "identity_projection_state_idx")
+}
+
+// @module master-data-identity
+// A completed generation is built in isolation and only becomes visible through
+// the singleton pointer after every row has been written successfully.
+model identity_projection_generations {
+  id                      String                               @id @default(cuid())
+  status                  identity_projection_generation_status @default(BUILDING)
+  sourceResolutionVersion Int
+  failureReason           String?                              @db.Text
+  createdAt               DateTime                             @default(now())
+  activatedAt             DateTime?
+  retiredAt               DateTime?
+  projections             identity_resolution_projection[]
+  activePointers          identity_projection_generation_pointer[] @relation("identity_projection_active_generation")
+  passRateProcessRows     pass_rate_process_identity_projection[]
+
+  @@index([status, createdAt], map: "identity_projection_generation_status_idx")
+}
+
+// @module master-data-identity
+// The single control row provides both the active generation and a CAS version
+// so a rebuild cannot publish a stale snapshot over an intervening decision.
+model identity_projection_generation_pointer {
+  key               String                              @id
+  activeGenerationId String?
+  resolutionVersion Int                                 @default(0)
+  switchedAt        DateTime                            @default(now())
+  activeGeneration  identity_projection_generations?    @relation("identity_projection_active_generation", fields: [activeGenerationId], references: [id], onDelete: SetNull)
 }
 
 // @module master-data-identity
@@ -1324,6 +1356,32 @@ model identity_reconciliation_metrics {
 
   @@unique([runId, metricKey], map: "identity_reconciliation_metric_key")
   @@index([metricKey], map: "identity_reconciliation_metric_idx")
+}
+
+// @module report
+// Narrow, generation-scoped read model for pass-rate process aggregation.
+// It deliberately stores only the facts needed by this consumer, so reports
+// never join the generic identity projection during normal reads.
+model pass_rate_process_identity_projection {
+  id                 String                               @id @default(cuid())
+  generationId       String
+  inspectionId       String
+  createdAtSnapshot  DateTime
+  inspectionDate     DateTime
+  category           inspection_category
+  incomingType       String?
+  effectiveProcessId String?
+  state              historical_identity_resolution_state
+  resolutionId       String?
+  quantity           Int
+  qualifiedQuantity  Int?
+  unqualifiedQuantity Int?
+  result             inspection_result
+  generation         identity_projection_generations     @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([generationId, inspectionId], map: "pass_rate_process_projection_generation_inspection_key")
+  @@index([generationId, createdAtSnapshot, inspectionDate], map: "pass_rate_process_projection_snapshot_idx")
+  @@index([generationId, effectiveProcessId, state], map: "pass_rate_process_projection_identity_idx")
 }
 
 model supplier_score_snapshots {
@@ -2029,6 +2087,13 @@ enum historical_identity_decision_source {
   OBSERVED_VALID_ID
   LEGACY_AUDIT
   MANUAL_DECISION
+}
+
+enum identity_projection_generation_status {
+  BUILDING
+  ACTIVE
+  RETIRED
+  FAILED
 }
 
 enum identity_reconciliation_cutoff_kind {

@@ -6,6 +6,7 @@ import {
   HistoricalIdentityResolutionService,
   IdentityProjectionService,
 } from '~/modules/master-data-identity';
+import { PassRateProjectionService } from '~/modules/report';
 import { isBusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
@@ -482,7 +483,19 @@ export async function bootstrapHistoricalIdentitySidecar(
     decisions += 1;
   }
   const projection = options.rebuild
-    ? await IdentityProjectionService.rebuildAll()
+    ? await (async () => {
+        const staged = await IdentityProjectionService.createStagedGeneration();
+        const passRateProjection =
+          await PassRateProjectionService.buildGeneration(staged.generationId);
+        const publication =
+          await IdentityProjectionService.publishStagedGeneration(staged);
+        if (!publication.published) {
+          throw new Error(
+            `IDENTITY_PROJECTION_PUBLISH_FAILED:${publication.reason}`,
+          );
+        }
+        return { ...staged, ...passRateProjection, ...publication };
+      })()
     : null;
   return {
     apply: true,
