@@ -5318,6 +5318,7 @@
 - 本地 generation `cmsab3wj200008zlhj6vb1l59`：扫描台账 50,293 条，合格率窄投影 9,554 条并原子发布。
 - 本地全期影子对账：legacy 与 projection 的总量均为 411,561、合格数均为 411,391、合格率均为 99.96，三项差异均为 0；身份状态 `RESOLVED=4,242`、`UNRESOLVED=5,312` 已入指标详情。
 - 定向测试 `4/4` 文件、`10/10` 测试与后端 TypeScript：通过。
+- 最终全仓验证：Vitest `259/259` 文件、`2368/2368` 用例，`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `git diff --check` 均通过；本地数据库 51 个 migration 均已应用。
 
 **commit:** `cab876f4 feat(@qgs/backend): publish identity projections atomically`、`48c072ed feat(@qgs/backend): shadow pass-rate identity metrics`
 
