@@ -1,6 +1,14 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
-import { generateIdentityBaseline } from './master-data-identity-baseline';
+import {
+  generateIdentityBaseline,
+  isDirectExecution,
+  runIdentityBaselineCli,
+} from './master-data-identity-baseline';
 
 function createClient() {
   return {
@@ -46,5 +54,38 @@ describe('master data identity baseline', () => {
     expect(first.fields.every((field) => field.records === 2)).toBe(true);
     expect(first.fields.every((field) => field.missingId === 1)).toBe(true);
     expect(first.fields.every((field) => field.withId === 1)).toBe(true);
+  });
+
+  it('runs the CLI when tsx provides the script path relative to the working directory', () => {
+    expect(
+      isDirectExecution(
+        'scripts/master-data-identity-baseline.ts',
+        'file:///workspace/apps/backend/scripts/master-data-identity-baseline.ts',
+        '/workspace/apps/backend',
+      ),
+    ).toBe(true);
+  });
+
+  it('writes the requested baseline file through the CLI entry point', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'qgs-identity-baseline-'));
+    const output = join(directory, 'baseline.json');
+    try {
+      const baseline = await runIdentityBaselineCli(
+        [`--output=${output}`, '--page-size=2'],
+        {
+          client: createClient(),
+          generatedAt: new Date('2026-08-01T00:00:00.000Z'),
+        },
+      );
+      const persisted = JSON.parse(await readFile(output, 'utf8')) as {
+        contentChecksum: string;
+        pageSize: number;
+      };
+
+      expect(persisted.contentChecksum).toBe(baseline.contentChecksum);
+      expect(persisted.pageSize).toBe(2);
+    } finally {
+      await rm(directory, { force: true, recursive: true });
+    }
   });
 });

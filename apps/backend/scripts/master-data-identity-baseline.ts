@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 import { listMasterDataGovernanceFields } from '~/utils/master-data-fields';
 import prisma from '~/utils/prisma';
@@ -11,7 +12,7 @@ import prisma from '~/utils/prisma';
 const DEFAULT_PAGE_SIZE = 500;
 const MAX_PAGE_SIZE = 1000;
 
-interface BaselineClient {
+export interface IdentityBaselineClient {
   $queryRawUnsafe<T>(query: string, ...values: unknown[]): Promise<T>;
 }
 
@@ -80,7 +81,7 @@ function getTargetDescriptors() {
     );
 }
 
-async function readPrimaryKey(client: BaselineClient, table: string) {
+async function readPrimaryKey(client: IdentityBaselineClient, table: string) {
   const rows = await client.$queryRawUnsafe<ColumnRow[]>(
     `SELECT COLUMN_NAME AS columnName
      FROM information_schema.KEY_COLUMN_USAGE
@@ -97,7 +98,10 @@ async function readPrimaryKey(client: BaselineClient, table: string) {
   return columns[0] || '';
 }
 
-async function hasSoftDeleteColumn(client: BaselineClient, table: string) {
+async function hasSoftDeleteColumn(
+  client: IdentityBaselineClient,
+  table: string,
+) {
   const rows = await client.$queryRawUnsafe<ColumnRow[]>(
     `SELECT COLUMN_NAME AS columnName
      FROM information_schema.COLUMNS
@@ -110,7 +114,7 @@ async function hasSoftDeleteColumn(client: BaselineClient, table: string) {
 }
 
 async function scanTarget(
-  client: BaselineClient,
+  client: IdentityBaselineClient,
   target: TargetDescriptor,
   pageSize: number,
 ) {
@@ -179,7 +183,7 @@ async function scanTarget(
 
 export async function generateIdentityBaseline(
   options: {
-    client?: BaselineClient;
+    client?: IdentityBaselineClient;
     generatedAt?: Date;
     pageSize?: number;
   } = {},
@@ -216,19 +220,39 @@ function parseOptions(args: string[]) {
   return { output: resolve(output), pageSize: normalizePageSize(pageSize) };
 }
 
-async function main() {
-  const options = parseOptions(process.argv.slice(2));
+export async function runIdentityBaselineCli(
+  args = process.argv.slice(2),
+  options: {
+    client?: IdentityBaselineClient;
+    generatedAt?: Date;
+  } = {},
+) {
+  const cliOptions = parseOptions(args);
   const baseline = await generateIdentityBaseline({
-    pageSize: options.pageSize,
+    client: options.client,
+    generatedAt: options.generatedAt,
+    pageSize: cliOptions.pageSize,
   });
-  await mkdir(dirname(options.output), { recursive: true });
+  await mkdir(dirname(cliOptions.output), { recursive: true });
   await writeFile(
-    options.output,
+    cliOptions.output,
     `${JSON.stringify(baseline, null, 2)}\n`,
     'utf8',
   );
+  return baseline;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
-  void main();
+export function isDirectExecution(
+  scriptPath = process.argv[1],
+  moduleUrl = import.meta.url,
+  workingDirectory = process.cwd(),
+) {
+  return (
+    Boolean(scriptPath) &&
+    resolve(workingDirectory, scriptPath) === fileURLToPath(moduleUrl)
+  );
+}
+
+if (isDirectExecution()) {
+  void runIdentityBaselineCli();
 }
