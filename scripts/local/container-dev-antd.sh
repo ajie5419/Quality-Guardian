@@ -43,8 +43,12 @@ if [[ "${CONTAINER_DEV_SEED:-false}" == "true" || "$USER_COUNT" == "0" ]]; then
   pnpm --dir apps/backend run db:seed
 fi
 
-echo "Running ordered release maintenance..."
-sh apps/backend/scripts/run-release-maintenance.sh
+if [[ "${CONTAINER_DEV_RUN_MAINTENANCE:-true}" == "true" ]]; then
+  echo "Running ordered release maintenance..."
+  sh apps/backend/scripts/run-release-maintenance.sh
+else
+  echo "Skipping release maintenance for the imported local snapshot."
+fi
 
 echo "Starting pnpm dev:antd..."
 
