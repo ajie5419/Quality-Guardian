@@ -27,6 +27,7 @@ const IDENTITY_REGISTRY: Record<string, Record<string, RegistryEntry>> = {
   after_sales: {
     defectCategoryId: { kind: 'quality-category' },
     defectSubcategoryId: { kind: 'quality-subcategory' },
+    divisionId: { kind: 'department' },
     feedbackDeptId: { kind: 'department' },
     partId: { kind: 'part' },
     productCategoryId: { kind: 'quality-category' },
@@ -50,6 +51,7 @@ const IDENTITY_REGISTRY: Record<string, Record<string, RegistryEntry>> = {
     defectCategoryId: { kind: 'quality-category' },
     defectClassification: { kind: 'quality-subcategory' },
     defectSubcategoryId: { kind: 'quality-subcategory' },
+    divisionId: { kind: 'department' },
     partId: { kind: 'part' },
     processId: { kind: 'process' },
     projectId: { kind: 'project' },

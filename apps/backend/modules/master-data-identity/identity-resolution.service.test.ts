@@ -80,13 +80,15 @@ describe('historical identity resolution service', () => {
     const { HistoricalIdentityResolutionService } = await import(
       './identity-resolution.service'
     );
-    tx.historical_identity_resolutions.findFirst.mockResolvedValue({
-      canonicalId: 'supplier-old',
-      decisionVersion: 1,
-      id: 'decision-1',
-      sourceFingerprint: 'old',
-      state: 'RESOLVED',
-    });
+    tx.historical_identity_resolutions.findFirst
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({
+        canonicalId: 'supplier-old',
+        decisionVersion: 1,
+        id: 'decision-1',
+        sourceFingerprint: 'old',
+        state: 'RESOLVED',
+      });
     const result = await HistoricalIdentityResolutionService.append(
       {
         canonicalId: 'supplier-new',

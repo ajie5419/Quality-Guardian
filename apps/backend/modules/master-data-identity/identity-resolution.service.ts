@@ -103,6 +103,18 @@ async function appendDecision(
 ) {
   assertDecisionInput(params);
   const sourceFingerprint = createIdentitySourceFingerprint(params);
+  const matching = await client.historical_identity_resolutions.findFirst({
+    where: {
+      canonicalId: normalize(params.canonicalId) || null,
+      entityId: normalize(params.entityId),
+      entityType: normalize(params.entityType),
+      fieldName: normalize(params.fieldName),
+      sourceFingerprint,
+      state: params.state,
+    },
+    orderBy: { decisionVersion: 'desc' },
+  });
+  if (matching && !params.supersedesId) return matching;
   const latest = await client.historical_identity_resolutions.findFirst({
     where: {
       entityId: normalize(params.entityId),
@@ -111,15 +123,6 @@ async function appendDecision(
     },
     orderBy: { decisionVersion: 'desc' },
   });
-  if (
-    latest &&
-    latest.sourceFingerprint === sourceFingerprint &&
-    latest.canonicalId === (normalize(params.canonicalId) || null) &&
-    latest.state === params.state &&
-    !params.supersedesId
-  ) {
-    return latest;
-  }
   if (params.supersedesId && latest?.id !== params.supersedesId) {
     throw new BusinessError(
       'IDENTITY_RESOLUTION_CHANGED',
