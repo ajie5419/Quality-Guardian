@@ -7,6 +7,7 @@ import {
 } from '~/modules/master-data-governance';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
   badRequestResponse,
@@ -24,8 +25,13 @@ export default defineValidatedHandler(
       );
       const auditId = String(getRouterParam(event, 'id') || '').trim();
       if (!auditId) return badRequestResponse(event, 'Missing audit ID');
+      const actorId = String(getCurrentUser(event).id || '').trim();
       return useResponseSuccess(
-        await MasterDataGovernanceService.resolveRequest(auditId, body),
+        await MasterDataGovernanceService.resolveRequest(
+          auditId,
+          body,
+          actorId,
+        ),
       );
     } catch (error: unknown) {
       logApiError('master-data-governance-resolve', error, undefined, event);

@@ -7,6 +7,10 @@ vi.mock('~/modules/supplier-identity', () => ({
   },
 }));
 
+vi.mock('~/modules/master-data-identity', () => ({
+  HistoricalIdentityResolutionService: { resolveManualWorkItem: vi.fn() },
+}));
+
 vi.mock('~/modules/inspection', () => ({
   InspectionClassificationResolutionService: {
     resolve: vi.fn(),
@@ -51,12 +55,12 @@ describe('master data governance service', () => {
     });
   });
 
-  it('routes inspection classification references to the owning domain', async () => {
+  it('routes classification references to the sidecar ledger without changing facts', async () => {
     const { MasterDataGovernanceService } = await import(
       './master-data-governance.service'
     );
-    const { InspectionClassificationResolutionService } = await import(
-      '~/modules/inspection'
+    const { HistoricalIdentityResolutionService } = await import(
+      '~/modules/master-data-identity'
     );
     const { MasterDataResolutionAuditService } = await import(
       '~/modules/supplier-identity'
@@ -66,7 +70,7 @@ describe('master data governance service', () => {
       id: 'audit-1',
     } as never);
     vi.mocked(
-      InspectionClassificationResolutionService.resolve,
+      HistoricalIdentityResolutionService.resolveManualWorkItem,
     ).mockResolvedValue({ auditId: 'audit-1' } as never);
 
     const input = {
@@ -81,19 +85,21 @@ describe('master data governance service', () => {
     });
 
     expect(
-      InspectionClassificationResolutionService.resolve,
+      HistoricalIdentityResolutionService.resolveManualWorkItem,
     ).toHaveBeenCalledWith({
-      ...input,
-      resolutionType: 'CLASSIFICATION',
+      actorId: '',
+      auditId: 'audit-1',
+      canonicalId: 'subcategory-1',
+      note: '',
     });
   });
 
-  it('routes inspection department references to the owning domain', async () => {
+  it('routes department references to the sidecar ledger', async () => {
     const { MasterDataGovernanceService } = await import(
       './master-data-governance.service'
     );
-    const { InspectionDepartmentResolutionService } = await import(
-      '~/modules/inspection'
+    const { HistoricalIdentityResolutionService } = await import(
+      '~/modules/master-data-identity'
     );
     const { MasterDataResolutionAuditService } = await import(
       '~/modules/supplier-identity'
@@ -103,7 +109,9 @@ describe('master data governance service', () => {
       fieldName: 'responsibleDepartmentId',
       id: 'audit-department',
     } as never);
-    vi.mocked(InspectionDepartmentResolutionService.resolve).mockResolvedValue({
+    vi.mocked(
+      HistoricalIdentityResolutionService.resolveManualWorkItem,
+    ).mockResolvedValue({
       auditId: 'audit-department',
     } as never);
     const input = {
@@ -115,17 +123,22 @@ describe('master data governance service', () => {
 
     await MasterDataGovernanceService.resolve(input);
 
-    expect(InspectionDepartmentResolutionService.resolve).toHaveBeenCalledWith(
-      input,
-    );
+    expect(
+      HistoricalIdentityResolutionService.resolveManualWorkItem,
+    ).toHaveBeenCalledWith({
+      actorId: '',
+      auditId: 'audit-department',
+      canonicalId: 'dept-production',
+      note: '',
+    });
   });
 
-  it('routes inspection request process references to the owning domain', async () => {
+  it('routes inspection request process references to the sidecar ledger', async () => {
     const { MasterDataGovernanceService } = await import(
       './master-data-governance.service'
     );
-    const { InspectionProcessResolutionService } = await import(
-      '~/modules/inspection'
+    const { HistoricalIdentityResolutionService } = await import(
+      '~/modules/master-data-identity'
     );
     const { MasterDataResolutionAuditService } = await import(
       '~/modules/supplier-identity'
@@ -135,7 +148,9 @@ describe('master data governance service', () => {
       fieldName: 'processId',
       id: 'audit-process',
     } as never);
-    vi.mocked(InspectionProcessResolutionService.resolve).mockResolvedValue({
+    vi.mocked(
+      HistoricalIdentityResolutionService.resolveManualWorkItem,
+    ).mockResolvedValue({
       auditId: 'audit-process',
     } as never);
     const input = {
@@ -147,8 +162,13 @@ describe('master data governance service', () => {
 
     await MasterDataGovernanceService.resolve(input);
 
-    expect(InspectionProcessResolutionService.resolve).toHaveBeenCalledWith(
-      input,
-    );
+    expect(
+      HistoricalIdentityResolutionService.resolveManualWorkItem,
+    ).toHaveBeenCalledWith({
+      actorId: '',
+      auditId: 'audit-process',
+      canonicalId: 'process-incoming',
+      note: '',
+    });
   });
 });

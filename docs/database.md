@@ -56,3 +56,13 @@ model xxx {
 3. 分页：`skip` + `take`，前端传 `page` + `pageSize`
 4. 批量写入用事务：`prisma.$transaction([])`
 5. 原始 SQL 用 `prisma.$queryRawUnsafe` / `$executeRawUnsafe`，必须参数化防注入
+
+## 历史身份旁路
+
+`master-data-identity` 模块新增的四张表不替代也不修改事实表：
+
+- `historical_identity_resolutions`：追加式身份决策账本；修正通过 `supersedesId` 创建新版本。
+- `identity_resolution_projection`：当前解析读模型；可删除并从账本重建。
+- `identity_reconciliation_runs`、`identity_reconciliation_metrics`：WP2 影子统计的事实集合 cutoff 与差异指标。
+
+`MANUAL_DECISION` 必须记录 `decidedById`。迁移只能创建结构，旁路初始化必须通过 `scripts/historical-identity-sidecar-bootstrap.ts`，默认 dry-run，只有 `--apply` 才会写旁路表；该脚本不得纳入 release maintenance。

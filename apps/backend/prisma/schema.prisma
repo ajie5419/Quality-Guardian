@@ -1240,6 +1240,92 @@ model unresolved_master_data_refs {
   @@index([entityType, fieldName])
 }
 
+// @module master-data-identity
+// Immutable decisions for historical fact identities. Corrections create a successor row.
+model historical_identity_resolutions {
+  id                String                               @id @default(cuid())
+  entityType        String
+  entityId          String
+  fieldName         String
+  decisionVersion   Int
+  rawId             String?
+  rawName           String?
+  sourceFingerprint String
+  canonicalId       String?
+  state             historical_identity_resolution_state
+  decisionSource    historical_identity_decision_source
+  evidence          Json?
+  decisionNote      String?                              @db.Text
+  decidedById       String?
+  decidedAt         DateTime                             @default(now())
+  supersedesId      String?                              @unique
+  supersedes        historical_identity_resolutions?     @relation("historical_identity_resolution_supersession", fields: [supersedesId], references: [id])
+  supersededBy      historical_identity_resolutions?     @relation("historical_identity_resolution_supersession")
+
+  @@unique([entityType, entityId, fieldName, decisionVersion], map: "historical_identity_resolution_version_key")
+  @@index([entityType, entityId, fieldName], map: "historical_identity_resolution_lookup_idx")
+  @@index([canonicalId, state], map: "historical_identity_resolution_canonical_idx")
+  @@index([state, decisionSource], map: "historical_identity_resolution_state_idx")
+}
+
+// @module master-data-identity
+// Rebuildable current pointer derived from the immutable decision ledger.
+model identity_resolution_projection {
+  id                   String                               @id @default(cuid())
+  entityType           String
+  entityId             String
+  fieldName            String
+  sourceFingerprint    String
+  effectiveCanonicalId String?
+  state                historical_identity_resolution_state
+  resolutionId         String?
+  projectionVersion    Int                                  @default(1)
+  rebuiltAt            DateTime                             @default(now())
+
+  @@unique([entityType, entityId, fieldName], map: "identity_projection_reference_key")
+  @@index([effectiveCanonicalId, state], map: "identity_projection_canonical_idx")
+  @@index([state, entityType, fieldName], map: "identity_projection_state_idx")
+}
+
+// @module master-data-identity
+// A run fixes one fact-set cutoff before WP2 compares legacy and projection results.
+model identity_reconciliation_runs {
+  id                 String                              @id @default(cuid())
+  consumerKey        String
+  factEntityType     String
+  baselineChecksum   String
+  cutoffKind         identity_reconciliation_cutoff_kind
+  createdAtCutoff    DateTime?
+  idCutoff           String?
+  snapshotDescriptor Json?
+  status             identity_reconciliation_run_status  @default(PENDING)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  failureReason      String?                             @db.Text
+  createdAt          DateTime                            @default(now())
+  updatedAt          DateTime                            @updatedAt
+  metrics            identity_reconciliation_metrics[]
+
+  @@index([consumerKey, status, createdAt], map: "identity_reconciliation_consumer_idx")
+  @@index([factEntityType, cutoffKind, status], map: "identity_reconciliation_fact_idx")
+}
+
+// @module master-data-identity
+model identity_reconciliation_metrics {
+  id              String                       @id @default(cuid())
+  runId           String
+  metricKey       String
+  legacyValue     Decimal                      @db.Decimal(20, 4)
+  projectionValue Decimal                      @db.Decimal(20, 4)
+  differenceValue Decimal                      @db.Decimal(20, 4)
+  details         Json?
+  createdAt       DateTime                     @default(now())
+  run             identity_reconciliation_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, metricKey], map: "identity_reconciliation_metric_key")
+  @@index([metricKey], map: "identity_reconciliation_metric_idx")
+}
+
 model supplier_score_snapshots {
   id                    String    @id @default(cuid())
   supplierId            String    @unique
@@ -1926,6 +2012,37 @@ enum master_data_resolution_status {
   OPEN
   RESOLVED
   IGNORED
+}
+
+enum historical_identity_resolution_state {
+  RESOLVED
+  RETIRED
+  UNRESOLVED
+  AMBIGUOUS
+  CONFLICT
+  INVALID_ID
+  NOT_APPLICABLE
+  UNKNOWN_PROVENANCE
+}
+
+enum historical_identity_decision_source {
+  OBSERVED_VALID_ID
+  LEGACY_AUDIT
+  MANUAL_DECISION
+}
+
+enum identity_reconciliation_cutoff_kind {
+  CREATED_AT
+  ID_BOUNDARY
+  SNAPSHOT_DESCRIPTOR
+}
+
+enum identity_reconciliation_run_status {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum inspection_result {

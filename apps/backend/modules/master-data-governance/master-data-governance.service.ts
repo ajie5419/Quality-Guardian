@@ -1,18 +1,7 @@
 import type { MasterDataResolutionStatus } from '~/modules/supplier-identity';
 
-import { AfterSalesClassificationResolutionService } from '~/modules/after-sales';
-import {
-  InspectionClassificationResolutionService,
-  InspectionDepartmentResolutionService,
-  InspectionIdentityResolutionService,
-  InspectionProcessResolutionService,
-} from '~/modules/inspection';
-import { PlanningBomGovernanceResolutionService } from '~/modules/planning';
-import {
-  MasterDataResolutionAuditService,
-  SupplierIdentityGovernanceResolutionService,
-} from '~/modules/supplier-identity';
-import { WorkOrderGovernanceResolutionService } from '~/modules/work-order';
+import { HistoricalIdentityResolutionService } from '~/modules/master-data-identity';
+import { MasterDataResolutionAuditService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 
@@ -104,20 +93,22 @@ export const MasterDataGovernanceService = {
     };
   },
 
-  async resolveRequest(auditId: string, input: unknown) {
+  async resolveRequest(auditId: string, input: unknown, actorId: string) {
     const body = masterDataGovernanceResolutionSchema.parse(input);
-    return this.resolve({ auditId, ...body });
+    return this.resolve({ auditId, actorId, ...body });
   },
 
   async resolve(
     params:
       | {
+          actorId?: string;
           auditId: string;
           canonicalIds: string[];
           note: string;
           resolutionType: 'IDENTITY';
         }
       | {
+          actorId?: string;
           auditId: string;
           categoryId: string;
           note: string;
@@ -125,12 +116,14 @@ export const MasterDataGovernanceService = {
           subcategoryId: string;
         }
       | {
+          actorId?: string;
           auditId: string;
           departmentId: string;
           note: string;
           resolutionType: 'DEPARTMENT';
         }
       | {
+          actorId?: string;
           auditId: string;
           note: string;
           processId: string;
@@ -153,32 +146,11 @@ export const MasterDataGovernanceService = {
           400,
         );
       }
-      if (audit.entityType === 'inspections') {
-        return InspectionIdentityResolutionService.resolve({
-          ...params,
-          canonicalId: assertSingleId(params.canonicalIds),
-        });
-      }
-      if (audit.entityType === 'project_boms') {
-        return audit.fieldName === 'requiredProcessIds'
-          ? PlanningBomGovernanceResolutionService.resolveRequiredProcesses({
-              ...params,
-              processIds: params.canonicalIds,
-            })
-          : PlanningBomGovernanceResolutionService.resolvePart({
-              ...params,
-              partId: assertSingleId(params.canonicalIds),
-            });
-      }
-      if (audit.entityType === 'supplier_identity_links') {
-        return SupplierIdentityGovernanceResolutionService.resolve({
-          ...params,
-          supplierId: assertSingleId(params.canonicalIds),
-        });
-      }
-      return WorkOrderGovernanceResolutionService.resolve({
-        ...params,
-        resolvedId: assertSingleId(params.canonicalIds),
+      return HistoricalIdentityResolutionService.resolveManualWorkItem({
+        actorId: params.actorId || '',
+        auditId: params.auditId,
+        canonicalId: assertSingleId(params.canonicalIds),
+        note: params.note,
       });
     }
     if (
@@ -186,14 +158,24 @@ export const MasterDataGovernanceService = {
       audit.fieldName === 'responsibleDepartmentId' &&
       params.resolutionType === 'DEPARTMENT'
     ) {
-      return InspectionDepartmentResolutionService.resolve(params);
+      return HistoricalIdentityResolutionService.resolveManualWorkItem({
+        actorId: params.actorId || '',
+        auditId: params.auditId,
+        canonicalId: params.departmentId,
+        note: params.note,
+      });
     }
     if (
       audit.entityType === 'qms_inspection_requests' &&
       audit.fieldName === 'processId' &&
       params.resolutionType === 'PROCESS'
     ) {
-      return InspectionProcessResolutionService.resolve(params);
+      return HistoricalIdentityResolutionService.resolveManualWorkItem({
+        actorId: params.actorId || '',
+        auditId: params.auditId,
+        canonicalId: params.processId,
+        note: params.note,
+      });
     }
     if (params.resolutionType !== 'CLASSIFICATION') {
       throw new BusinessError(
@@ -203,10 +185,20 @@ export const MasterDataGovernanceService = {
       );
     }
     if (audit.entityType === 'quality_records') {
-      return InspectionClassificationResolutionService.resolve(params);
+      return HistoricalIdentityResolutionService.resolveManualWorkItem({
+        actorId: params.actorId || '',
+        auditId: params.auditId,
+        canonicalId: params.subcategoryId,
+        note: params.note,
+      });
     }
     if (audit.entityType === 'after_sales') {
-      return AfterSalesClassificationResolutionService.resolve(params);
+      return HistoricalIdentityResolutionService.resolveManualWorkItem({
+        actorId: params.actorId || '',
+        auditId: params.auditId,
+        canonicalId: params.subcategoryId,
+        note: params.note,
+      });
     }
     throw new BusinessError(
       'MASTER_DATA_REFERENCE_NOT_SUPPORTED',
