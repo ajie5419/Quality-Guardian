@@ -8,6 +8,14 @@ type ReconciliationCutoff =
   | { idCutoff: string; kind: 'ID_BOUNDARY' }
   | { kind: 'SNAPSHOT_DESCRIPTOR'; snapshotDescriptor: Prisma.InputJsonValue };
 
+export type ReconciliationMetric = {
+  details?: Prisma.InputJsonValue;
+  differenceValue: number;
+  legacyValue: number;
+  metricKey: string;
+  projectionValue: number;
+};
+
 function assertCutoff(cutoff: ReconciliationCutoff) {
   if (cutoff.kind === 'CREATED_AT' && !cutoff.createdAtCutoff) {
     throw new BusinessError(
@@ -52,6 +60,39 @@ export const IdentityReconciliationService = {
             ? params.cutoff.snapshotDescriptor
             : undefined,
       },
+    });
+  },
+
+  async completeRun(params: {
+    metrics: ReconciliationMetric[];
+    runId: string;
+  }) {
+    return prisma.$transaction(async (tx) => {
+      const run = await tx.identity_reconciliation_runs.findUnique({
+        where: { id: params.runId },
+        select: { status: true },
+      });
+      if (!run || (run.status !== 'PENDING' && run.status !== 'RUNNING')) {
+        throw new BusinessError(
+          'RECONCILIATION_RUN_NOT_WRITABLE',
+          'Reconciliation run is not writable',
+          409,
+        );
+      }
+      await tx.identity_reconciliation_metrics.createMany({
+        data: params.metrics.map((metric) => ({
+          details: metric.details,
+          differenceValue: metric.differenceValue,
+          legacyValue: metric.legacyValue,
+          metricKey: metric.metricKey,
+          projectionValue: metric.projectionValue,
+          runId: params.runId,
+        })),
+      });
+      return tx.identity_reconciliation_runs.update({
+        where: { id: params.runId },
+        data: { completedAt: new Date(), status: 'COMPLETED' },
+      });
     });
   },
 };

@@ -1368,7 +1368,7 @@ model pass_rate_process_identity_projection {
   inspectionId       String
   createdAtSnapshot  DateTime
   inspectionDate     DateTime
-  category           inspection_category
+  category           String                               @db.VarChar(32)
   incomingType       String?
   effectiveProcessId String?
   state              historical_identity_resolution_state
