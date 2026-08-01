@@ -38,10 +38,11 @@
 
 - 本地 Prisma migration：49 个，Schema 最新。
 - migration 前后历史身份基线 `contentChecksum` 均为 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
-- 定向服务测试与 TypeScript：通过；完整门禁结果在提交前补充。
+- 定向服务测试 `2/2` 文件、`8/8` 测试通过；后端全量 `254/254` 文件、`2352/2352` 测试通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
 - 未访问或修改生产数据库；旁路表的 10 条验证决策可随测试库重建而丢弃，不影响事实快照。
 
-**commit:** 待提交。
+**commit:** `015bede6 feat(@qgs/backend): add historical identity sidecar`
 
 **遗留问题：**
 
