@@ -189,11 +189,7 @@ jobs:
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" stop backend
             deploy_prisma_migrations || { echo "prisma migration failed, rolling back"; rollback; exit 1; }
-            if [ "$SKIP_MAINTENANCE" != "true" ]; then
-              run_backend 600 "$RELEASE_MAINTENANCE_CMD" || { echo "release maintenance failed, rolling back"; rollback; exit 1; }
-            else
-              echo "release maintenance skipped (skip_maintenance=true)"
-            fi
+            if [ "$SKIP_MAINTENANCE" = "true" ]; then echo "release maintenance skipped (skip_maintenance=true)"; else run_backend 600 "$RELEASE_MAINTENANCE_CMD" || { echo "release maintenance failed, rolling back"; rollback; exit 1; }; fi
             run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend || { echo "service startup failed, rolling back"; rollback; exit 1; }
 
             ok=0
