@@ -29,6 +29,15 @@
 
 ## 执行记录
 
+## [0.23.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.23.0...qgs-v0.23.1) (2026-08-07)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** close connections so maintenance scripts exit ([368cc86](https://github.com/ajie5419/Quality-Guardian/commit/368cc860ea57be9e7f23dc8d4d8c61133b95b0a6))
+* **@qgs/backend:** drop unresolved classification and close maintenance connections ([3aad4fb](https://github.com/ajie5419/Quality-Guardian/commit/3aad4fbe585474488b4f197bdface99b1e27c2c2))
+* **@qgs/backend:** drop unresolved classification from release maintenance ([2ce6013](https://github.com/ajie5419/Quality-Guardian/commit/2ce6013b6906eb4d0a5a4d0328237aafeb07415f))
+
 ## [0.23.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.22.0...qgs-v0.23.0) (2026-08-07)
 
 
