@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '@qgs/shared';
+
 import type {
   MasterDataCanonicalRelation,
   MasterDataGovernanceField,
@@ -960,11 +962,16 @@ export const MasterDataGovernanceKernel = {
   },
 
   async resolveCanonicalNamesByIds(options: {
+    canonicalIdById?: Map<string, string>;
     canonicalIds: Array<null | string | undefined>;
     configKey: string;
     fallbackNameById?:
       | Map<string, null | string | undefined>
       | Record<string, null | string | undefined>;
+    idLikeNameById?: ReadonlyArray<{
+      id: string;
+      rawName: null | string | undefined;
+    }>;
   }) {
     const field = getFieldOrThrow(options.configKey);
     const resolvedMap = new Map<string, null | string>();
@@ -998,7 +1005,96 @@ export const MasterDataGovernanceKernel = {
         canonicalMap.get(id) || normalizeValue(fallbackMap.get(id)) || null,
       );
     }
+    if (options.idLikeNameById) {
+      // Historical rows may freeze the canonical ID into the name snapshot
+      // while the ID column holds a retired legacy ID. Resolving the name
+      // snapshot as a canonical ID keeps those rows readable instead of
+      // labeling them as invalidated master data.
+      const unresolved = options.idLikeNameById.filter(
+        (pair) => normalizeValue(pair.rawName) && !resolvedMap.get(pair.id),
+      );
+      if (unresolved.length > 0) {
+        const rawIdNames = await readCanonicalNamesByIds(
+          field.canonical,
+          unresolved.map((pair) => normalizeValue(pair.rawName) as string),
+        );
+        for (const pair of unresolved) {
+          const rawName = normalizeValue(pair.rawName) as string;
+          const name = rawIdNames.get(rawName);
+          if (name) {
+            resolvedMap.set(pair.id, name);
+            options.canonicalIdById?.set(pair.id, rawName);
+          }
+        }
+      }
+    }
     return resolvedMap;
+  },
+
+  /**
+   * Merges resolved identity rows that share the same canonical name so a
+   * department split across a legacy ID and its canonical ID renders as one
+   * chart slice. This is a read-only presentation merge: stored rows and
+   * master data are never rewritten, and unresolved rows pass through.
+   */
+  mergeResolvedIdentityAggregateItems<T extends IdentityAggregateItem>(
+    rows: readonly T[],
+    options: { canonicalIdById?: ReadonlyMap<string, string> } = {},
+  ): T[] {
+    const resolved: T[] = [];
+    const unresolved: T[] = [];
+    for (const row of rows) {
+      if (row.resolutionStatus === 'RESOLVED') {
+        resolved.push(row);
+      } else {
+        unresolved.push(row);
+      }
+    }
+    const groups = new Map<
+      string,
+      {
+        canonicalId: null | string;
+        rawName: null | string;
+        row: T;
+        total: number;
+      }
+    >();
+    for (const row of resolved) {
+      const key = normalizeValue(row.name);
+      if (!key) {
+        unresolved.push(row);
+        continue;
+      }
+      const canonicalId =
+        options.canonicalIdById?.get(String(row.id || '')) || row.id || null;
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, {
+          canonicalId,
+          rawName: row.rawName ?? null,
+          row,
+          total: row.value,
+        });
+        continue;
+      }
+      existing.total += row.value;
+      if (row.value > existing.row.value) {
+        existing.canonicalId = canonicalId;
+        existing.row = row;
+      }
+      if (!existing.rawName && row.rawName) {
+        existing.rawName = row.rawName;
+      }
+    }
+    return [
+      ...unresolved,
+      ...groups.values().map(({ canonicalId, rawName, row, total }) => ({
+        ...row,
+        id: canonicalId,
+        value: total,
+        ...(rawName ? { rawName } : {}),
+      })),
+    ];
   },
 
   async buildNameWhere(options: {

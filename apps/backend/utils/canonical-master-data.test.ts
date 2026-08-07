@@ -473,4 +473,142 @@ describe('masterDataGovernanceKernel', () => {
       }),
     );
   });
+
+  it('resolves an unresolved canonical ID through an ID-like name snapshot', async () => {
+    queryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'dept-1769576623191', name: '生产 OBU' }]);
+    const canonicalIdById = new Map<string, string>();
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: ['a3a98d7b568511f1881c00163e37355f'],
+        configKey: 'responsibleDepartment',
+        canonicalIdById,
+        idLikeNameById: [
+          {
+            id: 'a3a98d7b568511f1881c00163e37355f',
+            rawName: 'dept-1769576623191',
+          },
+        ],
+      }),
+    ).resolves.toEqual(
+      new Map([['a3a98d7b568511f1881c00163e37355f', '生产 OBU']]),
+    );
+    expect(canonicalIdById).toEqual(
+      new Map([['a3a98d7b568511f1881c00163e37355f', 'dept-1769576623191']]),
+    );
+    expect(queryRawUnsafe).toHaveBeenLastCalledWith(
+      expect.stringContaining('FROM `departments`'),
+      'dept-1769576623191',
+    );
+  });
+
+  it('keeps an unresolved ID when the name snapshot is not a canonical ID', async () => {
+    queryRawUnsafe.mockResolvedValue([]);
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: ['a3a98e23568511f1881c00163e37355f'],
+        configKey: 'responsibleDepartment',
+        idLikeNameById: [
+          {
+            id: 'a3a98e23568511f1881c00163e37355f',
+            rawName: '秦皇岛弘旺设备安装工程有限公司',
+          },
+        ],
+      }),
+    ).resolves.toEqual(new Map([['a3a98e23568511f1881c00163e37355f', null]]));
+  });
+
+  it('merges resolved rows sharing a canonical name into one aggregate row', () => {
+    const result =
+      MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems(
+        [
+          {
+            id: 'a3a98d7b568511f1881c00163e37355f',
+            name: '生产 OBU',
+            resolutionStatus: 'RESOLVED' as const,
+            value: 47,
+          },
+          {
+            id: 'dept-r9u69gg8y64qutugxzsd8u6r',
+            name: '生产 OBU',
+            resolutionStatus: 'RESOLVED' as const,
+            value: 42,
+          },
+          {
+            id: 'dept-1769576623191',
+            name: '生产 OBU',
+            resolutionStatus: 'RESOLVED' as const,
+            value: 9,
+          },
+          {
+            id: 'a3a98e23568511f1881c00163e37355f',
+            name: '主数据已失效：秦皇岛弘旺设备安装工程有限公司',
+            rawName: '秦皇岛弘旺设备安装工程有限公司',
+            resolutionReason: 'INVALID_REFERENCE' as const,
+            resolutionStatus: 'INVALID' as const,
+            value: 1,
+          },
+        ],
+        {
+          canonicalIdById: new Map([
+            ['a3a98d7b568511f1881c00163e37355f', 'dept-1769576623191'],
+          ]),
+        },
+      );
+
+    expect(result).toEqual([
+      {
+        id: 'a3a98e23568511f1881c00163e37355f',
+        name: '主数据已失效：秦皇岛弘旺设备安装工程有限公司',
+        rawName: '秦皇岛弘旺设备安装工程有限公司',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+      {
+        id: 'dept-1769576623191',
+        name: '生产 OBU',
+        resolutionStatus: 'RESOLVED',
+        value: 98,
+      },
+    ]);
+  });
+
+  it('keeps unresolved rows and empty names untouched', () => {
+    const result =
+      MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems([
+        {
+          id: 'dept-a',
+          name: '数据待治理：生产 OBU',
+          resolutionReason: 'MISSING_REQUIRED' as const,
+          resolutionStatus: 'MISSING' as const,
+          value: 1,
+        },
+        {
+          id: null,
+          name: '',
+          resolutionStatus: 'RESOLVED' as const,
+          value: 2,
+        },
+      ]);
+
+    expect(result).toEqual([
+      {
+        id: 'dept-a',
+        name: '数据待治理：生产 OBU',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: null,
+        name: '',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+    ]);
+  });
 });

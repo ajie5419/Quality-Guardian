@@ -247,12 +247,20 @@ export const AfterSalesChartAggregationService = {
     }
     const aggregateRows = [...aggregateMap.values()];
 
+    const canonicalIdById = new Map<string, string>();
     let canonicalNames = dimensionConfig.governanceKey
       ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
           canonicalIds: aggregateRows.map(
             (item) => item.identity?.id || item.rawId,
           ),
           configKey: dimensionConfig.governanceKey,
+          canonicalIdById,
+          idLikeNameById: aggregateRows
+            .map((item) => ({
+              id: item.identity?.id || item.rawId || '',
+              rawName: item.identity?.rawName ?? null,
+            }))
+            .filter((pair) => pair.id !== ''),
         })
       : new Map<string, null | string>();
     if (dimensionConfig.classification) {
@@ -271,8 +279,8 @@ export const AfterSalesChartAggregationService = {
             );
     }
 
-    return aggregateRows
-      .map((item) => {
+    return MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems(
+      aggregateRows.map((item) => {
         const rawId = item.identity?.id || item.rawId;
         const roundedValue = Number(item.value.toFixed(2));
         return dimensionConfig.governanceKey || dimensionConfig.classification
@@ -288,7 +296,9 @@ export const AfterSalesChartAggregationService = {
               id: rawId || QMS_DEFAULT_VALUES.UNCLASSIFIED,
               value: roundedValue,
             });
-      })
+      }),
+      { canonicalIdById },
+    )
       .sort((a, b) => b.value - a.value)
       .slice(0, limit);
   },

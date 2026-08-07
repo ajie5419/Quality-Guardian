@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueStatsService } from '~/modules/inspection/inspection-issue-stats.service';
 import { QualityClassificationService } from '~/modules/quality-classification';
+import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -15,11 +16,17 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
-  },
-}));
+vi.mock('~/utils/canonical-master-data', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/utils/canonical-master-data')
+  >('~/utils/canonical-master-data');
+  return {
+    MasterDataGovernanceKernel: {
+      ...actual.MasterDataGovernanceKernel,
+      resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+    },
+  };
+});
 
 vi.mock('~/modules/quality-classification', () => ({
   QualityClassificationService: {
@@ -759,6 +766,183 @@ describe('inspectionIssueStatsService', () => {
           resolutionReason: 'NOT_APPLICABLE',
           resolutionStatus: 'MISSING',
           value: 1,
+        },
+      ]);
+    });
+
+    it('resolves a retired department ID through the frozen canonical ID name snapshot', async () => {
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        {
+          date: new Date('2024-01-15'),
+          defectSubcategoryId: null,
+          defectCategoryId: null,
+          defectSubtype: '',
+          defectType: '',
+          division: '',
+          isClaim: false,
+          lossAmount: 0,
+          projectName: '',
+          quantity: 0,
+          responsibleDepartment: 'dept-1769576623191',
+          responsibleDepartmentId: 'a3a98d7b568511f1881c00163e37355f',
+          severity: '',
+          status: 'OPEN',
+          supplierId: null,
+          supplierName: '',
+        },
+      ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(
+        new Map([['a3a98d7b568511f1881c00163e37355f', '生产 OBU']]),
+      );
+
+      const result = await InspectionIssueStatsService.getIssueChartAggregation(
+        {
+          dimension: 'responsibleDepartment',
+          metric: 'count',
+          year: 2024,
+        },
+      );
+
+      expect(result).toEqual([
+        {
+          id: 'a3a98d7b568511f1881c00163e37355f',
+          name: '生产 OBU',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
+        },
+      ]);
+      expect(
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
+      ).toHaveBeenCalledWith(
+        expect.objectContaining({
+          configKey: 'responsibleDepartment',
+          idLikeNameById: [
+            {
+              id: 'a3a98d7b568511f1881c00163e37355f',
+              rawName: 'dept-1769576623191',
+            },
+          ],
+        }),
+      );
+    });
+
+    it('keeps an unresolvable department reference as invalidated master data', async () => {
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        {
+          date: new Date('2024-01-15'),
+          defectSubcategoryId: null,
+          defectCategoryId: null,
+          defectSubtype: '',
+          defectType: '',
+          division: '',
+          isClaim: false,
+          lossAmount: 0,
+          projectName: '',
+          quantity: 0,
+          responsibleDepartment: '秦皇岛弘旺设备安装工程有限公司',
+          responsibleDepartmentId: 'a3a98e23568511f1881c00163e37355f',
+          severity: '',
+          status: 'OPEN',
+          supplierId: null,
+          supplierName: '',
+        },
+      ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockResolvedValue(new Map());
+
+      const result = await InspectionIssueStatsService.getIssueChartAggregation(
+        {
+          dimension: 'responsibleDepartment',
+          metric: 'count',
+          year: 2024,
+        },
+      );
+
+      expect(result).toEqual([
+        {
+          id: 'a3a98e23568511f1881c00163e37355f',
+          name: '主数据已失效：秦皇岛弘旺设备安装工程有限公司',
+          rawName: '秦皇岛弘旺设备安装工程有限公司',
+          resolutionReason: 'INVALID_REFERENCE',
+          resolutionStatus: 'INVALID',
+          value: 1,
+        },
+      ]);
+    });
+
+    it('merges the legacy department ID row with the canonical row', async () => {
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        {
+          date: new Date('2024-01-15'),
+          defectSubcategoryId: null,
+          defectCategoryId: null,
+          defectSubtype: '',
+          defectType: '',
+          division: '',
+          isClaim: false,
+          lossAmount: 0,
+          projectName: '',
+          quantity: 0,
+          responsibleDepartment: 'dept-1769576623191',
+          responsibleDepartmentId: 'a3a98d7b568511f1881c00163e37355f',
+          severity: '',
+          status: 'OPEN',
+          supplierId: null,
+          supplierName: '',
+        },
+        {
+          date: new Date('2024-01-16'),
+          defectSubcategoryId: null,
+          defectCategoryId: null,
+          defectSubtype: '',
+          defectType: '',
+          division: '',
+          isClaim: false,
+          lossAmount: 0,
+          projectName: '',
+          quantity: 0,
+          responsibleDepartment: '生产 OBU',
+          responsibleDepartmentId: 'dept-1769576623191',
+          severity: '',
+          status: 'OPEN',
+          supplierId: null,
+          supplierName: '',
+        },
+      ]);
+      (
+        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+      ).mockImplementation(
+        (options: { canonicalIdById?: Map<string, string> }) => {
+          options.canonicalIdById?.set(
+            'a3a98d7b568511f1881c00163e37355f',
+            'dept-1769576623191',
+          );
+          return Promise.resolve(
+            new Map([
+              ['a3a98d7b568511f1881c00163e37355f', '生产 OBU'],
+              ['dept-1769576623191', '生产 OBU'],
+            ]),
+          );
+        },
+      );
+
+      const result = await InspectionIssueStatsService.getIssueChartAggregation(
+        {
+          dimension: 'responsibleDepartment',
+          metric: 'count',
+          year: 2024,
+        },
+      );
+
+      expect(result).toEqual([
+        {
+          id: 'dept-1769576623191',
+          name: '生产 OBU',
+          resolutionStatus: 'RESOLVED',
+          value: 2,
         },
       ]);
     });

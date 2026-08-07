@@ -15,11 +15,17 @@ vi.mock('~/modules/data-scope/data-scope.service', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
-  },
-}));
+vi.mock('~/utils/canonical-master-data', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/utils/canonical-master-data')
+  >('~/utils/canonical-master-data');
+  return {
+    MasterDataGovernanceKernel: {
+      ...actual.MasterDataGovernanceKernel,
+      resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+    },
+  };
+});
 
 vi.mock('~/modules/quality-classification', () => {
   const listForManagement = vi.fn().mockResolvedValue([]);
