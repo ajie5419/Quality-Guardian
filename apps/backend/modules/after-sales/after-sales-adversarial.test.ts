@@ -234,14 +234,12 @@ describe('afterSalesService – adversarial', () => {
         expect.objectContaining({
           where: expect.objectContaining({
             customerName: { contains: 'Customer A' },
-            defectType: { contains: '制造装配缺陷' },
             handler: { contains: 'Handler A' },
             occurDate: {
               gte: explicitRange.start,
               lt: explicitRange.end,
             },
             partName: { contains: 'Part A' },
-            productType: { contains: '车辆产品' },
             projectName: { contains: 'Project A' },
             workOrderNumber: { contains: 'WO-001' },
           }),
@@ -262,6 +260,26 @@ describe('afterSalesService – adversarial', () => {
             OR: expect.arrayContaining([
               { supplierBrand: { contains: 'Brand A' } },
               { projectName: { contains: 'Brand A' } },
+            ]),
+          }),
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { productType: { contains: '车辆产品' } },
+              {
+                productCategory: {
+                  is: { name: { contains: '车辆产品' } },
+                },
+              },
+            ]),
+          }),
+          expect.objectContaining({
+            OR: expect.arrayContaining([
+              { defectType: { contains: '制造装配缺陷' } },
+              {
+                defectCategory: {
+                  is: { name: { contains: '制造装配缺陷' } },
+                },
+              },
             ]),
           }),
         ]),
