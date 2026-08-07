@@ -29,6 +29,37 @@
 
 ## 执行记录
 
+## [0.23.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.22.0...qgs-v0.23.0) (2026-08-07)
+
+
+### Features
+
+* **@qgs/backend:** add historical identity sidecar ([015bede](https://github.com/ajie5419/Quality-Guardian/commit/015bede6526964e438da54d8e3405451e1ec788f))
+* **@qgs/backend:** gate pass-rate projection rollout ([6cf722d](https://github.com/ajie5419/Quality-Guardian/commit/6cf722df7e7e61566f12e9bd3e63f8f498119355))
+* **@qgs/backend:** merge confirmed duplicate TEAM identities during release maintenance ([2a5b442](https://github.com/ajie5419/Quality-Guardian/commit/2a5b4425654b88175c7e5728e16dc348f06024f8))
+* **@qgs/backend:** publish identity projections atomically ([cab876f](https://github.com/ajie5419/Quality-Guardian/commit/cab876f4d170e7efabd86815a8f7bbf7d02683c3))
+* **@qgs/backend:** reconcile pass-rate rollout windows ([af8e324](https://github.com/ajie5419/Quality-Guardian/commit/af8e32455db5e7911cd015e3bd35f8a180f5dd3c))
+* **@qgs/backend:** recover stale pass-rate projections ([ec5e9e1](https://github.com/ajie5419/Quality-Guardian/commit/ec5e9e161edfd9b5aaf0e3b360c84225fff1fda9))
+* **@qgs/backend:** shadow pass-rate identity metrics ([48c072e](https://github.com/ajie5419/Quality-Guardian/commit/48c072ed18ef1bac5c476669c61886de427666a4))
+* **@qgs/web-antd:** localize pass-rate rollout controls ([701e110](https://github.com/ajie5419/Quality-Guardian/commit/701e110281373fa26e300bc5662ffa49c04bd4b0))
+* **@qgs/web-antd:** manage pass-rate projection rollout ([3fbb7f0](https://github.com/ajie5419/Quality-Guardian/commit/3fbb7f0020ace684866e9db50f8348c625982f1a))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** batch identity sidecar rebuild ([b8a6e88](https://github.com/ajie5419/Quality-Guardian/commit/b8a6e88539c3c3b0330a04aaef3925b9477f4480))
+* **@qgs/backend:** guard stale pass-rate projections ([45487a7](https://github.com/ajie5419/Quality-Guardian/commit/45487a768472f90ee8aae883fdd3899eb65acfbc))
+* **@qgs/backend:** harden identity sidecar coverage ([9482f98](https://github.com/ajie5419/Quality-Guardian/commit/9482f98251d46b2f7e8c59fa70eb0d6365655a23))
+* **@qgs/backend:** isolate projection rebuild from web process ([db82caa](https://github.com/ajie5419/Quality-Guardian/commit/db82caac64e1b98cfc3e78e59d009da7c0fada6e))
+* **@qgs/backend:** merge statistics by master-data IDs with read-time resolution ([10a8946](https://github.com/ajie5419/Quality-Guardian/commit/10a8946c1a785f1fa58a1fe702af676e81ab6e51))
+* **@qgs/backend:** resolve classification display names from master-data IDs ([600c230](https://github.com/ajie5419/Quality-Guardian/commit/600c2303b2b5ce812c4388482a1cda8cc5ea3866))
+* **@qgs/web-antd:** drive inspection entry process options from system settings ([f1b03c6](https://github.com/ajie5419/Quality-Guardian/commit/f1b03c6bbfa64b24caf50afcdec240fe4840a6c8))
+* **@qgs/web-antd:** keep projection rollback available ([0b887c6](https://github.com/ajie5419/Quality-Guardian/commit/0b887c66a63b8ed7ba171fa8db12b0dc558d131f))
+* **dev:** preserve imported local database snapshots ([b6a397d](https://github.com/ajie5419/Quality-Guardian/commit/b6a397d3788983f80ffa7d85382e91c70a8729ba))
+* **project:** align governance identity resolution ([5bfcb91](https://github.com/ajie5419/Quality-Guardian/commit/5bfcb91a8c62fdd35da57c6b260cea486380b48f))
+* **project:** execute identity baseline CLI ([68e81be](https://github.com/ajie5419/Quality-Guardian/commit/68e81be000b8f1731f5cc8a54ef337283c7d6f1f))
+* **project:** freeze historical identity snapshots ([b54a55c](https://github.com/ajie5419/Quality-Guardian/commit/b54a55c9ed967c55033bbf848afa56fa043b6ee9))
+
 ### 2026-08-07 质量分类列表展示改为「ID → 当前主数据名」解析
 
 **背景与问题：**
