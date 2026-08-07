@@ -70,10 +70,7 @@ export function resolveInspectionSupplierIdentity(
     if (!supplier) {
       return { action: 'unresolved', reason: 'NO_IDENTITY_EVIDENCE' };
     }
-    if (
-      input.existingSupplier?.id === supplier.id &&
-      input.existingSupplierName === supplier.name
-    ) {
+    if (input.existingSupplier?.id === supplier.id) {
       return { action: 'skip', reason: 'EXISTING_VALID_ID' };
     }
     return { action: 'update', supplier, team: null };
@@ -104,9 +101,7 @@ export function resolveInspectionSupplierIdentity(
   }
   if (
     input.existingSupplier?.id === input.processSupplier.id &&
-    input.existingSupplierName === input.processSupplier.name &&
-    input.existingTeamId === team.id &&
-    input.existingTeamName === team.name
+    input.existingTeamId === team.id
   ) {
     return { action: 'skip', reason: 'EXISTING_VALID_ID' };
   }

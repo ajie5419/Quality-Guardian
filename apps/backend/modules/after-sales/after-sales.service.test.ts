@@ -16,16 +16,22 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi
-      .fn()
-      .mockImplementation(
-        async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
-          new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
-      ),
-  },
-}));
+vi.mock('~/utils/canonical-master-data', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/utils/canonical-master-data')
+  >('~/utils/canonical-master-data');
+  return {
+    MasterDataGovernanceKernel: {
+      ...actual.MasterDataGovernanceKernel,
+      resolveCanonicalNamesByIds: vi
+        .fn()
+        .mockImplementation(
+          async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
+            new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
+        ),
+    },
+  };
+});
 
 vi.mock('~/modules/quality-classification', () => {
   const listForManagement = vi.fn().mockResolvedValue([
@@ -155,6 +161,82 @@ describe('afterSalesService', () => {
       expect(item.qualityLoss).toBe(150);
       expect(item.responsibleDepartments).toEqual(['Quality', 'Engineering']);
       expect(item.supplierBrandId).toBe('supplier-1');
+    });
+
+    it('resolves classification names from current master data over snapshots', async () => {
+      const mockRecords = [
+        {
+          id: 'AS-2',
+          occurDate: new Date('2024-01-01T10:00:00.000Z'),
+          factoryDate: new Date('2023-12-01T10:00:00.000Z'),
+          closeDate: null,
+          shipDate: null,
+          createdAt: new Date('2024-01-01T10:00:00.000Z'),
+          claimStatus: 'OPEN',
+          materialCost: 0,
+          laborTravelCost: 0,
+          respDept: null,
+          responsibleDepartments: null,
+          solution: null,
+          isClaim: false,
+          photos: '[]',
+          projectName: 'Project A',
+          workOrderNumber: 'WO-001',
+          productType: '产品类型-旧',
+          productSubtype: '产品子类-旧',
+          defectType: '缺陷-旧',
+          defectSubtype: '缺陷子类-旧',
+          division: null,
+          partName: null,
+          supplierBrand: null,
+          supplierBrandId: null,
+          runningHours: null,
+          defectCategory: { name: '缺陷-新' },
+          defectSubcategory: { name: '缺陷子类-新' },
+          productCategory: { name: '产品类型-新' },
+          productSubcategory: { name: '产品子类-新' },
+        },
+      ];
+
+      (prisma.after_sales.findMany as any).mockResolvedValue(mockRecords);
+
+      const result = await AfterSalesService.getList({});
+
+      expect(result[0]).toMatchObject({
+        defectType: '缺陷-新',
+        defectSubtype: '缺陷子类-新',
+        productType: '产品类型-新',
+        productSubtype: '产品子类-新',
+      });
+    });
+
+    it('matches classification name filters against snapshot or current master-data names', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({
+        defectType: '缺陷-新',
+        productType: '产品类型-新',
+      });
+
+      const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
+      expect(where.AND).toEqual([
+        {
+          OR: [
+            { productType: { contains: '产品类型-新' } },
+            {
+              productCategory: {
+                is: { name: { contains: '产品类型-新' } },
+              },
+            },
+          ],
+        },
+        {
+          OR: [
+            { defectType: { contains: '缺陷-新' } },
+            { defectCategory: { is: { name: { contains: '缺陷-新' } } } },
+          ],
+        },
+      ]);
     });
   });
 });

@@ -3,6 +3,7 @@ import type {
   IssuePassRateBucketInput,
 } from '~/modules/report/pass-rate-process';
 
+import { Prisma } from '@prisma/client';
 import { getTargetPassRate as getTargetPassRateByStd } from '~/modules/inspection/quality-standards';
 import {
   buildCanonicalProcessPassRateTargets,
@@ -18,6 +19,13 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
+import { getIssuePassRateSummaryByRange } from './pass-rate-issue-summary.service';
+import {
+  getProjectedPassRateDrillDownByRange,
+  getProjectedPassRateSummaryByRange,
+} from './pass-rate-projection-query.service';
+import { PassRateProjectionService } from './pass-rate-projection.service';
+
 const logger = createModuleLogger('ReportPassRate');
 
 interface DrillDownItem {
@@ -29,11 +37,20 @@ interface DrillDownItem {
   totalCount: number;
 }
 
+async function getActivePassRateGeneration() {
+  return PassRateProjectionService.getReadableGeneration();
+}
+
 interface NetPassRateSummary {
   passCount: number;
   passRate: number;
   totalCount: number;
 }
+
+export type PassRateFactSnapshot = {
+  createdAtCutoff: Date;
+  idCutoff: string;
+};
 
 export type PassRateSource = 'inspection' | 'issue';
 
@@ -55,9 +72,29 @@ type IssuePassRateRow = {
 
 const GLOBAL_DEFAULT_TARGET = 99.85;
 
-async function getInspectionPassRateRows(start: Date, end: Date) {
+async function getInspectionPassRateRows(
+  start: Date,
+  end: Date,
+  snapshot?: PassRateFactSnapshot,
+) {
   return prisma.inspections.findMany({
-    where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
+    where: {
+      AND: snapshot
+        ? [
+            {
+              OR: [
+                { createdAt: { lt: snapshot.createdAtCutoff } },
+                {
+                  createdAt: snapshot.createdAtCutoff,
+                  id: { lte: snapshot.idCutoff },
+                },
+              ],
+            },
+          ]
+        : undefined,
+      isDeleted: false,
+      inspectionDate: { gte: start, lte: end },
+    },
     select: {
       category: true,
       incomingType: true,
@@ -140,6 +177,24 @@ export async function getNetPassRateSummaryByRange(
     return getIssuePassRateSummaryByRange(start, end);
   }
 
+  const active = await getActivePassRateGeneration();
+  if (active?.activeGenerationId) {
+    return getProjectedPassRateSummaryByRange(
+      active.activeGenerationId,
+      start,
+      end,
+      active.snapshot,
+    );
+  }
+
+  return getLegacyInspectionPassRateSummaryByRange(start, end);
+}
+
+export async function getLegacyInspectionPassRateSummaryByRange(
+  start: Date,
+  end: Date,
+  snapshot?: PassRateFactSnapshot,
+): Promise<NetPassRateSummary> {
   const [summary] = await prisma.$queryRaw<
     Array<{ passCount: bigint | null; totalCount: bigint | null }>
   >`
@@ -156,39 +211,20 @@ export async function getNetPassRateSummaryByRange(
     WHERE isDeleted = 0
       AND inspectionDate >= ${start}
       AND inspectionDate <= ${end}
+      ${
+        snapshot
+          ? Prisma.sql`
+              AND (
+                createdAt < ${snapshot.createdAtCutoff}
+                OR (createdAt = ${snapshot.createdAtCutoff} AND id <= ${snapshot.idCutoff})
+              )
+            `
+          : Prisma.empty
+      }
   `;
 
   const totalCount = Number(summary?.totalCount || 0);
   const passCount = Number(summary?.passCount || 0);
-
-  return {
-    totalCount,
-    passCount,
-    passRate: totalCount > 0 ? roundPercent((passCount / totalCount) * 100) : 0,
-  };
-}
-
-async function getIssuePassRateSummaryByRange(
-  start: Date,
-  end: Date,
-): Promise<NetPassRateSummary> {
-  const [inspectionSummary, issueSummary] = await Promise.all([
-    prisma.inspections.aggregate({
-      where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
-      _sum: { quantity: true },
-    }),
-    prisma.quality_records.aggregate({
-      where: { isDeleted: false, date: { gte: start, lte: end } },
-      _sum: { quantity: true },
-    }),
-  ]);
-
-  const totalCount = Number(inspectionSummary._sum.quantity || 0);
-  const unqualifiedCount = Math.max(
-    0,
-    Math.min(totalCount, Number(issueSummary._sum.quantity || 0)),
-  );
-  const passCount = Math.max(0, totalCount - unqualifiedCount);
 
   return {
     totalCount,
@@ -283,8 +319,35 @@ export async function getPassRateDrillDownByRange(
   getTargetPassRate: (name?: string) => number,
   source: PassRateSource = 'inspection',
 ): Promise<DrillDownItem[]> {
+  if (source === 'inspection') {
+    const active = await getActivePassRateGeneration();
+    if (active?.activeGenerationId) {
+      return getProjectedPassRateDrillDownByRange(
+        active.activeGenerationId,
+        start,
+        end,
+        active.snapshot,
+        getTargetPassRate,
+      );
+    }
+  }
+  return getLegacyPassRateDrillDownByRange(
+    start,
+    end,
+    getTargetPassRate,
+    source,
+  );
+}
+
+export async function getLegacyPassRateDrillDownByRange(
+  start: Date,
+  end: Date,
+  getTargetPassRate: (name?: string) => number,
+  source: PassRateSource = 'inspection',
+  snapshot?: PassRateFactSnapshot,
+): Promise<DrillDownItem[]> {
   const drillDown: DrillDownItem[] = [];
-  const inspections = await getInspectionPassRateRows(start, end);
+  const inspections = await getInspectionPassRateRows(start, end, snapshot);
   const issueRows =
     source === 'issue' ? await getIssuePassRateRows(start, end) : [];
   const resolveBucket = await createPassRateBucketResolver();

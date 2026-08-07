@@ -19,14 +19,20 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi.fn(
-      async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
-        new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
-    ),
-  },
-}));
+vi.mock('~/utils/canonical-master-data', async () => {
+  const actual = await vi.importActual<
+    typeof import('~/utils/canonical-master-data')
+  >('~/utils/canonical-master-data');
+  return {
+    MasterDataGovernanceKernel: {
+      ...actual.MasterDataGovernanceKernel,
+      resolveCanonicalNamesByIds: vi.fn(
+        async ({ canonicalIds }: { canonicalIds: Array<null | string> }) =>
+          new Map(canonicalIds.filter(Boolean).map((id) => [id, null])),
+      ),
+    },
+  };
+});
 
 vi.mock('~/modules/quality-classification', () => {
   const listForManagement = vi.fn().mockResolvedValue([]);

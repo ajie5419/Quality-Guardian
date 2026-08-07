@@ -6,9 +6,10 @@ import type {
   UploadFile,
 } from 'ant-design-vue';
 
+import { computed } from 'vue';
+
 import { Form, Input, InputNumber, Select } from 'ant-design-vue';
 
-import { incomingInspectionTypeOptions } from '../entry-mode';
 import InspectionRequestEntryUploadActions from './InspectionRequestEntryUploadActions.vue';
 
 type EntryCopy = {
@@ -88,6 +89,15 @@ const form = defineModel<{
 const attachmentFileList = defineModel<UploadFile[]>('attachmentFileList', {
   required: true,
 });
+
+// Incoming type options follow the inspection request process settings
+// (system/inspection-processes) so administrators can control them.
+const incomingTypeOptions = computed(() =>
+  props.processOptions.map((item) => ({
+    label: item.processName,
+    value: item.processName,
+  })),
+);
 
 function handleWorkOrderChange(value: SelectProps['value']) {
   if (props.isIncomingEntry) {
@@ -212,7 +222,7 @@ function handleProcessIdentityChange(
   <Form.Item v-if="props.isIncomingEntry" label="进货类型" required>
     <Select
       v-model:value="form.incomingType"
-      :options="incomingInspectionTypeOptions"
+      :options="incomingTypeOptions"
       class="w-full"
       placeholder="请选择进货类型"
       allow-clear

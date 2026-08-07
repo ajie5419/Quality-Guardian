@@ -359,6 +359,7 @@ model team_identity_merges {
   referenceCounts    Json?
   reason             String?                            @db.Text
   operator           String
+  migrateReferences  Boolean                            @default(true)
   completedAt        DateTime?
   isDeleted          Boolean                            @default(false)
   createdAt          DateTime                           @default(now())
@@ -1240,6 +1241,176 @@ model unresolved_master_data_refs {
   @@index([entityType, fieldName])
 }
 
+// @module master-data-identity
+// Immutable decisions for historical fact identities. Corrections create a successor row.
+model historical_identity_resolutions {
+  id                String                               @id @default(cuid())
+  entityType        String
+  entityId          String
+  fieldName         String
+  decisionVersion   Int
+  rawId             String?
+  rawName           String?
+  sourceFingerprint String
+  canonicalId       String?
+  state             historical_identity_resolution_state
+  decisionSource    historical_identity_decision_source
+  evidence          Json?
+  decisionNote      String?                              @db.Text
+  decidedById       String?
+  decidedAt         DateTime                             @default(now())
+  supersedesId      String?                              @unique
+  supersedes        historical_identity_resolutions?     @relation("historical_identity_resolution_supersession", fields: [supersedesId], references: [id])
+  supersededBy      historical_identity_resolutions?     @relation("historical_identity_resolution_supersession")
+
+  @@unique([entityType, entityId, fieldName, decisionVersion], map: "historical_identity_resolution_version_key")
+  @@index([entityType, entityId, fieldName], map: "historical_identity_resolution_lookup_idx")
+  @@index([canonicalId, state], map: "historical_identity_resolution_canonical_idx")
+  @@index([state, decisionSource], map: "historical_identity_resolution_state_idx")
+}
+
+// @module master-data-identity
+// Rebuildable current pointer derived from the immutable decision ledger.
+model identity_resolution_projection {
+  id                   String                               @id @default(cuid())
+  generationId         String?
+  entityType           String
+  entityId             String
+  fieldName            String
+  sourceFingerprint    String
+  effectiveCanonicalId String?
+  state                historical_identity_resolution_state
+  resolutionId         String?
+  projectionVersion    Int                                  @default(1)
+  rebuiltAt            DateTime                             @default(now())
+  generation           identity_projection_generations?     @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([generationId, entityType, entityId, fieldName], map: "identity_projection_generation_reference_key")
+  @@index([generationId, entityType, fieldName], map: "identity_projection_generation_lookup_idx")
+  @@index([effectiveCanonicalId, state], map: "identity_projection_canonical_idx")
+  @@index([state, entityType, fieldName], map: "identity_projection_state_idx")
+}
+
+// @module master-data-identity
+// A completed generation is built in isolation and only becomes visible through
+// the singleton pointer after every row has been written successfully.
+model identity_projection_generations {
+  id                      String                               @id @default(cuid())
+  status                  identity_projection_generation_status @default(BUILDING)
+  sourceResolutionVersion Int
+  failureReason           String?                              @db.Text
+  createdAt               DateTime                             @default(now())
+  activatedAt             DateTime?
+  retiredAt               DateTime?
+  projections             identity_resolution_projection[]
+  activePointers          identity_projection_generation_pointer[] @relation("identity_projection_active_generation")
+  passRateProcessRows     pass_rate_process_identity_projection[]
+
+  @@index([status, createdAt], map: "identity_projection_generation_status_idx")
+}
+
+// @module master-data-identity
+// The single control row provides both the active generation and a CAS version
+// so a rebuild cannot publish a stale snapshot over an intervening decision.
+model identity_projection_generation_pointer {
+  key               String                              @id
+  activeGenerationId String?
+  resolutionVersion Int                                 @default(0)
+  switchedAt        DateTime                            @default(now())
+  activeGeneration  identity_projection_generations?    @relation("identity_projection_active_generation", fields: [activeGenerationId], references: [id], onDelete: SetNull)
+}
+
+// @module master-data-identity
+// A run fixes one fact-set cutoff before WP2 compares legacy and projection results.
+model identity_reconciliation_runs {
+  id                 String                              @id @default(cuid())
+  consumerKey        String
+  factEntityType     String
+  projectionGenerationId String?
+  baselineChecksum   String
+  cutoffKind         identity_reconciliation_cutoff_kind
+  createdAtCutoff    DateTime?
+  idCutoff           String?
+  snapshotDescriptor Json?
+  status             identity_reconciliation_run_status  @default(PENDING)
+  startedAt          DateTime?
+  completedAt        DateTime?
+  failureReason      String?                             @db.Text
+  createdAt          DateTime                            @default(now())
+  updatedAt          DateTime                            @updatedAt
+  metrics            identity_reconciliation_metrics[]
+
+  @@index([consumerKey, status, createdAt], map: "identity_reconciliation_consumer_idx")
+  @@index([factEntityType, cutoffKind, status], map: "identity_reconciliation_fact_idx")
+  @@index([consumerKey, projectionGenerationId, status, createdAt], map: "identity_reconciliation_generation_idx")
+}
+
+// @module report
+// Durable rebuild work for the pass-rate projection. It is deliberately
+// separate from supplier score jobs because publication has different CAS and
+// recovery semantics.
+model pass_rate_projection_refresh_jobs {
+  id          String                              @id @default(cuid())
+  status      pass_rate_projection_refresh_status @default(PENDING)
+  reason      String?
+  requestedById String?
+  attempts    Int                                 @default(0)
+  leaseUntil  DateTime?
+  lastError   String?                             @db.Text
+  completedAt DateTime?
+  isDeleted   Boolean                             @default(false)
+  createdAt   DateTime                            @default(now())
+  updatedAt   DateTime                            @updatedAt
+
+  @@index([status, leaseUntil, isDeleted], map: "pass_rate_projection_refresh_status_idx")
+}
+
+// @module master-data-identity
+model identity_reconciliation_metrics {
+  id              String                       @id @default(cuid())
+  runId           String
+  metricKey       String
+  legacyValue     Decimal                      @db.Decimal(20, 4)
+  projectionValue Decimal                      @db.Decimal(20, 4)
+  differenceValue Decimal                      @db.Decimal(20, 4)
+  details         Json?
+  createdAt       DateTime                     @default(now())
+  run             identity_reconciliation_runs @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@unique([runId, metricKey], map: "identity_reconciliation_metric_key")
+  @@index([metricKey], map: "identity_reconciliation_metric_idx")
+}
+
+// @module report
+// Narrow, generation-scoped read model for pass-rate process aggregation.
+// It deliberately stores only the facts needed by this consumer, so reports
+// never join the generic identity projection during normal reads.
+model pass_rate_process_identity_projection {
+  id                 String                               @id @default(cuid())
+  generationId       String
+  inspectionId       String
+  createdAtSnapshot  DateTime
+  // This watermark is copied from the source fact. It lets the feature-read
+  // guard reject a generation after an inspection is edited or soft-deleted.
+  updatedAtSnapshot  DateTime?
+  inspectionDate     DateTime
+  category           String                               @db.VarChar(32)
+  incomingType       String?
+  effectiveProcessId String?
+  state              historical_identity_resolution_state
+  resolutionId       String?
+  quantity           Int
+  qualifiedQuantity  Int?
+  unqualifiedQuantity Int?
+  result             inspection_result
+  generation         identity_projection_generations     @relation(fields: [generationId], references: [id], onDelete: Cascade)
+
+  @@unique([generationId, inspectionId], map: "pass_rate_process_projection_generation_inspection_key")
+  @@index([generationId, createdAtSnapshot, inspectionDate], map: "pass_rate_process_projection_snapshot_idx")
+  @@index([generationId, updatedAtSnapshot], map: "pass_rate_process_projection_freshness_idx")
+  @@index([generationId, effectiveProcessId, state], map: "pass_rate_process_projection_identity_idx")
+}
+
 model supplier_score_snapshots {
   id                    String    @id @default(cuid())
   supplierId            String    @unique
@@ -1926,6 +2097,51 @@ enum master_data_resolution_status {
   OPEN
   RESOLVED
   IGNORED
+}
+
+enum historical_identity_resolution_state {
+  RESOLVED
+  RETIRED
+  UNRESOLVED
+  AMBIGUOUS
+  CONFLICT
+  INVALID_ID
+  NOT_APPLICABLE
+  UNKNOWN_PROVENANCE
+}
+
+enum historical_identity_decision_source {
+  OBSERVED_VALID_ID
+  LEGACY_AUDIT
+  MANUAL_DECISION
+}
+
+enum identity_projection_generation_status {
+  BUILDING
+  ACTIVE
+  RETIRED
+  FAILED
+}
+
+enum identity_reconciliation_cutoff_kind {
+  CREATED_AT
+  ID_BOUNDARY
+  SNAPSHOT_DESCRIPTOR
+}
+
+enum pass_rate_projection_refresh_status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum identity_reconciliation_run_status {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
 }
 
 enum inspection_result {

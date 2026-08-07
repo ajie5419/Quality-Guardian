@@ -5,6 +5,7 @@ import {
   assertBackfillIntegrity,
   bootstrapExactTeamLinks,
   compareOpenAuditSnapshots,
+  persistResolutionAudit,
 } from './supplier-identity-backfill-runtime';
 
 vi.mock('~/utils/prisma', () => ({
@@ -130,6 +131,35 @@ describe('supplier identity backfill runtime', () => {
           entityId: 'team-1',
           entityType: 'supplier_identity_links',
           reason: 'team_supplier_identity_conflict',
+        }),
+      }),
+    );
+  });
+
+  it('does not reopen an existing manual resolution during a repeated scan', async () => {
+    vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+    await persistResolutionAudit({
+      entityType: 'quality_records',
+      resolved: [],
+      unresolved: [
+        {
+          entityId: 'record-1',
+          evidence: { source: 'repeat-scan' },
+          rawId: null,
+          rawName: 'Historical Supplier',
+          reason: 'NO_IDENTITY_EVIDENCE',
+        },
+      ],
+    });
+
+    expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.not.objectContaining({
+          resolutionNote: expect.anything(),
+          resolvedAt: expect.anything(),
+          resolvedId: expect.anything(),
+          status: expect.anything(),
         }),
       }),
     );

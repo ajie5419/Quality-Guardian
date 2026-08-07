@@ -53,6 +53,12 @@ async function applyDeptNames(items: QualityLossItem[]) {
   const names = await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
     canonicalIds: items.map((item) => item.responsibleDepartmentId),
     configKey: 'responsibleDepartment',
+    idLikeNameById: items
+      .map((item) => ({
+        id: item.responsibleDepartmentId || '',
+        rawName: item.responsibleDepartment ?? null,
+      }))
+      .filter((pair) => pair.id !== ''),
   });
   return items.map((item) => {
     const identity = createIdentityAggregateItem({

@@ -59,6 +59,7 @@ const targetTeam = {
 const attempt: TeamMergeAttempt = {
   attemptToken: 'attempt-1',
   auditId: 'merge-1',
+  migrateReferences: true,
   operator: input.operator,
   sourceName: sourceTeam.dictKey,
   sourceTeamId: sourceTeam.id,

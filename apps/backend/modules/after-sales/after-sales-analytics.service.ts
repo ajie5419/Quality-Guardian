@@ -190,6 +190,7 @@ function toIdentityItems(
 }
 
 function formatStatsResponse(input: {
+  canonicalIdById: ReadonlyMap<string, string>;
   defectNames: Map<string, null | string>;
   defectStats: Array<{
     _count: { id: number };
@@ -231,12 +232,16 @@ function formatStatsResponse(input: {
       ),
       input.supplierNames,
     ).slice(0, 5),
-    deptDistribution: toIdentityItems(
-      mergeIdentityCountGroups(input.deptStats, (row) =>
-        requireStatisticsIdentity('responsibleDept', row),
+    deptDistribution:
+      MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems(
+        toIdentityItems(
+          mergeIdentityCountGroups(input.deptStats, (row) =>
+            requireStatisticsIdentity('responsibleDept', row),
+          ),
+          input.deptNames,
+        ),
+        { canonicalIdById: input.canonicalIdById },
       ),
-      input.deptNames,
-    ),
   };
 }
 
@@ -337,6 +342,7 @@ export const AfterSalesAnalyticsService = {
         }),
       ]);
 
+      const canonicalIdById = new Map<string, string>();
       const [defectNames, supplierNames, deptNames] = await Promise.all([
         QualityClassificationService.resolveCategoryNamesByIds(
           QUALITY_CLASSIFICATION_SCOPE.AFTER_SALES_DEFECT,
@@ -349,6 +355,13 @@ export const AfterSalesAnalyticsService = {
         MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
           canonicalIds: deptStats.map((item) => item.respDeptId),
           configKey: 'responsibleDepartment',
+          canonicalIdById,
+          idLikeNameById: deptStats
+            .map((item) => ({
+              id: item.respDeptId || '',
+              rawName: item.respDept ?? null,
+            }))
+            .filter((pair) => pair.id !== ''),
         }),
       ]);
 
@@ -385,6 +398,7 @@ export const AfterSalesAnalyticsService = {
           `;
 
       return formatStatsResponse({
+        canonicalIdById,
         defectNames,
         defectStats,
         deptNames,

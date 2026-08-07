@@ -341,6 +341,7 @@ export const InspectionIssueStatsService = {
     const aggregateRows = [...aggregateMap.values()];
     const canonicalIds = aggregateRows.map((item) => item.identity?.id || null);
     let canonicalNames = new Map<string, null | string>();
+    const canonicalIdById = new Map<string, string>();
     if (params.dimension === 'defectType') {
       canonicalNames =
         await QualityClassificationService.resolveCategoryNamesByIds(
@@ -358,11 +359,18 @@ export const InspectionIssueStatsService = {
         await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
           configKey: controlledConfigKey,
           canonicalIds,
+          canonicalIdById,
+          idLikeNameById: aggregateRows
+            .map((item) => ({
+              id: item.identity?.id ?? '',
+              rawName: item.identity?.rawName ?? null,
+            }))
+            .filter((pair) => pair.id !== ''),
         });
     }
     const top = Number(params.top) > 0 ? Number(params.top) : 15;
-    return aggregateRows
-      .map((item) => {
+    return MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems(
+      aggregateRows.map((item) => {
         const value = Math.round(item.value * 100) / 100;
         return controlledConfigKey || classificationDimension
           ? createIdentityAggregateItem({
@@ -379,7 +387,9 @@ export const InspectionIssueStatsService = {
               id: item.name,
               value,
             });
-      })
+      }),
+      { canonicalIdById },
+    )
       .sort((a, b) => b.value - a.value)
       .slice(0, top);
   },

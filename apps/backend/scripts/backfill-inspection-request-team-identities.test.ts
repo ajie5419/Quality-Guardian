@@ -33,7 +33,7 @@ describe('inspection request TEAM identity backfill', () => {
     vi.clearAllMocks();
   });
 
-  it('backfills a unique canonical TEAM identity and snapshot', async () => {
+  it('backfills a unique canonical TEAM identity without changing the snapshot', async () => {
     vi.mocked(prisma.qms_inspection_requests.findMany)
       .mockResolvedValueOnce([
         {
@@ -57,7 +57,7 @@ describe('inspection request TEAM identity backfill', () => {
     ).resolves.toMatchObject({ updated: 1, unresolved: 0 });
     expect(prisma.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
       where: { id: 'request-1', isDeleted: false, teamId: null },
-      data: { team: 'Team A', teamId: 'team-1' },
+      data: { teamId: 'team-1' },
     });
     expect(persistResolutionAudit).toHaveBeenCalledWith(
       expect.objectContaining({ fieldName: 'teamId' }),

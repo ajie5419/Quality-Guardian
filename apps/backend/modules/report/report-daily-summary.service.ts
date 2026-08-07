@@ -70,6 +70,12 @@ export const ReportDailySummaryService = {
       await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
         canonicalIds: issues.map((item) => item.responsibleDepartmentId),
         configKey: 'responsibleDepartment',
+        idLikeNameById: issues
+          .map((item) => ({
+            id: item.responsibleDepartmentId || '',
+            rawName: item.responsibleDepartment ?? null,
+          }))
+          .filter((pair) => pair.id !== ''),
       });
     interface ProcessItem {
       partNames: Set<string>;

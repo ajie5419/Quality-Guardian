@@ -1,3 +1,5 @@
+import type { IdentityAggregateItem } from '@qgs/shared';
+
 import type {
   MasterDataCanonicalRelation,
   MasterDataGovernanceField,
@@ -24,14 +26,6 @@ type DatabaseCount =
 type CountRow = { count: DatabaseCount };
 type DistinctValueRow = { value: null | string };
 type ValueCountRow = { count: DatabaseCount; value: null | string };
-
-type TxClient = Parameters<Parameters<typeof prisma.$transaction>[0]>[0];
-
-export interface MasterDataRenameResult {
-  affectedRows: number;
-  field: string;
-  model: string;
-}
 
 export interface MasterDataOrphanItem {
   configKey: string;
@@ -212,21 +206,6 @@ function toAffectedRows(value: DatabaseCount) {
   return 0;
 }
 
-async function queryExactMatchCount(
-  tx: TxClient,
-  model: string,
-  field: string,
-  value: string,
-) {
-  const modelName = quoteIdentifier(model);
-  const fieldName = quoteIdentifier(field);
-  const rows = await tx.$queryRawUnsafe<CountRow[]>(
-    `SELECT COUNT(1) AS count FROM ${modelName} WHERE ${fieldName} = ?`,
-    value,
-  );
-  return toAffectedRows(rows[0]?.count);
-}
-
 async function fetchSourceValues(field: MasterDataGovernanceField) {
   const values = new Set<string>();
   const source = field.source;
@@ -281,116 +260,6 @@ function getFieldOrThrow(configKey: string) {
     throw new Error('INVALID_CONFIG_KEY');
   }
   return field;
-}
-
-async function maybeRenameSourceEntity(
-  tx: TxClient,
-  configKey: string,
-  oldValue: string,
-  newValue: string,
-  dryRun: boolean,
-): Promise<MasterDataRenameResult[]> {
-  const results: MasterDataRenameResult[] = [];
-
-  if (configKey === 'supplierName') {
-    if (dryRun) {
-      const count = await queryExactMatchCount(
-        tx,
-        'suppliers',
-        'name',
-        oldValue,
-      );
-      results.push({ model: 'suppliers', field: 'name', affectedRows: count });
-    } else {
-      const affectedRows = await tx.$executeRawUnsafe(
-        `UPDATE suppliers
-         SET name = ?
-         WHERE isDeleted = 0 AND name = ?`,
-        newValue,
-        oldValue,
-      );
-      results.push({
-        model: 'suppliers',
-        field: 'name',
-        affectedRows: toAffectedRows(affectedRows),
-      });
-    }
-  }
-
-  if (configKey === 'division' || configKey === 'responsibleDepartment') {
-    if (dryRun) {
-      const count = await queryExactMatchCount(
-        tx,
-        'departments',
-        'name',
-        oldValue,
-      );
-      results.push({
-        model: 'departments',
-        field: 'name',
-        affectedRows: count,
-      });
-    } else {
-      const affectedRows = await tx.$executeRawUnsafe(
-        `UPDATE departments
-         SET name = ?
-         WHERE isDeleted = 0 AND name = ?`,
-        newValue,
-        oldValue,
-      );
-      results.push({
-        model: 'departments',
-        field: 'name',
-        affectedRows: toAffectedRows(affectedRows),
-      });
-    }
-  }
-
-  return results;
-}
-
-async function renameDictionaryRows(
-  tx: TxClient,
-  dictType: string,
-  oldValue: string,
-  newValue: string,
-  dryRun: boolean,
-) {
-  if (dryRun) {
-    const rows = await tx.$queryRawUnsafe<CountRow[]>(
-      `SELECT COUNT(1) AS count
-       FROM dictionaries
-       WHERE isDeleted = 0
-         AND dictType = ?
-         AND (dictKey = ? OR dictValue = ?)`,
-      dictType,
-      oldValue,
-      oldValue,
-    );
-    return {
-      model: 'dictionaries',
-      field: 'dictKey,dictValue',
-      affectedRows: toAffectedRows(rows[0]?.count),
-    } satisfies MasterDataRenameResult;
-  }
-
-  const affectedRows = await tx.$executeRawUnsafe(
-    `UPDATE dictionaries
-     SET dictKey = ?, dictValue = ?
-     WHERE isDeleted = 0
-       AND dictType = ?
-       AND (dictKey = ? OR dictValue = ?)`,
-    newValue,
-    newValue,
-    dictType,
-    oldValue,
-    oldValue,
-  );
-  return {
-    model: 'dictionaries',
-    field: 'dictKey,dictValue',
-    affectedRows: toAffectedRows(affectedRows),
-  } satisfies MasterDataRenameResult;
 }
 
 async function readCanonicalNameById(
@@ -647,10 +516,6 @@ async function persistUnresolvedCanonicalRefs(params: {
             rawId: null,
             rawName: row.value,
             reason: 'NO_EXACT_CANONICAL_MATCH',
-            resolutionNote: null,
-            resolvedAt: null,
-            resolvedId: null,
-            status: 'OPEN',
           },
         }),
       ),
@@ -914,86 +779,6 @@ export const MasterDataGovernanceKernel = {
     return getFieldOrThrow(configKey);
   },
 
-  async rename(request: {
-    configKey: string;
-    dryRun?: boolean;
-    newValue: string;
-    oldValue: string;
-  }): Promise<MasterDataRenameResult[]> {
-    const field = getFieldOrThrow(request.configKey);
-    const oldValue = normalizeValue(request.oldValue);
-    const newValue = normalizeValue(request.newValue);
-    const dryRun = Boolean(request.dryRun);
-
-    if (!oldValue) {
-      throw new Error('VALIDATION:oldValue 不能为空');
-    }
-    if (!newValue) {
-      throw new Error('VALIDATION:newValue 不能为空');
-    }
-    if (oldValue === newValue) {
-      throw new Error('VALIDATION:oldValue 与 newValue 不能相同');
-    }
-
-    return prisma.$transaction(async (tx) => {
-      const results: MasterDataRenameResult[] = [];
-
-      for (const target of field.targets) {
-        if (dryRun) {
-          const count = await queryExactMatchCount(
-            tx,
-            target.table,
-            target.nameColumn,
-            oldValue,
-          );
-          results.push({
-            model: target.table,
-            field: target.nameColumn,
-            affectedRows: count,
-          });
-          continue;
-        }
-
-        const modelName = quoteIdentifier(target.table);
-        const fieldName = quoteIdentifier(target.nameColumn);
-        const affectedRows = await tx.$executeRawUnsafe(
-          `UPDATE ${modelName} SET ${fieldName} = ? WHERE ${fieldName} = ?`,
-          newValue,
-          oldValue,
-        );
-        results.push({
-          model: target.table,
-          field: target.nameColumn,
-          affectedRows: toAffectedRows(affectedRows),
-        });
-      }
-
-      if (field.source.type === 'dictionary') {
-        results.push(
-          await renameDictionaryRows(
-            tx,
-            field.source.dictType,
-            oldValue,
-            newValue,
-            dryRun,
-          ),
-        );
-      }
-
-      results.push(
-        ...(await maybeRenameSourceEntity(
-          tx,
-          field.key,
-          oldValue,
-          newValue,
-          dryRun,
-        )),
-      );
-
-      return results;
-    });
-  },
-
   async auditOrphans(configKeys?: string[]): Promise<MasterDataOrphanItem[]> {
     const orphanMap = new Map<
       string,
@@ -1153,24 +938,40 @@ export const MasterDataGovernanceKernel = {
     >(
       `SELECT ${idColumn} AS id, ${nameColumn} AS name
        FROM ${table}
-       WHERE ${nameColumn} IN (${placeholders})${whereSql}`,
+       WHERE ${nameColumn} IN (${placeholders})${whereSql}
+       ORDER BY ${nameColumn} ASC, ${idColumn} ASC`,
       ...normalizedNames,
     );
-    const hitMap = new Map(
-      rows.map((row) => [normalizeValue(row.name), row.id]),
-    );
+    const candidateIdsByName = new Map<string, Set<string>>();
+    for (const row of rows) {
+      const name = normalizeValue(row.name);
+      const id = normalizeValue(row.id);
+      if (!name || !id) continue;
+      const candidateIds = candidateIdsByName.get(name) || new Set<string>();
+      candidateIds.add(id);
+      candidateIdsByName.set(name, candidateIds);
+    }
     for (const name of normalizedNames) {
-      resolvedMap.set(name, hitMap.get(name) || null);
+      const candidateIds = candidateIdsByName.get(name);
+      resolvedMap.set(
+        name,
+        candidateIds?.size === 1 ? [...candidateIds][0] || null : null,
+      );
     }
     return resolvedMap;
   },
 
   async resolveCanonicalNamesByIds(options: {
+    canonicalIdById?: Map<string, string>;
     canonicalIds: Array<null | string | undefined>;
     configKey: string;
     fallbackNameById?:
       | Map<string, null | string | undefined>
       | Record<string, null | string | undefined>;
+    idLikeNameById?: ReadonlyArray<{
+      id: string;
+      rawName: null | string | undefined;
+    }>;
   }) {
     const field = getFieldOrThrow(options.configKey);
     const resolvedMap = new Map<string, null | string>();
@@ -1204,7 +1005,96 @@ export const MasterDataGovernanceKernel = {
         canonicalMap.get(id) || normalizeValue(fallbackMap.get(id)) || null,
       );
     }
+    if (options.idLikeNameById) {
+      // Historical rows may freeze the canonical ID into the name snapshot
+      // while the ID column holds a retired legacy ID. Resolving the name
+      // snapshot as a canonical ID keeps those rows readable instead of
+      // labeling them as invalidated master data.
+      const unresolved = options.idLikeNameById.filter(
+        (pair) => normalizeValue(pair.rawName) && !resolvedMap.get(pair.id),
+      );
+      if (unresolved.length > 0) {
+        const rawIdNames = await readCanonicalNamesByIds(
+          field.canonical,
+          unresolved.map((pair) => normalizeValue(pair.rawName) as string),
+        );
+        for (const pair of unresolved) {
+          const rawName = normalizeValue(pair.rawName) as string;
+          const name = rawIdNames.get(rawName);
+          if (name) {
+            resolvedMap.set(pair.id, name);
+            options.canonicalIdById?.set(pair.id, rawName);
+          }
+        }
+      }
+    }
     return resolvedMap;
+  },
+
+  /**
+   * Merges resolved identity rows that share the same canonical name so a
+   * department split across a legacy ID and its canonical ID renders as one
+   * chart slice. This is a read-only presentation merge: stored rows and
+   * master data are never rewritten, and unresolved rows pass through.
+   */
+  mergeResolvedIdentityAggregateItems<T extends IdentityAggregateItem>(
+    rows: readonly T[],
+    options: { canonicalIdById?: ReadonlyMap<string, string> } = {},
+  ): T[] {
+    const resolved: T[] = [];
+    const unresolved: T[] = [];
+    for (const row of rows) {
+      if (row.resolutionStatus === 'RESOLVED') {
+        resolved.push(row);
+      } else {
+        unresolved.push(row);
+      }
+    }
+    const groups = new Map<
+      string,
+      {
+        canonicalId: null | string;
+        rawName: null | string;
+        row: T;
+        total: number;
+      }
+    >();
+    for (const row of resolved) {
+      const key = normalizeValue(row.name);
+      if (!key) {
+        unresolved.push(row);
+        continue;
+      }
+      const canonicalId =
+        options.canonicalIdById?.get(String(row.id || '')) || row.id || null;
+      const existing = groups.get(key);
+      if (!existing) {
+        groups.set(key, {
+          canonicalId,
+          rawName: row.rawName ?? null,
+          row,
+          total: row.value,
+        });
+        continue;
+      }
+      existing.total += row.value;
+      if (row.value > existing.row.value) {
+        existing.canonicalId = canonicalId;
+        existing.row = row;
+      }
+      if (!existing.rawName && row.rawName) {
+        existing.rawName = row.rawName;
+      }
+    }
+    return [
+      ...unresolved,
+      ...groups.values().map(({ canonicalId, rawName, row, total }) => ({
+        ...row,
+        id: canonicalId,
+        value: total,
+        ...(rawName ? { rawName } : {}),
+      })),
+    ];
   },
 
   async buildNameWhere(options: {
@@ -1418,6 +1308,7 @@ export const MasterDataGovernanceKernel = {
     const orphans = await this.auditOrphans(fields.map((field) => field.key));
     const missing: MasterDataAuditReport['missing'] = [];
     const invalid: MasterDataAuditReport['invalid'] = [];
+    let mismatchedCanonicalName = 0;
 
     // Run count queries sequentially to avoid an admin audit saturating the DB pool.
     for (const field of fields) {
@@ -1428,12 +1319,13 @@ export const MasterDataGovernanceKernel = {
           .map((item) => ({ ...item, configKey: field.key })),
       );
       const invalidRows = await this.auditInvalidCanonicalIds(field.key);
+      mismatchedCanonicalName += invalidRows.reduce(
+        (sum, item) => sum + item.mismatchedCanonicalName,
+        0,
+      );
       invalid.push(
         ...invalidRows
-          .filter(
-            (item) =>
-              item.invalidCanonicalId > 0 || item.mismatchedCanonicalName > 0,
-          )
+          .filter((item) => item.invalidCanonicalId > 0)
           .map((item) => ({ ...item, configKey: field.key })),
       );
     }
@@ -1447,15 +1339,8 @@ export const MasterDataGovernanceKernel = {
       (sum, item) => sum + item.invalidCanonicalId,
       0,
     );
-    const mismatchedCanonicalName = invalid.reduce(
-      (sum, item) => sum + item.mismatchedCanonicalName,
-      0,
-    );
     const hasIssues =
-      orphanCount > 0 ||
-      missingCanonicalId > 0 ||
-      invalidCanonicalId > 0 ||
-      mismatchedCanonicalName > 0;
+      orphanCount > 0 || missingCanonicalId > 0 || invalidCanonicalId > 0;
 
     return {
       invalid,
@@ -1615,10 +1500,7 @@ export const MasterDataGovernanceKernel = {
         result.audit.mismatchedCanonicalName = mismatchedCanonicalName;
       }
       const hasAuditError =
-        orphanCount > 0 ||
-        missingCanonicalId > 0 ||
-        invalidCanonicalId > 0 ||
-        mismatchedCanonicalName > 0;
+        orphanCount > 0 || missingCanonicalId > 0 || invalidCanonicalId > 0;
       result.audit.status = hasAuditError ? 'warn' : 'pass';
       if (hasAuditError && failOnAuditError) {
         throw new Error(

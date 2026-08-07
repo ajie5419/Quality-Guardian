@@ -405,11 +405,7 @@ async function persistAudits(audits: ReconciliationAudit[]) {
         rawId: audit.rawId,
         rawName: audit.rawName,
         reason: audit.reason,
-        resolutionNote: null,
-        resolvedAt: null,
-        resolvedId: null,
         isDeleted: false,
-        status: 'OPEN',
       },
     });
   }

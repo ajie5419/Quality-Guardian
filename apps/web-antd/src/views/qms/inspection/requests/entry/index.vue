@@ -260,7 +260,14 @@ async function loadWorkOrderProcessOptions(workOrderNumber: string) {
 
     workOrderProcesses.value = list || [];
     const selected = isIncomingEntry.value
-      ? workOrderProcesses.value.find((item) => item.category === 'INCOMING')
+      ? (requestForm.incomingType
+          ? workOrderProcesses.value.find(
+              (item) =>
+                item.category === 'INCOMING' &&
+                item.processName === requestForm.incomingType,
+            )
+          : undefined) ||
+        workOrderProcesses.value.find((item) => item.category === 'INCOMING')
       : workOrderProcesses.value.find(
           (item) => item.processId === requestForm.processId,
         );
@@ -413,6 +420,21 @@ watch(
     void loadWorkOrderProcessOptions(workOrderNumber);
   },
   { immediate: true },
+);
+
+watch(
+  () => requestForm.incomingType,
+  (incomingType) => {
+    if (!isIncomingEntry.value || !incomingType) return;
+    const matched = workOrderProcesses.value.find(
+      (item) =>
+        item.category === 'INCOMING' && item.processName === incomingType,
+    );
+    if (matched) {
+      requestForm.processId = matched.processId;
+      requestForm.processName = matched.processName;
+    }
+  },
 );
 
 watch(

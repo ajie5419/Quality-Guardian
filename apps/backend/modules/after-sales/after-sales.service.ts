@@ -19,6 +19,7 @@ import { FileStorageService } from '~/modules/file-storage/file-storage.service'
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { resolveCanonicalClassificationName } from '~/utils/classification-resolver';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
 import prisma from '~/utils/prisma';
 
@@ -270,7 +271,13 @@ export const AfterSalesService = {
     if (productCategoryId && String(productCategoryId).trim() !== '') {
       where.productCategoryId = String(productCategoryId).trim();
     } else if (productType && String(productType).trim() !== '') {
-      where.productType = { contains: String(productType).trim() };
+      const searchTerm = String(productType).trim();
+      appendAndCondition(where, {
+        OR: [
+          { productType: { contains: searchTerm } },
+          { productCategory: { is: { name: { contains: searchTerm } } } },
+        ],
+      });
     }
     if (productSubcategoryId && String(productSubcategoryId).trim() !== '') {
       where.productSubcategoryId = String(productSubcategoryId).trim();
@@ -278,7 +285,13 @@ export const AfterSalesService = {
     if (defectCategoryId && String(defectCategoryId).trim() !== '') {
       where.defectCategoryId = String(defectCategoryId).trim();
     } else if (defectType && String(defectType).trim() !== '') {
-      where.defectType = { contains: String(defectType).trim() };
+      const searchTerm = String(defectType).trim();
+      appendAndCondition(where, {
+        OR: [
+          { defectType: { contains: searchTerm } },
+          { defectCategory: { is: { name: { contains: searchTerm } } } },
+        ],
+      });
     }
     if (defectSubcategoryId && String(defectSubcategoryId).trim() !== '') {
       where.defectSubcategoryId = String(defectSubcategoryId).trim();
@@ -325,6 +338,12 @@ export const AfterSalesService = {
     const list = await prisma.after_sales.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      include: {
+        defectCategory: { select: { name: true } },
+        defectSubcategory: { select: { name: true } },
+        productCategory: { select: { name: true } },
+        productSubcategory: { select: { name: true } },
+      },
     });
 
     // Map to frontend expectation with formatted dates
@@ -352,8 +371,26 @@ export const AfterSalesService = {
         photos: tryParsePhotos(item.photos as string),
         defectCategoryId: item.defectCategoryId || undefined,
         defectSubcategoryId: item.defectSubcategoryId || undefined,
-        productType: item.productType || '',
-        productSubtype: item.productSubtype || '',
+        defectType:
+          resolveCanonicalClassificationName(
+            item.defectCategory?.name,
+            item.defectType,
+          ) || '',
+        defectSubtype:
+          resolveCanonicalClassificationName(
+            item.defectSubcategory?.name,
+            item.defectSubtype,
+          ) || '',
+        productType:
+          resolveCanonicalClassificationName(
+            item.productCategory?.name,
+            item.productType,
+          ) || '',
+        productSubtype:
+          resolveCanonicalClassificationName(
+            item.productSubcategory?.name,
+            item.productSubtype,
+          ) || '',
         productCategoryId: item.productCategoryId || undefined,
         productSubcategoryId: item.productSubcategoryId || undefined,
         division: item.division || '',

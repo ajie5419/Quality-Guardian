@@ -25,6 +25,689 @@
 
 ## 执行记录
 
+---
+
+## 执行记录
+
+### 2026-08-07 质量分类列表展示改为「ID → 当前主数据名」解析
+
+**背景与问题：**
+
+- 上一轮结论：质量分类改名后，历史记录（检验问题/售后）列表/详情仍显示登记时的旧快照名，而统计标签跟随当前主数据名，两者不一致。
+- 用户指示按「ID → 当前主数据名」统一列表展示（与统计一致，符合全系统 ID 化方向）。
+
+**执行内容：**
+
+- 新增 `apps/backend/utils/classification-resolver.ts`：`resolveCanonicalClassificationName(currentName, snapshotName)`，当前主数据名优先、历史快照兜底（镜像 `resolveCanonicalProcessName` 的语义）。
+- `apps/backend/modules/inspection/inspection-issue-list.service.ts`：`inspectionIssueInclude` 增加 `defectCategory`/`defectSubcategory` 关系（name）；`mapInspectionIssueRecord` 覆盖 `defectType`/`defectSubtype` 为解析后的当前名（快照兜底）。覆盖列表、详情、供应商问题三个查询入口。
+- `apps/backend/modules/after-sales/after-sales.service.ts`：`getList` 增加四组分类关系 include；映射覆盖 `defectType`/`defectSubtype`/`productType`/`productSubtype` 为当前名（快照兜底）；`productType`/`defectType` 名称筛选改为 AND + OR（快照 contains 或 当前主数据名 contains），避免改名后按新名搜不到旧记录。
+- 新增/更新测试：`classification-resolver.test.ts`（4 用例）；`inspection-issue-list.service.test.ts`（当前名优先、快照兜底 2 用例）；`after-sales.service.test.ts`（当前名优先、名称筛选 OR 2 用例）。
+
+**验证结果：**
+
+- vitest：4 个相关文件 + report 模块 18 文件 158/158 通过
+- typecheck（backend）：通过
+- lint（prettier）：通过
+- check:qms-arch：通过
+- 本地冒烟：检验问题 `getIssueById` 与售后 `getList` 改名后均返回新名，已还原且无残留
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 无。行为与统计口径一致：列表/详情/统计均按 ID 解析当前主数据名，历史快照仅作兜底。
+
+---
+
+## 执行记录
+
+---
+
+## 执行记录
+
+### 2026-08-07 质量分类列表展示改为「ID → 当前主数据名」解析
+
+**背景与问题：**
+
+- 上一轮结论：质量分类改名后，历史记录（检验问题/售后）列表/详情仍显示登记时的旧快照名，而统计标签跟随当前主数据名，两者不一致。
+- 用户指示按「ID → 当前主数据名」统一列表展示（与统计一致，符合全系统 ID 化方向）。
+
+**执行内容：**
+
+- 新增 `apps/backend/utils/classification-resolver.ts`：`resolveCanonicalClassificationName(currentName, snapshotName)`，当前主数据名优先、历史快照兜底（镜像 `resolveCanonicalProcessName` 的语义）。
+- `apps/backend/modules/inspection/inspection-issue-list.service.ts`：`inspectionIssueInclude` 增加 `defectCategory`/`defectSubcategory` 关系（name）；`mapInspectionIssueRecord` 覆盖 `defectType`/`defectSubtype` 为解析后的当前名（快照兜底）。覆盖列表、详情、供应商问题三个查询入口。
+- `apps/backend/modules/after-sales/after-sales.service.ts`：`getList` 增加四组分类关系 include；映射覆盖 `defectType`/`defectSubtype`/`productType`/`productSubtype` 为当前名（快照兜底）；`productType`/`defectType` 名称筛选改为 AND + OR（快照 contains 或 当前主数据名 contains），避免改名后按新名搜不到旧记录。
+- 新增/更新测试：`classification-resolver.test.ts`（4 用例）；`inspection-issue-list.service.test.ts`（当前名优先、快照兜底 2 用例）；`after-sales.service.test.ts`（当前名优先、名称筛选 OR 2 用例）。
+
+**验证结果：**
+
+- vitest：4 个相关文件 + report 模块 18 文件 158/158 通过
+- typecheck（backend）：通过
+- lint（prettier）：通过
+- check:qms-arch：通过
+- 本地冒烟：检验问题 `getIssueById` 与售后 `getList` 改名后均返回新名，已还原且无残留
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 无。行为与统计口径一致：列表/详情/统计均按 ID 解析当前主数据名，历史快照仅作兜底。
+
+### 2026-08-07 质量分类改名行为核实（质量分类设置）
+
+**背景与问题：**
+
+- 用户询问：「质量分类设置」里修改分类名称，是否和报检工序改名一样——已登记表单里的原分类名会怎样、统计有什么影响。
+
+**结论（已实证）：**
+
+- 改名入口 `updateCategory` / `updateSubcategory` 只更新 `quality_classification_categories` / `quality_classification_subcategories` 主表，不回写任何历史快照。
+- 历史记录（`quality_records` 检验问题、`after_sales` 售后记录）同时存 ID 与名称快照（`defectType/defectSubtype`、`productType/productSubtype`）。列表/详情序列化直接展开快照字段，所以**历史表单显示名保持旧名**（与报检工序不同：工序列表是 relation 优先显示新名）。
+- 统计按 `defectCategoryId/defectSubcategoryId` 聚合、标签用 `resolveCategoryNamesByIds/resolveSubcategoryNamesByIds`（当前主表名），所以**统计标签跟随新名、桶归属与计数不变**；无 ID 的历史遗留行按快照名聚合，不受改名影响。
+
+**执行内容：**
+
+- 本地测试库实证：`updateCategory` 将 `工艺缺陷`（id=bs4mognz1q5f1710wfkajgi3）改名 `工艺缺陷-测试`，确认 `quality_records.defectType` 快照与列表序列化仍为旧名、`resolveCategoryNamesByIds` 返回新名，随后还原；子类别 `其他` 同步验证快照不变后还原。
+- 无业务代码改动；无需新增单测（现有 quality-classification.service.test.ts、inspection-issue-stats/after-sales 聚合测试已覆盖 ID 归并与改名标签逻辑）。
+
+**验证结果：**
+
+- 实证断言：快照不回写 ✓、列表显示旧名 ✓、统计标签跟随新名 ✓、改名后还原干净 ✓（无残留）
+- typecheck/lint 未涉及（仅 CHANGELOG 变更）
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 列表显示旧名、统计标签显示新名，两者在改名后会出现短暂不一致；如需统一，可将列表展示改为 ID → 当前主数据名解析（与统计一致），或保留快照并在统计中展示快照名。
+
+---
+
+## 执行记录
+
+---
+
+## 执行记录
+
+### 2026-08-07 质量分类列表展示改为「ID → 当前主数据名」解析
+
+**背景与问题：**
+
+- 上一轮结论：质量分类改名后，历史记录（检验问题/售后）列表/详情仍显示登记时的旧快照名，而统计标签跟随当前主数据名，两者不一致。
+- 用户指示按「ID → 当前主数据名」统一列表展示（与统计一致，符合全系统 ID 化方向）。
+
+**执行内容：**
+
+- 新增 `apps/backend/utils/classification-resolver.ts`：`resolveCanonicalClassificationName(currentName, snapshotName)`，当前主数据名优先、历史快照兜底（镜像 `resolveCanonicalProcessName` 的语义）。
+- `apps/backend/modules/inspection/inspection-issue-list.service.ts`：`inspectionIssueInclude` 增加 `defectCategory`/`defectSubcategory` 关系（name）；`mapInspectionIssueRecord` 覆盖 `defectType`/`defectSubtype` 为解析后的当前名（快照兜底）。覆盖列表、详情、供应商问题三个查询入口。
+- `apps/backend/modules/after-sales/after-sales.service.ts`：`getList` 增加四组分类关系 include；映射覆盖 `defectType`/`defectSubtype`/`productType`/`productSubtype` 为当前名（快照兜底）；`productType`/`defectType` 名称筛选改为 AND + OR（快照 contains 或 当前主数据名 contains），避免改名后按新名搜不到旧记录。
+- 新增/更新测试：`classification-resolver.test.ts`（4 用例）；`inspection-issue-list.service.test.ts`（当前名优先、快照兜底 2 用例）；`after-sales.service.test.ts`（当前名优先、名称筛选 OR 2 用例）。
+
+**验证结果：**
+
+- vitest：4 个相关文件 + report 模块 18 文件 158/158 通过
+- typecheck（backend）：通过
+- lint（prettier）：通过
+- check:qms-arch：通过
+- 本地冒烟：检验问题 `getIssueById` 与售后 `getList` 改名后均返回新名，已还原且无残留
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 无。行为与统计口径一致：列表/详情/统计均按 ID 解析当前主数据名，历史快照仅作兜底。
+
+---
+
+## 执行记录
+
+---
+
+## 执行记录
+
+### 2026-08-07 质量分类列表展示改为「ID → 当前主数据名」解析
+
+**背景与问题：**
+
+- 上一轮结论：质量分类改名后，历史记录（检验问题/售后）列表/详情仍显示登记时的旧快照名，而统计标签跟随当前主数据名，两者不一致。
+- 用户指示按「ID → 当前主数据名」统一列表展示（与统计一致，符合全系统 ID 化方向）。
+
+**执行内容：**
+
+- 新增 `apps/backend/utils/classification-resolver.ts`：`resolveCanonicalClassificationName(currentName, snapshotName)`，当前主数据名优先、历史快照兜底（镜像 `resolveCanonicalProcessName` 的语义）。
+- `apps/backend/modules/inspection/inspection-issue-list.service.ts`：`inspectionIssueInclude` 增加 `defectCategory`/`defectSubcategory` 关系（name）；`mapInspectionIssueRecord` 覆盖 `defectType`/`defectSubtype` 为解析后的当前名（快照兜底）。覆盖列表、详情、供应商问题三个查询入口。
+- `apps/backend/modules/after-sales/after-sales.service.ts`：`getList` 增加四组分类关系 include；映射覆盖 `defectType`/`defectSubtype`/`productType`/`productSubtype` 为当前名（快照兜底）；`productType`/`defectType` 名称筛选改为 AND + OR（快照 contains 或 当前主数据名 contains），避免改名后按新名搜不到旧记录。
+- 新增/更新测试：`classification-resolver.test.ts`（4 用例）；`inspection-issue-list.service.test.ts`（当前名优先、快照兜底 2 用例）；`after-sales.service.test.ts`（当前名优先、名称筛选 OR 2 用例）。
+
+**验证结果：**
+
+- vitest：4 个相关文件 + report 模块 18 文件 158/158 通过
+- typecheck（backend）：通过
+- lint（prettier）：通过
+- check:qms-arch：通过
+- 本地冒烟：检验问题 `getIssueById` 与售后 `getList` 改名后均返回新名，已还原且无残留
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 无。行为与统计口径一致：列表/详情/统计均按 ID 解析当前主数据名，历史快照仅作兜底。
+
+### 2026-08-07 质量分类改名行为核实（质量分类设置）
+
+**背景与问题：**
+
+- 用户询问：「质量分类设置」里修改分类名称，是否和报检工序改名一样——已登记表单里的原分类名会怎样、统计有什么影响。
+
+**结论（已实证）：**
+
+- 改名入口 `updateCategory` / `updateSubcategory` 只更新 `quality_classification_categories` / `quality_classification_subcategories` 主表，不回写任何历史快照。
+- 历史记录（`quality_records` 检验问题、`after_sales` 售后记录）同时存 ID 与名称快照（`defectType/defectSubtype`、`productType/productSubtype`）。列表/详情序列化直接展开快照字段，所以**历史表单显示名保持旧名**（与报检工序不同：工序列表是 relation 优先显示新名）。
+- 统计按 `defectCategoryId/defectSubcategoryId` 聚合、标签用 `resolveCategoryNamesByIds/resolveSubcategoryNamesByIds`（当前主表名），所以**统计标签跟随新名、桶归属与计数不变**；无 ID 的历史遗留行按快照名聚合，不受改名影响。
+
+**执行内容：**
+
+- 本地测试库实证：`updateCategory` 将 `工艺缺陷`（id=bs4mognz1q5f1710wfkajgi3）改名 `工艺缺陷-测试`，确认 `quality_records.defectType` 快照与列表序列化仍为旧名、`resolveCategoryNamesByIds` 返回新名，随后还原；子类别 `其他` 同步验证快照不变后还原。
+- 无业务代码改动；无需新增单测（现有 quality-classification.service.test.ts、inspection-issue-stats/after-sales 聚合测试已覆盖 ID 归并与改名标签逻辑）。
+
+**验证结果：**
+
+- 实证断言：快照不回写 ✓、列表显示旧名 ✓、统计标签跟随新名 ✓、改名后还原干净 ✓（无残留）
+- typecheck/lint 未涉及（仅 CHANGELOG 变更）
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 列表显示旧名、统计标签显示新名，两者在改名后会出现短暂不一致；如需统一，可将列表展示改为 ID → 当前主数据名解析（与统计一致），或保留快照并在统计中展示快照名。
+
+### 2026-08-07 工序改名行为核实（报检与检验设置）
+
+**背景与问题：**
+
+- 用户询问：在「系统设置-报检与检验设置」里修改报检工序名称后，已登记表单里的原工序名会发生什么变化、数据统计有什么影响。
+- 需要区分三层行为：历史快照是否被回写、UI 展示名如何解析、统计分桶是否受影响。
+
+**结论（已实证）：**
+
+- 改名只更新 `processes.name`（以及 sort 变化时同步 `inspection_request_process_options.sort`），不回写任何历史快照（`qms_inspection_requests.processName`、`inspections.processName` 等）。
+- 读取路径 `resolveCanonicalProcessName` 优先取 processId 关联的当前进程表名，因此报检任务列表/详情、检验记录展示名会跟随新名；历史快照字段仍是旧名。
+- 统计影响：PROCESS 类合格率等按 processId/teamId + bindings 分桶的统计，桶归属与计数不变，仅展示标签跟随新名；INCOMING 类按 `incomingType || processName` 字符串分桶，已有 incomingType 的行不受影响。按 processName 快照字符串分组的旧统计路径会保留旧名。
+
+**执行内容：**
+
+- 本地测试库实证：用 `ProcessMasterService.update` 将 `涂装`（id=1b9bd2ab568211f1881c00163e37355f）改名为 `涂装-测试`，验证请求/检验快照不变、展示名跟随新名、合格率分桶不变，随后还原为 `涂装` 并确认无残留。
+- `apps/backend/utils/process-resolver.test.ts`：新增 2 个用例覆盖 `resolveCanonicalProcessName` 关系优先与快照回退行为。
+
+**验证结果：**
+
+- typecheck: backend 通过
+- vitest: apps/backend/utils/process-resolver.test.ts 11/11 通过
+- 数据库还原确认：无 `涂装-测试` 残留
+
+**commit:** 未提交（工作区已有其他轮次未提交改动）
+
+**遗留问题：**
+
+- 统计入口若存在按 processName 字符串分组的历史路径（如无 incomingType 的 INCOMING 行），改名会造成新旧名分桶；建议后续统一到 processId 维度。
+
+### 2026-08-06 报检工序/进货类型选项改为系统设置驱动（修复设置无法控制）
+
+**背景与根因：**
+
+- 用户反馈：报检页面工序/进货类型选项「控制不了了」——不随「系统设置-报检与检验设置」变化。
+- 根因：进货检验入口的「进货类型」下拉选项是前端硬编码（`entry-mode.ts incomingInspectionTypeOptions`：原材料/外购件/辅材/机加成品件），与系统设置（`inspection_request_process_options`，控制 INCOMING/PROCESS 工序启用与排序）完全脱节；同时进货入口 `processName/processId` 自动取全局 INCOMING 工序第一个（7-29 选项重建后排序第一为「原材料」），导致「进货类型=外购件」时任务页却显示「原材料」。
+- 历史佐证：`requestInfo.incomingType=外购件` 的行，6 月 `processName=外购件` 441 行（当时 INCOMING 排序第一为外购件）、7 月出现 `processName=原材料` 40 行、8 月 6 行（7-29 排序变化后）。
+
+**执行内容：**
+
+- `apps/web-antd/src/views/qms/inspection/requests/entry/components/InspectionRequestEntryFormFields.vue`：「进货类型」下拉选项改为从 `processOptions`（INCOMING 工序，来源 `listInspectionRequestOptions`，受系统设置控制）派生，删除硬编码选项。
+- `apps/web-antd/src/views/qms/inspection/requests/entry/entry-mode.ts`：删除不再使用的 `incomingInspectionTypeOptions`。
+- 上轮已加联动：`index.vue` 在「进货类型」变化时同步 `processId/processName` 为同名 INCOMING 工序，重选工单时优先按已选进货类型匹配。
+- 链路闭环：系统设置页（`/system/inspection-processes` selection）控制 INCOMING/PROCESS 工序启用与排序 → 报检页「进货类型」/「工序」下拉同步 → 选择后 `processName/processId` 一致 → 报检任务页显示一致。
+
+**验证结果：**
+
+- 新增单测：进货类型下拉选项来自 processOptions（设置驱动）。
+- web-antd 报检相关 7 个测试文件 / 38 用例通过；`pnpm run check:type`、`pnpm lint` 通过。
+
+**commit:** 未提交（待用户审阅）
+
+**遗留问题：**
+
+- 历史 46 行（`incomingType=外购件` 但 `processName=原材料`）为修复前保存的数据，未自动改写；如需要可提供脚本按 `requestInfo.incomingType` 回填。
+- 若设置页将某 INCOMING 工序禁用，报检页「进货类型」下拉将不再出现该选项；历史数据不受影响。
+
+### 2026-08-06 进货报检「进货类型」与任务页「检验类型」不一致修复
+
+**背景与根因：**
+
+- 用户反馈：报检页面填「外购件」，落到报检任务页面显示「原材料」。
+- 根因：进货检验扫码报检入口有两个不同字段——「进货类型」（`incomingType`，页面可见可选：原材料/外购件/辅材/机加成品件）与「检验类型/工序」（`processName/processId`，进货入口无下拉，由 `loadWorkOrderProcessOptions` 自动取全局 INCOMING 工序选项第一个，按 sort 排序为「原材料」）。
+- 用户选「进货类型=外购件」，保存的 `processName/processId` 却是自动默认的「原材料」；报检任务页「工序/检验类型」列展示 `processName`，因此显示「原材料」。
+- 数据佐证：`qms_inspection_requests` 中 `requestInfo={"incomingType":"外购件"}` 的行，`processName=外购件` 919 行、`processName=原材料` 46 行（2026-07 起出现，7 月 40 行、8 月 6 行，与 7-28 工序选项全局化改动时间吻合）；`processes` 表名称与 ID 无错位。
+
+**执行内容：**
+
+- `apps/web-antd/src/views/qms/inspection/requests/entry/index.vue`：新增 `incomingType` 联动 —— 进货入口选择「进货类型」时，把 `processId/processName` 同步为同名 INCOMING 工序；重选工单时优先按已选「进货类型」匹配，未选时回退第一个 INCOMING 工序。
+
+**验证结果：**
+
+- `pnpm run check:type`、`pnpm lint` 通过；web-antd 报检相关 7 个测试文件 / 37 用例通过。
+- 后端无改动。
+
+**commit:** 未提交（待用户审阅）
+
+**遗留问题：**
+
+- 历史 46 行（`incomingType=外购件` 但 `processName=原材料`）保存即错，按「历史数据不自动改写」原则未处理；如需修正可提供脚本按 `requestInfo.incomingType` 回填，或任务页对 INCOMING 任务优先展示进货类型。
+- 其余 919 行两字段一致，不受影响。
+
+### 2026-08-06 统计部门重复归并：旧 ID 行与 canonical 行读时合并
+
+**背景与根因：**
+
+- 上轮修复「主数据已失效」后，统计页面仍出现多个同名部门（如生产 OBU 三行、采购部两行）。
+- 根因一：同一部门的历史行 `responsibleDepartmentId` 是旧 hex ID（读时回退解析出名称），与迁移后使用 canonical ID 的行并存，统计按 ID 分组被拆成两行。
+- 根因二：`生产 OBU` 在主数据源存在两个启用部门：`dept-1769576623191`（2026-01-28 创建）与 `dept-r9u69gg8y64qutugxzsd8u6r`（2026-06-04 导入，parentId 指向前者，疑似迁移导入的重复部门），两行引用并行累计。
+
+**执行内容（读时展示归并，历史行与主数据零改写）：**
+
+- `apps/backend/utils/canonical-master-data.ts`：`resolveCanonicalNamesByIds` 新增可选输出 `canonicalIdById`（旧 ID → 快照里的 canonical ID）；新增 `mergeResolvedIdentityAggregateItems` —— 对 RESOLVED 行按规范名称归并 value，输出 ID 优先取引用最多的行的 canonical ID；INVALID/MISSING 行原样保留。
+- 三个按部门聚合的消费方接入：
+  - `inspection-issue-stats.service.ts`（检验问题统计 → 责任部门）
+  - `after-sales-chart-aggregation.service.ts`（售后图表）
+  - `after-sales-analytics.service.ts`（售后主统计部门分布）
+- 质量损失与日报是明细附名场景，不按部门聚合，无需归并。
+
+**验证结果：**
+
+- 单元测试：内核 +3（canonicalIdById 填充、同名归并、未解析行保留）；检验问题统计 +1（旧 ID 行与 canonical 行合并）；相关测试 mock 改为 `vi.importActual` 保留真实归并实现。
+- 后端全量 vitest 265 文件 / 2402 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 全部通过。
+- 本地库（quality_guard_local_test）端到端：
+  - 截图页 2026 责任部门：重复名「无」，生产 OBU 98（47+9+42）一行、采购部 39、结构 BU1 31 等全部归并；仅保留 2 行真实失效（秦皇岛弘旺/祥腾，部门已软删除）。
+  - 售后图表与部门分布：生产 OBU 10（7+3）一行，无重复名；1 行 MISSING（respDeptId 为空）保留。
+
+**commit:** 未提交（待用户审阅）
+
+**遗留问题：**
+
+- `生产 OBU` 两个启用部门（`dept-1769576623191` / `dept-r9u69gg8y64qutugxzsd8u6r`）为主数据源重复，统计已按名称归并展示；建议走人工裁决确定 canonical（含 42 条历史引用的归属），与研究院两个同名叶子一并处理。
+- 2 行引用已软删除部门的历史检验记录仍待人工裁决。
+
+### 2026-08-06 统计字段「主数据已失效」修复：历史旧部门 ID 读时回退解析
+
+**背景与根因：**
+
+- 截图问题：检验问题统计 → 责任部门 页面出现多行「主数据已失效：dept-xxx」。
+- 根因：历史 `quality_records` 行的 `responsibleDepartmentId` 存的是旧系统部门 ID（32 位 hex，如 `a3a98d7b568511f1881c00163e37355f`），而 `responsibleDepartment` 名称快照冻结的是新 canonical 部门 ID 字符串（如 `dept-1769576623191`）。`MasterDataGovernanceKernel.resolveCanonicalNamesByIds` 用旧 ID 查 `departments` 失败，被 `createIdentityAggregateItem` 判为 `INVALID_REFERENCE`，前端显示「主数据已失效」。
+- 同型数据：`after_sales.feedbackDept/feedbackDeptId`（旧 hex + dept 快照）等；`work_orders.divisionId` 全为 canonical，无需处理。
+
+**执行内容（全部只读回退，历史行零改写）：**
+
+- `apps/backend/utils/canonical-master-data.ts`：`resolveCanonicalNamesByIds` 新增可选参数 `idLikeNameById` —— canonical ID 解析失败时，把行的 rawName（冻结的名称快照）当作 canonical ID 再查一次；命中则注册到结果。
+- 部门维度统计消费方接入回退：
+  - `inspection-issue-stats.service.ts`（检验问题统计 → 责任部门，截图页面）
+  - `after-sales-chart-aggregation.service.ts`、`after-sales-analytics.service.ts`（售后图表/主统计部门分布）
+  - `quality-loss.service.ts`（质量损失部门名）
+  - `report-daily-summary.service.ts`（日报部门分组）
+- 其余 `resolveCanonicalNamesByIds` 调用点（work-order/supervision/planning/supplier-identity/inspection-identity-resolution 等）为 part/process/project/supplier/team 维度，无「名称快照是部门 ID」形态，未改动。
+
+**验证结果：**
+
+- 单元测试：`canonical-master-data.test.ts` +2（idLikeNameById 正例 / 负例快照非 ID 保持 null）；`inspection-issue-stats.service.test.ts` +2（旧 ID+dept 快照 → 显示部门名；快照非 ID → 保持「主数据已失效」）。
+- 后端全量 vitest 265 文件 / 2399 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 全部通过。
+- 本地库（quality_guard_local_test）端到端：
+  - 截图页 `getIssueChartAggregation(responsibleDepartment, 2026)`：修复前 15 行 INVALID → 修复后 2 行 INVALID，生产 OBU 47/采购部 27/结构 BU1 21 等全部 RESOLVED。
+  - 售后 `getChartAggregation(responsibleDept)` 与 `getStats().deptDistribution`：11 行、0 INVALID。
+  - 剩余 2 行 INVALID（秦皇岛弘旺设备安装工程有限公司、秦皇岛祥腾机械制造有限公司）为真实失效引用：对应部门在 `departments` 中 `isDeleted=1`（软删除），名称快照是公司名而非 canonical ID，无法也不应自动解析，按设计保留「主数据已失效」走人工治理。
+
+**commit:** 未提交（待用户审阅）
+
+**遗留问题：**
+
+- 2 行引用已软删除部门的历史检验记录（ISS-2026-0ZQBQZVD、ISS-2026-RQDA0UE_）需人工裁决：恢复部门或重新指定责任部门。
+- 上轮 TEAM 遗留：研究院两个同名部门叶子待裁决；生产环境发布后需在维护窗口执行 `run-release-maintenance.sh` 走 record-only 合并。
+
+
+### 2026-08-05 TEAM 重复班组修复（三）：读时归一 + 发布维护自动合并（生产代码方案）
+
+**背景与决策：**
+
+- 用户否决「改写历史业务行」的合并方案：历史数据不能受影响。最终诉求是字段 ID 化：历史重复字段（含空格变体）合并、新输入走 ID、聚合按 canonical 归并。
+- 采用「只登记映射（record-only merge）+ 读时归一」：`team_identity_merges` 记录 `sourceTeamId → targetTeamId`，退役重复 TEAM；历史行保留原 ID，读取/统计路径沿映射解析到 canonical，历史零改写。
+
+**执行内容：**
+
+- Schema：`team_identity_merges` 新增 `migrateReferences Boolean @default(true)`（migration `20260805000000_add_team_merge_migrate_references_flag`）。
+- 合并服务：`migrateReferences=false` 时只迁移 `identityMetadata`（别名/nameKey/来源），跳过 inspections/requests/welders/workOrderRequirements，且跳过零引用校验；默认 `true` 保持旧 CLI 行为兼容。
+- 新 CLI：`merge-team-identities.ts` 支持 `--migrate-references=true|false`。
+- 读时归一：`TeamIdentityService.resolveCanonicalIds`（沿 COMPLETED 映射链解析，带循环防护）；`resolveNamesByIds` 旧 ID 返回 canonical 名称；报检统计（`inspection-request-stats.service.ts`）分组前先归一到 canonical。
+- 发布维护自动合并：`team-duplicate-merge-plan.ts` 证据门控规划（部门叶子精确同名 / 存活来源链接；证据冲突或缺失留人工队列）；业务确认规则将 机加车间→机加 BU、模具车间→模具 BU、组装车间→组装 BU 一并纳入（不同名，按 nameKey 无法分组，规则显式声明）。
+- `merge-confirmed-team-duplicates.ts --apply`（dry-run 默认）+ `run-release-maintenance.sh` 在 reconcile 之后自动执行；`merge-team-identities.ts` 手动合并亦可走 record-only。
+
+**验证结果：**
+
+- 单元测试：新增 record-only 合并、canonical 链解析、旧 ID 名称水合、规划器证据门控等用例；后端全量 vitest 265 文件 / 2395 用例通过。
+- 门禁：`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 全部通过。
+- 本地库（quality_guard_local_test）端到端：构造空格变体重复组（验收临 时A/验收临时A + 部门叶子证据）→ dry-run 精确产出 1 条计划 → apply 后 COMPLETED 且 `migrateReferences=false`、源退役、目标启用；inspections/requests/welders/work_order_requirements 四表行数与 MD5 哈希前后完全一致（历史零改写）；`resolveCanonicalIds` 旧 ID → canonical、名称水合正确；再次 dry-run 为 0（幂等）。临时数据已清理，库还原 61 条 TEAM / 5 条合并。
+
+**commit:** 未提交（待用户审阅）
+
+**遗留问题：**
+
+- 研究院两个同名部门叶子仍待人工裁决（主数据源重复，非页面重复）。
+- 生产发布后在维护窗口执行 `run-release-maintenance.sh`，确认结构 BU1/BU2 与 BU/车间 5 组以 record-only 方式退役；若某环境存在未确认的 nameKey 重复组，会留在人工处置队列，不会自动合并。
+
+### 2026-08-05 TEAM 重复班组修复（二）：机加/模具/组装 BU 与 车间 三组合并
+
+**执行内容：**
+
+- 业务确认「车间 = BU 同一组织」后，将三个历史遗留车间 TEAM 合并进部门来源 canonical 的 BU TEAM：
+  - `0e9b4363…`（机加车间）→ `0e9b423b…`（机加 BU）：迁移 inspections 27、requests 30、welders 1。
+  - `0e9b4372…`（模具车间）→ `0e9b418a…`（模具 BU）：迁移 welders 10。
+  - `0e9b4388…`（组装车间）→ `0e9b4170…`（组装 BU）：迁移 inspections 2、requests 2、welders 3。
+- 退役三个车间 ID（status=0），车间名称保留为 BU 团队的 HISTORICAL 别名；`team_identity_merges` 累计 5 条 COMPLETED 审计。
+- 随后 `reconcile-team-identities.ts --apply` 收敛：created=0、linked=13、aliasesSeeded=56。
+- 未修改任何代码文件，纯本地数据修复。
+
+**验证结果：**
+
+- 三组 BU 启用、三组车间退役；下拉口径 59 → 56。
+- 引用全部归并：机加 BU inspections 1175/requests 604、模具 BU 172/54/welders 10、组装 BU 199/103/welders 3；退役 ID 引用为 0。
+- 车间名称为 HISTORICAL 别名，历史名称检索不受影响。
+
+**commit:** 无（本地数据修复，未提交）
+
+**遗留问题：**
+
+- BU/车间三组对应的部门来源审计（`ambiguous_team_source_identity`）仍 OPEN，走主数据治理人工处置队列确认来源归属。
+- 研究院两个同名部门叶子待裁决（无子节点、无业务引用，建议保留 `dept-1778115885336`、删除 `dept-1778116016969`）。
+
+### 2026-08-05 TEAM 重复班组修复：结构 BU1/结构BU1 两组显式合并
+
+**执行内容：**
+
+- 在本地容器库 `quality_guard_local_test`（127.0.0.1:3307）复现并修复 TEAM 字典两组空格/紧凑重复：结构 BU1/结构BU1、结构 BU2/结构BU2（原 4 条启用记录）。
+- 按部门叶子来源判定 canonical（结构 BU1/BU2 空格版，引用占绝大多数），通过 `merge-team-identities.ts` 显式合并 2 组：
+  - `0e9b438f…`（结构BU1）→ `0e9b41a9…`（结构 BU1）：迁移 inspections 4、requests 4、welders 11。
+  - `0e9b4395…`（结构BU2）→ `0e9b421a…`（结构 BU2）：迁移 inspections 14、requests 14、welders 4。
+- 退役源 ID（status=0），`team_identity_merges` 留 2 条 COMPLETED 审计；随后 `reconcile-team-identities.ts --apply` 收敛：created=0、linked=13、aliasesSeeded=59。
+- 未修改任何代码文件，本次为纯本地数据修复。
+
+**验证结果：**
+
+- 结构组启用记录 4 → 2；下拉口径（dictType=team, isDeleted=0, status=1）61 → 59。
+- 引用全部归并到 canonical：结构 BU1 inspections 411/requests 286/welders 15；结构 BU2 366/252/5；退役 ID 引用为 0。
+- 近重复审计 `group:*`（ambiguous_near_duplicate_team_identities）2 条已 RESOLVED。
+
+**commit:** 无（本地数据修复，未提交）
+
+**遗留问题：**
+
+- 结构 BU1/BU2 两个部门来源审计（`ambiguous_team_source_identity`）仍 OPEN：按架构「名称相似不建立归属 + 退役同名记录作为碰撞证据」留待人工处置队列确认来源链接。
+- 生产或其他环境若存在同样重复，需在发布维护窗口按同样流程执行（`TEAM_IDENTITY_MAINTENANCE_MODE=1` + 停写）。
+- 机加 BU/机加车间、模具 BU/模具车间、组装 BU/组装车间三组与研究院两个同名部门叶子仍待单独裁决。
+
+### 2026-08-01 主数据身份治理 WP3：修复投影重建导致登录网络错误
+
+**执行内容：**
+
+- 根因确认是管理员重建请求在 Web 进程内立即执行完整投影构建，使 1 GB 本地 MySQL 容器达到内存上限并停止响应，登录接口因此表现为网络错误。
+- 管理员重建入口改为只写持久任务队列，完整构建仅由独立 worker 消费；新增测试确保 Web 请求不会启动构建。
+- 修复投影门禁失败时前端同时禁止关闭的问题：未通过门禁时仍禁止开启，但已开启的投影始终可以关闭并立即回退原有统计。
+- 安全重启本地 MySQL 容器释放资源，将中断任务和 3 个未完成派生代次标记为失败；未修改历史事实表。
+
+**验证结果：**
+
+- 后端定向 Vitest：`1/1` 文件、`6/6` 测试通过；前后端类型检查、`pnpm lint`、`pnpm run check:qms-arch` 和 `git diff --check` 通过。
+- 浏览器重新加载后登录态、系统设置和报检工序均正常；实际关闭投影成功，最终开关为 `false`，报表恢复使用 legacy。
+- 登录接口空请求在约 4 毫秒内返回预期参数错误，证明 Web 与数据库连接恢复；生产环境未访问、未修改。
+
+**commit:** `db82caa fix(@qgs/backend): isolate projection rebuild from web process`、`0b887c6 fix(@qgs/web-antd): keep projection rollback available`
+
+**遗留问题：**
+
+- 当前失败任务保留为本地审计证据；下一次重建需由独立 worker 在受控维护窗口消费，不能重新接回 Web 请求进程。
+
+### 2026-08-01 主数据身份治理 WP3：合格率投影管理界面中文化
+
+**执行内容：**
+
+- 将合格率投影切换区域的标题、说明、按钮、状态字段、布尔值、差异指标、启停确认、重建确认和操作结果消息全部接入中英文国际化资源；中文环境不再显示英文硬编码文案。
+- 将既有合格率投影启用 API 测试从 60 行压缩到 48 行，保持非管理员拒绝和管理员成功切换两条路径的验证，消除 API 目录文件行数门禁违规。
+
+**验证结果：**
+
+- 本地浏览器实测中文页面：正文、状态值和影子差异均正确显示；重建确认弹窗完整显示中文，验收时点击取消，未提交重建任务、未改变投影开关。
+- 定向 Vitest：`1/1` 文件、`1/1` 测试通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+
+**commit:** `ff0e5ad test(@qgs/backend): satisfy rollout route size gate`、`701e110 feat(@qgs/web-antd): localize pass-rate rollout controls`
+
+**遗留问题：**
+
+- 无。
+
+### 2026-08-01 主数据身份治理 WP3：合格率安全正式切换准备
+
+**执行内容：**
+
+- 新增独立的合格率投影重建任务表和管理接口；不复用供应商评分任务。开关启用实行 fail-closed 门禁：active generation、新鲜度、当前 generation 的已完成影子对账、三项核心差异、冻结基线 checksum 及发布后失败/构建 generation 均必须通过；禁用始终允许。
+- 为影子对账运行记录 `projectionGenerationId`，防止旧 generation 的成功对账被误用于当前 generation；发布维护会初始化受控基线 checksum。
+- 陈旧投影读取时立即安全回退 legacy，并在请求之外持久化、异步消费可重试重建任务；重启遗留任务可通过独立脚本或管理员入口重试，构建失败继续使用 legacy。
+- 系统“报检与检验设置”页新增仅管理员可见的合格率投影控制区，显示 generation、激活时间、新鲜度、基线、最近影子对账和三项差异；启用、禁用和重建均需要明确确认。
+- 对仍为 `UNRESOLVED` 的旁路记录只应用可证明规则：重新验证的 raw ID 自动转为 `RESOLVED`/`RETIRED`/`INVALID_ID`，仅非过程检验的 `processId` 可转 `NOT_APPLICABLE`，其余证据不足数据保持待治理。全程未修改事实表。
+- 新增并执行当月、上月、最近一周、跨月、无数据、历史补录六个固定 generation 的影子对账窗口；每个窗口独立持久化运行和指标。
+
+**验证结果：**
+
+- 本地 Prisma migration：53 个，新增 migration 仅增加 rollout 控制列和可重试任务表。
+- 本地 deterministic 分类新增 7 条 `RESOLVED` 决策；没有把未知引用强制分类。新 active generation `cmsadme9x000s8zlh5r8kbwrd` 已发布，合格率投影 9,554 行。
+- 六个影子窗口的总量、合格数、合格率差异均为 0；无数据窗口为 0/0/0。当前状态 gate：`rolloutReady=true`、`fresh=true`、`baselineMatch=true`、无 BUILDING/FAILED 阻断 generation。
+- 本地实际执行启用后再禁用：启用成功、门禁保持通过、最终恢复默认 legacy（`enabled=false`）。
+- 历史身份基线 checksum 保持 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 后端全量 Vitest：`264/264` 文件、`2384/2384` 测试通过；前端 `vue-tsc --noEmit`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+
+**commit:** `6cf722df feat(@qgs/backend): gate pass-rate projection rollout`、`ec5e9e16 feat(@qgs/backend): recover stale pass-rate projections`、`af8e3245 feat(@qgs/backend): reconcile pass-rate rollout windows`、`3fbb7f00 feat(@qgs/web-antd): manage pass-rate projection rollout`
+
+**遗留问题：**
+
+- 本轮没有启动前端 dev/build 服务，遵循项目约束；本地验收服务器未运行，因此实际页面点击验收需在下一次本地容器开发服务已启动时完成。
+
+### 2026-08-01 主数据身份治理 WP1：页面治理入口与旁路语义修复
+
+**执行内容：**
+
+- 将在线处置能力、canonical 选项来源和分类范围收敛到 `master-data-identity` registry；治理服务和 Web 页面不再各自维护字段白名单。
+- 治理列表接口返回每条工作项的处置能力，覆盖报检任务、检验不合格项、售后记录的受支持 canonical ID 字段；选项接口和提交接口均以同一 registry descriptor 校验。
+- 明确 `quality_records.defectClassification` 是 legacy 分类映射，只走分类处置，不能作为原始 canonical ID 字段。
+- 页面成功消息和弹窗说明改为“追加身份决策、更新身份投影、解决治理项”，不再错误声称批量更新业务记录。
+
+**验证结果：**
+
+- 定向服务测试：`2/2` 文件、`12/12` 测试通过，覆盖报检任务 `partId`、不合格项 `projectId`、售后 `projectId` 的 options 与 resolve 路径。
+- 后端全量测试：`255/255` 文件、`2360/2360` 测试通过。
+- 本地浏览器验收：管理员登录后，报检任务 `partId` 的治理项显示处置入口、可加载规范物料选项，弹窗明确历史事实不修改；未提交处置，测试数据保持不变。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+
+**commit:** `5bfcb91a fix(project): align governance identity resolution`
+
+**遗留问题：**
+
+- `project_boms.requiredProcessIds` 是集合字段，需要专用集合决策模型，当前不对外暴露单值在线处置入口。
+
+### 2026-08-01 主数据身份治理 WP1：旁路台账与投影基础设施
+
+**执行内容：**
+
+- 新增只增不改的历史身份决策台账、可删除重建的身份投影、影子对账运行和指标四张旁路表；migration 未触碰历史事实表。
+- 新增 `master-data-identity` 模块，注册受控字段的 canonical 类型；人工决定必须有认证操作人，纠错仅能生成 successor 决策。
+- 将系统设置人工治理入口改为“工作清单 CAS + 台账追加 + 投影更新”，不再调用会回写事实 ID 或名称快照的旧领域修复路径。
+- 新增默认 dry-run 的旁路初始化脚本；本地完成全量旁路初始化，未加入 release maintenance。
+
+**验证结果：**
+
+- 本地 Prisma migration：49 个，Schema 最新。
+- migration 前后历史身份基线 `contentChecksum` 均为 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 全量旁路结果：投影 48,983 条（`RESOLVED=40,089`、`RETIRED=141`、`UNRESOLVED=5,518`、`INVALID_ID=179`、`UNKNOWN_PROVENANCE=3,056`）；核心域台账为检验 36,849、报检任务 11,009、不合格品 1,778、售后 473。
+- 定向服务测试 `2/2` 文件、`8/8` 测试通过；后端全量 `254/254` 文件、`2352/2352` 测试通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `git diff --check`：通过。
+- 未访问或修改生产数据库；旁路表可随测试库重建而丢弃，不影响事实快照。
+
+**commit:** `015bede6 feat(@qgs/backend): add historical identity sidecar`、`b8a6e88 fix(@qgs/backend): batch identity sidecar rebuild`
+
+**遗留问题：**
+
+- WP2 才建立领域事实投影、影子统计差异和逐报表开关；本阶段未切换报表读取。
+
+### 2026-08-01 主数据身份治理 WP1 前置：冻结基线门禁
+
+**执行内容：**
+
+- 修复身份基线脚本在 `tsx` 相对脚本路径下错误跳过 CLI 入口的问题；CLI 现在将执行路径和模块真实路径规范化后比较。
+- 为 CLI 入口和 JSON 写入补充回归测试，并对本地快照连续生成两次正式基线。
+- 新增 `docs/baselines/master-data-identity-2026-08-01.json`，作为 WP1 additive migration 前的历史事实冻结依据。
+
+**验证结果：**
+
+- 定向测试：`1/1` 文件、`3/3` 测试通过。
+- 后端 TypeScript：通过。
+- 两次基线的 `contentChecksum` 均为 `95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 本地快照核对：检验记录 9575、报检任务 3424、不合格品 237、售后 55、治理项 `OPEN=5561`、`RESOLVED=4411`。
+- 未创建 Prisma migration，未访问或修改生产数据库。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- WP1 的不可变解析台账与投影表必须在本基线及 WP0 全量门禁均通过后才可创建。
+
+### 2026-08-01 主数据身份治理 WP0：本地页面验收
+
+**执行内容：**
+
+- 使用本地管理员账号完成质量概览、售后质量、检验记录、不合格品项、报检任务和主数据治理页面验收。
+- 核对治理页待处置/已解决筛选、页面刷新以及验收前后数据库状态计数。
+- 全程未新增、编辑、删除或处置业务数据。
+
+**验证结果：**
+
+- 六个业务页面登录、导航、列表读取及分页：通过。
+- 治理状态保持 `OPEN=5561`、`RESOLVED=4411`：通过。
+- 活跃事实记录保持检验 9554、不合格品 218、售后 54、报检任务 3251：通过。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- 售后列表部分历史事业部显示原始 `dept-*` ID，属于后续 `RETIRED/UNRESOLVED` 投影治理范围。
+- 浏览器控制台存在既有 `/system/architecture/index.vue` 路由组件无效错误，与 WP0 身份止血无关。
+
+### 2026-08-01 导入生产备份到本地测试数据库
+
+**执行内容：**
+
+- 使用现有 Apple Container MySQL 创建持久化数据库 `quality_guard_local_test`，完整导入 `/Users/zhaoxiaojie/Downloads/db_dump.sql`。
+- 保留原有 `quality_guard_container` 不变；首次不完整导入库已删除并重新创建。
+- 将 Apple Container 本地开发默认数据库及示例配置切换到 `quality_guard_local_test`。
+
+**验证结果：**
+
+- 数据表：73 张；核心表记录数与备份审计一致。
+- Prisma migration：48 个，数据库 Schema 为最新状态。
+- MySQL 本地用户连接与核心数据查询：通过。
+- 未运行 release maintenance，未连接或修改生产数据库。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- 备份 SQL 在插入数据前重新开启外键检查，导入时仅在当前导入会话内保持关闭；导入结束后连接级设置自动失效。
+
+### 2026-08-01 本地快照启动隔离发布维护
+
+**执行内容：**
+
+- 修复 Apple Container 本地开发启动固定执行生产 release maintenance，导致导入快照首次扫描新增治理项并触发完整性门禁的问题。
+- 新增 `CONTAINER_DEV_RUN_MAINTENANCE` 开关；导入快照的本地配置默认跳过发布维护，生产发布脚本及其门禁保持不变。
+- 将失败启动已经修改的 `quality_guard_local_test` 删除后从原始 SQL 完整重建，恢复到未污染快照。
+
+**验证结果：**
+
+- 本地启动脚本语法：通过。
+- Prisma migration：48 个，数据库 Schema 为最新状态。
+- 核心记录数及原始 `OPEN` 治理项数量与备份一致。
+- 未连接或修改生产数据库。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- 需要主动验证发布维护时，可在单次本地命令中显式设置 `CONTAINER_DEV_RUN_MAINTENANCE=true`；该操作会修改测试副本，应先保留或重建快照。
+
+### 2026-08-01 主数据身份治理 WP0：历史快照冻结与可信基线
+
+**执行内容：**
+
+- 删除已下线的主数据改名内核及其历史名称批量改写能力；管理接口继续返回“主数据改名功能已下线”。
+- 发布维护及相关回填只补 canonical ID，保留供应商、TEAM、项目、部门和事业部的历史名称快照。
+- 批量名称解析在存在重名候选时返回 `null`，不再依赖数据库行顺序静默归属；历史名称与当前主数据名称不一致改为观察指标。
+- 重复扫描不再将 `RESOLVED` 治理项重置为 `OPEN` 或清空既有裁决字段。
+- 新增只读、分页、确定性的身份基线生成器，显式输出 JSON 产物与不含生成时间的内容校验和。
+
+**验证结果：**
+
+- 定向测试：`11/11` 文件、`84/84` 测试通过。
+- 后端全量测试：`253/253` 文件、`2346/2346` 测试通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `rtk git diff --check`：通过。
+- 未创建 Prisma migration，未访问或修改生产数据库。
+
+**commit:** 待提交（主工作区存在用户改动，按任务约束不自行提交）。
+
+**遗留问题：**
+
+- `RETIRED` 旁路状态、不可变解析台账和领域事实投影属于 WP1/WP2，尚未创建 migration。
+
+### 2026-08-01 主数据身份治理实施方案
+
+**执行内容：**
+
+- 基于生产备份只读审计和现有代码映射，新增可实施的主数据身份治理方案。
+- 明确历史事实冻结、不可变解析台账、身份投影、领域事实投影、影子对账和逐消费者切换设计。
+- 将实施拆分为止血、旁路基础设施、首批试点、领域迁移、强约束与旧路径退出七个工作包，并定义验收、回滚、脚本处置和提交边界。
+
+**验证结果：**
+
+- 后端 TypeScript：通过（方案编写前基线）。
+- 文档结构与项目代码、Schema、发布脚本和现有投影实现交叉核对：通过。
+- 本阶段仅新增方案文档并更新执行记录，不修改应用代码或数据库 Schema。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- 二月份至新基线生效日前的原始名称，仍需早期备份或 RDS binlog 才能完整恢复；无证据部分按 `UNKNOWN_PROVENANCE` 管理。
+
+### 2026-08-01 Codex Sol/Terra 模型路由固定
+
+**执行内容：**
+
+- 新增项目级 Codex 配置，将主代理固定为 `gpt-5.6-sol`，将默认执行子代理固定为 `gpt-5.6-terra`。
+- 新增 `terra_executor` 自定义代理，统一承担调查、编码、重构、调试和验证。
+- 在 `AGENTS.md` 增加强制路由、等待、独立验收、禁止静默降级和最终披露规则。
+
+**验证结果：**
+
+- TOML 语法解析：通过。
+- 配置值与路由规则一致性：通过。
+- 本次仅修改 Codex 项目配置与文档，不涉及应用代码，不运行应用 lint、typecheck 或测试。
+
+**commit:** 待提交。
+
+**遗留问题：**
+
+- Codex 需要重新加载项目任务后才能保证新的项目级默认模型配置生效。
+
 ## [0.22.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.21.0...qgs-v0.22.0) (2026-07-31)
 
 
@@ -5108,3 +5791,44 @@
 **遗留问题：**
 
 - 无。
+### 2026-08-01 主数据身份治理 WP2：合格率影子对账与原子投影发布
+
+**执行内容：**
+
+- 身份投影改为 generation + singleton pointer 的 CAS 发布；构建中的 generation 永不被报表读取，决策变更导致 CAS 失败时保留旧 generation。
+- 新增合格率工序窄投影，按 `processId` 聚合，名称仅用于展示；不再让合格率查询 join 通用身份旁路表。
+- 合格率默认继续使用 legacy 口径。`QMS_PASS_RATE_IDENTITY_PROJECTION_ENABLED=true` 才会显式读取新投影，设置读取失败也会安全回退 legacy。
+- 新增合格率影子对账脚本，legacy 与 projection 共享 `createdAt + inspectionId` 事实快照；对账结果写入既有运行/指标表，包含总量、合格数、合格率、分组清单和身份状态。
+- 因历史检验类别存在枚举外值，窄投影的旁路类别列改为字符串，完整保留历史事实而不影响源表。
+
+**验证结果：**
+
+- 本地 Prisma migration：51 个，新增 migration 仅修改旁路表，历史事实基线未写入。
+- 本地 generation `cmsab3wj200008zlhj6vb1l59`：扫描台账 50,293 条，合格率窄投影 9,554 条并原子发布。
+- 本地全期影子对账：legacy 与 projection 的总量均为 411,561、合格数均为 411,391、合格率均为 99.96，三项差异均为 0；身份状态 `RESOLVED=4,242`、`UNRESOLVED=5,312` 已入指标详情。
+- 定向测试 `4/4` 文件、`10/10` 测试与后端 TypeScript：通过。
+- 最终全仓验证：Vitest `259/259` 文件、`2368/2368` 用例，`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `git diff --check` 均通过；本地数据库 51 个 migration 均已应用。
+
+**commit:** `cab876f4 feat(@qgs/backend): publish identity projections atomically`、`48c072ed feat(@qgs/backend): shadow pass-rate identity metrics`
+
+**遗留问题：**
+
+- 开关保持关闭，待连续影子对账差异均可解释并完成页面验收后才允许切换合格率读取口径。
+
+### 2026-08-01 主数据身份治理 WP2：影子快照与新鲜度保护修正
+
+**执行内容：**
+
+- 新增旁路字段 `updatedAtSnapshot` 与对应索引；新 migration 只修改可重建的合格率投影表，不修改任何历史事实。
+- 影子对账先读取 active generation，再从该 generation 的窄投影捕获 `createdAt + inspectionId` cutoff；补录事实不会再造成非身份原因的伪差异。
+- `IDENTITY_STATE:*` 指标已与总量、合格数使用相同的业务日期窗口和事实 cutoff。
+- 报表开关打开时，数据库端比较源事实与投影的创建/更新边界、活跃行数及 `LIMIT 1` 的逐行不匹配存在性；任何新建、编辑、软删除或查询失败都会记录原因并安全回退 legacy，不全量加载投影。
+
+**验证结果：**
+
+- 本地 Prisma migration：52 个；generation `cmsabvogh00008z3e2pqnnlt4` 扫描 50,293 条、写入 9,554 条并原子发布。
+- 本地全期影子对账 run `cmsabvtyq00008z47jc5hrgfo`：legacy 与 projection 总量均为 411,561、合格数均为 411,391、合格率均为 99.96，三项差异均为 0；窗口内身份状态 `RESOLVED=4,234`、`UNRESOLVED=5,287`。
+- 只读基线 checksum 复核一致：`95c62629cb2c49e257b72a7a3f5c918d7393c164bb40a9dde788bb9962f93fd2`。
+- 定向 `4/4` 文件、`13/13` 用例；全仓 Vitest `259/259` 文件、`2371/2371` 用例；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`git diff --check` 全部通过。
+
+**commit:** `45487a76 fix(@qgs/backend): guard stale pass-rate projections`

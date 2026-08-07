@@ -29,6 +29,9 @@ async function run() {
       reason: args.get('reason'),
       sourceTeamId: args.get('source-team-id'),
       targetTeamId: args.get('target-team-id'),
+      ...(args.has('migrate-references')
+        ? { migrateReferences: args.get('migrate-references') === 'true' }
+        : {}),
     });
     const operator = args.get('operator')?.trim();
     if (!operator) throw new Error('--operator is required');

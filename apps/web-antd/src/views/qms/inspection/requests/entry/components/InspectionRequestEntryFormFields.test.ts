@@ -35,6 +35,7 @@ vi.mock('ant-design-vue', async () => {
       name: 'MockSelect',
       inheritAttrs: false,
       emits: ['change', 'search', 'update:value'],
+      props: ['options'],
       setup(_, { attrs }) {
         return () => h('div', attrs);
       },
@@ -160,5 +161,54 @@ describe('inspection request entry material identity', () => {
     expect(form.requestNewPart).toBe(false);
     expect(wrapper.text()).not.toContain('自由输入');
     expect(wrapper.text()).not.toContain('规范物料');
+  });
+});
+
+describe('inspection request entry incoming type options', () => {
+  it('derives incoming type options from the settings-driven process options', () => {
+    const form = createForm();
+    const wrapper = mount(InspectionRequestEntryFormFields, {
+      props: {
+        attachmentFileList: [],
+        beforeUpload: async (file: File) => file,
+        bomPartOptions: [],
+        bomPartsLoading: false,
+        checkResultOptions: [],
+        entryCopy: {
+          attachmentLabel: 'Attachment',
+          componentLabel: 'Component',
+          partLabel: 'Part',
+          partPlaceholder: 'Select part',
+          processLabel: 'Process',
+          teamLabel: 'Responsible unit',
+          teamPlaceholder: 'Select unit',
+        },
+        form,
+        isIncomingEntry: true,
+        partSearchLoading: false,
+        processOptions: [
+          { label: '原材料', processName: '原材料', value: 'proc-raw' },
+          { label: '外购件', processName: '外购件', value: 'proc-out' },
+        ],
+        requiresComponentName: false,
+        requiresStationSelection: false,
+        stationQuantity: 0,
+        submitting: false,
+        teamLoading: false,
+        teamOptions: [],
+        uploadAction: '/upload',
+        workOrderLoading: false,
+        workOrderOptions: [],
+        workOrderProcessesLoading: false,
+      },
+    });
+    const select = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find((item) => item.attributes('placeholder') === '请选择进货类型');
+
+    expect(select?.props('options')).toEqual([
+      { label: '原材料', value: '原材料' },
+      { label: '外购件', value: '外购件' },
+    ]);
   });
 });

@@ -181,10 +181,8 @@ describe('inspection issue responsibility backfill', () => {
         supplierName: null,
       },
       data: {
-        responsibleDepartment: '采购部',
         responsibleDepartmentId: 'dept-purchase',
         supplierId: 'supplier-a',
-        supplierName: 'Supplier A',
       },
     });
     expect(prisma.unresolved_master_data_refs.updateMany).toHaveBeenCalledWith(
@@ -222,10 +220,8 @@ describe('inspection issue responsibility backfill', () => {
     expect(prisma.quality_records.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: {
-          responsibleDepartment: '生产 OBU',
           responsibleDepartmentId: 'dept-production',
           supplierId: 'supplier-a',
-          supplierName: 'Supplier A',
         },
       }),
     );
@@ -250,7 +246,6 @@ describe('inspection issue responsibility backfill', () => {
     expect(prisma.quality_records.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          responsibleDepartment: '生产 OBU',
           supplierId: 'supplier-a',
         }),
       }),
@@ -277,7 +272,7 @@ describe('inspection issue responsibility backfill', () => {
           fieldName: 'supplierId',
           reason: 'CONFLICTING_SUPPLIER_EVIDENCE',
         }),
-        update: expect.objectContaining({ status: 'OPEN' }),
+        update: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
   });
@@ -330,7 +325,7 @@ describe('inspection issue responsibility backfill', () => {
           fieldName: 'supplierId',
           reason: 'MISSING_EXTERNAL_SUPPLIER_EVIDENCE',
         }),
-        update: expect.objectContaining({ status: 'OPEN' }),
+        update: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
   });

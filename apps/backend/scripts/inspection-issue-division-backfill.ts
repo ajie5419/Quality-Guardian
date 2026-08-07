@@ -311,10 +311,6 @@ async function persistAuditInputs(
         rawId: input.rawId,
         rawName: input.rawName,
         reason: input.reason,
-        resolutionNote: null,
-        resolvedAt: null,
-        resolvedId: null,
-        status: 'OPEN',
       },
     });
   });
@@ -406,10 +402,7 @@ async function backfillWorkOrders(
           break;
         }
         case 'resolved': {
-          if (
-            row.divisionId === resolution.candidate.id &&
-            row.division === resolution.candidate.name
-          ) {
+          if (row.divisionId === resolution.candidate.id) {
             summary.skipped += 1;
             auditInputs.push({
               entityId: row.workOrderNumber,
@@ -448,7 +441,6 @@ async function backfillWorkOrders(
               workOrderNumber: update.workOrderNumber,
             },
             data: {
-              division: update.candidate.name,
               divisionId: update.candidate.id,
             },
           }),
@@ -630,13 +622,8 @@ function planIssueUpdate(
   }
 
   const data: Prisma.quality_recordsUncheckedUpdateManyInput = {};
-  if (
-    targetDivision &&
-    (issue.divisionId !== targetDivision.id ||
-      issue.division !== targetDivision.name)
-  ) {
+  if (targetDivision && issue.divisionId !== targetDivision.id) {
     data.divisionId = targetDivision.id;
-    data.division = targetDivision.name;
   }
   if (!issue.inspectionId && candidateInspectionId) {
     data.inspectionId = candidateInspectionId;

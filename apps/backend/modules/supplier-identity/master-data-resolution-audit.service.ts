@@ -89,6 +89,7 @@ export const MasterDataResolutionAuditService = {
         409,
       );
     }
+    return result;
   },
 
   async findMatchingOpenBatch(

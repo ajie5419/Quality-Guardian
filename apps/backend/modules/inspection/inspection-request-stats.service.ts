@@ -186,14 +186,18 @@ export const InspectionRequestStatsService = {
         },
       }),
     ]);
-    const [supplierNamesById, teamNamesById] = await Promise.all([
-      SupplierIdentityService.resolveNamesByIds(
-        collectIdentityIds(periodRequests.map((item) => item.supplierId)),
-      ),
-      TeamIdentityService.resolveNamesByIds(
-        collectIdentityIds(periodRequests.map((item) => item.teamId)),
-      ),
-    ]);
+    const [supplierNamesById, teamNamesById, teamCanonicalById] =
+      await Promise.all([
+        SupplierIdentityService.resolveNamesByIds(
+          collectIdentityIds(periodRequests.map((item) => item.supplierId)),
+        ),
+        TeamIdentityService.resolveNamesByIds(
+          collectIdentityIds(periodRequests.map((item) => item.teamId)),
+        ),
+        TeamIdentityService.resolveCanonicalIds(
+          periodRequests.map((item) => item.teamId),
+        ),
+      ]);
     const now = new Date();
     const inspectorStatusMap = new Map<
       string,
@@ -344,7 +348,9 @@ export const InspectionRequestStatsService = {
           todaySubmittedProcessCount += 1;
         }
         const identityId = normalizeIdentityId(
-          isIncoming ? item.supplierId : item.teamId,
+          isIncoming
+            ? item.supplierId
+            : (teamCanonicalById.get(item.teamId) ?? item.teamId),
         );
         const identityKey = identityId || UNRESOLVED_IDENTITY_KEY;
         const countMap = isIncoming ? supplierMap : teamMap;

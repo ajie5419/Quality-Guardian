@@ -462,5 +462,87 @@ describe('inspectionIssueListService', () => {
         }),
       );
     });
+
+    it('prefers current master-data classification names over historical snapshots', async () => {
+      (prisma.quality_records.findFirst as any).mockResolvedValue({
+        id: 'rec-3',
+        nonConformanceNumber: 'NC-3',
+        date: new Date('2024-01-15'),
+        defectType: '工艺缺陷',
+        defectSubtype: '其他',
+        defectCategory: { name: '工艺缺陷-测试' },
+        defectSubcategory: { name: '其他-测试' },
+        severity: null,
+        status: 'OPEN',
+        lossAmount: null,
+        inspector: null,
+        responsibleDepartment: null,
+        responsibleDepartments: null,
+        responsibleWelder: null,
+        rootCause: null,
+        solution: null,
+        partName: null,
+        description: null,
+        isClaim: false,
+        issuePhoto: null,
+        projectName: null,
+        workOrderNumber: null,
+        supplierName: null,
+        quantity: null,
+        updatedAt: new Date('2024-01-15'),
+        process: null,
+      });
+
+      const result = await InspectionIssueListService.getIssueById({
+        id: 'rec-3',
+        userContext: { roles: ['super_admin'], userId: 'admin-1' },
+      });
+
+      expect(result).toMatchObject({
+        defectType: '工艺缺陷-测试',
+        defectSubtype: '其他-测试',
+      });
+    });
+
+    it('keeps snapshot classification names when the master-data reference is missing', async () => {
+      (prisma.quality_records.findFirst as any).mockResolvedValue({
+        id: 'rec-4',
+        nonConformanceNumber: 'NC-4',
+        date: new Date('2024-01-15'),
+        defectType: '工艺缺陷',
+        defectSubtype: '其他',
+        defectCategory: null,
+        defectSubcategory: null,
+        severity: null,
+        status: 'OPEN',
+        lossAmount: null,
+        inspector: null,
+        responsibleDepartment: null,
+        responsibleDepartments: null,
+        responsibleWelder: null,
+        rootCause: null,
+        solution: null,
+        partName: null,
+        description: null,
+        isClaim: false,
+        issuePhoto: null,
+        projectName: null,
+        workOrderNumber: null,
+        supplierName: null,
+        quantity: null,
+        updatedAt: new Date('2024-01-15'),
+        process: null,
+      });
+
+      const result = await InspectionIssueListService.getIssueById({
+        id: 'rec-4',
+        userContext: { roles: ['super_admin'], userId: 'admin-1' },
+      });
+
+      expect(result).toMatchObject({
+        defectType: '工艺缺陷',
+        defectSubtype: '其他',
+      });
+    });
   });
 });

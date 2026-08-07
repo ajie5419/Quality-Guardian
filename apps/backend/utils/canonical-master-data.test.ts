@@ -271,7 +271,6 @@ describe('masterDataGovernanceKernel', () => {
       update: expect.objectContaining({
         isDeleted: false,
         rawName: 'Unknown process',
-        status: 'OPEN',
       }),
     });
     expect(queryRawUnsafe.mock.calls[2]?.[0]).toContain('`isDeleted` = 0');
@@ -315,23 +314,6 @@ describe('masterDataGovernanceKernel', () => {
       }),
     ).resolves.toBeNull();
     expect(queryRawUnsafe).not.toHaveBeenCalled();
-  });
-
-  it('includes the department source when previewing a division rename', async () => {
-    queryRawUnsafe.mockResolvedValue([{ count: 2 }]);
-
-    await expect(
-      MasterDataGovernanceKernel.rename({
-        configKey: 'division',
-        dryRun: true,
-        newValue: 'New Division',
-        oldValue: 'Old Division',
-      }),
-    ).resolves.toContainEqual({
-      affectedRows: 2,
-      field: 'name',
-      model: 'departments',
-    });
   });
 
   it('aggregates only actionable audit findings', async () => {
@@ -404,5 +386,229 @@ describe('masterDataGovernanceKernel', () => {
         status: 'warn',
       },
     });
+  });
+
+  it('treats a historical name snapshot mismatch as an observation', async () => {
+    vi.spyOn(MasterDataGovernanceKernel, 'auditOrphans').mockResolvedValue([]);
+    vi.spyOn(
+      MasterDataGovernanceKernel,
+      'auditMissingCanonicalIds',
+    ).mockResolvedValue([]);
+    vi.spyOn(
+      MasterDataGovernanceKernel,
+      'auditInvalidCanonicalIds',
+    ).mockResolvedValue([
+      {
+        invalidCanonicalId: 0,
+        mismatchedCanonicalName: 2,
+        table: 'work_orders',
+      },
+    ]);
+
+    await expect(
+      MasterDataGovernanceKernel.auditGovernance({ configKeys: ['division'] }),
+    ).resolves.toMatchObject({
+      invalid: [],
+      summary: {
+        invalidCanonicalId: 0,
+        mismatchedCanonicalName: 2,
+        status: 'pass',
+      },
+    });
+  });
+
+  it('returns null for duplicate canonical names regardless of row order', async () => {
+    queryRawUnsafe.mockResolvedValue([
+      { id: 'department-2', name: 'Production' },
+      { id: 'department-1', name: 'Production' },
+      { id: 'department-3', name: 'Quality' },
+    ]);
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalIdsByNames({
+        configKey: 'division',
+        names: ['Production', 'Quality'],
+      }),
+    ).resolves.toEqual(
+      new Map([
+        ['Production', null],
+        ['Quality', 'department-3'],
+      ]),
+    );
+    expect(queryRawUnsafe.mock.calls[0]?.[0]).toContain('ORDER BY `name` ASC');
+  });
+
+  it('keeps an existing resolution when an unresolved reference is scanned again', async () => {
+    __masterDataGovernanceTestHooks.resetCaches();
+    queryRawUnsafe
+      .mockResolvedValueOnce([{ columnName: 'id' }])
+      .mockResolvedValueOnce([
+        { columnName: 'id' },
+        { columnName: 'isDeleted' },
+      ])
+      .mockResolvedValueOnce([
+        { rowKey: 'requirement-1', value: 'Unknown process' },
+      ]);
+    unresolvedUpsert.mockResolvedValue({ id: 'audit-1' });
+
+    await __masterDataGovernanceTestHooks.backfillTargetCanonicalIds(
+      {
+        idColumn: 'processId',
+        nameColumn: 'processName',
+        nullable: true,
+        table: 'work_order_requirements',
+      },
+      new Map(),
+      { batchSize: 100, configKey: 'processName' },
+    );
+
+    expect(unresolvedUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.not.objectContaining({
+          resolutionNote: expect.anything(),
+          resolvedAt: expect.anything(),
+          resolvedId: expect.anything(),
+          status: expect.anything(),
+        }),
+      }),
+    );
+  });
+
+  it('resolves an unresolved canonical ID through an ID-like name snapshot', async () => {
+    queryRawUnsafe
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ id: 'dept-1769576623191', name: '生产 OBU' }]);
+    const canonicalIdById = new Map<string, string>();
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: ['a3a98d7b568511f1881c00163e37355f'],
+        configKey: 'responsibleDepartment',
+        canonicalIdById,
+        idLikeNameById: [
+          {
+            id: 'a3a98d7b568511f1881c00163e37355f',
+            rawName: 'dept-1769576623191',
+          },
+        ],
+      }),
+    ).resolves.toEqual(
+      new Map([['a3a98d7b568511f1881c00163e37355f', '生产 OBU']]),
+    );
+    expect(canonicalIdById).toEqual(
+      new Map([['a3a98d7b568511f1881c00163e37355f', 'dept-1769576623191']]),
+    );
+    expect(queryRawUnsafe).toHaveBeenLastCalledWith(
+      expect.stringContaining('FROM `departments`'),
+      'dept-1769576623191',
+    );
+  });
+
+  it('keeps an unresolved ID when the name snapshot is not a canonical ID', async () => {
+    queryRawUnsafe.mockResolvedValue([]);
+
+    await expect(
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+        canonicalIds: ['a3a98e23568511f1881c00163e37355f'],
+        configKey: 'responsibleDepartment',
+        idLikeNameById: [
+          {
+            id: 'a3a98e23568511f1881c00163e37355f',
+            rawName: '秦皇岛弘旺设备安装工程有限公司',
+          },
+        ],
+      }),
+    ).resolves.toEqual(new Map([['a3a98e23568511f1881c00163e37355f', null]]));
+  });
+
+  it('merges resolved rows sharing a canonical name into one aggregate row', () => {
+    const result =
+      MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems(
+        [
+          {
+            id: 'a3a98d7b568511f1881c00163e37355f',
+            name: '生产 OBU',
+            resolutionStatus: 'RESOLVED' as const,
+            value: 47,
+          },
+          {
+            id: 'dept-r9u69gg8y64qutugxzsd8u6r',
+            name: '生产 OBU',
+            resolutionStatus: 'RESOLVED' as const,
+            value: 42,
+          },
+          {
+            id: 'dept-1769576623191',
+            name: '生产 OBU',
+            resolutionStatus: 'RESOLVED' as const,
+            value: 9,
+          },
+          {
+            id: 'a3a98e23568511f1881c00163e37355f',
+            name: '主数据已失效：秦皇岛弘旺设备安装工程有限公司',
+            rawName: '秦皇岛弘旺设备安装工程有限公司',
+            resolutionReason: 'INVALID_REFERENCE' as const,
+            resolutionStatus: 'INVALID' as const,
+            value: 1,
+          },
+        ],
+        {
+          canonicalIdById: new Map([
+            ['a3a98d7b568511f1881c00163e37355f', 'dept-1769576623191'],
+          ]),
+        },
+      );
+
+    expect(result).toEqual([
+      {
+        id: 'a3a98e23568511f1881c00163e37355f',
+        name: '主数据已失效：秦皇岛弘旺设备安装工程有限公司',
+        rawName: '秦皇岛弘旺设备安装工程有限公司',
+        resolutionReason: 'INVALID_REFERENCE',
+        resolutionStatus: 'INVALID',
+        value: 1,
+      },
+      {
+        id: 'dept-1769576623191',
+        name: '生产 OBU',
+        resolutionStatus: 'RESOLVED',
+        value: 98,
+      },
+    ]);
+  });
+
+  it('keeps unresolved rows and empty names untouched', () => {
+    const result =
+      MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems([
+        {
+          id: 'dept-a',
+          name: '数据待治理：生产 OBU',
+          resolutionReason: 'MISSING_REQUIRED' as const,
+          resolutionStatus: 'MISSING' as const,
+          value: 1,
+        },
+        {
+          id: null,
+          name: '',
+          resolutionStatus: 'RESOLVED' as const,
+          value: 2,
+        },
+      ]);
+
+    expect(result).toEqual([
+      {
+        id: 'dept-a',
+        name: '数据待治理：生产 OBU',
+        resolutionReason: 'MISSING_REQUIRED',
+        resolutionStatus: 'MISSING',
+        value: 1,
+      },
+      {
+        id: null,
+        name: '',
+        resolutionStatus: 'RESOLVED',
+        value: 2,
+      },
+    ]);
   });
 });

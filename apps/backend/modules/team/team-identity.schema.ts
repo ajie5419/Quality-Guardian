@@ -34,6 +34,9 @@ export const teamIdentityMergeSchema = z
     reason: z.string().trim().min(1).max(2000),
     sourceTeamId: z.string().trim().min(1).max(191),
     targetTeamId: z.string().trim().min(1).max(191),
+    // false = record the canonical mapping and retire the source without
+    // rewriting historical business references (read paths resolve old IDs).
+    migrateReferences: z.boolean().optional(),
   })
   .refine((input) => input.sourceTeamId !== input.targetTeamId, {
     message: 'Source and target TEAM IDs must be different',

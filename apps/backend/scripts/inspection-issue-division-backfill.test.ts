@@ -184,7 +184,7 @@ describe('inspection issue division backfill', () => {
         isDeleted: false,
         workOrderNumber: 'WO-1',
       },
-      data: { division: 'Division A', divisionId: 'dept-a' },
+      data: { divisionId: 'dept-a' },
     });
     expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
       where: {
@@ -195,7 +195,6 @@ describe('inspection issue division backfill', () => {
         isDeleted: false,
       },
       data: {
-        division: 'Division A',
         divisionId: 'dept-a',
         inspectionId: 'inspection-primary',
       },
@@ -393,7 +392,7 @@ describe('inspection issue division backfill', () => {
             fieldName: 'divisionId',
           },
         },
-        update: expect.objectContaining({ status: 'OPEN' }),
+        update: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
     expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
@@ -405,7 +404,7 @@ describe('inspection issue division backfill', () => {
             fieldName: 'inspectionId',
           },
         },
-        update: expect.objectContaining({ status: 'OPEN' }),
+        update: expect.not.objectContaining({ status: expect.anything() }),
       }),
     );
   });

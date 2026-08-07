@@ -28,7 +28,6 @@ interface IdentityTarget {
   update: (
     row: MissingIdentityRow,
     identity: CanonicalIdentity,
-    normalizeSnapshot: boolean,
   ) => Promise<number>;
 }
 
@@ -135,10 +134,6 @@ async function recordUnresolved(
       rawId: null,
       rawName: row.rawName,
       reason: match.reason,
-      resolutionNote: null,
-      resolvedAt: null,
-      resolvedId: null,
-      status: 'OPEN',
     },
   });
 }
@@ -188,11 +183,7 @@ async function runTargets(
           await recordUnresolved(target, row, match);
           continue;
         }
-        const count = await target.update(
-          row,
-          match.identity,
-          match.matchedBy === 'id',
-        );
+        const count = await target.update(row, match.identity);
         summary.updated += count;
         if (count === 0) {
           summary.concurrentChanges += 1;
@@ -230,7 +221,7 @@ function projectTargets(): IdentityTarget[] {
           rawName: row.projectName,
         }));
       },
-      update: async (row, identity, normalizeSnapshot) => {
+      update: async (row, identity) => {
         const result = await prisma.work_orders.updateMany({
           where: {
             isDeleted: false,
@@ -240,7 +231,6 @@ function projectTargets(): IdentityTarget[] {
           },
           data: {
             projectId: identity.id,
-            ...(normalizeSnapshot ? { projectName: identity.name } : {}),
           },
         });
         return result.count;
@@ -260,7 +250,7 @@ function projectTargets(): IdentityTarget[] {
           take,
           select: { id: true, projectName: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.inspections.updateMany({
           where: {
             id: row.entityId,
@@ -268,7 +258,7 @@ function projectTargets(): IdentityTarget[] {
             projectId: null,
             projectName: row.rawName,
           },
-          data: { projectId: identity.id, ...data },
+          data: { projectId: identity.id },
         }),
     ),
     createIdProjectTarget(
@@ -285,7 +275,7 @@ function projectTargets(): IdentityTarget[] {
           take,
           select: { id: true, projectName: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.quality_records.updateMany({
           where: {
             id: row.entityId,
@@ -293,7 +283,7 @@ function projectTargets(): IdentityTarget[] {
             projectId: null,
             projectName: row.rawName,
           },
-          data: { projectId: identity.id, ...data },
+          data: { projectId: identity.id },
         }),
     ),
     createIdProjectTarget(
@@ -310,7 +300,7 @@ function projectTargets(): IdentityTarget[] {
           take,
           select: { id: true, projectName: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.after_sales.updateMany({
           where: {
             id: row.entityId,
@@ -318,7 +308,7 @@ function projectTargets(): IdentityTarget[] {
             projectId: null,
             projectName: row.rawName,
           },
-          data: { projectId: identity.id, ...data },
+          data: { projectId: identity.id },
         }),
     ),
     createIdProjectTarget(
@@ -335,7 +325,7 @@ function projectTargets(): IdentityTarget[] {
           take,
           select: { id: true, projectName: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.quality_losses.updateMany({
           where: {
             id: row.entityId,
@@ -343,7 +333,7 @@ function projectTargets(): IdentityTarget[] {
             projectId: null,
             projectName: row.rawName,
           },
-          data: { projectId: identity.id, ...data },
+          data: { projectId: identity.id },
         }),
     ),
     createIdProjectTarget(
@@ -360,7 +350,7 @@ function projectTargets(): IdentityTarget[] {
           take,
           select: { id: true, projectName: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.vehicle_commissioning_issues.updateMany({
           where: {
             id: row.entityId,
@@ -368,7 +358,7 @@ function projectTargets(): IdentityTarget[] {
             projectId: null,
             projectName: row.rawName,
           },
-          data: { projectId: identity.id, ...data },
+          data: { projectId: identity.id },
         }),
     ),
   ];
@@ -383,7 +373,6 @@ function createIdProjectTarget(
   updateMany: (
     row: MissingIdentityRow,
     identity: CanonicalIdentity,
-    data: { projectName?: string },
   ) => Promise<{ count: number }>,
 ): IdentityTarget {
   return {
@@ -396,12 +385,8 @@ function createIdProjectTarget(
         rawName: row.projectName,
       }));
     },
-    update: async (row, identity, normalizeSnapshot) => {
-      const result = await updateMany(
-        row,
-        identity,
-        normalizeSnapshot ? { projectName: identity.name } : {},
-      );
+    update: async (row, identity) => {
+      const result = await updateMany(row, identity);
       return result.count;
     },
   };
@@ -424,7 +409,7 @@ function departmentTargets(): IdentityTarget[] {
           take,
           select: { id: true, respDept: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.after_sales.updateMany({
           where: {
             id: row.entityId,
@@ -432,7 +417,7 @@ function departmentTargets(): IdentityTarget[] {
             respDept: row.rawName,
             respDeptId: null,
           },
-          data: { respDeptId: identity.id, ...data },
+          data: { respDeptId: identity.id },
         }),
     ),
     createDepartmentTarget(
@@ -450,7 +435,7 @@ function departmentTargets(): IdentityTarget[] {
           take,
           select: { id: true, respDept: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.quality_losses.updateMany({
           where: {
             id: row.entityId,
@@ -458,7 +443,7 @@ function departmentTargets(): IdentityTarget[] {
             respDept: row.rawName,
             respDeptId: null,
           },
-          data: { respDeptId: identity.id, ...data },
+          data: { respDeptId: identity.id },
         }),
     ),
     createDepartmentTarget(
@@ -476,7 +461,7 @@ function departmentTargets(): IdentityTarget[] {
           take,
           select: { id: true, responsibleDepartment: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.quality_records.updateMany({
           where: {
             id: row.entityId,
@@ -484,7 +469,7 @@ function departmentTargets(): IdentityTarget[] {
             responsibleDepartment: row.rawName,
             responsibleDepartmentId: null,
           },
-          data: { responsibleDepartmentId: identity.id, ...data },
+          data: { responsibleDepartmentId: identity.id },
         }),
     ),
     createDepartmentTarget(
@@ -502,7 +487,7 @@ function departmentTargets(): IdentityTarget[] {
           take,
           select: { id: true, responsibleDepartment: true },
         }),
-      (row, identity, data) =>
+      (row, identity) =>
         prisma.vehicle_commissioning_issues.updateMany({
           where: {
             id: row.entityId,
@@ -510,7 +495,7 @@ function departmentTargets(): IdentityTarget[] {
             responsibleDepartment: row.rawName,
             responsibleDepartmentId: null,
           },
-          data: { responsibleDepartmentId: identity.id, ...data },
+          data: { responsibleDepartmentId: identity.id },
         }),
     ),
   ];
@@ -532,7 +517,6 @@ function createDepartmentTarget(
   updateMany: (
     row: MissingIdentityRow,
     identity: CanonicalIdentity,
-    data: { respDept?: string; responsibleDepartment?: string },
   ) => Promise<{ count: number }>,
 ): IdentityTarget {
   return {
@@ -545,15 +529,8 @@ function createDepartmentTarget(
         rawName: row.respDept ?? row.responsibleDepartment ?? null,
       }));
     },
-    update: async (row, identity, normalizeSnapshot) => {
-      let data: { respDept?: string; responsibleDepartment?: string } = {};
-      if (normalizeSnapshot) {
-        data =
-          fieldName === 'respDeptId'
-            ? { respDept: identity.name }
-            : { responsibleDepartment: identity.name };
-      }
-      const result = await updateMany(row, identity, data);
+    update: async (row, identity) => {
+      const result = await updateMany(row, identity);
       return result.count;
     },
   };

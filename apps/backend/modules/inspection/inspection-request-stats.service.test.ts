@@ -4,6 +4,7 @@ import prisma from '~/utils/prisma';
 import { InspectionRequestStatsService } from './inspection-request-stats.service';
 
 const identityMocks = vi.hoisted(() => ({
+  resolveCanonicalIds: vi.fn(),
   resolveSupplierNamesByIds: vi.fn(),
   resolveTeamNamesByIds: vi.fn(),
 }));
@@ -16,6 +17,7 @@ vi.mock('~/modules/supplier-identity', () => ({
 
 vi.mock('~/modules/team', () => ({
   TeamIdentityService: {
+    resolveCanonicalIds: identityMocks.resolveCanonicalIds,
     resolveNamesByIds: identityMocks.resolveTeamNamesByIds,
   },
 }));
@@ -102,6 +104,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
         ['team-b', '班组B'],
       ]),
     );
+    identityMocks.resolveCanonicalIds.mockResolvedValue(new Map());
   }
 
   it('excludes incoming inspection records from byTeam', async () => {
@@ -386,6 +389,40 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.byTeam).toEqual([
       { count: 1, team: '装配 BU', teamId: 'team-1' },
       { count: 1, team: '装配 BU', teamId: 'team-2' },
+    ]);
+  });
+
+  it('aggregates legacy merged team ids under the canonical team', async () => {
+    const requests = [
+      makeRequest({ id: 'r1', team: '结构 BU2', teamId: 'team-a' }),
+      makeRequest({ id: 'r2', team: '结构BU2', teamId: 'team-legacy' }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(
+      new Map([
+        ['team-a', '结构 BU2'],
+        ['team-legacy', '结构BU2'],
+      ]),
+    );
+    identityMocks.resolveCanonicalIds.mockResolvedValue(
+      new Map([['team-legacy', 'team-a']]),
+    );
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      { count: 2, team: '结构 BU2', teamId: 'team-a' },
+    ]);
+    expect(result.historyByTeam).toEqual(result.byTeam);
+    expect(result.reinspectionRateByTeam).toEqual([
+      expect.objectContaining({
+        submittedCount: 2,
+        team: '结构 BU2',
+        teamId: 'team-a',
+      }),
     ]);
   });
 

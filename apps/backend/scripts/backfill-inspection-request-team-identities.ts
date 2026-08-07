@@ -102,7 +102,7 @@ export async function backfillInspectionRequestTeamIdentities(
         });
         continue;
       }
-      if (row.teamId === candidate.id && row.team === candidate.name) {
+      if (row.teamId === candidate.id) {
         batchResolved.push({ entityId: row.id, resolvedId: candidate.id });
         continue;
       }
@@ -123,7 +123,6 @@ export async function backfillInspectionRequestTeamIdentities(
               teamId: item.existingTeamId,
             },
             data: {
-              team: item.candidate.name,
               teamId: item.candidate.id,
             },
           }),

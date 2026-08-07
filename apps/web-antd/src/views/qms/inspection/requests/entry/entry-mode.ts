@@ -8,13 +8,6 @@ export const inspectionRequestEntryCheckResultOptions = [
   { label: '不适用', value: 'NA' },
 ];
 
-export const incomingInspectionTypeOptions = [
-  { label: '原材料', value: '原材料' },
-  { label: '外购件', value: '外购件' },
-  { label: '辅材', value: '辅材' },
-  { label: '机加成品件', value: '机加成品件' },
-];
-
 export const MACHINED_INCOMING_INSPECTION_TYPE = '机加成品件';
 
 type WorkOrderOptionSource = {

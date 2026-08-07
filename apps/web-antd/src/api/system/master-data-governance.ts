@@ -2,6 +2,19 @@ import { requestClient } from '#/api/request';
 
 export namespace MasterDataGovernanceApi {
   export type Status = 'IGNORED' | 'OPEN' | 'RESOLVED';
+  export type Resolution =
+    | {
+        configKey: string;
+        kind: 'IDENTITY';
+        multiple: boolean;
+      }
+    | {
+        kind: 'CLASSIFICATION';
+        scope:
+          | 'AFTER_SALES_DEFECT'
+          | 'AFTER_SALES_PRODUCT'
+          | 'INSPECTION_ISSUE_DEFECT';
+      };
 
   export interface Reference {
     entityId: string;
@@ -14,6 +27,7 @@ export namespace MasterDataGovernanceApi {
     rawId: null | string;
     rawName: null | string;
     reason: string;
+    resolution: null | Resolution;
     resolutionNote: null | string;
     resolvedAt: null | string;
     resolvedId: null | string;
@@ -77,7 +91,8 @@ export function resolveMasterDataReferenceApi(
       },
 ) {
   return requestClient.put<{
-    affectedCount: number;
+    decision: { id: string };
+    projection: { id: string };
     resolvedAuditCount: number;
   }>(`${BASE_URL}/${id}`, data);
 }
