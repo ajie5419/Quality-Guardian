@@ -143,7 +143,6 @@ export const InspectionRecordQueryService = {
         : null,
       stationSelection: normalizeInspectionStationSelection(
         inspection.stationSelection,
-        inspection.quantity,
       ),
     };
   },
@@ -337,7 +336,6 @@ export const InspectionRecordQueryService = {
         unqualifiedQuantity,
         stationSelection: normalizeInspectionStationSelection(
           item.stationSelection,
-          item.quantity,
         ),
       };
     });

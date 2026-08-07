@@ -5904,3 +5904,64 @@
 - 定向 `4/4` 文件、`13/13` 用例；全仓 Vitest `259/259` 文件、`2371/2371` 用例；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`git diff --check` 全部通过。
 
 **commit:** `45487a76 fix(@qgs/backend): guard stale pass-rate projections`
+
+### 2026-08-07 台数（stationSelection）截断修复
+
+**执行内容：**
+
+- 根因：报检创建时后端把所选台号按表单「数量」字段（默认 1）截断，选第 N 台被静默存成第 1 台；读路径又按同一 quantity 二次截断。
+- 修复：台号上限改为工单机器台数（work_orders.quantity）。创建服务先查工单并计算机器台数上限，再序列化 stationSelection；上限 ≤ 0 时不传（不再截断）。读路径（inspection-record-query.service.ts、qgs-shared mapInspectionRequestRecord）改为按原样展示已存台号。
+- 改动文件：inspection-request-work-orders.ts、inspection-request-create.service.ts、inspection-record-query.service.ts、packages/qgs-shared inspection-request.ts，并新增 2 个测试用例。
+
+**验证结果：**
+
+- 定向测试：qgs-shared inspection-request 17/17、inspection 模块 683/683 通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 历史已按错误逻辑落库的记录（quantity=1、indexes=[1]）无法恢复，原所选台号在写入时已丢失。
+
+### 2026-08-07 台数修复审查整改
+
+**执行内容：**
+
+- 审查整改：台号上限由「全部关联工单的最大机器数」改为「选中工单（workOrderNumber）的机器数」，与前端 stationQuantity 口径一致。
+- 服务端校验：提交了台数选择但工单机器数为 0 时，不再静默不设限落库，改为抛 `INVALID_STATION_SELECTION` 业务错误拒绝请求（符合 CONSTRAINTS.md 对所有用户输入做校验的要求）。
+- 后端模块补导出 `normalizeInspectionStationSelection`；新增 2 个测试用例（选中工单机器数作为上限、0 台工单拒绝选择）。
+
+**验证结果：**
+
+- inspection 模块 + qgs-shared qms 定向测试 685/685 通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 历史已落库的错误台号记录无法恢复。
+
+### 2026-08-07 责任焊工必填一致性修复
+
+**执行内容：**
+
+- 根因：`selectRequired` 校验规则只拦截 `undefined/null`，不拦截空字符串 `''`；报检任务完成检验弹窗（CloseInspectionModal）把 `responsibleWelder` 预填为 `''`，导致「焊接」工序下责任焊工不填也能提交，与不合格项新建问题页面（字段初始为 undefined，必填生效）行为不一致。
+- 修复：
+  1. `apps/web-antd/src/adapter/form.ts`：`selectRequired` 对空字符串和空数组也判定为未选择（与 `required` 规则一致），弹窗内责任焊工、缺陷分类等选择字段显示即必填，与新建问题页对齐。
+  2. `apps/web-antd/src/views/qms/inspection/records/components/InspectionForm.vue`：检验记录页不合格补充区增加校验，工序名含「焊」时责任焊工必填（该页旧逻辑只有显示条件、无必填）。
+  3. `apps/backend/modules/inspection/inspection-issue.schema.ts`：create 校验增加兜底，`processName` 为「焊接」时 `responsibleWelder` 必填；新增 2 个 schema 测试用例。
+
+**验证结果：**
+
+- 后端 inspection 模块 643/643 通过（含新增 schema 用例）。
+- 前端 inspection issues/records/requests 相关测试 98/98 通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 显示触发条件仍按各页面现状：完成检验弹窗与新建问题页为工序精确「焊接」，检验记录页为工序含「焊」；如要统一为含「焊」，需确认工序字典口径后另行调整。
+- 完成检验弹窗的工序沿用报检单并锁定，若报检单工序名非精确「焊接」的焊接类名称，责任焊工字段不会显示（同新建问题页口径）。

@@ -88,6 +88,8 @@ vi.mock('~/modules/inspection/inspection-request', async () => {
     normalizeInspectionRequestCheckResult:
       SHARED.normalizeInspectionRequestCheckResult,
     normalizeInspectionRequestText: SHARED.normalizeInspectionRequestText,
+    normalizeInspectionStationSelection:
+      SHARED.normalizeInspectionStationSelection,
     parseInspectionRequestQuantity: SHARED.parseInspectionRequestQuantity,
     serializeInspectionStationSelection:
       SHARED.serializeInspectionStationSelection,

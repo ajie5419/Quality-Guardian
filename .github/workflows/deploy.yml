@@ -56,6 +56,9 @@ jobs:
           if [ -n "$INPUT_VERSION" ]; then
             VERSION="$INPUT_VERSION"
             DISPLAY_VERSION="$INPUT_VERSION"
+          elif [[ "$REF_NAME" == qgs-v* ]]; then
+            VERSION="${REF_NAME#qgs-}"
+            DISPLAY_VERSION="${REF_NAME#qgs-}"
           elif [[ "$REF_NAME" == v* ]]; then
             VERSION="$REF_NAME"
             DISPLAY_VERSION="$REF_NAME"

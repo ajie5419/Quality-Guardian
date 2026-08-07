@@ -171,6 +171,12 @@ describe('inspection station selection', () => {
       formatInspectionStationSelection({ indexes: [1, 2], mode: 'PARTIAL' }),
     ).toBe('第 1 台、第 2 台');
   });
+
+  it('preserves station indexes without a quantity bound', () => {
+    expect(
+      normalizeInspectionStationSelection({ indexes: [3], mode: 'PARTIAL' }),
+    ).toEqual({ indexes: [3], mode: 'PARTIAL' });
+  });
 });
 
 describe('resolveInspectionRequestIssueResponsibility', () => {

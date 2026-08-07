@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { isIncomingInspectionRequestProcess } from '~/modules/inspection/inspection-request';
+import {
+  isIncomingInspectionRequestProcess,
+  normalizeInspectionStationSelection,
+  serializeInspectionStationSelection,
+} from '~/modules/inspection/inspection-request';
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
+import { assertWorkOrdersExist } from '~/modules/inspection/inspection-request-work-orders';
 import { PartMasterService } from '~/modules/part-master';
 import { ProcessMasterService } from '~/modules/process-master';
 import { SystemService } from '~/modules/system';
@@ -96,6 +101,7 @@ vi.mock('~/modules/inspection/inspection-request', () => ({
   normalizeInspectionRequestAttachments: vi.fn().mockReturnValue([]),
   normalizeInspectionRequestCheckResult: vi.fn().mockReturnValue('PASS'),
   normalizeInspectionRequestText: vi.fn().mockImplementation((v) => v || ''),
+  normalizeInspectionStationSelection: vi.fn().mockReturnValue(null),
   parseInspectionRequestQuantity: vi.fn().mockReturnValue(1),
   serializeInspectionStationSelection: vi.fn().mockReturnValue(''),
 }));
@@ -122,6 +128,8 @@ const mockRequest = {
 describe('inspectionRequestCreateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(assertWorkOrdersExist).mockResolvedValue([]);
+    vi.mocked(normalizeInspectionStationSelection).mockReturnValue(null);
     vi.mocked(isIncomingInspectionRequestProcess).mockReturnValue(false);
     vi.mocked(
       ProcessMasterService.assertInspectionRequestOption,
@@ -159,6 +167,112 @@ describe('inspectionRequestCreateService', () => {
         'V2',
       ),
     ).rejects.toThrow('not enabled');
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('bounds station selection by work order machine count, not form quantity', async () => {
+    vi.mocked(assertWorkOrdersExist).mockResolvedValue([
+      { projectName: 'Project A', quantity: 4, workOrderNumber: 'WO-001' },
+    ]);
+    vi.mocked(normalizeInspectionStationSelection).mockReturnValue({
+      indexes: [3],
+      mode: 'PARTIAL',
+    });
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        qms_inspection_requests: {
+          create: vi.fn().mockResolvedValue(mockRequest),
+        },
+      }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        componentName: 'Component A',
+        partName: 'Bearing',
+        processName: 'Welding',
+        quantity: 1,
+        stationSelection: { indexes: [3], mode: 'PARTIAL' },
+        workOrderNumber: 'WO-001',
+      },
+    );
+
+    expect(serializeInspectionStationSelection).toHaveBeenCalledWith(
+      { indexes: [3], mode: 'PARTIAL' },
+      4,
+    );
+  });
+
+  it('bounds station selection by the selected work order machine count', async () => {
+    vi.mocked(assertWorkOrdersExist).mockResolvedValue([
+      { projectName: 'Project A', quantity: 2, workOrderNumber: 'WO-001' },
+      { projectName: 'Project B', quantity: 8, workOrderNumber: 'WO-002' },
+    ]);
+    vi.mocked(normalizeInspectionStationSelection).mockReturnValue({
+      indexes: [2],
+      mode: 'PARTIAL',
+    });
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        qms_inspection_requests: {
+          create: vi.fn().mockResolvedValue(mockRequest),
+        },
+      }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        componentName: 'Component A',
+        partName: 'Bearing',
+        processName: 'Welding',
+        quantity: 1,
+        stationSelection: { indexes: [2], mode: 'PARTIAL' },
+        workOrderNumber: 'WO-001',
+      },
+    );
+
+    expect(serializeInspectionStationSelection).toHaveBeenCalledWith(
+      { indexes: [2], mode: 'PARTIAL' },
+      2,
+    );
+  });
+
+  it('rejects station selection when the work order has no machines', async () => {
+    vi.mocked(assertWorkOrdersExist).mockResolvedValue([
+      { projectName: 'Project A', quantity: 0, workOrderNumber: 'WO-001' },
+    ]);
+    vi.mocked(normalizeInspectionStationSelection).mockReturnValue({
+      indexes: [1],
+      mode: 'PARTIAL',
+    });
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        qms_inspection_requests: {
+          create: vi.fn().mockResolvedValue(mockRequest),
+        },
+      }),
+    );
+
+    await expect(
+      InspectionRequestCreateService.createRequest(
+        {} as any,
+        { id: 'user-1', username: 'admin' } as any,
+        {
+          componentName: 'Component A',
+          partName: 'Bearing',
+          processName: 'Welding',
+          quantity: 1,
+          stationSelection: { indexes: [1], mode: 'PARTIAL' },
+          workOrderNumber: 'WO-001',
+        },
+      ),
+    ).rejects.toThrow(
+      'station selection requires a work order with at least one machine',
+    );
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
