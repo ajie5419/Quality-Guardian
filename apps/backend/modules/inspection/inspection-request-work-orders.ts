@@ -41,7 +41,7 @@ export async function assertWorkOrdersExist(
 ) {
   const normalized = [...new Set(workOrderNumbers.map((item) => item.trim()))];
   const workOrders = await prisma.work_orders.findMany({
-    select: { projectName: true, workOrderNumber: true },
+    select: { projectName: true, quantity: true, workOrderNumber: true },
     where: { workOrderNumber: { in: normalized } },
   });
   const existing = new Set(workOrders.map((item) => item.workOrderNumber));

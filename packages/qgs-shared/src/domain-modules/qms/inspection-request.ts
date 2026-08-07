@@ -403,7 +403,6 @@ export function mapInspectionRequestRecord<
       null,
     stationSelection: normalizeInspectionStationSelection(
       record.stationSelection,
-      (record as { quantity?: unknown }).quantity,
     ),
     unqualifiedQuantity:
       record.unqualifiedQuantity ??

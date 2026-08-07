@@ -27,6 +27,7 @@ import {
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestCheckResult,
   normalizeInspectionRequestText,
+  normalizeInspectionStationSelection,
   parseInspectionRequestQuantity,
   serializeInspectionStationSelection,
 } from './inspection-request';
@@ -54,12 +55,23 @@ export const InspectionRequestCreateService = {
         'legacy inspection request identity contract used',
       );
     }
+    const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
+    const workOrders =
+      (await assertWorkOrdersExist(prisma, workOrderNumbers)) ?? [];
+    const workOrderNumber =
+      normalizeInspectionRequestText(body.workOrderNumber) ||
+      workOrderNumbers[0] ||
+      '';
+    const selectedWorkOrder = workOrders.find(
+      (item) => item.workOrderNumber === workOrderNumber,
+    );
+    const machineStationBound = Number(selectedWorkOrder?.quantity) || 0;
     const payload = await buildCreateRequestPayload(
       body,
       identityContract,
       isPublic,
+      machineStationBound,
     );
-    await assertWorkOrdersExist(prisma, payload.workOrderNumbers);
 
     const created = await retryOnRequestNoConflict(() =>
       prisma.$transaction(async (tx) => {
@@ -175,6 +187,7 @@ async function buildCreateRequestPayload(
   body: RequestBody,
   identityContract: 'V1' | 'V2',
   _isPublic: boolean,
+  machineStationBound = 0,
 ) {
   const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
   const workOrderNumber =
@@ -277,9 +290,18 @@ async function buildCreateRequestPayload(
   }
   const team = supplier?.name || teamIdentity?.name || '';
   const quantity = parseInspectionRequestQuantity(body.quantity);
+  const normalizedStationSelection = normalizeInspectionStationSelection(
+    body.stationSelection,
+  );
+  if (normalizedStationSelection && machineStationBound < 1) {
+    throw new BusinessError(
+      'INVALID_STATION_SELECTION',
+      'station selection requires a work order with at least one machine',
+    );
+  }
   const stationSelection = serializeInspectionStationSelection(
     body.stationSelection,
-    quantity,
+    machineStationBound > 0 ? machineStationBound : undefined,
   );
   const attachments = normalizeInspectionRequestAttachments(body.attachments);
   const governedFields = buildGovernedWriteFieldsForTable(

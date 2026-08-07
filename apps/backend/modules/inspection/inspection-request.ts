@@ -12,6 +12,7 @@ import {
   normalizeInspectionRequestCheckResult as normalizeInspectionRequestCheckResultRule,
   normalizeInspectionRequestStatus as normalizeInspectionRequestStatusRule,
   normalizeInspectionRequestText as normalizeInspectionRequestTextRule,
+  normalizeInspectionStationSelection as normalizeInspectionStationSelectionRule,
   parseInspectionRequestAttachments as parseInspectionRequestAttachmentsRule,
   parseInspectionRequestPriority as parseInspectionRequestPriorityRule,
   parseInspectionRequestQuantity as parseInspectionRequestQuantityRule,
@@ -60,6 +61,13 @@ export function serializeInspectionStationSelection(
   quantity?: unknown,
 ) {
   return serializeInspectionStationSelectionRule(value, quantity);
+}
+
+export function normalizeInspectionStationSelection(
+  value: unknown,
+  quantity?: unknown,
+) {
+  return normalizeInspectionStationSelectionRule(value, quantity);
 }
 
 export function normalizeInspectionRequestAttachments(value: unknown) {
