@@ -10,6 +10,8 @@ import { PassRateProjectionService } from '~/modules/report';
 import { isBusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
+import { closeConnections } from './close-connections';
+
 type Candidate = {
   entityId: string;
   entityType: string;
@@ -507,7 +509,13 @@ export async function bootstrapHistoricalIdentitySidecar(
 }
 
 if (process.argv[1]?.endsWith('historical-identity-sidecar-bootstrap.ts')) {
-  void bootstrapHistoricalIdentitySidecar().then((summary) => {
-    process.stdout.write(`${JSON.stringify(summary)}\n`);
-  });
+  void bootstrapHistoricalIdentitySidecar()
+    .then(async (summary) => {
+      process.stdout.write(`${JSON.stringify(summary)}\n`);
+      await closeConnections();
+    })
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
 }

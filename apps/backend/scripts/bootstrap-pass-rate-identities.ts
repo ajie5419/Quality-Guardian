@@ -2,6 +2,7 @@ import process from 'node:process';
 
 import { createModuleLogger } from '~/utils/logger';
 
+import { closeConnections } from './close-connections';
 import { bootstrapPassRateIdentityBindings } from './pass-rate-identity-bootstrap';
 
 const logger = createModuleLogger('pass-rate-identity-bootstrap');
@@ -14,7 +15,11 @@ async function main() {
   logger.info(result, 'Pass-rate identity bindings bootstrapped');
 }
 
-main().catch((error: unknown) => {
-  logger.error(error, 'Pass-rate identity bootstrap failed');
-  process.exitCode = 1;
-});
+void main()
+  .then(async () => {
+    await closeConnections();
+  })
+  .catch((error: unknown) => {
+    logger.error(error, 'Pass-rate identity bootstrap failed');
+    process.exitCode = 1;
+  });

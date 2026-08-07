@@ -1,5 +1,6 @@
 import type { SupplierIdentity } from './quality-record-supplier-identity-backfill';
 
+import { team_identity_merge_status } from '@prisma/client';
 import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
@@ -272,7 +273,7 @@ export async function loadOpenAuditSnapshot(): Promise<OpenAuditSnapshot> {
 export async function loadSupplierIdentityContext(
   effectiveLinks: Map<string, EffectiveTeamLink>,
 ) {
-  const [suppliers, teams] = await Promise.all([
+  const [suppliers, teams, completedMerges, aliases] = await Promise.all([
     prisma.suppliers.findMany({
       where: { isDeleted: false },
       select: { id: true, name: true },
@@ -281,18 +282,50 @@ export async function loadSupplierIdentityContext(
       where: { dictType: 'team', isDeleted: false, status: 1 },
       select: { dictKey: true, id: true },
     }),
+    prisma.team_identity_merges.findMany({
+      where: {
+        isDeleted: false,
+        status: team_identity_merge_status.COMPLETED,
+      },
+      select: { sourceTeamId: true, targetTeamId: true },
+    }),
+    prisma.team_identity_aliases.findMany({
+      where: { isDeleted: false },
+      select: { alias: true, teamId: true },
+    }),
   ]);
   const teamIdentities = teams.map((item) => ({
     id: item.id,
     name: item.dictKey,
   }));
+  const teamById = new Map(teamIdentities.map((item) => [item.id, item]));
+  const teamByName = buildUniqueIdentityMap(teamIdentities);
+
+  // Historical rows may still reference retired source TEAMs of completed
+  // merges. Resolve those references through the canonical mapping instead of
+  // flagging them unresolved, keeping the record-only merge contract.
+  for (const merge of completedMerges) {
+    const target = teamById.get(merge.targetTeamId);
+    if (!target || teamById.has(merge.sourceTeamId)) continue;
+    teamById.set(merge.sourceTeamId, target);
+    const targetLink = effectiveLinks.get(merge.targetTeamId);
+    if (targetLink) effectiveLinks.set(merge.sourceTeamId, targetLink);
+  }
+  // Retired names (e.g. workshop variants) resolve to their canonical TEAM
+  // unless the alias collides with an active team name.
+  for (const alias of aliases) {
+    const team = teamById.get(alias.teamId);
+    if (team && !teamByName.has(alias.alias)) {
+      teamByName.set(alias.alias, team);
+    }
+  }
 
   return {
     effectiveLinks,
     supplierById: new Map(suppliers.map((item) => [item.id, item])),
     supplierByName: buildUniqueIdentityMap(suppliers),
-    teamById: new Map(teamIdentities.map((item) => [item.id, item])),
-    teamByName: buildUniqueIdentityMap(teamIdentities),
+    teamById,
+    teamByName,
   };
 }
 

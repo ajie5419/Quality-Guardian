@@ -1,5 +1,6 @@
 import process from 'node:process';
 
+import { closeConnections } from './close-connections';
 import { reconcilePassRateIdentity } from './reconcile-pass-rate-identity';
 
 function iso(date: Date) {
@@ -63,7 +64,13 @@ export async function reconcilePassRateIdentityWindows(
 }
 
 if (process.argv[1]?.endsWith('reconcile-pass-rate-identity-windows.ts')) {
-  void reconcilePassRateIdentityWindows().then((summary) => {
-    process.stdout.write(`${JSON.stringify(summary)}\n`);
-  });
+  void reconcilePassRateIdentityWindows()
+    .then(async (summary) => {
+      process.stdout.write(`${JSON.stringify(summary)}\n`);
+      await closeConnections();
+    })
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
 }
