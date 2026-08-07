@@ -29,6 +29,16 @@
 
 ## 执行记录
 
+## [0.23.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.23.1...qgs-v0.23.2) (2026-08-07)
+
+
+### Bug Fixes
+
+* **ci:** resolve qgs-v tags to clean deploy versions ([410519f](https://github.com/ajie5419/Quality-Guardian/commit/410519f9180f5f3defc31ffe551745e1520d02f5))
+* **project:** clamp inspection station selection by work order machine count ([29b6ee6](https://github.com/ajie5419/Quality-Guardian/commit/29b6ee6b1c5bc0a6198ae2398fce349e0f11b1c1))
+* **project:** clamp station selection by work order machine count and require responsible welder for welding defects ([5374fa2](https://github.com/ajie5419/Quality-Guardian/commit/5374fa256b67e71ef014f98b3c51f9a0514d930b))
+* **project:** require responsible welder for welding defects ([2ab6b7d](https://github.com/ajie5419/Quality-Guardian/commit/2ab6b7df71a6c64c5639e5c0a6e6c90c75585642))
+
 ## [0.23.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.23.0...qgs-v0.23.1) (2026-08-07)
 
 
