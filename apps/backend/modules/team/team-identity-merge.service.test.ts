@@ -22,6 +22,7 @@ const mocks = vi.hoisted(() => ({
     sourceTeamId: 'team-source',
     targetName: 'StructureBU2',
     targetTeamId: 'team-target',
+    migrateReferences: true,
   },
   counts: {
     inspections: 3,
@@ -142,6 +143,35 @@ describe('teamIdentityMergeService', () => {
     expect(
       mocks.tx.team_identity_merge_participants.deleteMany,
     ).toHaveBeenCalledWith({ where: { mergeId: mocks.attempt.auditId } });
+  });
+
+  it('record-only merge migrates only identity metadata and skips the zero-reference check', async () => {
+    vi.mocked(acquireTeamMerge).mockResolvedValue({
+      attempt: { ...mocks.attempt, migrateReferences: false },
+      kind: 'acquired',
+    });
+
+    await expect(
+      TeamIdentityMergeService.merge(
+        {
+          migrateReferences: false,
+          reason: 'Confirmed duplicate',
+          sourceTeamId: mocks.attempt.sourceTeamId,
+          targetTeamId: mocks.attempt.targetTeamId,
+        },
+        'admin',
+      ),
+    ).resolves.toEqual({
+      auditId: 'merge-1',
+      counts: mocks.counts,
+      targetTeamId: mocks.attempt.targetTeamId,
+    });
+
+    const migratedGroups = vi
+      .mocked(migrateTeamReferenceGroup)
+      .mock.calls.map((call) => call[2]);
+    expect(migratedGroups).toEqual(['identityMetadata']);
+    expect(countTeamReferences).not.toHaveBeenCalled();
   });
 
   it('returns a completed merge without running migration groups', async () => {

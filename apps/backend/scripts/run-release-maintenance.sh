@@ -11,6 +11,7 @@ cd "$BACKEND_DIR"
 # create canonical IDs and audit evidence, but must never normalize a fact name.
 "$TSX_BIN" scripts/backfill-role-page-permissions.ts --apply
 "$TSX_BIN" scripts/reconcile-team-identities.ts --apply
+TEAM_IDENTITY_MAINTENANCE_MODE=1 "$TSX_BIN" scripts/merge-confirmed-team-duplicates.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-issue-divisions.ts --apply
 "$TSX_BIN" scripts/backfill-quality-record-supplier-identities.ts --apply
 "$TSX_BIN" scripts/backfill-identity-relations.ts

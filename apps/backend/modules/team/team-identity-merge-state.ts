@@ -22,6 +22,7 @@ export interface TeamMergeInput {
   reason: string;
   sourceTeamId: string;
   targetTeamId: string;
+  migrateReferences?: boolean;
 }
 
 export interface TeamMergeAttempt {
@@ -32,6 +33,7 @@ export interface TeamMergeAttempt {
   sourceTeamId: string;
   targetName: string;
   targetTeamId: string;
+  migrateReferences: boolean;
 }
 
 export type TeamMergeAcquisition =
@@ -249,6 +251,7 @@ function acquiredAttempt(
   auditId: string,
   input: TeamMergeInput,
   names: { sourceName: string; targetName: string },
+  migrateReferences = input.migrateReferences !== false,
 ): TeamMergeAcquisition {
   return {
     attempt: {
@@ -259,6 +262,7 @@ function acquiredAttempt(
       sourceTeamId: input.sourceTeamId,
       targetName: names.targetName,
       targetTeamId: input.targetTeamId,
+      migrateReferences,
     },
     kind: 'acquired',
   };
@@ -303,10 +307,16 @@ async function claimExistingMerge(
     );
   }
   await quarantineSource(tx, source, input.operator);
-  return acquiredAttempt(attemptToken, merge.id, input, {
-    sourceName: merge.sourceNameSnapshot,
-    targetName: merge.targetNameSnapshot,
-  });
+  return acquiredAttempt(
+    attemptToken,
+    merge.id,
+    input,
+    {
+      sourceName: merge.sourceNameSnapshot,
+      targetName: merge.targetNameSnapshot,
+    },
+    merge.migrateReferences,
+  );
 }
 
 async function createMerge(
@@ -322,6 +332,7 @@ async function createMerge(
       attemptToken,
       idempotencyKey: `team-merge:${source.id}`,
       leaseUntil: leaseUntil(),
+      migrateReferences: input.migrateReferences !== false,
       operator: input.operator,
       reason: input.reason,
       sourceNameSnapshot: source.dictKey,

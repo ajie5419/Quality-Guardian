@@ -28,6 +28,9 @@ const mocks = vi.hoisted(() => ({
     team_identity_sources: {
       create: vi.fn(),
     },
+    team_identity_merges: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -81,6 +84,7 @@ describe('teamIdentityService', () => {
       null,
     );
     vi.mocked(mocks.tx.dictionaries.findMany).mockResolvedValue([]);
+    vi.mocked(mocks.tx.team_identity_merges.findMany).mockResolvedValue([]);
   });
 
   it('creates the dictionary identity, canonical alias, and manual source atomically', async () => {
@@ -319,5 +323,39 @@ describe('teamIdentityService', () => {
       },
       data: { status: 0, updatedBy: 'admin' },
     });
+  });
+
+  it('resolves legacy TEAM IDs to canonical IDs through completed merges', async () => {
+    vi.mocked(mocks.tx.team_identity_merges.findMany).mockResolvedValue([
+      { sourceTeamId: 'legacy-a', targetTeamId: 'canonical-a' },
+      { sourceTeamId: 'canonical-a', targetTeamId: 'canonical-b' },
+    ]);
+
+    const resolved = await TeamIdentityService.resolveCanonicalIds([
+      'legacy-a',
+      'canonical-b',
+      'unknown',
+    ]);
+
+    expect(resolved.get('legacy-a')).toBe('canonical-b');
+    expect(resolved.get('canonical-b')).toBe('canonical-b');
+    expect(resolved.get('unknown')).toBe('unknown');
+  });
+
+  it('hydrates canonical names for legacy IDs without rewriting rows', async () => {
+    vi.mocked(mocks.tx.team_identity_merges.findMany).mockResolvedValue([
+      { sourceTeamId: 'legacy-a', targetTeamId: 'canonical-a' },
+    ]);
+    vi.mocked(mocks.tx.dictionaries.findMany).mockResolvedValue([
+      { id: 'canonical-a', dictKey: 'Canonical A' },
+    ]);
+
+    const names = await TeamIdentityService.resolveNamesByIds([
+      'legacy-a',
+      'canonical-a',
+    ]);
+
+    expect(names.get('legacy-a')).toBe('Canonical A');
+    expect(names.get('canonical-a')).toBe('Canonical A');
   });
 });

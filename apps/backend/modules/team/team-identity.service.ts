@@ -6,6 +6,7 @@ import type {
   TeamIdentityUpdateInput,
 } from './team-identity.schema';
 
+import { team_identity_merge_status } from '@prisma/client';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
@@ -148,7 +149,53 @@ export const TeamIdentityService = {
       ...new Set(teamIds.map((id) => String(id || '').trim())),
     ].filter(Boolean);
     if (ids.length === 0) return new Map<string, string>();
-    return findTeamNamesByIds(ids);
+    const canonicalById = await this.resolveCanonicalIds(ids);
+    const names = await findTeamNamesByIds([
+      ...new Set([...canonicalById.values(), ...ids]),
+    ]);
+    const namesById = new Map<string, string>();
+    for (const id of new Set([...canonicalById.values(), ...ids])) {
+      const canonicalId = canonicalById.get(id) ?? id;
+      namesById.set(id, names.get(canonicalId) ?? '');
+    }
+    return namesById;
+  },
+
+  /**
+   * Resolve legacy TEAM IDs to their canonical ID through completed merge
+   * mappings. Historical rows keep their original IDs untouched; read paths
+   * use this mapping so aggregation merges duplicates and names hydrate from
+   * the canonical team.
+   */
+  async resolveCanonicalIds(teamIds: ReadonlyArray<null | string | undefined>) {
+    const ids = [
+      ...new Set(teamIds.map((id) => String(id || '').trim())),
+    ].filter(Boolean);
+    if (ids.length === 0) return new Map<string, string>();
+    const merges = await prisma.team_identity_merges.findMany({
+      where: {
+        isDeleted: false,
+        sourceTeamId: { in: ids },
+        status: team_identity_merge_status.COMPLETED,
+      },
+      select: { sourceTeamId: true, targetTeamId: true },
+    });
+    const direct = new Map(
+      merges.map((merge) => [merge.sourceTeamId, merge.targetTeamId]),
+    );
+    const canonicalById = new Map<string, string>();
+    for (const id of ids) {
+      let current = id;
+      const seen = new Set<string>();
+      while (direct.has(current) && !seen.has(current)) {
+        seen.add(current);
+        const next = direct.get(current);
+        if (!next) break;
+        current = next;
+      }
+      canonicalById.set(id, current);
+    }
+    return canonicalById;
   },
 
   async listOptions(params: TeamIdentityListQuery = {}) {

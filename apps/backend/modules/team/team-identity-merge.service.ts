@@ -45,6 +45,7 @@ function normalizeMergeInput(input: TeamIdentityMergeInput, operator: string) {
     reason: normalizeDisplayName(input.reason),
     sourceTeamId,
     targetTeamId,
+    migrateReferences: input.migrateReferences !== false,
   };
 }
 
@@ -141,7 +142,10 @@ async function finalizeMerge(attempt: TeamMergeAttempt) {
   return prisma.$transaction(
     async (tx) => {
       await renewMergeLease(tx, attempt);
-      if ((await countTeamReferences(tx, attempt.sourceTeamId)) !== 0) {
+      if (
+        attempt.migrateReferences &&
+        (await countTeamReferences(tx, attempt.sourceTeamId)) !== 0
+      ) {
         throw new BusinessError(
           'TEAM_MERGE_INCOMPLETE',
           'Source TEAM still has references',
@@ -191,7 +195,12 @@ async function executeMerge(input: ReturnType<typeof normalizeMergeInput>) {
   if (acquisition.kind === 'completed') return acquisition.result;
   const { attempt } = acquisition;
   try {
-    for (const group of TEAM_IDENTITY_REFERENCE_GROUPS) {
+    const groups = attempt.migrateReferences
+      ? TEAM_IDENTITY_REFERENCE_GROUPS
+      : TEAM_IDENTITY_REFERENCE_GROUPS.filter(
+          (group) => group === 'identityMetadata',
+        );
+    for (const group of groups) {
       await migrateReferenceGroup(attempt, group);
     }
     return await finalizeMerge(attempt);

@@ -68,9 +68,13 @@ Each reference batch uses a compare-and-set predicate and aborts when its applie
 
 TEAM option reads bypass Redis, so TEAM mutations do not depend on distributed cache invalidation for correctness. Generic dictionary options retain their existing cache behavior for non-TEAM dictionary types.
 
+Record-only merges (`migrateReferences=false`) register the canonical mapping and retire the source without rewriting any business row. Historical rows keep their original IDs; read paths resolve them through the completed merge mapping (`TeamIdentityService.resolveCanonicalIds`) before aggregation and name hydration, so statistics merge duplicates without touching history. Release maintenance runs `merge-confirmed-team-duplicates.ts --apply`, which plans record-only merges only when a canonical is supported by an exact active department leaf name, a live source link, or an explicit business-confirmed rule; groups without evidence remain ambiguity audits for the manual disposition queue.
+
 ## Statistics contract
 
 TEAM statistics group by `teamId`. Current names are resolved in one batch after aggregation. Rows with a missing ID use one unresolved bucket; a non-empty invalid ID remains a separate unresolved row containing that ID. This preserves evidence without guessing or merging unrelated identities.
+
+IDs registered as sources in a completed merge resolve to their canonical team before grouping; the merge mapping never rewrites historical rows.
 
 ## Regression guards
 

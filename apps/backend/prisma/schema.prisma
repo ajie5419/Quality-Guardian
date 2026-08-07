@@ -359,6 +359,7 @@ model team_identity_merges {
   referenceCounts    Json?
   reason             String?                            @db.Text
   operator           String
+  migrateReferences  Boolean                            @default(true)
   completedAt        DateTime?
   isDeleted          Boolean                            @default(false)
   createdAt          DateTime                           @default(now())
