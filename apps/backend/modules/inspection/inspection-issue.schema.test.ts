@@ -96,6 +96,27 @@ describe('inspection issue schema', () => {
     ).toThrow();
   });
 
+  it('requires a responsible welder for welding process creates', () => {
+    expect(() =>
+      parseInspectionIssueCreateBody({
+        ...validCreateBody,
+        processName: '焊接',
+      }),
+    ).toThrow('焊接工序必须填写责任焊工');
+
+    const result = parseInspectionIssueCreateBody({
+      ...validCreateBody,
+      processName: '焊接',
+      responsibleWelder: 'Welder A',
+    });
+    expect(result.processName).toBe('焊接');
+    expect(result.responsibleWelder).toBe('Welder A');
+  });
+
+  it('does not require a responsible welder for non-welding process creates', () => {
+    expect(() => parseInspectionIssueCreateBody(validCreateBody)).not.toThrow();
+  });
+
   it('accepts a partial update but rejects an empty update', () => {
     expect(parseInspectionIssueUpdateBody({ status: 'IN_PROGRESS' })).toEqual({
       status: 'IN_PROGRESS',

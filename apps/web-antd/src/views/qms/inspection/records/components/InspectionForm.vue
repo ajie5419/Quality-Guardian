@@ -459,6 +459,13 @@ defineExpose({
         message.warning('请填写责任部门');
         throw new Error('Issue responsible department required');
       }
+      if (
+        linkedIssueDraft.value.processName.includes('焊') &&
+        !String(linkedIssueDraft.value.responsibleWelder || '').trim()
+      ) {
+        message.warning('焊接工序必须选择责任焊工');
+        throw new Error('Responsible welder required for welding process');
+      }
       if (!linkedIssueDraft.value.defectCategoryId.trim()) {
         message.warning('请选择缺陷分类');
         throw new Error('Issue defect type required');

@@ -124,6 +124,15 @@ const createSchema = z
       message: '责任部门不能为空',
       path: ['responsibleDepartment'],
     },
+  )
+  .refine(
+    (value) =>
+      String(value.processName || '').trim() !== '焊接' ||
+      Boolean(value.responsibleWelder),
+    {
+      message: '焊接工序必须填写责任焊工',
+      path: ['responsibleWelder'],
+    },
   );
 
 const updateSchema = z
