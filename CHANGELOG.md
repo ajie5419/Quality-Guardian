@@ -60,6 +60,38 @@
 * **project:** execute identity baseline CLI ([68e81be](https://github.com/ajie5419/Quality-Guardian/commit/68e81be000b8f1731f5cc8a54ef337283c7d6f1f))
 * **project:** freeze historical identity snapshots ([b54a55c](https://github.com/ajie5419/Quality-Guardian/commit/b54a55c9ed967c55033bbf848afa56fa043b6ee9))
 
+
+### 2026-08-07 移除 classify-historical-identity-unresolved 维护步骤
+### 2026-08-07 移除 classify-historical-identity-unresolved 维护步骤
+
+**背景与问题：**
+
+- 维护脚本 `classify-historical-identity-unresolved.ts --apply` 尾部调用 `IdentityProjectionService.createStagedGeneration()` 全量重建身份投影（约 30 万行插入）并自动发布新代次，在 1GB 内存的本地 MySQL 容器上资源耗尽（400% CPU、内存 99%、块读 7.6TB），导致 MySQL 无响应、所有连接挂起。
+- 用户明确表示不需要该功能，指示取消。
+
+**执行内容：**
+
+- `apps/backend/scripts/run-release-maintenance.sh`：从发布维护序列移除 `classify-historical-identity-unresolved.ts --apply` 步骤（该序列在数据库 migration 后、应用切流前执行，本地容器初始化复用同一顺序）。
+- 删除 `apps/backend/scripts/classify-historical-identity-unresolved.ts` 与 `classify-historical-identity-unresolved.test.ts`（全仓无其他引用者）。
+- 清理仓库根目录误产物 `bash`、`quality-guardian-system@0.20.3`。
+
+**验证结果：**
+
+- 定向测试 `inspection-request-category-backfill.test.ts`、`reporting-identity-backfill.test.ts` 通过（断言的是序列中其他脚本的顺序/存在，不受影响）。
+- lint / typecheck / check:qms-arch 通过。
+- 本地 MySQL 容器已重启恢复，dev 后端与前端正常。
+
+**commit:** 未提交
+
+**遗留问题：**
+
+- 未分类的 UNRESOLVED 投影行（约 4.1 万）不再由该脚本自动确定性分类，保留在处置队列，不自动合并。
+- 投影基础设施（createStagedGeneration/publish 与合格率投影）保留，报告与 WP3 治理界面不受影响。
+- 本地 DB 有两个中断运行遗留的 BUILDING 代次（2026-08-07 03:09:46、03:29:31 UTC），无害、不阻塞后续运行；如需清理可后续走现有服务路径。
+
+---
+
+
 ### 2026-08-07 质量分类列表展示改为「ID → 当前主数据名」解析
 
 **背景与问题：**
