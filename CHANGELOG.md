@@ -79,6 +79,36 @@
 * **project:** execute identity baseline CLI ([68e81be](https://github.com/ajie5419/Quality-Guardian/commit/68e81be000b8f1731f5cc8a54ef337283c7d6f1f))
 * **project:** freeze historical identity snapshots ([b54a55c](https://github.com/ajie5419/Quality-Guardian/commit/b54a55c9ed967c55033bbf848afa56fa043b6ee9))
 
+### 2026-08-07 发布 qgs v0.23.2 并修复生产部署失败根因（deploy.yml script_stop 注入问题）
+
+**背景与问题：**
+
+- v0.23.2 tag 自动部署（run 31163387287）在 release maintenance 步骤瞬间失败（exit 1、零输出），且失败后回滚未执行，生产 backend 一度处于停止状态。
+- 这是连续第 3 次发布失败：v0.23.0 维护脚本超时；v0.23.1 / v0.23.2 维护脚本"瞬间 exit 1"（脚本实际从未运行）。
+- 根因：`.github/workflows/deploy.yml` 中 `appleboy/ssh-action@v1.0.3` 设置了 `script_stop: true`。该 action 会把脚本按行拆分，并在每一行后注入 `DRONE_SSH_PREV_COMMAND_EXIT_CODE=$? ; if [ $DRONE_SSH_PREV_COMMAND_EXIT_CODE -ne 0 ]; then exit $DRONE_SSH_PREV_COMMAND_EXIT_CODE; fi;`，注入行会进入多行函数体内部：
+  - `run_backend` 在 `if ... else run_backend ...; fi` 的 else 分支被调用时，紧邻的上一条语句是返回 1 的 `[ "$SKIP_MAINTENANCE" = "true" ]`，函数体内第一条注入检查捕获 `$?=1` 直接 `exit 1`，维护脚本从未真正执行；
+  - 函数内部任何命令失败（如 docker pull 失败）也会被注入检查提前 `exit 1`，绕过脚本自身的 `|| { rollback; exit 1; }` 与 ERR trap，回滚从未生效。
+- 已按 drone-ssh scriptCommands() 相同逻辑本地复现，trace 与生产日志完全一致。
+
+**执行内容：**
+
+- `.github/workflows/deploy.yml`：从 "Deploy to ECS" 步骤删除 `script_stop: true`（root cause fix）。脚本自身已有 `set -euo pipefail`、各关键步骤 `|| { echo ...; rollback; exit 1; }` 显式错误处理与 ERR trap 回滚，删除后这些机制按 shell 正常语义生效；SSH 会话非零退出码仍会使 job 失败。
+- 发布 qgs v0.23.2（PR #90，tag `qgs-v0.23.2`）：3 个 fix（台数截断、责任焊工必填、deploy tag 版本解析）。
+- 生产恢复部署：workflow_dispatch `deploy_only=true + skip_maintenance=true + version=v0.23.2`（run 31164489642），沿用 v0.23.1 已验证路径，成功。
+
+**验证结果：**
+
+- deploy.yml YAML 语法通过。
+- 本地复现注入行为与生产日志一致（run_backend 在 else 分支瞬间 exit 1、`||` 回滚分支被绕过）。
+- 生产恢复部署成功：migration 无 pending、backend/frontend 启动、健康检查通过、质量损失回填容器已拉起。
+
+**commit:** `498c32f9` fix(ci): remove script_stop injection that bypasses deploy rollback
+
+**遗留问题：**
+
+- release maintenance 脚本在生产环境的真实耗时/成败尚未验证（v0.23.0 曾超时）；下次 tag 自动部署将走修复后的完整链路，需观察维护脚本执行结果。
+- CHANGELOG.md 存在重复的 "## 执行记录" 标题与多条重复记录（历史遗留，本次未整理）。
+
 
 ### 2026-08-07 移除 classify-historical-identity-unresolved 维护步骤
 ### 2026-08-07 移除 classify-historical-identity-unresolved 维护步骤
