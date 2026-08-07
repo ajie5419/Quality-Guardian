@@ -13,6 +13,7 @@ import {
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
 import { DeptService } from '~/modules/dept/dept.service';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
+import { resolveCanonicalClassificationName } from '~/utils/classification-resolver';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
 import prisma from '~/utils/prisma';
 import {
@@ -42,6 +43,16 @@ type QualityRecordOrderField = keyof Pick<
 >;
 
 const inspectionIssueInclude = {
+  defectCategory: {
+    select: {
+      name: true,
+    },
+  },
+  defectSubcategory: {
+    select: {
+      name: true,
+    },
+  },
   process: {
     select: {
       name: true,
@@ -119,6 +130,16 @@ export function mapInspectionIssueRecord(
 
   return {
     ...issue,
+    defectType:
+      resolveCanonicalClassificationName(
+        issue.defectCategory?.name,
+        issue.defectType,
+      ) || '',
+    defectSubtype:
+      resolveCanonicalClassificationName(
+        issue.defectSubcategory?.name,
+        issue.defectSubtype,
+      ) || '',
     inspectionId: issue.inspectionId || undefined,
     ncNumber: issue.nonConformanceNumber || '',
     reportDate: formatDate(issue.date),

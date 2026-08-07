@@ -4,6 +4,7 @@ import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import {
   __resetProcessResolverRuntimeForTest,
   buildProcessNameWhere,
+  resolveCanonicalProcessName,
   resolveCanonicalProcessNameById,
   resolveProcessIdForWrite,
   resolveProcessIdsByNames,
@@ -171,5 +172,23 @@ describe('process-resolver helpers', () => {
     );
 
     expect(processName).toBe('回退工序');
+  });
+
+  it('resolveCanonicalProcessName prefers the current process relation name over the snapshot', () => {
+    expect(
+      resolveCanonicalProcessName({
+        process: { name: '涂装-测试' },
+        processName: '涂装',
+      }),
+    ).toBe('涂装-测试');
+  });
+
+  it('resolveCanonicalProcessName falls back to the snapshot when the relation name is empty', () => {
+    expect(
+      resolveCanonicalProcessName({
+        process: { name: null },
+        processName: '涂装',
+      }),
+    ).toBe('涂装');
   });
 });
