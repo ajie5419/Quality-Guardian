@@ -3,6 +3,7 @@
 ## 当前状态
 
 - 最新变更: 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
+- 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
 - 测试状态: WP3 定向测试与后端全仓 Vitest `264/264` 文件、`2384/2384` 用例及全部提交门禁均已通过。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）

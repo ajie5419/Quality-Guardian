@@ -5,6 +5,8 @@ import process from 'node:process';
 import { MASTER_DATA_IDENTITY_BASELINE_KEY } from '~/modules/report';
 import prisma from '~/utils/prisma';
 
+import { closeConnections } from './close-connections';
+
 type BaselineDocument = { contentChecksum?: unknown };
 
 export async function bootstrapMasterDataIdentityBaseline() {
@@ -28,7 +30,13 @@ export async function bootstrapMasterDataIdentityBaseline() {
 }
 
 if (process.argv[1]?.endsWith('bootstrap-master-data-identity-baseline.ts')) {
-  void bootstrapMasterDataIdentityBaseline().then((summary) => {
-    process.stdout.write(`${JSON.stringify(summary)}\n`);
-  });
+  void bootstrapMasterDataIdentityBaseline()
+    .then(async (summary) => {
+      process.stdout.write(`${JSON.stringify(summary)}\n`);
+      await closeConnections();
+    })
+    .catch((error: unknown) => {
+      console.error(error);
+      process.exitCode = 1;
+    });
 }

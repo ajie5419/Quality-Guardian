@@ -5,6 +5,7 @@ import process from 'node:process';
 import { TeamIdentityMergeService } from '~/modules/team';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 import { planConfirmedDuplicateMerges } from './team-duplicate-merge-plan';
 
@@ -97,6 +98,7 @@ async function run() {
     }
   } finally {
     await prisma.$disconnect();
+    redis.disconnect();
   }
 }
 

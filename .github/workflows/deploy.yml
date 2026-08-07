@@ -15,6 +15,11 @@ on:
         required: false
         default: false
         type: boolean
+      skip_maintenance:
+        description: 'Skip the release maintenance script (emergency restore)'
+        required: false
+        default: false
+        type: boolean
 
 concurrency:
   group: deploy-production
@@ -39,6 +44,7 @@ jobs:
           EVENT="${GITHUB_EVENT_NAME}"
           INPUT_VERSION="${{ github.event.inputs.version || '' }}"
           DEPLOY_ONLY="${{ github.event.inputs.deploy_only || 'false' }}"
+          SKIP_MAINTENANCE="${{ github.event.inputs.skip_maintenance || 'false' }}"
 
           if [ "$DEPLOY_ONLY" = "true" ] && [ -z "$INPUT_VERSION" ]; then
             echo "When deploy_only=true, 'version' is required."
@@ -60,6 +66,7 @@ jobs:
 
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "display_version=$DISPLAY_VERSION" >> "$GITHUB_OUTPUT"
+          echo "skip_maintenance=$SKIP_MAINTENANCE" >> "$GITHUB_OUTPUT"
 
       - name: Login ACR
         if: ${{ github.event.inputs.deploy_only != 'true' }}
@@ -105,6 +112,7 @@ jobs:
             IMAGE_REPO='${{ env.IMAGE_REPO }}'
             COMPOSE_FILE='${{ env.COMPOSE_FILE }}'
             HEALTH_URL='${{ env.HEALTH_URL }}'
+            SKIP_MAINTENANCE='${{ steps.version.outputs.skip_maintenance }}'
 
             if [ ! -f "$COMPOSE_FILE" ]; then
               ALT_COMPOSE_FILE="/opt/qms/infra/docker/docker-compose.yml"
@@ -177,12 +185,12 @@ jobs:
             sed -i.qms "/^  frontend:/,/^  [^ ]/ s#^    image:.*#    image: ${IMAGE_REPO}:frontend-${TAG}#" "$COMPOSE_FILE"
             rm -f "${COMPOSE_FILE}.qms"
 
-            run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
+            run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend || { echo "image pull failed, rolling back"; rollback; exit 1; }
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
             run_with_timeout 120 docker compose -f "$COMPOSE_FILE" stop backend
-            deploy_prisma_migrations
-            run_backend 600 "$RELEASE_MAINTENANCE_CMD"
-            run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend
+            deploy_prisma_migrations || { echo "prisma migration failed, rolling back"; rollback; exit 1; }
+            if [ "$SKIP_MAINTENANCE" = "true" ]; then echo "release maintenance skipped (skip_maintenance=true)"; else run_backend 600 "$RELEASE_MAINTENANCE_CMD" || { echo "release maintenance failed, rolling back"; rollback; exit 1; }; fi
+            run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend || { echo "service startup failed, rolling back"; rollback; exit 1; }
 
             ok=0
             for _ in {1..30}; do
@@ -195,6 +203,7 @@ jobs:
 
             if [ "$ok" -ne 1 ]; then
               echo "healthcheck failed"
+              rollback
               exit 1
             fi
 

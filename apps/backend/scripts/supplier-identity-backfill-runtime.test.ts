@@ -5,6 +5,7 @@ import {
   assertBackfillIntegrity,
   bootstrapExactTeamLinks,
   compareOpenAuditSnapshots,
+  loadSupplierIdentityContext,
   persistResolutionAudit,
 } from './supplier-identity-backfill-runtime';
 
@@ -17,6 +18,8 @@ vi.mock('~/utils/prisma', () => ({
       update: vi.fn(),
     },
     suppliers: { findMany: vi.fn() },
+    team_identity_aliases: { findMany: vi.fn() },
+    team_identity_merges: { findMany: vi.fn() },
     unresolved_master_data_refs: {
       findMany: vi.fn(),
       updateMany: vi.fn(),
@@ -133,6 +136,42 @@ describe('supplier identity backfill runtime', () => {
           reason: 'team_supplier_identity_conflict',
         }),
       }),
+    );
+  });
+
+  it('canonicalizes completed merge sources and historical aliases', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      { id: 'supplier-1', name: 'Machine BU Supplier' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: '机加 BU', id: 'team-bu' },
+      { dictKey: '模具 BU', id: 'team-mould-bu' },
+    ] as never);
+    vi.mocked(prisma.team_identity_merges.findMany).mockResolvedValue([
+      { sourceTeamId: 'team-workshop', targetTeamId: 'team-bu' },
+    ] as never);
+    vi.mocked(prisma.team_identity_aliases.findMany).mockResolvedValue([
+      { alias: '机加车间', teamId: 'team-bu' },
+    ] as never);
+
+    const effectiveLinks = new Map([
+      [
+        'team-bu',
+        { supplier: { id: 'supplier-1', name: 'Machine BU Supplier' } },
+      ],
+    ]);
+    const context = await loadSupplierIdentityContext(effectiveLinks);
+
+    expect(context.teamById.get('team-workshop')).toEqual({
+      id: 'team-bu',
+      name: '机加 BU',
+    });
+    expect(context.teamByName.get('机加车间')).toEqual({
+      id: 'team-bu',
+      name: '机加 BU',
+    });
+    expect(context.effectiveLinks.get('team-workshop')).toEqual(
+      effectiveLinks.get('team-bu'),
     );
   });
 
