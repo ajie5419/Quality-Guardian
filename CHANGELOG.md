@@ -109,6 +109,24 @@
 - release maintenance 脚本在生产环境的真实耗时/成败尚未验证（v0.23.0 曾超时）；下次 tag 自动部署将走修复后的完整链路，需观察维护脚本执行结果。
 - CHANGELOG.md 存在重复的 "## 执行记录" 标题与多条重复记录（历史遗留，本次未整理）。
 
+### 2026-08-07 生产部署修复验证（完整链路，run 31165145073）
+
+**执行内容：**
+
+- 修复合并后，用 `deploy_only=true + skip_maintenance=false + version=v0.23.2` 在生产跑完整部署链路（含 release maintenance），验证修复效果与维护脚本真实行为。
+
+**验证结果：**
+
+- **修复生效**：maintenance 失败后 `|| { echo "release maintenance failed, rolling back"; rollback; exit 1; }` 分支正常执行，compose 恢复 `.bak`、redis/backend/frontend 容器拉起（此前该分支被 script_stop 注入绕过，回滚从未生效）。
+- **维护脚本真实失败点**：`backfill-quality-record-supplier-identities.ts` 的完整性检查拒绝：`open-audits.new=29`（生产原有 7131 条 OPEN 未解析引用，本次各供应商/班组回填首次全量扫描新增 29 条；其中质量记录回填处理 224 行、仅新增 1 条未解析，样本 `ISS-2026-J_XAPFCF` / `MISSING_PROCESS_TEAM_LINK` / 供应商"尊达"）。
+- 新增的 29 条未解析引用已写入生产 `unresolved_master_data_refs`（审计队列）。这些 key 已进入下次运行的 before 快照，**下次维护运行应不再因这 29 条报新增**（假设未验证）；但维护序列中后续步骤（identity-relations、pass-rate bootstrap 等）从未在生产跑过，仍待验证。
+- 失败后回滚使生产保持 v0.23.2（backend/frontend 运行中）；v0.23.2 于 09:06 已通过 skip_maintenance 路径成功上线（run 31164489642）。
+
+**遗留问题：**
+
+- 29 条新增未解析引用需要结合生产数据核对（需要生产库访问权限）：确认是真未解析（保留审计）还是解析逻辑漏匹配（改解析）。
+- 下次 tag 自动部署应观察：维护序列后续步骤能否在生产 600s 内完成；若仍失败需逐脚本定位。
+
 
 ### 2026-08-07 移除 classify-historical-identity-unresolved 维护步骤
 ### 2026-08-07 移除 classify-historical-identity-unresolved 维护步骤
