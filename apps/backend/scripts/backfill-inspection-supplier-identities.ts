@@ -18,6 +18,7 @@ interface IdentityContext {
   effectiveLinks: Map<string, EffectiveTeamLink>;
   supplierById: Map<string, { id: string; name: string }>;
   supplierByName: Map<string, { id: string; name: string }>;
+  externalTeamIds?: Set<string>;
   internalTeamIds?: Set<string>;
   teamById: Map<string, TeamIdentity>;
   teamByName: Map<string, TeamIdentity>;
@@ -132,6 +133,9 @@ export async function backfillInspectionSupplierIdentities(
         supplierByName: row.supplierName
           ? context.supplierByName.get(row.supplierName) || null
           : null,
+        teamIsExternal: Boolean(
+          resolvedTeam && context.externalTeamIds?.has(resolvedTeam.id),
+        ),
         teamIsInternal: Boolean(
           resolvedTeam && context.internalTeamIds?.has(resolvedTeam.id),
         ),

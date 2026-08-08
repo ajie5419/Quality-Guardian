@@ -155,6 +155,10 @@ async function main() {
                 ? identityContext.supplierById.get(row.inspection.supplierId) ||
                   null
                 : null,
+              teamIsExternal: Boolean(
+                inspectionTeamId &&
+                  identityContext.externalTeamIds.has(inspectionTeamId),
+              ),
               teamIsInternal: Boolean(
                 inspectionTeamId &&
                   identityContext.internalTeamIds.has(inspectionTeamId),

@@ -11,6 +11,8 @@ import prisma from '~/utils/prisma';
 import { persistResolutionAudit } from './supplier-identity-backfill-runtime';
 
 interface TeamIdentityContext {
+  effectiveLinks?: Map<string, unknown>;
+  externalTeamIds?: Set<string>;
   internalTeamIds?: Set<string>;
   teamById: Map<string, TeamIdentity>;
   teamByName: Map<string, TeamIdentity>;
@@ -110,6 +112,20 @@ export async function backfillInspectionRequestTeamIdentities(
           rawId: row.teamId,
           rawName: row.team,
           reason: 'team_identity_not_resolved',
+        });
+        continue;
+      }
+      if (
+        context.externalTeamIds?.has(candidate.id) &&
+        !context.effectiveLinks?.has(candidate.id)
+      ) {
+        unresolved += 1;
+        batchUnresolved.push({
+          entityId: row.id,
+          evidence: { requestNo: row.requestNo, teamId: candidate.id },
+          rawId: row.teamId,
+          rawName: row.team,
+          reason: 'MISSING_PROCESS_TEAM_LINK',
         });
         continue;
       }

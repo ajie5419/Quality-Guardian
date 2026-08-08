@@ -93,6 +93,19 @@ describe('inspection supplier identity backfill', () => {
     });
   });
 
+  it('audits an external TEAM without a valid link even without supplier fields', () => {
+    expect(
+      resolve({
+        category: 'PROCESS',
+        teamById: teamA,
+        teamIsExternal: true,
+      }),
+    ).toEqual({
+      action: 'unresolved',
+      reason: 'MISSING_PROCESS_TEAM_LINK',
+    });
+  });
+
   it('audits a valid supplier that conflicts with the TEAM mapping', () => {
     expect(
       resolve({

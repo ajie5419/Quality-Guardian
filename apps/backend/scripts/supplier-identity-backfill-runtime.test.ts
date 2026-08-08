@@ -141,6 +141,53 @@ describe('supplier identity backfill runtime', () => {
     );
   });
 
+  it('treats a TEAM with DEPARTMENT and SUPPLIER sources as an invalid link', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Conflicted Team', id: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        isDeleted: false,
+        id: 'link-1',
+        identityNameSnapshot: 'Conflicted Team',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-linked',
+          isDeleted: false,
+          name: 'Resident Supplier',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-linked',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      {
+        sourceId: 'department-1',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-1',
+      },
+      {
+        sourceId: 'supplier-linked',
+        sourceType: 'SUPPLIER',
+        teamId: 'team-1',
+      },
+    ] as never);
+    vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+    await expect(loadExplicitTeamLinks('apply')).resolves.toMatchObject({
+      conflicts: 1,
+      effectiveLinks: new Map(),
+    });
+    expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          evidence: expect.objectContaining({ teamSourceConflict: 'true' }),
+        }),
+      }),
+    );
+  });
+
   it('canonicalizes completed merge sources and historical aliases', async () => {
     vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
       { id: 'supplier-1', name: 'Machine BU Supplier' },
@@ -175,6 +222,42 @@ describe('supplier identity backfill runtime', () => {
     });
     expect(context.effectiveLinks.get('team-workshop')).toEqual(
       effectiveLinks.get('team-bu'),
+    );
+  });
+
+  it('classifies only DEPARTMENT-only TEAMs as internal', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.team_identity_merges.findMany).mockResolvedValue(
+      [] as never,
+    );
+    vi.mocked(prisma.team_identity_aliases.findMany).mockResolvedValue(
+      [] as never,
+    );
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      {
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-internal',
+      },
+      {
+        sourceType: 'SUPPLIER',
+        teamId: 'team-external',
+      },
+      {
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-conflicted',
+      },
+      {
+        sourceType: 'SUPPLIER',
+        teamId: 'team-conflicted',
+      },
+    ] as never);
+
+    const context = await loadSupplierIdentityContext(new Map());
+
+    expect(context.internalTeamIds).toEqual(new Set(['team-internal']));
+    expect(context.externalTeamIds).toEqual(
+      new Set(['team-conflicted', 'team-external']),
     );
   });
 

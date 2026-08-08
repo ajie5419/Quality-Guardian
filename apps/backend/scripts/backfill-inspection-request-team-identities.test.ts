@@ -141,4 +141,36 @@ describe('inspection request TEAM identity backfill', () => {
       }),
     );
   });
+
+  it('audits an external TEAM request without a valid explicit link', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'request-4',
+          requestNo: 'IR-4',
+          supplierId: null,
+          team: 'External Team',
+          teamId: 'team-external',
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      backfillInspectionRequestTeamIdentities(options, {
+        effectiveLinks: new Map(),
+        externalTeamIds: new Set(['team-external']),
+        teamById: new Map([
+          ['team-external', { id: 'team-external', name: 'External Team' }],
+        ]),
+        teamByName: new Map(),
+      }),
+    ).resolves.toMatchObject({ unresolved: 1, updated: 0 });
+    expect(persistResolutionAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unresolved: [
+          expect.objectContaining({ reason: 'MISSING_PROCESS_TEAM_LINK' }),
+        ],
+      }),
+    );
+  });
 });

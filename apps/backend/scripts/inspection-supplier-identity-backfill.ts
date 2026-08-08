@@ -12,6 +12,7 @@ export interface InspectionIdentityInput {
   existingTeamName: null | string;
   processSupplier: null | SupplierIdentity;
   supplierByName: null | SupplierIdentity;
+  teamIsExternal?: boolean;
   teamIsInternal?: boolean;
   teamById: null | TeamIdentity;
   teamByName: null | TeamIdentity;
@@ -97,6 +98,9 @@ export function resolveInspectionSupplierIdentity(
       reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS',
       team,
     };
+  }
+  if (input.teamIsExternal && !input.processSupplier) {
+    return { action: 'unresolved', reason: 'MISSING_PROCESS_TEAM_LINK' };
   }
   if (input.existingSupplierId && !input.existingSupplier) {
     return { action: 'unresolved', reason: 'INVALID_EXISTING_ID' };

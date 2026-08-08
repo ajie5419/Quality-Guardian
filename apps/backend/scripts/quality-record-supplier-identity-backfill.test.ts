@@ -82,6 +82,27 @@ describe('quality record supplier identity backfill', () => {
     });
   });
 
+  it('audits an external process TEAM without a valid link even without supplier fields', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: null,
+        existingSupplierId: null,
+        existingSupplierName: null,
+        inspection: {
+          category: 'PROCESS',
+          processSupplier: null,
+          supplierById: null,
+          supplierByName: null,
+          teamIsExternal: true,
+        },
+        supplierByRecordName: null,
+      }),
+    ).toEqual({
+      action: 'unresolved',
+      reason: 'MISSING_PROCESS_TEAM_LINK',
+    });
+  });
+
   it('does not overwrite a valid conflicting supplier ID', () => {
     expect(
       resolveQualityRecordSupplierIdentity({

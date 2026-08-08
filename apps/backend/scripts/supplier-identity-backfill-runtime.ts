@@ -63,15 +63,22 @@ export async function loadExplicitTeamLinks(
     where: {
       isDeleted: false,
       sourceId: { in: [...new Set(links.map((link) => link.supplierId))] },
-      sourceType: 'SUPPLIER',
+      sourceType: { in: ['DEPARTMENT', 'SUPPLIER'] },
       teamId: { in: [...new Set(links.map((link) => link.identityId))] },
     },
-    select: { sourceId: true, teamId: true },
+    select: { sourceId: true, sourceType: true, teamId: true },
   });
 
   const activeTeamIds = new Set(teams.map((team) => team.id));
   const supplierTeamSourcePairs = new Set(
-    sources.map((source) => `${source.teamId}:${source.sourceId}`),
+    sources
+      .filter((source) => source.sourceType === 'SUPPLIER')
+      .map((source) => `${source.teamId}:${source.sourceId}`),
+  );
+  const departmentTeamIds = new Set(
+    sources
+      .filter((source) => source.sourceType === 'DEPARTMENT')
+      .map((source) => source.teamId),
   );
   const effectiveLinks = new Map<string, EffectiveTeamLink>();
   const unresolvedAudits: UnresolvedRefInput[] = [];
@@ -84,7 +91,8 @@ export async function loadExplicitTeamLinks(
       !activeTeamIds.has(link.identityId) ||
       resolveSupplierInspectionPolicy(link.supplier).identitySource !==
         'team' ||
-      !supplierTeamSourcePairs.has(`${link.identityId}:${link.supplierId}`)
+      !supplierTeamSourcePairs.has(`${link.identityId}:${link.supplierId}`) ||
+      departmentTeamIds.has(link.identityId)
     ) {
       conflicts += 1;
       unresolvedAudits.push({
@@ -94,6 +102,9 @@ export async function loadExplicitTeamLinks(
           supplierCategory: link.supplier.category || '',
           supplierOutsourcingMode: link.supplier.outsourcingMode || '',
           teamId: link.identityId,
+          teamSourceConflict: departmentTeamIds.has(link.identityId)
+            ? 'true'
+            : 'false',
         },
         rawId: link.supplierId,
         rawName: link.identityNameSnapshot,
@@ -164,8 +175,11 @@ export async function loadSupplierIdentityContext(
         select: { alias: true, teamId: true },
       }),
       prisma.team_identity_sources.findMany({
-        where: { isDeleted: false, sourceType: 'DEPARTMENT' },
-        select: { teamId: true },
+        where: {
+          isDeleted: false,
+          sourceType: { in: ['DEPARTMENT', 'SUPPLIER'] },
+        },
+        select: { sourceType: true, teamId: true },
       }),
     ]);
   const teamIdentities = teams.map((item) => ({
@@ -198,7 +212,24 @@ export async function loadSupplierIdentityContext(
     effectiveLinks,
     supplierById: new Map(suppliers.map((item) => [item.id, item])),
     supplierByName: buildUniqueIdentityMap(suppliers),
-    internalTeamIds: new Set(sources.map((source) => source.teamId)),
+    externalTeamIds: new Set(
+      sources
+        .filter((source) => source.sourceType === 'SUPPLIER')
+        .map((source) => source.teamId),
+    ),
+    internalTeamIds: new Set(
+      sources
+        .filter(
+          (source) =>
+            source.sourceType === 'DEPARTMENT' &&
+            !sources.some(
+              (candidate) =>
+                candidate.teamId === source.teamId &&
+                candidate.sourceType === 'SUPPLIER',
+            ),
+        )
+        .map((source) => source.teamId),
+    ),
     teamById,
     teamByName,
   };
