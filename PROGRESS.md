@@ -3,7 +3,7 @@
 ## 当前状态
 
 - 最新变更: qgs v0.24.0 已发布（PR #94 合并、release PR #92 合并、tag `qgs-v0.24.0`）。tag deploy 曾因 17 条 PROCESS supplier identity unresolved 被维护门禁拦截，随后错误地以 `skip_maintenance=true` 完成部署；该绕过没有证明 17 条记录均为有效外包事实，不能再按“补 link 即可解决”处理。后续修复规定：内部 BU 的 supplier 字段必须清空；只有具有确定性 SUPPLIER 来源的外部 TEAM 才能建 link；其他记录继续阻断并待证据化处置。
-- 本轮独立验收修复已完成：画像/评分 supplier→TEAM 查询、在线与回填的 PROCESS 判定、内部字段清理审计和软删关联恢复均统一为 active TEAM + active exact SUPPLIER source + active PROCESS-policy link。DEPARTMENT+SUPPLIER 双来源不再被清理为内部，而是作为无效关联/未解析外部事实阻断；回填源 CAS 与 cleared/resolved/unresolved 审计位于同一事务。实现提交：`f9e325a1`、`d57a8303`、`ebc98eba`、`38e379bf`。
+- 本轮独立验收修复已完成：画像/评分 supplier→TEAM 查询、在线与回填的 PROCESS 判定、内部字段清理审计和软删关联恢复均统一为 active TEAM + active exact SUPPLIER source + active PROCESS-policy link。DEPARTMENT+SUPPLIER 双来源不再被清理为内部，而是作为无效关联/未解析外部事实阻断；回填源 CAS 与 cleared/resolved/unresolved 审计位于同一事务。实现提交：`f9e325a1`、`d57a8303`、`ebc98eba`、`38e379bf`、`4fa20802`。
 - `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
 - 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
