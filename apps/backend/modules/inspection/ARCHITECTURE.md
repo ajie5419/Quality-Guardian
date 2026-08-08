@@ -45,7 +45,7 @@ inspection 是 QMS 的检验域模块，覆盖检验记录、检验表模板、�
 - 后端以显式类型和 canonical ID 为权威；仅当它们与报检任务已有 `supplierId` 或 TEAM→Supplier 映射直接冲突时拒绝关闭。
 - 旧客户端未提交显式类型时，只允许使用报检工序做兼容推断；旧 `responsibleDepartment` 仅在值本身是有效 canonical 部门 ID 时兼容，供应商名称不得回退写入责任部门。
 
-历史回填只处理存在 `qms_inspection_requests.linkedIssueId` 的关联不合格项，并只接受报检 `supplierId`、TEAM→Supplier 映射或关联检验 `supplierId` 作为确定性外部身份。普通 `PROCESS + teamId` 不等于外协；证据冲突、缺失或已有其他有效责任部门时保留原值并写入 OPEN 审计。回填支持 dry-run/apply、keyset 分批、字段级 CAS 和幂等重试，并在生产 deploy 的 migration 与供应商身份回填之后自动执行。
+历史回填只处理存在 `qms_inspection_requests.linkedIssueId` 的关联不合格项，并只接受报检 `supplierId`、经有效 source 验证的 TEAM→Supplier 映射或关联检验 `supplierId` 作为确定性外部身份。普通 `PROCESS + teamId` 不等于外协；证据冲突、缺失或已有其他有效责任部门时保留原值并写入 OPEN 审计。已由 `DEPARTMENT` source 确定为内部 BU 的 PROCESS inspection、报检和关联质量记录以 supplier ID 与名称双字段 CAS 清空错误供应商事实；回填支持 dry-run/apply、keyset 分批和幂等重试，并在生产 deploy 的 migration 与供应商身份回填之后自动执行。
 
 多工单进货报检：
 

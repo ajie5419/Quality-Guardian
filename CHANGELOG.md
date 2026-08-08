@@ -36,10 +36,9 @@
 
 **发布过程：**
 
-- tag 触发的 deploy（run 31242204439）在 release maintenance 阶段失败：供应商身份回填完整性检查 `open-audits.new=17`。
-- 17 条新增 unresolved 均为数据缺口：PROCESS 检验引用「机加 BU」等 TEAM 但无 TEAM→供应商链接（示例：秦皇岛隽华重工科技有限公司/机加 BU、尊达，`MISSING_PROCESS_TEAM_LINK`）。backfill 脚本本版本零改动，判定为生产数据新增/变更所致，非代码回归。
-- 按仓库既定恢复路径（与 0.23.2 相同）：手动 `workflow_dispatch` 部署 `deploy_only=true` + `skip_maintenance=true`，v0.24.0 部署成功（run 31242625012）。
-- 影响：本次未运行 release maintenance（身份回填、pass-rate 投影刷新等未执行）；两条 Prisma migration 已执行；17 条及既有 unresolved 留在处置队列 `unresolved_master_data_refs`，需在部署后的 supplier identity links UI 补齐 TEAM→供应商链接后另行回填。
+- tag 触发的 deploy（run 31242204439）在 release maintenance 阶段失败，记录为 17 条 PROCESS supplier identity unresolved。该数字只证明当时门禁发现未完成的身份事实，不能证明它们全是数据缺口、外包事实或可由 TEAM→supplier mapping 修复。
+- 随后手动 `workflow_dispatch` 使用 `skip_maintenance=true` 完成了 v0.24.0 部署（run 31242625012）。这是未完成维护时的错误绕过，不是既定恢复路径；后续 workflow 已删除该输入。
+- 影响：两条 Prisma migration 已执行，但 supplier identity 回填、pass-rate 投影刷新和健康检查没有完成。17 条以及既有 unresolved 必须由确定性身份来源重新处置：内部 `DEPARTMENT` TEAM 清空错误 supplier 字段；只有匹配有效 `SUPPLIER` 来源的外部 TEAM 才能建立 link；歧义记录继续阻断发布。
 
 **commit:** `b5319b8e`
 
@@ -6282,3 +6281,4 @@
 - 正常 deploy workflow 删除 `skip_maintenance`，Prisma migration 后必须连续运行 release maintenance。
 - 更正 v0.24.0 记录：`skip_maintenance=true` 的手工部署是未完成维护时的错误绕过，不是已验证的恢复路径；17 条 unresolved 的外部/内部归属尚未在生产执行本轮证据化回填。
 - 提交：`f1720641`、`5d82561`。验证：后端全量 Vitest `267/267` 文件、`2445/2445` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
+- 后续提交：`a4f08a7` 以 CAS 清除内部 BU 的 PROCESS 报检 supplierId，并使 inspection/quality record 的清理同时比较 supplierId 与 supplierName；`b9a0789` 将在线/批量/backfill resolver 收紧为精确 `SUPPLIER` source 与外包策略，外部 TEAM 缺有效 link 直接拒绝 PROCESS 写入，候选 API/UI 按 TEAM 过滤可链接供应商。验证：后端定向 Vitest `7/7` 文件、`64/64` 用例通过，前端定向 Vitest `2/2` 文件、`5/5` 用例通过，后端 `tsc --noEmit` 通过。

@@ -6,11 +6,11 @@
 - `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
 - 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
-- 测试状态: 后端全仓 Vitest `267/267` 文件、`2443/2443` 用例通过；前端相关定向 Vitest `12/12` 文件、`53/53` 用例通过（含 `SupplierSelect` 9/9）；lint、typecheck、架构门禁均通过。
+- 测试状态: supplier identity 修复提交前，后端全仓 Vitest `267/267` 文件、`2445/2445` 用例通过；前端相关定向 Vitest `12/12` 文件、`53/53` 用例通过（含 `SupplierSelect` 9/9）；lint、typecheck、架构门禁均通过。后续补丁须按其变更范围重新验证。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 617（含测试）
-- 当前版本: `0.19.1`
+- 当前版本: `0.24.0`
 
 ## 已完成
 
@@ -96,7 +96,7 @@ apps/backend/
 - [ ] 持续补强端到端业务流程验证
 - [x] 核对事业部生产回填汇总（工单修复 142 条，不合格项修复 46 条，无冲突和并发覆盖）
 - [ ] 人工处置事业部回填遗留的 124 条工单和不合格项侧 8 个无法解析计数
-- [x] 完成 supplier identity wave 的 PR、release-please、部署、migration、回填和健康检查
+- [ ] 完成 supplier identity wave 的生产回填与健康检查：v0.24.0 的 migration 已执行，但 maintenance 被 17 条未核实的 PROCESS supplier identity 阻断后又被错误绕过；本轮修复上线后必须通过正常发布链路重新运行。
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题、进货合格率和完整历史项目
 - [ ] 在本地管理员登录态或容器恢复后，通过主数据治理页处置 `ISS-2026-_O7D0ZBC` 的缺陷分类审计；当前保持 `OPEN`，未绕过认证或直接改库
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对

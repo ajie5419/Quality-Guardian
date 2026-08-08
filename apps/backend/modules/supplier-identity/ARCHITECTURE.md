@@ -9,14 +9,14 @@ supplier-identity 统一维护跨身份域关联。目前支持 `TEAM -> supplie
 - `supplierId`、`teamId` 都必须先校验存在、类型和启用状态。
 - 同一个 TEAM 只能关联一个未删除供应商。
 - 名称仅保存为映射快照，查询、统计和事件使用 ID。
-- 在线 resolver、管理候选和 PROCESS 写入只能消费有效 `supplier_identity_links`；无 link 返回未解析，禁止以 TEAM 与供应商同名建立关联。
+- 在线 resolver、批量 resolver、管理候选和 PROCESS 写入只能消费有效 `supplier_identity_links`：link 必须同时有匹配的活跃 `SUPPLIER` source 和受支持的供应商策略；无效 link 等同无 link，禁止以 TEAM 与供应商同名建立关联。
 - 新增或变更 link 必须证明 TEAM 有匹配供应商 ID 的有效 `SUPPLIER` 来源，目标必须是 `Outsourcing + IN_HOUSE_TEAM/EXTERNAL_SERVICE`。`DEPARTMENT` 或 `MANUAL` TEAM 不能因名称相同被视为外部队伍。
 - 无法解析、无效旧 ID 和证据冲突必须写入 `unresolved_master_data_refs`，不得静默覆盖。
 - 迁移工具必须支持有界分批、dry-run/apply、幂等重试和并发写保护。
 - 发布时先执行 Prisma migration，随后连续执行身份回填；回填按 TEAM 映射、报检任务 `teamId/supplierId`、`inspections`、`after_sales`、`quality_records` 的顺序处理。
 - 回填只读取显式有效 link，绝不按名称 bootstrap、恢复或建立 link；历史进货名称的唯一精确证据仅限于该历史字段本身的受审计回填。
 - apply 与 dry-run 都必须因任何 unresolved、conflict 或并发 CAS 失败而阻断。OPEN 审计不能成为后续发布的豁免基线。
-- 当 TEAM 的 `DEPARTMENT` 来源能确定其为内部 BU 时，回填以 CAS 清空 PROCESS inspection/quality record 的错误 supplier 字段，并记录已解决的审计证据；缺少这种确定性证据的数据继续 unresolved。
+- 当 TEAM 的 `DEPARTMENT` 来源能确定其为内部 BU 时，回填以同时比较 supplier ID 与名称的 CAS 清空 PROCESS inspection、inspection request 和 quality record 的错误 supplier 字段，并记录已解决的审计证据；缺少这种确定性证据的数据继续 unresolved。
 - 身份回填只补 canonical ID，不得用当前供应商或 TEAM 名称覆盖历史事实快照；重复扫描不得将人工 `RESOLVED` 裁决改回 `OPEN`。
 - 映射列表、选项、新增、修改和删除 API 仅系统管理员可用；系统设置中的管理页只用 canonical ID 提交，不通过名称推断关联。
 - unresolved 审计的分页读取和 compare-and-set 结案由本模块公开服务维护。系统设置中的治理页面只负责编排，业务字段必须由所属模块在同一事务内修复；`OPEN` 记录不得被视为已解决。
