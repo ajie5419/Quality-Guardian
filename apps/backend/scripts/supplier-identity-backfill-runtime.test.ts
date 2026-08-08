@@ -104,6 +104,20 @@ describe('supplier identity backfill runtime', () => {
         }),
       }),
     );
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith({
+      select: { sourceId: true, sourceType: true, teamId: true },
+      where: {
+        isDeleted: false,
+        teamId: { in: ['team-1'] },
+        OR: [
+          { sourceType: 'DEPARTMENT' },
+          {
+            sourceId: { in: ['supplier-linked'] },
+            sourceType: 'SUPPLIER',
+          },
+        ],
+      },
+    });
   });
 
   it('audits a policy-valid link without its exact SUPPLIER source', async () => {

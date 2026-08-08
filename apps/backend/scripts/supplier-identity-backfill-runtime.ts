@@ -62,9 +62,14 @@ export async function loadExplicitTeamLinks(
   const sources = await prisma.team_identity_sources.findMany({
     where: {
       isDeleted: false,
-      sourceId: { in: [...new Set(links.map((link) => link.supplierId))] },
-      sourceType: { in: ['DEPARTMENT', 'SUPPLIER'] },
       teamId: { in: [...new Set(links.map((link) => link.identityId))] },
+      OR: [
+        { sourceType: 'DEPARTMENT' },
+        {
+          sourceId: { in: [...new Set(links.map((link) => link.supplierId))] },
+          sourceType: 'SUPPLIER',
+        },
+      ],
     },
     select: { sourceId: true, sourceType: true, teamId: true },
   });
