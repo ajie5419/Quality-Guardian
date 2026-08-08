@@ -11,6 +11,7 @@ import prisma from '~/utils/prisma';
 import { persistResolutionAudit } from './supplier-identity-backfill-runtime';
 
 interface TeamIdentityContext {
+  internalTeamIds?: Set<string>;
   teamById: Map<string, TeamIdentity>;
   teamByName: Map<string, TeamIdentity>;
 }
@@ -40,6 +41,7 @@ export async function backfillInspectionRequestTeamIdentities(
       select: {
         id: true,
         requestNo: true,
+        supplierId: true,
         team: true,
         teamId: true,
       },
@@ -51,10 +53,19 @@ export async function backfillInspectionRequestTeamIdentities(
     cursorId = rows.at(-1)?.id;
     const batchUpdates: Array<{
       candidate: TeamIdentity;
+      clearSupplier: boolean;
+      existingSupplierId: null | string;
       existingTeamId: null | string;
       id: string;
     }> = [];
     const batchResolved: Array<{ entityId: string; resolvedId: string }> = [];
+    const batchCleared: Array<{
+      entityId: string;
+      evidence: Record<string, null | number | string>;
+      rawId: null | string;
+      rawName: null | string;
+      reason: string;
+    }> = [];
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
@@ -102,13 +113,18 @@ export async function backfillInspectionRequestTeamIdentities(
         });
         continue;
       }
-      if (row.teamId === candidate.id) {
+      const clearSupplier = Boolean(
+        row.supplierId && context.internalTeamIds?.has(candidate.id),
+      );
+      if (row.teamId === candidate.id && !clearSupplier) {
         batchResolved.push({ entityId: row.id, resolvedId: candidate.id });
         continue;
       }
       batchUpdates.push({
         candidate,
+        clearSupplier,
         existingTeamId: row.teamId,
+        existingSupplierId: row.supplierId,
         id: row.id,
       });
     }
@@ -121,9 +137,13 @@ export async function backfillInspectionRequestTeamIdentities(
               id: item.id,
               isDeleted: false,
               teamId: item.existingTeamId,
+              ...(item.clearSupplier
+                ? { supplierId: item.existingSupplierId }
+                : {}),
             },
             data: {
               teamId: item.candidate.id,
+              ...(item.clearSupplier ? { supplierId: null } : {}),
             },
           }),
         ),
@@ -136,6 +156,15 @@ export async function backfillInspectionRequestTeamIdentities(
             entityId: update.id,
             resolvedId: update.candidate.id,
           });
+          if (update.clearSupplier) {
+            batchCleared.push({
+              entityId: update.id,
+              evidence: { teamId: update.candidate.id },
+              rawId: update.existingSupplierId,
+              rawName: null,
+              reason: 'internal_team_supplier_fields_cleared',
+            });
+          }
         }
       });
       updated += applied;
@@ -150,6 +179,15 @@ export async function backfillInspectionRequestTeamIdentities(
         resolved: batchResolved,
         unresolved: batchUnresolved,
       });
+      if (batchCleared.length > 0) {
+        await persistResolutionAudit({
+          cleared: batchCleared,
+          entityType: 'qms_inspection_requests',
+          fieldName: 'supplierId',
+          resolved: [],
+          unresolved: [],
+        });
+      }
     }
   }
 

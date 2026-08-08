@@ -95,4 +95,50 @@ describe('inspection request TEAM identity backfill', () => {
       ],
     });
   });
+
+  it('clears an internal TEAM request supplier identity with a CAS update', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'request-3',
+          requestNo: 'IR-3',
+          supplierId: 'supplier-1',
+          team: 'Machine BU',
+          teamId: 'team-internal',
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+    vi.mocked(prisma.qms_inspection_requests.updateMany).mockResolvedValue({
+      count: 1,
+    });
+    vi.mocked(prisma.$transaction).mockResolvedValue([{ count: 1 }] as never);
+
+    await backfillInspectionRequestTeamIdentities(options, {
+      internalTeamIds: new Set(['team-internal']),
+      teamById: new Map([
+        ['team-internal', { id: 'team-internal', name: 'Machine BU' }],
+      ]),
+      teamByName: new Map(),
+    });
+
+    expect(prisma.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
+      data: { supplierId: null, teamId: 'team-internal' },
+      where: {
+        id: 'request-3',
+        isDeleted: false,
+        supplierId: 'supplier-1',
+        teamId: 'team-internal',
+      },
+    });
+    expect(persistResolutionAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cleared: [
+          expect.objectContaining({
+            reason: 'internal_team_supplier_fields_cleared',
+          }),
+        ],
+        fieldName: 'supplierId',
+      }),
+    );
+  });
 });

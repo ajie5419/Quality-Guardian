@@ -119,6 +119,7 @@ async function main() {
       candidate: null | SupplierIdentity;
       clearSupplier?: boolean;
       existingSupplierId: null | string;
+      existingSupplierName: null | string;
       id: string;
     }> = [];
     const batchCleared: Array<{
@@ -223,6 +224,7 @@ async function main() {
           candidate: null,
           clearSupplier: true,
           existingSupplierId: row.supplierId,
+          existingSupplierName: row.supplierName,
           id: row.id,
         });
         continue;
@@ -230,6 +232,7 @@ async function main() {
       batchUpdates.push({
         candidate: resolution.candidate,
         existingSupplierId: row.supplierId,
+        existingSupplierName: row.supplierName,
         id: row.id,
       });
     }
@@ -242,6 +245,7 @@ async function main() {
               id: item.id,
               isDeleted: false,
               supplierId: item.existingSupplierId,
+              supplierName: item.existingSupplierName,
             },
             data: {
               supplierId: item.clearSupplier ? null : item.candidate?.id,

@@ -88,6 +88,7 @@ export async function backfillInspectionSupplierIdentities(
       category: string;
       clearSupplier?: boolean;
       existingSupplierId: null | string;
+      existingSupplierName: null | string;
       existingTeamId: null | string;
       id: string;
       supplier: { id: string; name: string };
@@ -186,6 +187,7 @@ export async function backfillInspectionSupplierIdentities(
           clearSupplier: true,
           category: row.category,
           existingSupplierId: row.supplierId,
+          existingSupplierName: row.supplierName,
           existingTeamId: row.teamId,
           id: row.id,
           supplier: { id: '', name: '' },
@@ -196,6 +198,7 @@ export async function backfillInspectionSupplierIdentities(
       }
       batchUpdates.push({
         existingSupplierId: row.supplierId,
+        existingSupplierName: row.supplierName,
         existingTeamId: row.teamId,
         id: row.id,
         category: row.category,
@@ -213,6 +216,7 @@ export async function backfillInspectionSupplierIdentities(
               id: item.id,
               isDeleted: false,
               supplierId: item.existingSupplierId,
+              supplierName: item.existingSupplierName,
               teamId: item.existingTeamId,
             },
             data: {
