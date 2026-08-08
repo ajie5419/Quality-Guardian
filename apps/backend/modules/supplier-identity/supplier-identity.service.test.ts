@@ -84,6 +84,39 @@ describe('supplier identity service', () => {
     expect(prisma.suppliers.findMany).not.toHaveBeenCalled();
   });
 
+  it('does not resolve a TEAM with an active DEPARTMENT source', async () => {
+    vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue({
+      id: 'link-1',
+      supplier: {
+        category: 'Outsourcing',
+        id: 'supplier-1',
+        isDeleted: false,
+        name: 'Supplier A',
+        outsourcingMode: 'IN_HOUSE_TEAM',
+      },
+    } as never);
+    // The exact SUPPLIER source query is empty because Prisma excludes TEAMs
+    // that also carry an active DEPARTMENT source.
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue(null);
+
+    await expect(
+      SupplierIdentityService.resolveSupplierByTeamId('team-1'),
+    ).resolves.toBeNull();
+    expect(prisma.team_identity_sources.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          team: {
+            is: {
+              teamIdentitySources: {
+                none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+              },
+            },
+          },
+        }),
+      }),
+    );
+  });
+
   it('does not resolve an unlinked TEAM even when a supplier has the same name', async () => {
     vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
@@ -211,6 +244,40 @@ describe('supplier identity service', () => {
     await expect(
       SupplierIdentityService.resolveSuppliersByTeamIds(['team-1']),
     ).resolves.toEqual(new Map());
+  });
+
+  it('excludes dual-source TEAMs from batch supplier resolution', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-1',
+          isDeleted: false,
+          name: 'Supplier A',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-1',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
+
+    await expect(
+      SupplierIdentityService.resolveSuppliersByTeamIds(['team-1']),
+    ).resolves.toEqual(new Map());
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          team: {
+            is: {
+              teamIdentitySources: {
+                none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+              },
+            },
+          },
+        }),
+      }),
+    );
   });
 
   it('resolves canonical supplier names by unique IDs in one query', async () => {
@@ -380,6 +447,40 @@ describe('supplier identity service', () => {
       }),
     ).rejects.toMatchObject({ code: 'TEAM_IDENTITY_CONFLICT' });
     expect(prisma.supplier_identity_links.update).not.toHaveBeenCalled();
+  });
+
+  it('rejects linking a TEAM that also has an active DEPARTMENT source', async () => {
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      id: 'supplier-1',
+      name: 'Supplier A',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: 'Conflicted TEAM',
+      id: 'team-1',
+    } as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue(null);
+
+    await expect(
+      SupplierIdentityService.create({
+        supplierId: 'supplier-1',
+        teamId: 'team-1',
+      }),
+    ).rejects.toMatchObject({ code: 'TEAM_NOT_EXTERNAL_SUPPLIER_SOURCE' });
+    expect(prisma.team_identity_sources.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          team: {
+            is: {
+              teamIdentitySources: {
+                none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+              },
+            },
+          },
+        }),
+      }),
+    );
   });
 
   it('blocks restoring a deleted TEAM link to a different supplier with PROCESS facts', async () => {
@@ -574,6 +675,19 @@ describe('supplier identity service', () => {
         'supplier-non-process-policy',
       ]),
     ).resolves.toEqual(new Map([['supplier-valid', ['team-valid']]]));
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          team: {
+            is: {
+              teamIdentitySources: {
+                none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+              },
+            },
+          },
+        }),
+      }),
+    );
   });
 
   it('returns canonical TEAM IDs and classifies linked external teams', async () => {
@@ -655,6 +769,16 @@ describe('supplier identity service', () => {
         isDeleted: false,
         sourceType: 'SUPPLIER',
         teamId: { in: ['team-1'] },
+        team: {
+          is: {
+            dictType: 'team',
+            isDeleted: false,
+            status: 1,
+            teamIdentitySources: {
+              none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+            },
+          },
+        },
       },
     });
     expect(prisma.dictionaries.findMany).toHaveBeenCalledWith({
@@ -666,6 +790,7 @@ describe('supplier identity service', () => {
         dictType: 'team',
         isDeleted: false,
         teamIdentitySources: {
+          none: { isDeleted: false, sourceType: 'DEPARTMENT' },
           some: { isDeleted: false, sourceType: 'SUPPLIER' },
         },
         status: 1,
@@ -707,6 +832,16 @@ describe('supplier identity service', () => {
         sourceId: { in: ['supplier-1'] },
         sourceType: 'SUPPLIER',
         teamId: { in: ['team-1'] },
+        team: {
+          is: {
+            dictType: 'team',
+            isDeleted: false,
+            status: 1,
+            teamIdentitySources: {
+              none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+            },
+          },
+        },
       },
     });
   });
@@ -755,6 +890,16 @@ describe('supplier identity service', () => {
         isDeleted: false,
         sourceId: { in: ['supplier-target'] },
         sourceType: 'SUPPLIER',
+        team: {
+          is: {
+            dictType: 'team',
+            isDeleted: false,
+            status: 1,
+            teamIdentitySources: {
+              none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+            },
+          },
+        },
       },
     });
     expect(

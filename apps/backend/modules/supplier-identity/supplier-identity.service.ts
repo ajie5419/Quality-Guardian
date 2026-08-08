@@ -57,7 +57,6 @@ async function lockTeamForMutation(
     );
   }
 }
-
 async function lockTeamsForMutation(
   teamIds: string[],
   client: Prisma.TransactionClient,
@@ -66,7 +65,6 @@ async function lockTeamsForMutation(
     await lockTeamForMutation(teamId, client);
   }
 }
-
 async function validateLinkInput(
   input: SupplierIdentityInput,
   client: Pick<
@@ -113,6 +111,13 @@ async function validateLinkInput(
       sourceId: supplier.id,
       sourceType: 'SUPPLIER',
       teamId: team.id,
+      team: {
+        is: {
+          teamIdentitySources: {
+            none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+          },
+        },
+      },
     },
   });
   if (!source) {
@@ -123,7 +128,6 @@ async function validateLinkInput(
   }
   return { supplier, team };
 }
-
 async function assertNoProcessFactsForTeams(
   teamIds: ReadonlyArray<string>,
   client: Pick<
@@ -149,7 +153,6 @@ async function assertNoProcessFactsForTeams(
     );
   }
 }
-
 function teamIdentityConflict() {
   return new BusinessError(
     'TEAM_IDENTITY_CONFLICT',
@@ -157,7 +160,6 @@ function teamIdentityConflict() {
     409,
   );
 }
-
 export const SupplierIdentityService = {
   async assertTeamCanBeRetired(
     teamId: string,
@@ -241,7 +243,6 @@ export const SupplierIdentityService = {
       throw error;
     }
   },
-
   lockTeamForMutation,
 
   async delete(id: string) {

@@ -76,6 +76,13 @@ export async function listTeamIdsBySupplierIds(supplierIds: string[]) {
       sourceId: { in: eligibleSupplierIds },
       sourceType: 'SUPPLIER',
       teamId: { in: linkedTeamIds },
+      team: {
+        is: {
+          teamIdentitySources: {
+            none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+          },
+        },
+      },
     },
   });
   const sourcePairs = new Set(

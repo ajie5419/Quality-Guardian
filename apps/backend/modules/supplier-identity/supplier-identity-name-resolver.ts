@@ -60,6 +60,13 @@ export async function resolveTeamSupplierIdentity(
       sourceId: link.supplier.id,
       sourceType: 'SUPPLIER',
       teamId,
+      team: {
+        is: {
+          teamIdentitySources: {
+            none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+          },
+        },
+      },
     },
   });
   if (source) {
@@ -98,6 +105,13 @@ export async function resolveSuppliersByTeamIds(
       },
       sourceType: 'SUPPLIER',
       teamId: { in: ids },
+      team: {
+        is: {
+          teamIdentitySources: {
+            none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+          },
+        },
+      },
     },
     select: { sourceId: true, teamId: true },
   });

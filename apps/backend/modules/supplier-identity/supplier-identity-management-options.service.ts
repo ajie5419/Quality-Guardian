@@ -23,6 +23,7 @@ async function listKeywordTeamCandidates(
       status: 1,
       teamIdentitySources: {
         some: { isDeleted: false, sourceType: 'SUPPLIER' },
+        none: { isDeleted: false, sourceType: 'DEPARTMENT' },
       },
       ...(keyword ? { dictKey: { contains: keyword } } : {}),
     },
@@ -45,6 +46,16 @@ async function listBoundedSupplierSources(
       sourceType: 'SUPPLIER',
       ...(options.supplierIds ? { sourceId: { in: options.supplierIds } } : {}),
       ...(options.teamIds ? { teamId: { in: options.teamIds } } : {}),
+      team: {
+        is: {
+          dictType: 'team',
+          isDeleted: false,
+          status: 1,
+          teamIdentitySources: {
+            none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+          },
+        },
+      },
     },
     select: { sourceId: true, teamId: true },
     take,
@@ -88,6 +99,9 @@ async function listSelectedTeams(
       id: { in: teamIds },
       isDeleted: false,
       status: 1,
+      teamIdentitySources: {
+        none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+      },
     },
     orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
     select: { dictKey: true, id: true },

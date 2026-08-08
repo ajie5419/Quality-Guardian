@@ -213,25 +213,23 @@ export async function loadSupplierIdentityContext(
     }
   }
 
+  const externalTeamIds = new Set(
+    sources
+      .filter((source) => source.sourceType === 'SUPPLIER')
+      .map((source) => source.teamId),
+  );
+
   return {
     effectiveLinks,
     supplierById: new Map(suppliers.map((item) => [item.id, item])),
     supplierByName: buildUniqueIdentityMap(suppliers),
-    externalTeamIds: new Set(
-      sources
-        .filter((source) => source.sourceType === 'SUPPLIER')
-        .map((source) => source.teamId),
-    ),
+    externalTeamIds,
     internalTeamIds: new Set(
       sources
         .filter(
           (source) =>
             source.sourceType === 'DEPARTMENT' &&
-            !sources.some(
-              (candidate) =>
-                candidate.teamId === source.teamId &&
-                candidate.sourceType === 'SUPPLIER',
-            ),
+            !externalTeamIds.has(source.teamId),
         )
         .map((source) => source.teamId),
     ),
