@@ -145,65 +145,69 @@ export async function backfillInspectionRequestTeamIdentities(
       });
     }
 
-    if (options.mode === 'apply' && batchUpdates.length > 0) {
-      const results = await prisma.$transaction(
-        batchUpdates.map((item) =>
-          prisma.qms_inspection_requests.updateMany({
-            where: {
-              id: item.id,
-              isDeleted: false,
-              teamId: item.existingTeamId,
-              ...(item.clearSupplier
-                ? { supplierId: item.existingSupplierId }
-                : {}),
-            },
-            data: {
-              teamId: item.candidate.id,
-              ...(item.clearSupplier ? { supplierId: null } : {}),
-            },
-          }),
-        ),
-      );
-      const applied = results.reduce((sum, result) => sum + result.count, 0);
-      results.forEach((result, index) => {
-        const update = batchUpdates[index];
-        if (result.count > 0 && update) {
-          batchResolved.push({
-            entityId: update.id,
-            resolvedId: update.candidate.id,
-          });
-          if (update.clearSupplier) {
-            batchCleared.push({
+    if (options.mode === 'apply') {
+      const applied = await prisma.$transaction(async (tx) => {
+        const results = await Promise.all(
+          batchUpdates.map((item) =>
+            tx.qms_inspection_requests.updateMany({
+              where: {
+                id: item.id,
+                isDeleted: false,
+                teamId: item.existingTeamId,
+                ...(item.clearSupplier
+                  ? { supplierId: item.existingSupplierId }
+                  : {}),
+              },
+              data: {
+                teamId: item.candidate.id,
+                ...(item.clearSupplier ? { supplierId: null } : {}),
+              },
+            }),
+          ),
+        );
+        results.forEach((result, index) => {
+          const update = batchUpdates[index];
+          if (result.count > 0 && update) {
+            batchResolved.push({
               entityId: update.id,
-              evidence: { teamId: update.candidate.id },
-              rawId: update.existingSupplierId,
-              rawName: null,
-              reason: 'internal_team_supplier_fields_cleared',
+              resolvedId: update.candidate.id,
             });
+            if (update.clearSupplier) {
+              batchCleared.push({
+                entityId: update.id,
+                evidence: { teamId: update.candidate.id },
+                rawId: update.existingSupplierId,
+                rawName: null,
+                reason: 'internal_team_supplier_fields_cleared',
+              });
+            }
           }
-        }
+        });
+        await persistResolutionAudit(
+          {
+            entityType: 'qms_inspection_requests',
+            fieldName: 'teamId',
+            resolved: batchResolved,
+            unresolved: batchUnresolved,
+          },
+          tx,
+        );
+        await persistResolutionAudit(
+          {
+            cleared: batchCleared,
+            entityType: 'qms_inspection_requests',
+            fieldName: 'supplierId',
+            resolved: [],
+            unresolved: [],
+          },
+          tx,
+        );
+        return results.reduce((sum, result) => sum + result.count, 0);
       });
       updated += applied;
       concurrentChanges += batchUpdates.length - applied;
     } else {
       updated += batchUpdates.length;
-    }
-    if (options.mode === 'apply') {
-      await persistResolutionAudit({
-        entityType: 'qms_inspection_requests',
-        fieldName: 'teamId',
-        resolved: batchResolved,
-        unresolved: batchUnresolved,
-      });
-      if (batchCleared.length > 0) {
-        await persistResolutionAudit({
-          cleared: batchCleared,
-          entityType: 'qms_inspection_requests',
-          fieldName: 'supplierId',
-          resolved: [],
-          unresolved: [],
-        });
-      }
     }
   }
 

@@ -1,6 +1,6 @@
 import type { SupplierIdentity } from './quality-record-supplier-identity-backfill';
 
-import { team_identity_merge_status } from '@prisma/client';
+import { Prisma, team_identity_merge_status } from '@prisma/client';
 import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
@@ -235,30 +235,34 @@ export async function loadSupplierIdentityContext(
   };
 }
 
-export async function persistResolutionAudit(params: {
-  cleared?: Array<{
-    entityId: string;
-    evidence: Record<string, null | number | string>;
-    rawId: null | string;
-    rawName: null | string;
-    reason: string;
-  }>;
-  entityType:
-    | 'after_sales'
-    | 'inspections'
-    | 'qms_inspection_requests'
-    | 'quality_records'
-    | 'supplier_identity_links';
-  fieldName?: 'supplierId' | 'teamId';
-  resolved: Array<{ entityId: string; resolvedId: null | string }>;
-  unresolved: UnresolvedRefInput[];
-}) {
+export async function persistResolutionAudit(
+  params: {
+    cleared?: Array<{
+      entityId: string;
+      evidence: Record<string, null | number | string>;
+      rawId: null | string;
+      rawName: null | string;
+      reason: string;
+    }>;
+    entityType:
+      | 'after_sales'
+      | 'inspections'
+      | 'qms_inspection_requests'
+      | 'quality_records'
+      | 'supplier_identity_links';
+    fieldName?: 'supplierId' | 'teamId';
+    resolved: Array<{ entityId: string; resolvedId: null | string }>;
+    unresolved: UnresolvedRefInput[];
+  },
+  client?: Prisma.TransactionClient,
+) {
+  const db = client || prisma;
   const fieldName = params.fieldName || 'supplierId';
   const cleared = params.cleared || [];
   const operations = [
     ...(cleared.length > 0
       ? [
-          prisma.unresolved_master_data_refs.createMany({
+          db.unresolved_master_data_refs.createMany({
             data: cleared.map((item) => ({
               entityId: item.entityId,
               entityType: params.entityType,
@@ -276,7 +280,7 @@ export async function persistResolutionAudit(params: {
             skipDuplicates: true,
           }),
           ...cleared.map((item) =>
-            prisma.unresolved_master_data_refs.updateMany({
+            db.unresolved_master_data_refs.updateMany({
               where: {
                 entityId: item.entityId,
                 entityType: params.entityType,
@@ -300,7 +304,7 @@ export async function persistResolutionAudit(params: {
         ]
       : []),
     ...params.resolved.map((item) =>
-      prisma.unresolved_master_data_refs.updateMany({
+      db.unresolved_master_data_refs.updateMany({
         where: {
           entityId: item.entityId,
           entityType: params.entityType,
@@ -317,7 +321,7 @@ export async function persistResolutionAudit(params: {
       }),
     ),
     ...params.unresolved.map((item) =>
-      prisma.unresolved_master_data_refs.upsert({
+      db.unresolved_master_data_refs.upsert({
         where: {
           entityType_entityId_fieldName: {
             entityId: item.entityId,
@@ -345,6 +349,6 @@ export async function persistResolutionAudit(params: {
     ),
   ];
   if (operations.length > 0) {
-    await prisma.$transaction(operations);
+    await (client ? Promise.all(operations) : prisma.$transaction(operations));
   }
 }
