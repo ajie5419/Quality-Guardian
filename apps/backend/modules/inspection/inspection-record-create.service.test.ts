@@ -37,6 +37,7 @@ vi.mock('~/modules/supplier-identity', () => ({
     resolveTeamById: vi
       .fn()
       .mockResolvedValue({ id: 'team-1', name: 'Team A' }),
+    lockTeamForMutation: vi.fn(),
   },
 }));
 

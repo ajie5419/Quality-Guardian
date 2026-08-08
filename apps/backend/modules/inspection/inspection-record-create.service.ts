@@ -91,11 +91,20 @@ export const InspectionRecordCreateService = {
             'A canonical TEAM identity is required for process inspections',
           );
         }
-        const teamIdentity =
-          data.category === 'PROCESS'
-            ? await SupplierIdentityService.resolveTeamById(explicitTeamId)
-            : null;
         const execute = async (tx: Prisma.TransactionClient) => {
+          const teamIdentity =
+            data.category === 'PROCESS'
+              ? await SupplierIdentityService.resolveTeamById(
+                  explicitTeamId,
+                  tx,
+                )
+              : null;
+          if (teamIdentity) {
+            await SupplierIdentityService.lockTeamForMutation(
+              teamIdentity.id,
+              tx,
+            );
+          }
           const governedFields = buildGovernedWriteFieldsForTable(
             'inspections',
             {
@@ -119,11 +128,15 @@ export const InspectionRecordCreateService = {
               ? governedCanonicalIds.supplierId
               : data.supplierId;
           const supplierIdentity =
-            await SupplierIdentityService.resolveSupplierForInspection({
-              category: data.category,
-              supplierId: governedSupplierId,
-              teamId: teamIdentity?.id,
-            });
+            await SupplierIdentityService.resolveSupplierForInspection(
+              {
+                category: data.category,
+                supplierId:
+                  data.category === 'PROCESS' ? undefined : governedSupplierId,
+                teamId: teamIdentity?.id,
+              },
+              tx,
+            );
           if (data.category === 'INCOMING' && !supplierIdentity) {
             throw new BusinessError(
               'SUPPLIER_ID_REQUIRED',

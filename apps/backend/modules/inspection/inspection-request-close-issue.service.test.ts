@@ -423,7 +423,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
       userinfo: { id: 'user-1', username: 'admin' } as any,
     });
 
-    expect(mockResolveSupplierByTeamId).toHaveBeenCalledWith('team-1');
+    expect(mockResolveSupplierByTeamId).toHaveBeenCalledWith('team-1', tx);
     expect(buildInspectionIssueCreateData).toHaveBeenLastCalledWith(
       expect.objectContaining({
         responsibleDepartment: '生产 OBU',

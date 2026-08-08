@@ -95,8 +95,11 @@ export const InspectionRecordUpdateService = {
         );
       }
       const teamIdentity = teamIdForResolution
-        ? await SupplierIdentityService.resolveTeamById(teamIdForResolution)
+        ? await SupplierIdentityService.resolveTeamById(teamIdForResolution, tx)
         : null;
+      if (teamIdentity) {
+        await SupplierIdentityService.lockTeamForMutation(teamIdentity.id, tx);
+      }
       const governedFields = buildGovernedWriteFieldsForTable('inspections', {
         incomingType: data.incomingType,
         materialName: data.materialName,
@@ -121,11 +124,17 @@ export const InspectionRecordUpdateService = {
           ? previousInspection?.supplierId
           : governedSupplierId;
       const supplierIdentity =
-        await SupplierIdentityService.resolveSupplierForInspection({
-          category: inspectionCategory,
-          supplierId: supplierIdForResolution,
-          teamId: teamIdForResolution,
-        });
+        await SupplierIdentityService.resolveSupplierForInspection(
+          {
+            category: inspectionCategory,
+            supplierId:
+              inspectionCategory === 'PROCESS'
+                ? undefined
+                : supplierIdForResolution,
+            teamId: teamIdForResolution,
+          },
+          tx,
+        );
       if (inspectionCategory === 'INCOMING' && !supplierIdentity) {
         throw new BusinessError(
           'SUPPLIER_ID_REQUIRED',

@@ -16,7 +16,6 @@ import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 const DEFAULT_INSPECTION_CATEGORY = 'PROCESS';
 const INSPECTION_CATEGORIES = new Set(['INCOMING', 'PROCESS', 'SHIPMENT']);
@@ -55,10 +54,13 @@ async function prepareIdentityImportPayload(
     return { supplierId: supplier.id, supplierName: supplier.name };
   }
   if (category === 'PROCESS') {
-    const teamId = await resolveTeamIdForWrite({
-      explicitTeamId: String(item.teamId || '').trim() || undefined,
-      team: String(item.team || '').trim(), // governance-allow-direct-name-id
-    });
+    const teamId = String(item.teamId || '').trim();
+    if (!teamId) {
+      throw new BusinessError(
+        'TEAM_ID_REQUIRED',
+        'A canonical TEAM identity is required for process inspections',
+      );
+    }
     const team = await SupplierIdentityService.resolveTeamById(teamId);
     if (!team) {
       throw new BusinessError(
@@ -66,7 +68,12 @@ async function prepareIdentityImportPayload(
         'A canonical TEAM identity is required for process inspections',
       );
     }
-    return { team: team.name, teamId: team.id };
+    return {
+      supplierId: null,
+      supplierName: null,
+      team: team.name,
+      teamId: team.id,
+    };
   }
   return {};
 }

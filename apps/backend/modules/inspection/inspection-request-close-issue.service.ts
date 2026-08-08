@@ -77,6 +77,7 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     linkedIssue: options.linkedIssue,
     processName: resolveCloseRequestProcessName(options.request),
     request: options.request,
+    tx: options.tx,
   });
   const issueBody = buildCloseLinkedIssueBody({
     body: options.body,
@@ -236,10 +237,12 @@ async function resolveCloseIssueResponsibility(options: {
     supplierId?: null | string;
     teamId?: null | string;
   };
+  tx: Prisma.TransactionClient;
 }): Promise<CloseIssueResponsibility> {
   const explicitType = resolveExplicitResponsibilityType(options.linkedIssue);
   const teamSupplier = await SupplierIdentityService.resolveSupplierByTeamId(
     options.request.teamId || options.linkedInspection?.teamId,
+    options.tx,
   );
   const contextType = resolveContextResponsibilityType({
     linkedInspection: options.linkedInspection,
