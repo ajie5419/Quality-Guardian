@@ -6281,3 +6281,4 @@
 - 回填不再按名称建立/恢复 TEAM link；内部 `DEPARTMENT` TEAM 的错误 inspection/quality record supplier 字段以审计、CAS、幂等方式清空；所有 unresolved/conflict（包括重复运行中已有 OPEN 项）均阻断维护。
 - 正常 deploy workflow 删除 `skip_maintenance`，Prisma migration 后必须连续运行 release maintenance。
 - 更正 v0.24.0 记录：`skip_maintenance=true` 的手工部署是未完成维护时的错误绕过，不是已验证的恢复路径；17 条 unresolved 的外部/内部归属尚未在生产执行本轮证据化回填。
+- 提交：`f1720641`、`5d82561`。验证：后端全量 Vitest `267/267` 文件、`2445/2445` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
