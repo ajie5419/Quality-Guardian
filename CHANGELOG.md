@@ -6282,3 +6282,4 @@
 - 更正 v0.24.0 记录：`skip_maintenance=true` 的手工部署是未完成维护时的错误绕过，不是已验证的恢复路径；17 条 unresolved 的外部/内部归属尚未在生产执行本轮证据化回填。
 - 提交：`f1720641`、`5d82561`。验证：后端全量 Vitest `267/267` 文件、`2445/2445` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
 - 后续提交：`a4f08a7` 以 CAS 清除内部 BU 的 PROCESS 报检 supplierId，并使 inspection/quality record 的清理同时比较 supplierId 与 supplierName；`b9a0789` 将在线/批量/backfill resolver 收紧为精确 `SUPPLIER` source 与外包策略，外部 TEAM 缺有效 link 直接拒绝 PROCESS 写入，候选 API/UI 按 TEAM 过滤可链接供应商。验证：后端定向 Vitest `7/7` 文件、`64/64` 用例通过，前端定向 Vitest `2/2` 文件、`5/5` 用例通过，后端 `tsc --noEmit` 通过。
+- 文档更正提交：`29418e0`。最终验证：后端全量 Vitest `267/267` 文件、`2451/2451` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。

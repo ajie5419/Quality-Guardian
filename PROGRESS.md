@@ -6,7 +6,7 @@
 - `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
 - 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
-- 测试状态: supplier identity 修复提交前，后端全仓 Vitest `267/267` 文件、`2445/2445` 用例通过；前端相关定向 Vitest `12/12` 文件、`53/53` 用例通过（含 `SupplierSelect` 9/9）；lint、typecheck、架构门禁均通过。后续补丁须按其变更范围重新验证。
+- 测试状态: supplier identity 修复后，后端全仓 Vitest `267/267` 文件、`2451/2451` 用例通过；前端相关定向 Vitest `2/2` 文件、`5/5` 用例通过；lint、typecheck、架构门禁均通过。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 617（含测试）
