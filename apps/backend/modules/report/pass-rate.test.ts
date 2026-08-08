@@ -9,6 +9,9 @@ import {
 vi.mock('~/utils/prisma', () => ({
   default: {
     $queryRaw: vi.fn(),
+    dictionaries: {
+      findMany: vi.fn(),
+    },
     inspections: {
       aggregate: vi.fn(),
       findMany: vi.fn(),
@@ -170,6 +173,43 @@ describe('pass-rate quantity rule', () => {
         passCount: 10,
         process: '外协涂装',
         totalCount: 10,
+      }),
+    ]);
+  });
+
+  it('buckets incoming inspections by the canonical dictionary name', async () => {
+    (prisma.dictionaries.findMany as any).mockResolvedValue([
+      { dictKey: '机加成品件-外协', id: 'dict-1' },
+    ]);
+    (prisma.inspections.findMany as any).mockResolvedValue([
+      {
+        category: 'INCOMING',
+        incomingType: '机加成品件',
+        incomingTypeId: 'dict-1',
+        process: null,
+        processId: null,
+        processName: null,
+        qualifiedQuantity: 90,
+        quantity: 100,
+        result: 'PASS',
+        team: null,
+        teamId: null,
+        unqualifiedQuantity: 10,
+      },
+    ]);
+
+    const drillDown = await getPassRateDrillDownByRange(
+      new Date('2026-04-01'),
+      new Date('2026-04-30'),
+      () => 99.85,
+    );
+
+    expect(drillDown).toEqual([
+      expect.objectContaining({
+        category: '进货检验',
+        passCount: 90,
+        process: '机加成品件-外协',
+        totalCount: 100,
       }),
     ]);
   });

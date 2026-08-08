@@ -12,7 +12,11 @@ import {
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
-import { resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName as resolveCanonicalProcessNameByRelation,
+  resolveIncomingTypeName as resolveIncomingTypeNameByRelation,
+  resolveIncomingTypeNamesByIds,
+} from '~/utils/process-resolver';
 import {
   buildKeywordOr,
   buildYearFilter,
@@ -58,17 +62,36 @@ export const InspectionRecordQueryService = {
         skip,
         take,
         orderBy: [{ inspectionDate: 'desc' }, { createdAt: 'desc' }],
+        include: {
+          process: {
+            select: {
+              name: true,
+            },
+          },
+        },
       }),
       prisma.inspections.count({ where }),
     ]);
+    const incomingTypeNameById = await resolveIncomingTypeNamesByIds(
+      items.map((item) =>
+        item.category === 'INCOMING' ? item.incomingTypeId : null,
+      ),
+    );
 
     return {
       items: items.map((item) => ({
         ...item,
+        incomingType:
+          item.category === 'INCOMING'
+            ? incomingTypeNameById.get(item.incomingTypeId || '') ||
+              item.incomingType ||
+              null
+            : item.incomingType,
         partName:
           params.category === 'INCOMING'
             ? item.materialName || item.level1Component
             : item.level1Component || item.materialName,
+        processName: resolveCanonicalProcessNameByRelation(item),
       })),
       total,
     };
@@ -136,6 +159,10 @@ export const InspectionRecordQueryService = {
       drawingNo: templateMeta.drawingNo,
       formNo: templateMeta.formNo,
       inspectionDate: formatDate(inspection.inspectionDate),
+      incomingType:
+        inspection.category === 'INCOMING'
+          ? await resolveIncomingTypeNameByRelation(inspection)
+          : inspection.incomingType,
       processName: resolveCanonicalProcessNameByRelation(inspection),
       printHeaders,
       reportDate: inspection.reportDate
@@ -308,6 +335,11 @@ export const InspectionRecordQueryService = {
       [rawItems, total] = await runQuery(false);
     }
 
+    const incomingTypeNameById = await resolveIncomingTypeNamesByIds(
+      rawItems.map((item) =>
+        item.category === 'INCOMING' ? item.incomingTypeId : null,
+      ),
+    );
     const items = rawItems.map((item) => {
       const linkedIssues = item.qualityRecords || [];
       const fallbackUnqualifiedQuantity = linkedIssues.reduce(
@@ -322,6 +354,12 @@ export const InspectionRecordQueryService = {
 
       return {
         ...item,
+        incomingType:
+          item.category === 'INCOMING'
+            ? incomingTypeNameById.get(item.incomingTypeId || '') ||
+              item.incomingType ||
+              null
+            : item.incomingType,
         archiveDueAt: item.archiveTask?.dueAt || null,
         archiveTaskId: item.archiveTask?.id || null,
         archiveIsOverdue: Boolean(item.archiveTask?.isOverdue),

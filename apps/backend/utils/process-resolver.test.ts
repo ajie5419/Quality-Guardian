@@ -1,11 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
+import prisma from '~/utils/prisma';
 
 import {
   __resetProcessResolverRuntimeForTest,
   buildProcessNameWhere,
   resolveCanonicalProcessName,
   resolveCanonicalProcessNameById,
+  resolveIncomingTypeName,
+  resolveIncomingTypeNamesByIds,
   resolveProcessIdForWrite,
   resolveProcessIdsByNames,
 } from './process-resolver';
@@ -16,6 +19,14 @@ vi.mock('~/utils/canonical-master-data', () => ({
     resolveCanonicalIdForWrite: vi.fn(),
     resolveCanonicalIdsByNames: vi.fn(),
     resolveCanonicalNameById: vi.fn(),
+  },
+}));
+
+vi.mock('~/utils/prisma', () => ({
+  default: {
+    dictionaries: {
+      findMany: vi.fn(),
+    },
   },
 }));
 
@@ -190,5 +201,41 @@ describe('process-resolver helpers', () => {
         processName: '涂装',
       }),
     ).toBe('涂装');
+  });
+
+  it('resolves incoming-type names by dictionary id', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: '机加成品件-外协', id: 'dict-1' },
+    ] as never);
+
+    const resolved = await resolveIncomingTypeNamesByIds(['dict-1', '']);
+
+    expect(resolved.get('dict-1')).toBe('机加成品件-外协');
+    expect(prisma.dictionaries.findMany).toHaveBeenCalledWith({
+      where: {
+        dictType: 'incoming_type',
+        id: { in: ['dict-1'] },
+        isDeleted: false,
+        status: 1,
+      },
+      select: { dictKey: true, id: true },
+    });
+  });
+
+  it('resolveIncomingTypeName falls back to the snapshot when the dictionary id is unknown', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([] as never);
+
+    await expect(
+      resolveIncomingTypeName({
+        incomingType: '机加成品件',
+        incomingTypeId: 'unknown-id',
+      }),
+    ).resolves.toBe('机加成品件');
+  });
+
+  it('resolveIncomingTypeName returns the snapshot when no dictionary id exists', async () => {
+    await expect(
+      resolveIncomingTypeName({ incomingType: '机加成品件' }),
+    ).resolves.toBe('机加成品件');
   });
 });

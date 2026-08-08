@@ -18,7 +18,10 @@ export namespace InspectionSettingsApi {
     name: string;
     sort: number;
     status: number;
+    supplierSource: 'Outsourcing' | 'Supplier';
   }
+
+  export type ProcessSupplierSource = ProcessItem['supplierSource'];
 }
 
 export function getPublicIncomingMaterialInputSettingApi() {
@@ -65,6 +68,7 @@ export function createInspectionProcessApi(data: {
   code?: null | string;
   name: string;
   sort?: number;
+  supplierSource: InspectionSettingsApi.ProcessSupplierSource;
 }) {
   return requestClient.post<InspectionSettingsApi.ProcessItem>(
     '/system/inspection-processes',
@@ -79,6 +83,7 @@ export function updateInspectionProcessApi(
     name?: string;
     sort?: number;
     status?: 0 | 1;
+    supplierSource?: InspectionSettingsApi.ProcessSupplierSource;
   },
 ) {
   return requestClient.put<InspectionSettingsApi.ProcessItem>(

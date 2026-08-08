@@ -287,7 +287,10 @@ watch(
   () => activeValues.value.incomingType,
   (newVal, oldVal) => {
     if (props.type === 'incoming') {
-      const isMachined = newVal === '机加成品件';
+      const selectedProcess = processOptions.value.find(
+        (item) => item.value === newVal,
+      );
+      const isMachined = selectedProcess?.supplierSource === 'Outsourcing';
       formApi.updateSchema([
         {
           fieldName: 'supplierId',

@@ -207,8 +207,8 @@ describe('inspection request entry incoming type options', () => {
       .find((item) => item.attributes('placeholder') === '请选择进货类型');
 
     expect(select?.props('options')).toEqual([
-      { label: '原材料', value: '原材料' },
-      { label: '外购件', value: '外购件' },
+      { label: '原材料', value: 'proc-raw' },
+      { label: '外购件', value: 'proc-out' },
     ]);
   });
 });

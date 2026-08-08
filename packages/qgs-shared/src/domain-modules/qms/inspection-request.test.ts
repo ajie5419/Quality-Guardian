@@ -208,6 +208,37 @@ describe('resolveInspectionRequestIssueResponsibility', () => {
     });
   });
 
+  it('maps INCOMING category with a configured process name to supplier responsibility', () => {
+    expect(
+      resolveInspectionRequestIssueResponsibility({
+        category: 'INCOMING',
+        processName: '外购件',
+        supplierId: 'supplier-1',
+        team: 'Supplier A',
+      }),
+    ).toEqual({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: '采购部',
+      supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
+    });
+  });
+
+  it('keeps PROCESS category requests internal even with a matching process name', () => {
+    expect(
+      resolveInspectionRequestIssueResponsibility({
+        category: 'PROCESS',
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+        team: 'Assembly Team A',
+      }),
+    ).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Assembly Team A',
+      supplierId: null,
+      supplierName: '',
+    });
+  });
+
   it('maps outsourcing unit to supplierName and production OBU', () => {
     expect(
       resolveInspectionRequestIssueResponsibility({

@@ -15,6 +15,9 @@ vi.mock('~/utils/prisma', () => {
     metric_refresh_jobs: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    quality_classification_subcategories: {
+      findFirst: vi.fn(),
+    },
     quality_records: qualityRecords,
   };
   return {
@@ -319,6 +322,48 @@ describe('inspectionIssueMutationService', () => {
 
       expect(prisma.quality_records.create).toHaveBeenCalledTimes(1);
     });
+
+    it('rejects welding defects without a responsible welder by subcategory', async () => {
+      (
+        prisma.quality_classification_subcategories.findFirst as any
+      ).mockResolvedValue({
+        code: 'WELDING_DEFECT',
+        name: '焊接缺陷',
+      });
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+
+      await expect(
+        InspectionIssueMutationService.createIssue(mockUser, {
+          defectSubcategoryId: 'sub-welding',
+          processName: '外购件',
+          responsibleWelder: '',
+        }),
+      ).rejects.toThrow('焊接缺陷必须填写责任焊工');
+      expect(prisma.quality_records.create).not.toHaveBeenCalled();
+    });
+
+    it('accepts welding defects when a responsible welder is provided', async () => {
+      (
+        prisma.quality_classification_subcategories.findFirst as any
+      ).mockResolvedValue({
+        code: 'WELDING_DEFECT',
+        name: '焊接缺陷',
+      });
+      (prisma.quality_records.create as any).mockResolvedValue({
+        id: 'ISS-2026-005',
+        nonConformanceNumber: 'NC-26KJ-005',
+        partName: 'Part',
+      });
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+
+      await expect(
+        InspectionIssueMutationService.createIssue(mockUser, {
+          defectSubcategoryId: 'sub-welding',
+          processName: '外购件',
+          responsibleWelder: '张三',
+        }),
+      ).resolves.toMatchObject({ ncNumber: 'NC-26KJ-005' });
+    });
   });
 
   describe('updateIssue', () => {
@@ -357,6 +402,62 @@ describe('inspectionIssueMutationService', () => {
         data: { partName: 'Updated' },
       });
       expect(SystemLogService.auditLog).toHaveBeenCalled();
+    });
+
+    it('rejects switching the defect subcategory to a welding defect without a welder', async () => {
+      (
+        prisma.quality_classification_subcategories.findFirst as any
+      ).mockResolvedValue({
+        code: 'WELDING_DEFECT',
+        name: '焊接缺陷',
+      });
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        defectSubcategoryId: null,
+        inspection: null,
+        processName: '外购件',
+        responsibleWelder: '',
+        supplierId: null,
+        supplierName: null,
+      });
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+
+      await expect(
+        InspectionIssueMutationService.updateIssue(
+          mockUser,
+          'rec-1',
+          { defectSubcategoryId: 'sub-welding' },
+          null,
+        ),
+      ).rejects.toThrow('焊接缺陷必须填写责任焊工');
+      expect(prisma.quality_records.update).not.toHaveBeenCalled();
+    });
+
+    it('rejects updates when the current record already holds a welding defect without a welder', async () => {
+      (
+        prisma.quality_classification_subcategories.findFirst as any
+      ).mockResolvedValue({
+        code: 'WELDING_DEFECT',
+        name: '焊接缺陷',
+      });
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        defectSubcategoryId: 'sub-welding',
+        inspection: null,
+        processName: '外购件',
+        responsibleWelder: '',
+        supplierId: null,
+        supplierName: null,
+      });
+      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
+
+      await expect(
+        InspectionIssueMutationService.updateIssue(
+          mockUser,
+          'rec-1',
+          { partName: 'New Part' },
+          null,
+        ),
+      ).rejects.toThrow('焊接缺陷必须填写责任焊工');
+      expect(prisma.quality_records.update).not.toHaveBeenCalled();
     });
 
     it('should register photo references when photos provided in update', async () => {
@@ -444,9 +545,12 @@ describe('inspectionIssueMutationService', () => {
           isDeleted: false,
         },
         select: {
+          defectSubcategoryId: true,
           inspection: {
             select: { category: true, supplierId: true, teamId: true },
           },
+          processName: true,
+          responsibleWelder: true,
           supplierId: true,
           supplierName: true,
         },

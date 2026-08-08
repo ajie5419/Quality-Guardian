@@ -68,6 +68,7 @@ const workOrderProcesses = ref<
     category: 'INCOMING' | 'PROCESS';
     processId: string;
     processName: string;
+    supplierSource: null | string;
   }>
 >([]);
 
@@ -116,19 +117,23 @@ const {
   showError: message.error,
 });
 
-const {
-  clearResponsibleUnitIdentity,
-  loadResponsibleUnitOptions,
-  teamLoading,
-  teamOptions,
-} = useInspectionRequestIdentityOptions({ isIncomingEntry, requestForm });
-
 const processOptions = computed(() =>
   buildInspectionRequestEntryProcessOptions(
     workOrderProcesses.value,
     isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
   ),
 );
+
+const {
+  clearResponsibleUnitIdentity,
+  loadResponsibleUnitOptions,
+  teamLoading,
+  teamOptions,
+} = useInspectionRequestIdentityOptions({
+  isIncomingEntry,
+  processOptions,
+  requestForm,
+});
 
 const isAssemblyProcess = computed(() =>
   String(requestForm.processName || '').includes('组装'),
@@ -264,7 +269,7 @@ async function loadWorkOrderProcessOptions(workOrderNumber: string) {
           ? workOrderProcesses.value.find(
               (item) =>
                 item.category === 'INCOMING' &&
-                item.processName === requestForm.incomingType,
+                item.processId === requestForm.incomingType,
             )
           : undefined) ||
         workOrderProcesses.value.find((item) => item.category === 'INCOMING')
@@ -352,7 +357,7 @@ async function submitRequest() {
           : undefined,
       requestInfo: isIncomingEntry.value
         ? buildIncomingInspectionRequestInfo({
-            incomingType: requestForm.incomingType,
+            incomingType: requestForm.processName,
             notes: requestForm.requestInfo,
           })
         : requestForm.requestInfo,
@@ -427,8 +432,7 @@ watch(
   (incomingType) => {
     if (!isIncomingEntry.value || !incomingType) return;
     const matched = workOrderProcesses.value.find(
-      (item) =>
-        item.category === 'INCOMING' && item.processName === incomingType,
+      (item) => item.category === 'INCOMING' && item.processId === incomingType,
     );
     if (matched) {
       requestForm.processId = matched.processId;

@@ -66,6 +66,7 @@ describe('inspection request entry identity options', () => {
       {
         label: 'Welding',
         processName: 'Welding',
+        supplierSource: null,
         value: 'process-1',
       },
     ]);
@@ -92,6 +93,30 @@ describe('inspection request entry identity options', () => {
       {
         label: 'Renamed receipt verification',
         processName: 'Renamed receipt verification',
+        supplierSource: null,
+        value: 'process-2',
+      },
+    ]);
+  });
+
+  it('keeps the configured supplier source of each process option', () => {
+    expect(
+      buildInspectionRequestEntryProcessOptions(
+        [
+          {
+            category: 'INCOMING',
+            processId: 'process-2',
+            processName: '机加成品件',
+            supplierSource: 'Outsourcing',
+          },
+        ],
+        'INCOMING',
+      ),
+    ).toEqual([
+      {
+        label: '机加成品件',
+        processName: '机加成品件',
+        supplierSource: 'Outsourcing',
         value: 'process-2',
       },
     ]);

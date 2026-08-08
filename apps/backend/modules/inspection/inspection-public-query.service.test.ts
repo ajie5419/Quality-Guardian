@@ -100,11 +100,13 @@ describe('inspection public query service', () => {
         category: 'PROCESS',
         processId: 'process-1',
         processName: 'Canonical Welding',
+        supplierSource: 'Supplier',
       },
       {
         category: 'INCOMING',
         processId: 'process-1',
         processName: 'Canonical Welding',
+        supplierSource: 'Outsourcing',
       },
     ]);
 
@@ -115,11 +117,13 @@ describe('inspection public query service', () => {
         category: 'PROCESS',
         processId: 'process-1',
         processName: 'Canonical Welding',
+        supplierSource: 'Supplier',
       },
       {
         category: 'INCOMING',
         processId: 'process-1',
         processName: 'Canonical Welding',
+        supplierSource: 'Outsourcing',
       },
     ]);
     expect(
@@ -264,6 +268,27 @@ describe('getTodayIncomingInspections', () => {
 
     expect(result.pendingItems[0]?.incomingType).toBe('首批');
     expect(result.pendingItems[0]?.notes).toBe('外观检验');
+  });
+
+  it('prefers the current process name over the requestInfo snapshot', async () => {
+    const requestInfo = JSON.stringify({
+      incomingType: '机加成品件',
+      notes: '',
+    });
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({
+        requestInfo,
+        process: { name: '机加成品件-外协' },
+        status: 'SUBMITTED',
+      }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.pendingItems[0]?.incomingType).toBe('机加成品件-外协');
   });
 
   it('sets truncated=true when records hit the 200 limit', async () => {

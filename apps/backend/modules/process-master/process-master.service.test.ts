@@ -5,6 +5,11 @@ import { ProcessMasterService } from './process-master.service';
 
 vi.mock('~/utils/prisma', () => {
   const client = {
+    dictionaries: {
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
     inspection_request_process_options: {
       createMany: vi.fn(),
       findFirst: vi.fn(),
@@ -37,16 +42,34 @@ describe('process master service', () => {
 
   it('lists active global options for other modules', async () => {
     vi.mocked(prisma.processes.findMany).mockResolvedValue([
-      { id: 'process-1', name: 'Welding', sort: 3 },
+      {
+        id: 'process-1',
+        inspectionRequestCategory: 'PROCESS',
+        name: 'Welding',
+        sort: 3,
+        supplierSource: 'Supplier',
+      },
     ] as never);
 
     await expect(ProcessMasterService.listActiveOptions()).resolves.toEqual([
-      { id: 'process-1', name: 'Welding', sort: 3 },
+      {
+        id: 'process-1',
+        inspectionRequestCategory: 'PROCESS',
+        name: 'Welding',
+        sort: 3,
+        supplierSource: 'Supplier',
+      },
     ]);
     expect(prisma.processes.findMany).toHaveBeenCalledWith({
       where: { isDeleted: false, status: 1 },
       orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, sort: true },
+      select: {
+        id: true,
+        inspectionRequestCategory: true,
+        name: true,
+        sort: true,
+        supplierSource: true,
+      },
     });
   });
 
@@ -90,6 +113,85 @@ describe('process master service', () => {
         status: 1,
       },
     ]);
+  });
+
+  it('returns the configured supplier source for inspection request options', async () => {
+    vi.mocked(
+      prisma.inspection_request_process_options.findMany,
+    ).mockResolvedValue([
+      {
+        category: 'INCOMING',
+        process: {
+          id: 'process-2',
+          name: '机加成品件',
+          supplierSource: 'Outsourcing',
+        },
+      },
+    ] as never);
+
+    await expect(
+      ProcessMasterService.listInspectionRequestOptions('INCOMING'),
+    ).resolves.toEqual([
+      {
+        category: 'INCOMING',
+        processId: 'process-2',
+        processName: '机加成品件',
+        supplierSource: 'Outsourcing',
+      },
+    ]);
+  });
+
+  it('persists the supplier source when creating a process', async () => {
+    vi.mocked(prisma.processes.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.processes.create).mockResolvedValue({
+      code: null,
+      id: 'process-3',
+      name: '机加成品件',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Outsourcing',
+    } as never);
+
+    await ProcessMasterService.create({
+      categories: ['INCOMING'],
+      name: '机加成品件',
+      sort: 1,
+      supplierSource: 'Outsourcing',
+    });
+
+    expect(prisma.processes.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          supplierSource: 'Outsourcing',
+        }),
+      }),
+    );
+  });
+
+  it('updates the supplier source independently of the process name', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+    } as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: null,
+      id: 'process-1',
+      name: '机加完成品',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Outsourcing',
+    } as never);
+
+    await ProcessMasterService.update('process-1', {
+      supplierSource: 'Outsourcing',
+    });
+
+    expect(prisma.processes.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          supplierSource: 'Outsourcing',
+        }),
+      }),
+    );
   });
 
   it('restores a deleted process with the original ID', async () => {
@@ -216,5 +318,100 @@ describe('process master service', () => {
     expect(
       prisma.inspection_request_process_options.updateMany,
     ).not.toHaveBeenCalled();
+  });
+
+  it('keeps the incoming-type dictionary in sync when a process is renamed', async () => {
+    vi.mocked(prisma.processes.findFirst)
+      .mockResolvedValueOnce({
+        id: 'process-1',
+        name: '机加成品件',
+      } as never)
+      .mockResolvedValueOnce(null as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: null,
+      id: 'process-1',
+      name: '机加成品件-外协',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Outsourcing',
+    } as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { id: 'dict-1' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue(null as never);
+
+    await ProcessMasterService.update('process-1', {
+      name: '机加成品件-外协',
+    });
+
+    expect(prisma.dictionaries.findMany).toHaveBeenCalledWith({
+      where: {
+        dictType: 'incoming_type',
+        isDeleted: false,
+        OR: [{ dictKey: '机加成品件' }, { dictValue: '机加成品件' }],
+      },
+      select: { id: true },
+    });
+    expect(prisma.dictionaries.findFirst).toHaveBeenCalledWith({
+      where: {
+        dictType: 'incoming_type',
+        isDeleted: false,
+        NOT: { id: { in: ['dict-1'] } },
+        OR: [{ dictKey: '机加成品件-外协' }, { dictValue: '机加成品件-外协' }],
+      },
+      select: { id: true },
+    });
+    expect(prisma.dictionaries.updateMany).toHaveBeenCalledWith({
+      where: { id: { in: ['dict-1'] } },
+      data: { dictKey: '机加成品件-外协', dictValue: '机加成品件-外协' },
+    });
+  });
+
+  it('does not rewrite the dictionary when the target name is already taken', async () => {
+    vi.mocked(prisma.processes.findFirst)
+      .mockResolvedValueOnce({
+        id: 'process-1',
+        name: '机加成品件',
+      } as never)
+      .mockResolvedValueOnce(null as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: null,
+      id: 'process-1',
+      name: '机加成品件-外协',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Outsourcing',
+    } as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { id: 'dict-1' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      id: 'dict-2',
+    } as never);
+
+    await ProcessMasterService.update('process-1', {
+      name: '机加成品件-外协',
+    });
+
+    expect(prisma.dictionaries.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not touch the dictionary when the process name is unchanged', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+      name: 'Welding',
+    } as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: null,
+      id: 'process-1',
+      name: 'Welding',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Supplier',
+    } as never);
+
+    await ProcessMasterService.update('process-1', { sort: 2 });
+
+    expect(prisma.dictionaries.updateMany).not.toHaveBeenCalled();
   });
 });

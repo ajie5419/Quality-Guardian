@@ -8,8 +8,6 @@ export const inspectionRequestEntryCheckResultOptions = [
   { label: '不适用', value: 'NA' },
 ];
 
-export const MACHINED_INCOMING_INSPECTION_TYPE = '机加成品件';
-
 type WorkOrderOptionSource = {
   division?: null | string;
   multiStationEnabled?: boolean;
@@ -101,12 +99,18 @@ export function buildInspectionRequestEntryProcessOptions(
     category: 'INCOMING' | 'PROCESS';
     processId: string;
     processName: string;
+    supplierSource?: null | string;
   }>,
   category: 'INCOMING' | 'PROCESS',
 ) {
   const map = new Map<
     string,
-    { label: string; processName: string; value: string }
+    {
+      label: string;
+      processName: string;
+      supplierSource: null | string;
+      value: string;
+    }
   >();
   for (const item of workOrderProcesses) {
     if (item.category !== category) continue;
@@ -116,6 +120,7 @@ export function buildInspectionRequestEntryProcessOptions(
     map.set(processId, {
       label: processName,
       processName,
+      supplierSource: item.supplierSource || null,
       value: processId,
     });
   }

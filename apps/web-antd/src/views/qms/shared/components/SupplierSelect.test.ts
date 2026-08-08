@@ -193,4 +193,113 @@ describe('supplier select', () => {
     expect(wrapper.emitted('update:value')).toBeUndefined();
     expect(wrapper.emitted('change')).toBeUndefined();
   });
+
+  it('resolves a legacy name from another category when the filtered search misses', async () => {
+    const outsourcing = {
+      ...createSupplier('supplier-9', 'Outsourcing Supplier'),
+      category: 'Outsourcing' as const,
+    };
+    getSupplierList
+      .mockResolvedValueOnce({ items: [], total: 0 })
+      .mockResolvedValueOnce({ items: [outsourcing], total: 1 });
+
+    const wrapper = mount(SupplierSelect, {
+      props: {
+        legacyName: 'Outsourcing Supplier',
+        value: 'supplier-9',
+        valueMode: 'id',
+      },
+    });
+    await flushPromises();
+
+    expect(getSupplierList).toHaveBeenNthCalledWith(1, {
+      category: 'Supplier',
+      keyword: 'Outsourcing Supplier',
+      page: 1,
+      pageSize: 100,
+    });
+    expect(getSupplierList).toHaveBeenNthCalledWith(2, {
+      keyword: 'Outsourcing Supplier',
+      page: 1,
+      pageSize: 100,
+    });
+    expect(
+      wrapper
+        .findComponent({ name: 'MockSupplierSelectProbe' })
+        .props('options'),
+    ).toEqual([
+      expect.objectContaining({
+        label: 'Outsourcing Supplier',
+        value: 'supplier-9',
+      }),
+    ]);
+    expect(wrapper.emitted('update:value')).toBeUndefined();
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('falls back across categories when the selected id misses a same-name supplier', async () => {
+    const outsourcing = {
+      ...createSupplier('supplier-9', 'Outsourcing Supplier'),
+      category: 'Outsourcing' as const,
+    };
+    getSupplierList
+      .mockResolvedValueOnce({
+        items: [createSupplier('supplier-8', 'Outsourcing Supplier')],
+        total: 1,
+      })
+      .mockResolvedValueOnce({ items: [outsourcing], total: 1 });
+
+    const wrapper = mount(SupplierSelect, {
+      props: {
+        legacyName: 'Outsourcing Supplier',
+        value: 'supplier-9',
+        valueMode: 'id',
+      },
+    });
+    await flushPromises();
+
+    expect(getSupplierList).toHaveBeenNthCalledWith(1, {
+      category: 'Supplier',
+      keyword: 'Outsourcing Supplier',
+      page: 1,
+      pageSize: 100,
+    });
+    expect(getSupplierList).toHaveBeenNthCalledWith(2, {
+      keyword: 'Outsourcing Supplier',
+      page: 1,
+      pageSize: 100,
+    });
+    expect(
+      wrapper
+        .findComponent({ name: 'MockSupplierSelectProbe' })
+        .props('options'),
+    ).toEqual([
+      expect.objectContaining({
+        label: 'Outsourcing Supplier',
+        value: 'supplier-9',
+      }),
+    ]);
+    expect(wrapper.emitted('update:value')).toBeUndefined();
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
+
+  it('never guesses across categories without a preselected value', async () => {
+    const wrapper = mount(SupplierSelect, {
+      props: {
+        legacyName: 'Outsourcing Supplier',
+        valueMode: 'id',
+      },
+    });
+    await flushPromises();
+
+    expect(getSupplierList).toHaveBeenCalledTimes(1);
+    expect(getSupplierList).toHaveBeenNthCalledWith(1, {
+      category: 'Supplier',
+      keyword: 'Outsourcing Supplier',
+      page: 1,
+      pageSize: 100,
+    });
+    expect(wrapper.emitted('update:value')).toBeUndefined();
+    expect(wrapper.emitted('change')).toBeUndefined();
+  });
 });

@@ -26,7 +26,11 @@ import SupplierSelect from '../../../shared/components/SupplierSelect.vue';
 import WorkOrderSelect from '../../../shared/components/WorkOrderSelect.vue';
 import { useQualityClassificationOptions } from '../../../shared/composables/useQualityClassificationOptions';
 import { useAiAnalysis } from '../composables/useAiAnalysis';
-import { getIssueFormSchemaWithStatusOptions } from './issueFormData';
+import {
+  getIssueFormSchemaWithStatusOptions,
+  isWeldingDefectSubcategory,
+  isWeldingProcessName,
+} from './issueFormData';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
 import IssueSimilarCases from './IssueSimilarCases.vue';
 
@@ -382,6 +386,22 @@ onMounted(async () => {
             ),
             showSearch: true,
           }),
+        },
+      },
+      {
+        fieldName: 'responsibleWelder',
+        dependencies: {
+          triggerFields: [
+            'processName',
+            'defectCategoryId',
+            'defectSubcategoryId',
+          ],
+          show: (values: Record<string, unknown>) =>
+            isWeldingProcessName(values.processName) ||
+            isWeldingDefectSubcategory(
+              values.defectSubcategoryId,
+              classificationOptions.value,
+            ),
         },
       },
     ]);

@@ -22,8 +22,10 @@ type SupportedField = keyof typeof FIELD_CONFIG;
 type InspectionTx = Pick<
   Prisma.TransactionClient,
   | '$queryRaw'
+  | 'dictionaries'
   | 'inspections'
   | 'supplier_identity_links'
+  | 'suppliers'
   | 'team_identity_merge_participants'
 >;
 

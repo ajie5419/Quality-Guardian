@@ -220,6 +220,31 @@ describe('useInspectionRequestTaskActions', () => {
     });
   });
 
+  it('prefills incoming responsibility for INCOMING category with a configured process name', () => {
+    const composable = createComposable();
+
+    composable.openClose({
+      category: 'INCOMING',
+      id: 'request-1',
+      componentName: '',
+      inspectorName: 'Inspector A',
+      partName: 'Bearing',
+      processName: '外购件',
+      quantity: 2,
+      supplierId: 'supplier-1',
+      team: 'Supplier A',
+      workOrderNumber: 'WO-1',
+    } as any);
+
+    expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: '采购部',
+      responsibleDepartmentId: 'dept-purchase',
+      supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
+    });
+  });
+
   it('prefills outsourcing unit as supplierName and production OBU as responsible department', () => {
     const composable = createComposable();
 

@@ -18,3 +18,12 @@ export const supplierIdentityInputSchema = {
     return { supplierId, teamId };
   },
 };
+
+export const supplierIdentityOptionsQuerySchema = z.object({
+  keyword: z.string().trim().max(100).optional(),
+  take: z.coerce.number().int().positive().max(100).default(100),
+});
+
+export type SupplierIdentityOptionsQuery = z.infer<
+  typeof supplierIdentityOptionsQuerySchema
+>;

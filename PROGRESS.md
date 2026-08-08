@@ -2,12 +2,14 @@
 
 ## 当前状态
 
-- 最新变更: 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
+- 最新变更: 报检任务不合格供应商回显修复——`SupplierSelect` 在选中 ID 未命中时跨类别回退解析 legacyName（同名不同 ID 场景也生效），无选中值时不跨类别猜选，外协供应商在进货检验表单不再显示 ID；进货检验记录「进货类型」显示按 `incomingTypeId` 解析字典当前名（历史行不动）；工序改名联动同步 `incoming_type` 字典；进货合格率分桶统一为解析后名称。
+- `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
+- 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
-- 测试状态: WP3 定向测试与后端全仓 Vitest `264/264` 文件、`2384/2384` 用例及全部提交门禁均已通过。
+- 测试状态: 后端全仓 Vitest `267/267` 文件、`2443/2443` 用例通过；前端相关定向 Vitest `12/12` 文件、`53/53` 用例通过（含 `SupplierSelect` 9/9）；lint、typecheck、架构门禁均通过。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 581（含测试）
+- 模块 TS 文件数: 617（含测试）
 - 当前版本: `0.19.1`
 
 ## 已完成
@@ -49,6 +51,7 @@
 - [x] 调试验收问题台账的一级导出和二级编辑、删除、日志使用带提示的图标按钮
 - [x] 本地 Apple Container 开发启动脚本改用有界端口探测，避免 macOS `lsof` 内核阻塞
 - [x] supplier identity governance wave（供应商画像、评分、检验、不合格项、售后评分、TEAM 映射、存量回填与 unresolved 审计）
+- [x] `supplier_identity_links` 系统设置管理 UI（管理员菜单、canonical 选项、查看、新增、编辑、删除、权限与前端校验）
 - [x] 供应商画像数据源契约修复（历史项目完整聚合、检验批次合格率、手工工程问题归属、V3 快照重算）
 - [x] 新增供应商同名软删除档案恢复（保留原 ID、并发 CAS、RESTORE 审计、业务冲突分级）
 - [x] TEAM 主数据身份治理（独立模块、稳定来源、别名、合并审计、通用字典写保护）
@@ -95,7 +98,6 @@ apps/backend/
 - [ ] 人工处置事业部回填遗留的 124 条工单和不合格项侧 8 个无法解析计数
 - [x] 完成 supplier identity wave 的 PR、release-please、部署、migration、回填和健康检查
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题、进货合格率和完整历史项目
-- [ ] 为 `supplier_identity_links` 增加管理 UI
 - [ ] 在本地管理员登录态或容器恢复后，通过主数据治理页处置 `ISS-2026-_O7D0ZBC` 的缺陷分类审计；当前保持 `OPEN`，未绕过认证或直接改库
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对
 - [ ] 将其他受控主数据从 `DUAL_WRITE/legacy` 逐 wave 推进到在线 `ID-required`

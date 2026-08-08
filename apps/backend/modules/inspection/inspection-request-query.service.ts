@@ -137,6 +137,7 @@ const requestQueryIncludeWithWorkOrders = {
 };
 
 type RequestResponsibilitySource = {
+  category?: null | string;
   processName?: null | string;
   supplierId?: null | string;
   team?: null | string;
@@ -148,6 +149,7 @@ function resolveRequestIssueResponsibility(
   teamSupplierByTeamId: ReadonlyMap<string, { id: string; name: string }>,
 ) {
   return resolveInspectionRequestIssueResponsibility({
+    category: request.category,
     processName: request.processName,
     supplierId: request.supplierId,
     team: request.team,

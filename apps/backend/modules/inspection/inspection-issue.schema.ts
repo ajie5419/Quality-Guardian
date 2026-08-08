@@ -127,8 +127,10 @@ const createSchema = z
   )
   .refine(
     (value) =>
-      String(value.processName || '').trim() !== '焊接' ||
-      Boolean(value.responsibleWelder),
+      !String(value.processName || '')
+        .trim()
+        .includes('焊') ||
+      Boolean(String(value.responsibleWelder || '').trim()),
     {
       message: '焊接工序必须填写责任焊工',
       path: ['responsibleWelder'],

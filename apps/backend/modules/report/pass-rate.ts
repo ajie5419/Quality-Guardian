@@ -17,7 +17,10 @@ import {
 } from '~/modules/report/pass-rate-process';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { resolveCanonicalProcessName } from '~/utils/process-resolver';
+import {
+  resolveCanonicalProcessName,
+  resolveIncomingTypeNamesByIds,
+} from '~/utils/process-resolver';
 
 import { getIssuePassRateSummaryByRange } from './pass-rate-issue-summary.service';
 import {
@@ -59,6 +62,7 @@ type IssuePassRateRow = {
   incomingType: null | string;
   inspectionCategory: null | string;
   inspectionIncomingType: null | string;
+  inspectionIncomingTypeId: null | string;
   inspectionProcessId: null | string;
   inspectionProcessName: null | string;
   inspectionTeam: null | string;
@@ -98,6 +102,7 @@ async function getInspectionPassRateRows(
     select: {
       category: true,
       incomingType: true,
+      incomingTypeId: true,
       process: {
         select: {
           name: true,
@@ -252,6 +257,7 @@ async function getIssuePassRateRows(start: Date, end: Date) {
         select: {
           category: true,
           incomingType: true,
+          incomingTypeId: true,
           process: {
             select: {
               name: true,
@@ -271,6 +277,7 @@ async function getIssuePassRateRows(start: Date, end: Date) {
     incomingType: null,
     inspectionCategory: item.inspection?.category || null,
     inspectionIncomingType: item.inspection?.incomingType || null,
+    inspectionIncomingTypeId: item.inspection?.incomingTypeId || null,
     inspectionProcessId: item.inspection?.processId || null,
     inspectionProcessName: resolveCanonicalProcessName({
       process: item.inspection?.process,
@@ -351,6 +358,13 @@ export async function getLegacyPassRateDrillDownByRange(
   const issueRows =
     source === 'issue' ? await getIssuePassRateRows(start, end) : [];
   const resolveBucket = await createPassRateBucketResolver();
+  const incomingTypeIds = inspections.map((item) =>
+    item.category === 'INCOMING' ? item.incomingTypeId : null,
+  );
+  const incomingTypeNameById = await resolveIncomingTypeNamesByIds([
+    ...incomingTypeIds,
+    ...issueRows.map((item) => item.inspectionIncomingTypeId),
+  ]);
 
   const processStats: Record<
     string,
@@ -423,7 +437,10 @@ export async function getLegacyPassRateDrillDownByRange(
     (record) => record.category === 'INCOMING',
   )) {
     const bucketName = String(
-      item.incomingType || item.processName || '',
+      incomingTypeNameById.get(item.incomingTypeId || '') ||
+        item.incomingType ||
+        item.processName ||
+        '',
     ).trim();
     if (!bucketName) continue;
 
@@ -453,7 +470,8 @@ export async function getLegacyPassRateDrillDownByRange(
     if (resolveIssueCategoryByIdentity(item, processBucket) !== 'INCOMING')
       continue;
     const bucketName = String(
-      resolveIssueIncomingBucket(issueBucketInput) ||
+      incomingTypeNameById.get(item.inspectionIncomingTypeId || '') ||
+        resolveIssueIncomingBucket(issueBucketInput) ||
         item.inspectionIncomingType ||
         item.incomingType ||
         item.processName ||

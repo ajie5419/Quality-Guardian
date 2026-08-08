@@ -37,6 +37,7 @@ function toItem(record: {
   closedAt: Date | null;
   inspectionResult: string;
   partName: string;
+  process?: null | { name?: null | string };
   qualifiedQuantity: null | number;
   quantity: number;
   reporter: string;
@@ -60,7 +61,8 @@ function toItem(record: {
     reporter: maskReporter(record.reporter),
     status: record.status,
     inspectionResult: record.inspectionResult,
-    incomingType: info.incomingType,
+    incomingType:
+      String(record.process?.name || '').trim() || info.incomingType,
     notes: info.notes,
     submittedAt: record.submittedAt.toISOString(),
     closedAt: record.closedAt ? record.closedAt.toISOString() : null,
@@ -232,6 +234,11 @@ export const InspectionPublicQueryService = {
       orderBy: { submittedAt: 'desc' },
       take: TAKE_LIMIT,
       select: {
+        process: {
+          select: {
+            name: true,
+          },
+        },
         requestNo: true,
         partName: true,
         team: true,

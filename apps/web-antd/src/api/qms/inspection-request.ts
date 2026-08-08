@@ -144,6 +144,7 @@ export async function getPublicInspectionRequestProcesses(params: {
       category: 'INCOMING' | 'PROCESS';
       processId: string;
       processName: string;
+      supplierSource: null | string;
     }>
   >(QMS_API.PUBLIC_INSPECTION_REQUEST_PROCESSES, { params });
 }

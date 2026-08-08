@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionRecordQueryService } from '~/modules/inspection/inspection-record-query.service';
 import prisma from '~/utils/prisma';
+import { resolveIncomingTypeNamesByIds } from '~/utils/process-resolver';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -25,6 +26,8 @@ vi.mock('~/utils/prisma-error', () => ({
 
 vi.mock('~/utils/process-resolver', () => ({
   resolveCanonicalProcessName: vi.fn().mockReturnValue('Welding'),
+  resolveIncomingTypeName: vi.fn().mockResolvedValue(null),
+  resolveIncomingTypeNamesByIds: vi.fn().mockResolvedValue(new Map()),
 }));
 
 vi.mock('~/utils/query-helpers', () => ({
@@ -145,6 +148,29 @@ describe('inspectionRecordQueryService', () => {
 
       expect(result.items).toHaveLength(1);
       expect(result.total).toBe(1);
+    });
+
+    it('resolves the canonical incoming-type name for incoming records', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          archiveTask: null,
+          category: 'INCOMING',
+          incomingType: '机加成品件',
+          incomingTypeId: 'dict-1',
+          process: null,
+          qualityRecords: [],
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+      vi.mocked(resolveIncomingTypeNamesByIds).mockResolvedValue(
+        new Map([['dict-1', '机加成品件-外协']]),
+      );
+
+      const result = await InspectionRecordQueryService.findAll({});
+
+      expect(result.items[0]?.incomingType).toBe('机加成品件-外协');
+      expect(resolveIncomingTypeNamesByIds).toHaveBeenCalledWith(['dict-1']);
     });
 
     it('should call forExport mode without skip/take', async () => {
@@ -395,6 +421,41 @@ describe('inspectionRecordQueryService', () => {
         }),
       ).resolves.toEqual({ items: [], total: 0 });
       expect(prisma.inspections.findMany).not.toHaveBeenCalled();
+    });
+
+    it('resolves the current process name from the linked process', async () => {
+      const { resolveCanonicalProcessName } = await import(
+        '~/utils/process-resolver'
+      );
+      vi.mocked(resolveCanonicalProcessName).mockReturnValue('机加成品件-外协');
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          category: 'INCOMING',
+          materialName: 'Gear',
+          process: { name: '机加成品件-外协' },
+          processName: '机加成品件',
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+
+      const result = await InspectionRecordQueryService.findSupplierHistory({
+        category: 'INCOMING',
+        identitySource: 'supplier',
+        supplierId: 'supplier-1',
+      });
+
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          include: {
+            process: { select: { name: true } },
+          },
+        }),
+      );
+      expect(result.items[0].processName).toBe('机加成品件-外协');
+      expect(resolveCanonicalProcessName).toHaveBeenCalledWith(
+        expect.objectContaining({ process: { name: '机加成品件-外协' } }),
+      );
     });
   });
 });

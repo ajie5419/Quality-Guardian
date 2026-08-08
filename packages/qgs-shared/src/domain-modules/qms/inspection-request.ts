@@ -19,6 +19,8 @@ export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 export const INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT = '采购部';
 export const OUTSOURCING_INSPECTION_PROCESS_KEYWORD = '外协';
 export const OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT = '生产 OBU';
+export const WELDING_PROCESS_KEYWORD = '焊';
+export const WELDING_DEFECT_CODE = 'WELDING_DEFECT';
 const CHECK_RESULT_SET = new Set(['FAIL', 'NA', 'PASS']);
 const REQUEST_STATUS_SET = new Set<string>(
   Object.values(INSPECTION_REQUEST_STATUS),
@@ -100,16 +102,18 @@ export function resolveInspectionIssueResponsibilityTypeFromDepartment(
 }
 
 export function resolveInspectionRequestIssueResponsibility(input: {
+  category?: unknown;
   processName?: unknown;
   supplierId?: unknown;
   team?: unknown;
   teamSupplier?: null | { id: string; name: string };
 }) {
+  const category = normalizeInspectionRequestText(input.category);
   const processName = normalizeInspectionRequestText(input.processName);
   const team = normalizeInspectionRequestText(input.team);
   const supplierId = normalizeInspectionRequestText(input.supplierId) || null;
 
-  if (isIncomingInspectionRequestProcess(processName)) {
+  if (isIncomingInspectionRequestCategory({ category, processName })) {
     return {
       responsibilityType: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
       responsibleDepartment: INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT,

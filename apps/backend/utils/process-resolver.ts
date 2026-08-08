@@ -4,6 +4,7 @@ import process from 'node:process';
 
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
+import prisma from '~/utils/prisma';
 
 type CacheEntry = {
   expiresAt: number;
@@ -145,6 +146,62 @@ export async function resolveProcessId(
   }
   const resolvedMap = await resolveProcessIdsByNames([normalizedName]);
   return resolvedMap.get(normalizedName) ?? null;
+}
+
+/**
+ * Resolve the canonical incoming-type dictionary name for a batch of
+ * dictionary ids. Records whose id is unknown (renamed or retired) fall back
+ * to null so callers can keep the historical snapshot. The name is resolved
+ * from dictKey because the governance layer treats dictKey as the canonical
+ * name column for incoming_type (master-data-fields.ts).
+ */
+export async function resolveIncomingTypeNamesByIds(
+  incomingTypeIds: Array<null | string | undefined>,
+) {
+  const normalizedIds = [
+    ...new Set(
+      incomingTypeIds.map((item) => String(item || '').trim()).filter(Boolean),
+    ),
+  ];
+  const resolvedMap = new Map<string, null | string>();
+  if (normalizedIds.length === 0) {
+    return resolvedMap;
+  }
+  const rows = await prisma.dictionaries.findMany({
+    where: {
+      dictType: 'incoming_type',
+      id: { in: normalizedIds },
+      isDeleted: false,
+      status: 1,
+    },
+    select: {
+      dictKey: true,
+      id: true,
+    },
+  });
+  for (const row of rows) {
+    resolvedMap.set(row.id, String(row.dictKey || '').trim() || null);
+  }
+  return resolvedMap;
+}
+
+/**
+ * Resolve the canonical incoming-type name for a single inspection record.
+ * Prefers the dictionary relation by id and falls back to the creation-time
+ * snapshot so legacy rows keep displaying a name even when the dictionary
+ * entry was retired.
+ */
+export async function resolveIncomingTypeName(record?: {
+  incomingType?: null | string;
+  incomingTypeId?: null | string;
+}) {
+  const normalizedId = String(record?.incomingTypeId || '').trim();
+  const fallbackName = normalizeProcessName(record?.incomingType);
+  if (!normalizedId) {
+    return fallbackName || null;
+  }
+  const resolvedMap = await resolveIncomingTypeNamesByIds([normalizedId]);
+  return resolvedMap.get(normalizedId) || fallbackName || null;
 }
 
 export async function resolveProcessIdsByNames(

@@ -304,10 +304,6 @@
         "have": "Have",
         "none": "None",
         "process": {
-          "outsourced": "Outsourced",
-          "rawMaterial": "Raw Material",
-          "auxiliary": "Auxiliary",
-          "machined": "Machined",
           "cutting": "Cutting",
           "assembly": "Assembly",
           "welding": "Welding",

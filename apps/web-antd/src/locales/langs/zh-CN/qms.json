@@ -533,10 +533,6 @@
         "have": "有",
         "none": "无",
         "process": {
-          "outsourced": "外购件",
-          "rawMaterial": "原材料",
-          "auxiliary": "辅材",
-          "machined": "机加成品件",
           "cutting": "下料",
           "assembly": "组对",
           "welding": "焊接",

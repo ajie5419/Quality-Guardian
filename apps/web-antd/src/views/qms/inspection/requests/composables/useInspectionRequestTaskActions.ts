@@ -402,7 +402,9 @@ export function useInspectionRequestTaskActions(
     const issueResponsibility =
       record.issueResponsibility ||
       resolveInspectionRequestIssueResponsibility({
+        category: record.category,
         processName: record.processName,
+        supplierId: record.supplierId,
         team: record.team,
       });
     const responsibleDepartment = resolveTreeDepartmentIdentity(
