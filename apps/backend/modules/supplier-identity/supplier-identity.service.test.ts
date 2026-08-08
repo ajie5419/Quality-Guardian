@@ -439,10 +439,24 @@ describe('supplier identity service', () => {
   });
 
   it('loads TEAM identities for suppliers in one query', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      { id: 'supplier-1' },
+      { id: 'supplier-2' },
+    ] as never);
     vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
       { identityId: 'team-1', supplierId: 'supplier-1' },
       { identityId: 'team-2', supplierId: 'supplier-1' },
       { identityId: 'team-3', supplierId: 'supplier-2' },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-1', teamId: 'team-1' },
+      { sourceId: 'supplier-1', teamId: 'team-2' },
+      { sourceId: 'supplier-2', teamId: 'team-3' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { id: 'team-1' },
+      { id: 'team-2' },
+      { id: 'team-3' },
     ] as never);
 
     await expect(
@@ -465,6 +479,33 @@ describe('supplier identity service', () => {
         supplierId: { in: ['supplier-1', 'supplier-2'] },
       },
     });
+  });
+
+  it('excludes historical links without an active exact source, team, or PROCESS supplier policy', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      { id: 'supplier-valid' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      { identityId: 'team-valid', supplierId: 'supplier-valid' },
+      { identityId: 'team-no-source', supplierId: 'supplier-valid' },
+      { identityId: 'team-inactive', supplierId: 'supplier-valid' },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-valid', teamId: 'team-valid' },
+      { sourceId: 'supplier-valid', teamId: 'team-inactive' },
+      { sourceId: 'supplier-other', teamId: 'team-no-source' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { id: 'team-valid' },
+      { id: 'team-no-source' },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.teamIdsBySupplierIds([
+        'supplier-valid',
+        'supplier-non-process-policy',
+      ]),
+    ).resolves.toEqual(new Map([['supplier-valid', ['team-valid']]]));
   });
 
   it('returns canonical TEAM IDs and classifies linked external teams', async () => {
