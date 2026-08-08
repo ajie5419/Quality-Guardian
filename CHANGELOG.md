@@ -27,6 +27,19 @@
 
 ---
 
+## [0.24.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.23.2...qgs-v0.24.0) (2026-08-08)
+
+
+### Features
+
+* **project:** resolve supplier and process identities by stable id across inspection flows ([c8f5d3a](https://github.com/ajie5419/Quality-Guardian/commit/c8f5d3ae4a21338a4c763fa204fe7762b23faa96))
+* **project:** resolve supplier and process identities by stable id across inspection flows ([b5319b8](https://github.com/ajie5419/Quality-Guardian/commit/b5319b8e69139cd1f44d4d5536ecb3d4aa43110d))
+
+
+### Bug Fixes
+
+* **ci:** remove script_stop injection that bypasses deploy rollback ([#91](https://github.com/ajie5419/Quality-Guardian/issues/91)) ([49d7384](https://github.com/ajie5419/Quality-Guardian/commit/49d73848330fac70149fad97cb0a35e4a9a7027a))
+
 ### 2026-08-08 修复：报检任务不合格供应商回显显示 ID（跨类别 legacyName 解析）
 
 **问题：**
