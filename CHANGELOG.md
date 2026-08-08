@@ -27,6 +27,29 @@
 
 ---
 
+### 2026-08-08 修复：supplier identity 独立验收 P1 闭环
+
+**执行内容：**
+
+- 供应商画像/评分的 supplier→TEAM 查询现在只返回 active TEAM、有效 PROCESS-policy 外包供应商、精确 active `SUPPLIER` 来源和 active link 的交集，历史无效 link 不再进入聚合。
+- 回填上下文区分 external TEAM 与仅 DEPARTMENT 的 internal TEAM；外部 TEAM 缺有效 link 即使 supplier 字段为空也记录 `MISSING_PROCESS_TEAM_LINK`。同时，DEPARTMENT+SUPPLIER 双来源被视为冲突，绝不清理为内部事实。
+- `qms_inspection_requests`、`inspections`、`quality_records` 的内部 supplier 清理 CAS 与 cleared/resolved/unresolved 审计放入同一 Prisma transaction；审计失败会使事务失败。
+- 软删 TEAM link 仅可原供应商恢复；若改绑供应商且存在 PROCESS facts，服务端拒绝修改。
+
+**验证结果：**
+
+- 定向 Vitest：supplier identity、回填 resolver/runtime/request 共 `62/62` 通过。
+- 后端全仓 Vitest：`267/267` 文件、`2461/2461` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`：均通过（架构检查只报告既有 baseline）。
+
+**commits:** `f9e325a1`、`d57a8303`、`ebc98eba`、`38e379bf`
+
+**遗留问题：**
+
+- 未连接生产；v0.24.0 的 17 条及既有 unresolved 仍必须通过正常发布 maintenance/backfill 链路以确定性身份来源处置，任何歧义记录继续阻断发布。
+
+---
+
 ### 2026-08-08 发布：qgs v0.24.0（身份 ID 化治理 + 报检/检验显示修复）
 
 **执行内容：**
