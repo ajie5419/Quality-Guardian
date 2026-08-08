@@ -33,6 +33,7 @@
 
 - 提交 `b5319b8e` 经 PR #94 合入 main：SupplierSelect 跨类别 legacyName 回退、进货类型/工序按 ID 解析、supplier identity links 系统设置管理 UI、焊接缺陷责任焊工校验、责任部门 TreeSelect 独立勾选等。
 - release-please 生成发布 PR #92 → 合并 → tag `qgs-v0.24.0`。
+- 版本时间线：v0.23.3 的 release commit 曾生成但未打 tag；其内容随 `b5319b8e` 并入 v0.24.0，不构成独立已发布版本。
 
 **发布过程：**
 
@@ -49,7 +50,6 @@
 
 ### Features
 
-* **project:** resolve supplier and process identities by stable id across inspection flows ([c8f5d3a](https://github.com/ajie5419/Quality-Guardian/commit/c8f5d3ae4a21338a4c763fa204fe7762b23faa96))
 * **project:** resolve supplier and process identities by stable id across inspection flows ([b5319b8](https://github.com/ajie5419/Quality-Guardian/commit/b5319b8e69139cd1f44d4d5536ecb3d4aa43110d))
 
 
@@ -76,7 +76,7 @@
 
 - 定向前端测试 `SupplierSelect` 9/9，相关 QMS 前端测试 12 文件 53 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 ---
 
@@ -107,7 +107,7 @@
 - 本地 `prisma migrate deploy` 应用新 migration 成功且幂等（字典已是新名，0 行变更）。
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 
@@ -125,7 +125,7 @@
 - vitest: 全量 3046/3046 通过（新增 1 用例）
 - typecheck / eslint 变更文件: 通过
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 历史检验记录若 `processId` 为空（旧数据未回填），主列表仍显示创建时快照名；需按名称回填 `processId` 后才会跟随改名，回填前先在生产库核对 `inspections.processId` 填充率
@@ -146,7 +146,7 @@
 - prisma validate / check:prisma-migration: 通过
 - eslint 变更文件 / check:qms-arch: 通过
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 生产环境需执行新 migration 后，历史「机加成品件」工序才会回填为外协来源；部署后用户仍可在设置页手动调整任意工序的供应商来源
@@ -165,7 +165,7 @@
 - `pnpm run check:type`：通过（3/3 workspace tasks；weapp 为项目既有 skip）。
 - `pnpm run check:qms-arch`：通过（0 新违规）。
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 无；发布后动态菜单同步会创建页面与按钮权限记录，角色授权仍由既有 RBAC 管理流程维护。
@@ -187,17 +187,10 @@
 - eslint 变更文件: 通过
 - check:qms-arch: 通过
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 无
-
-### 2026-08-07 修复：焊接缺陷未弹出责任焊工（完结弹窗/不合格项表单）
-
-**执行内容：**
-- 根因：责任焊工字段显示条件只判断 `processName === '焊接'`，未按缺陷分类联动；报检工序（如外购件）非焊接时，即使选「制造缺陷→焊接缺陷」也不显示责任焊工
-- `packages/qgs-shared/src/domain-modules/qms/inspection-request.ts`：新增共享常量 `WELDING_PROCESS_KEYWORD`
-- `apps/web-antd/src/views/qms/inspection/issues/components/issueFormData.ts`：新增 `isWeldingProcessName`/`isWeldingDefectSubcategory` 判定函数，初始显示条件放宽为工序含「焊」
 
 ### 2026-08-07 修复：焊接缺陷未弹出责任焊工（完结弹窗/不合格项表单）
 
@@ -216,12 +209,14 @@
 - vitest: inspection + issues + shared 792/792 通过
 - check:qms-arch: 通过
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 无
 
 ### 2026-08-07 修复：厂内外包队按供应商主数据识别（生产 OBU 两条线）
+
+**已废止：** 本记录的名称匹配和 `bootstrapExactTeamLinks` 规则已被 v0.24.0 后的显式 `SUPPLIER` source + 有效 link 契约取代；不得再按 TEAM/供应商名称推断外协身份或创建 link。
 
 **执行内容：**
 - 根因：TEAM 字典同时容纳厂内班组（结构 BU/组装 BU 等）与厂外包队（公司名），但运行时只凭 `supplier_identity_links` 判断外协；26 家外包队有供应商主数据但缺链接，被误判为内部责任（责任部门空、入口分组错误）
@@ -236,7 +231,7 @@
 - vitest: supplier-identity + inspection 668/668 通过
 - check:qms-arch: 通过（服务文件拆分后回到 500 行内）
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 24 个无供应商主数据的 TEAM（含厂内班组及少数无主数据公司）保持内部责任；公司名且无主数据的需建供应商并走 `bootstrapExactTeamLinks` 补链接（`pnpm --dir apps/backend maintenance:supplier-identities -- --mode=apply`）
@@ -251,7 +246,7 @@
 - vitest: issues + requests 相关 74/74 通过
 - 未改动数据；重复节点 `dept-r9u69gg8y64qutugxzsd8u6r` 的退役需走主数据治理（43 条质量记录引用迁移后再软删）
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 历史 43 条 `quality_records.responsibleDepartmentId = dept-r9u69gg8y64qutugxzsd8u6r`，需迁移到主节点 `dept-1769576623191` 后软删重复节点
@@ -271,7 +266,7 @@
 - eslint 变更文件: 通过
 - vitest: 相关模块 789/789 通过（新增用例 38/38 含在总套件内）
 
-**commit:** 待提交
+**commit:** `b5319b8e`
 
 **遗留问题：**
 - 生产环境部门树必须包含「采购部」「生产 OBU」节点（本地数据源已验证存在），否则名称→ID 解析仍会落空
