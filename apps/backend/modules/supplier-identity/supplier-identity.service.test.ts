@@ -595,10 +595,65 @@ describe('supplier identity service', () => {
       take: 100,
       where: {
         isDeleted: false,
+        sourceId: { in: ['supplier-1'] },
         sourceType: 'SUPPLIER',
         teamId: { in: ['team-1'] },
       },
     });
+  });
+
+  it('searches supplier candidates before bounded sources', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      {
+        category: 'Outsourcing',
+        id: 'supplier-target',
+        name: 'Target Supplier',
+        outsourcingMode: 'EXTERNAL_SERVICE',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-target', teamId: 'team-target' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Target TEAM', id: 'team-target' },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.listManagementOptions({
+        keyword: 'Target',
+        take: 100,
+        target: 'supplier',
+      }),
+    ).resolves.toEqual({
+      suppliers: [{ label: 'Target Supplier', value: 'supplier-target' }],
+      teams: [{ label: 'Target TEAM', value: 'team-target' }],
+    });
+    expect(prisma.suppliers.findMany).toHaveBeenCalledWith({
+      orderBy: { name: 'asc' },
+      select: { category: true, id: true, name: true, outsourcingMode: true },
+      take: 100,
+      where: {
+        category: 'Outsourcing',
+        isDeleted: false,
+        name: { contains: 'Target' },
+        outsourcingMode: { in: ['IN_HOUSE_TEAM', 'EXTERNAL_SERVICE'] },
+      },
+    });
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith({
+      select: { sourceId: true, teamId: true },
+      take: 100,
+      where: {
+        isDeleted: false,
+        sourceId: { in: ['supplier-target'] },
+        sourceType: 'SUPPLIER',
+      },
+    });
+    expect(
+      vi.mocked(prisma.suppliers.findMany).mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      vi.mocked(prisma.team_identity_sources.findMany).mock
+        .invocationCallOrder[0] || Number.POSITIVE_INFINITY,
+    );
   });
 
   it('classifies an unlinked TEAM as internal even when a supplier has the same name', async () => {

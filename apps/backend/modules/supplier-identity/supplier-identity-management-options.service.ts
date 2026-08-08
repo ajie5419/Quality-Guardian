@@ -1,6 +1,11 @@
 import type { SupplierIdentityOptionsQuery } from './supplier-identity.schema';
 
-import { resolveSupplierInspectionPolicy } from '@qgs/shared';
+import {
+  EXTERNAL_SERVICE_OUTSOURCING_MODE,
+  IN_HOUSE_OUTSOURCING_MODE,
+  OUTSOURCING_CATEGORY,
+  resolveSupplierInspectionPolicy,
+} from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
 type TeamOption = { dictKey: string; id: string };
@@ -28,17 +33,41 @@ async function listKeywordTeamCandidates(
 }
 
 async function listBoundedSupplierSources(
-  teamIds: string[] | undefined,
+  options: { supplierIds?: string[]; teamIds?: string[] },
   take: number,
 ) {
-  if (teamIds?.length === 0) return [];
+  if (options.supplierIds?.length === 0 || options.teamIds?.length === 0) {
+    return [];
+  }
   return prisma.team_identity_sources.findMany({
     where: {
       isDeleted: false,
       sourceType: 'SUPPLIER',
-      ...(teamIds ? { teamId: { in: teamIds } } : {}),
+      ...(options.supplierIds ? { sourceId: { in: options.supplierIds } } : {}),
+      ...(options.teamIds ? { teamId: { in: options.teamIds } } : {}),
     },
     select: { sourceId: true, teamId: true },
+    take,
+  });
+}
+
+async function listKeywordSupplierCandidates(
+  params: SupplierIdentityOptionsQuery,
+  keyword: string,
+  take: number,
+) {
+  if (params.target === 'team') return null;
+  return prisma.suppliers.findMany({
+    where: {
+      category: OUTSOURCING_CATEGORY,
+      isDeleted: false,
+      outsourcingMode: {
+        in: [IN_HOUSE_OUTSOURCING_MODE, EXTERNAL_SERVICE_OUTSOURCING_MODE],
+      },
+      ...(keyword ? { name: { contains: keyword } } : {}),
+    },
+    orderBy: { name: 'asc' },
+    select: { category: true, id: true, name: true, outsourcingMode: true },
     take,
   });
 }
@@ -77,12 +106,24 @@ export async function listSupplierIdentityManagementOptions(
   const keyword = params.keyword?.trim() || '';
   const take = Math.min(Math.max(params.take || 100, 1), 100);
   const candidateTeams = await listKeywordTeamCandidates(params, keyword, take);
+  const candidateSuppliers = await listKeywordSupplierCandidates(
+    params,
+    keyword,
+    take,
+  );
   const sourceTeamIds = params.teamId
     ? [params.teamId]
     : candidateTeams?.map((team) => team.id);
-  const sources = await listBoundedSupplierSources(sourceTeamIds, take);
+  const sources = await listBoundedSupplierSources(
+    {
+      supplierIds: candidateSuppliers?.map((supplier) => supplier.id),
+      teamIds: sourceTeamIds,
+    },
+    take,
+  );
   const supplierRows =
-    sources.length === 0
+    candidateSuppliers ||
+    (sources.length === 0
       ? []
       : await prisma.suppliers.findMany({
           where: {
@@ -100,7 +141,7 @@ export async function listSupplierIdentityManagementOptions(
             outsourcingMode: true,
           },
           take,
-        });
+        }));
   const supplierIds = new Set(
     supplierRows
       .filter(
