@@ -1,11 +1,11 @@
-import type { DictionaryOptionItem } from '#/api/system/dictionary';
+import type { ProcessMasterOption } from '#/api/qms/process-master';
 
 import { ref } from 'vue';
 
 import { getProcessMasterOptionsApi } from '#/api/qms/process-master';
 
 interface UseProcessMasterOptionsParams<TOption> {
-  mapOptions: (options: DictionaryOptionItem[] | undefined) => TOption[];
+  mapOptions: (options: ProcessMasterOption[] | undefined) => TOption[];
 }
 
 export function useProcessMasterOptions<TOption>(

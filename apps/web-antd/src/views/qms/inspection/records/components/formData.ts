@@ -20,7 +20,12 @@ export function buildTeamIdentityFields(
 export const getFormSchema = (
   type: string,
   processOptionsOverride?:
-    | Array<{ label: string; value: string }>
+    | Array<{
+        inspectionRequestCategory?: null | string;
+        label: string;
+        supplierSource?: null | string;
+        value: string;
+      }>
     | DictionaryOptionItem[],
 ): VbenFormSchema[] => {
   const isIncoming = type === 'incoming';
@@ -32,11 +37,22 @@ export const getFormSchema = (
         if ('dictKey' in item) {
           return {
             label: item.dictValue || item.dictKey,
+            ...('supplierSource' in item
+              ? { supplierSource: item.supplierSource }
+              : {}),
+            ...('inspectionRequestCategory' in item
+              ? { inspectionRequestCategory: item.inspectionRequestCategory }
+              : {}),
             value: item.dictKey,
           };
         }
         return item;
       })
+    : [];
+  const incomingTypeOptions = isIncoming
+    ? processOptions.filter(
+        (item) => item.inspectionRequestCategory === 'INCOMING',
+      )
     : [];
 
   const schema: VbenFormSchema[] = [
@@ -67,24 +83,10 @@ export const getFormSchema = (
         rules: 'selectRequired',
         modelPropName: 'value',
         componentProps: {
-          options: [
-            {
-              label: $t('qms.inspection.records.options.process.rawMaterial'),
-              value: '原材料',
-            },
-            {
-              label: $t('qms.inspection.records.options.process.outsourced'),
-              value: '外购件',
-            },
-            {
-              label: $t('qms.inspection.records.options.process.auxiliary'),
-              value: '辅材',
-            },
-            {
-              label: $t('qms.inspection.records.options.process.machined'),
-              value: '机加成品件',
-            },
-          ],
+          options: incomingTypeOptions.map((item) => ({
+            label: item.label,
+            value: item.value,
+          })),
         },
       },
       {

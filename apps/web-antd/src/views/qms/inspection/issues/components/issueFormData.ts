@@ -6,12 +6,36 @@ import type { VbenFormSchema } from '#/adapter/form';
 
 import { useI18n } from '@vben/locales';
 
+import { WELDING_DEFECT_CODE, WELDING_PROCESS_KEYWORD } from '@qgs/shared';
+
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import {
   useClaimOptions,
   useSeverityOptions,
   useStatusOptions,
 } from '../constants';
+
+export function isWeldingProcessName(value: unknown) {
+  return String(value ?? '')
+    .trim()
+    .includes(WELDING_PROCESS_KEYWORD);
+}
+
+export function isWeldingDefectSubcategory(
+  subcategoryId: unknown,
+  classificationOptions: QualityClassificationCategory[],
+) {
+  const id = String(subcategoryId ?? '').trim();
+  if (!id) return false;
+  return classificationOptions
+    .flatMap((category) => category.subcategories)
+    .some(
+      (subcategory) =>
+        subcategory.id === id &&
+        (subcategory.code === WELDING_DEFECT_CODE ||
+          String(subcategory.name ?? '').includes(WELDING_PROCESS_KEYWORD)),
+    );
+}
 
 export function getIssueFormSchema(
   processOptionsOverride?: Array<{ label: string; value: string }>,
@@ -128,7 +152,9 @@ export function getIssueFormSchema(
         maxTagCount: 'responsive',
         treeDefaultExpandAll: true,
         treeCheckable: true,
-        treeCheckStrictly: false,
+        // Check parent and child departments independently so selecting a
+        // parent unit (e.g. 生产 OBU) does not cascade-select its child BUs.
+        treeCheckStrictly: true,
       },
     },
     {
@@ -144,7 +170,7 @@ export function getIssueFormSchema(
       dependencies: {
         triggerFields: ['processName'],
         show: (values: Record<string, unknown>) =>
-          String(values.processName || '').trim() === '焊接',
+          isWeldingProcessName(values.processName),
       },
     },
     {

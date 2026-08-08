@@ -91,11 +91,12 @@ const attachmentFileList = defineModel<UploadFile[]>('attachmentFileList', {
 });
 
 // Incoming type options follow the inspection request process settings
-// (system/inspection-processes) so administrators can control them.
+// (system/inspection-processes). Values are bound to the stable process ID so
+// renaming a process does not break downstream identity resolution.
 const incomingTypeOptions = computed(() =>
   props.processOptions.map((item) => ({
     label: item.processName,
-    value: item.processName,
+    value: item.value,
   })),
 );
 

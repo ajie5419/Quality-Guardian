@@ -390,6 +390,7 @@ model processes {
   id                        String                               @id @default(cuid())
   name                      String                               @unique
   code                      String?
+  supplierSource            String                               @default("Supplier") @db.VarChar(20)
   inspectionRequestCategory String                               @default("PROCESS") @db.VarChar(20)
   sort                      Int                                  @default(0)
   status                    Int                                  @default(1)

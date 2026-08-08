@@ -12,10 +12,13 @@ import {
 } from '#/api/qms/inspection-request';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
-import {
-  MACHINED_INCOMING_INSPECTION_TYPE,
-  mapInspectionRequestEntryTeamOptions,
-} from './entry-mode';
+import { mapInspectionRequestEntryTeamOptions } from './entry-mode';
+
+interface InspectionRequestProcessOption {
+  processName: string;
+  supplierSource: null | string;
+  value: string;
+}
 
 interface InspectionRequestIdentityForm {
   incomingType: string;
@@ -26,9 +29,10 @@ interface InspectionRequestIdentityForm {
 
 export function useInspectionRequestIdentityOptions(options: {
   isIncomingEntry: Readonly<Ref<boolean>>;
+  processOptions: Readonly<Ref<InspectionRequestProcessOption[]>>;
   requestForm: InspectionRequestIdentityForm;
 }) {
-  const { isIncomingEntry, requestForm } = options;
+  const { isIncomingEntry, processOptions, requestForm } = options;
   const { handleApiError } = useErrorHandler();
   const teamLoading = ref(false);
   const teamOptions = ref<SelectProps['options']>([]);
@@ -57,9 +61,12 @@ export function useInspectionRequestIdentityOptions(options: {
   async function loadSupplierOptions(keyword = '') {
     teamLoading.value = true;
     try {
+      const selectedProcess = processOptions.value.find(
+        (item) => item.value === requestForm.incomingType,
+      );
       teamOptions.value = await getPublicInspectionRequestSuppliers({
         category:
-          requestForm.incomingType === MACHINED_INCOMING_INSPECTION_TYPE
+          selectedProcess?.supplierSource === SUPPLIER_CATEGORY.OUTSOURCING
             ? SUPPLIER_CATEGORY.OUTSOURCING
             : SUPPLIER_CATEGORY.SUPPLIER,
         keyword: keyword.trim() || undefined,

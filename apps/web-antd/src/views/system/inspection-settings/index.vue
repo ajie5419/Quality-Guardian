@@ -19,6 +19,7 @@ import {
   message,
   Modal,
   Popconfirm,
+  Select,
   Space,
   Switch,
   Table,
@@ -76,7 +77,15 @@ const processDraft = reactive<{
   name: string;
   sort: number;
   status: 0 | 1;
-}>({ categories: [], code: '', name: '', sort: 0, status: 1 });
+  supplierSource: InspectionSettingsApi.ProcessSupplierSource;
+}>({
+  categories: [],
+  code: '',
+  name: '',
+  sort: 0,
+  status: 1,
+  supplierSource: 'Supplier',
+});
 
 const columns = computed(() => [
   { key: 'name', title: t('sys.inspectionSettings.processName') },
@@ -91,6 +100,12 @@ const columns = computed(() => [
     key: 'sort',
     title: t('sys.inspectionSettings.sort'),
     width: 90,
+  },
+  {
+    dataIndex: 'supplierSource',
+    key: 'supplierSource',
+    title: t('sys.inspectionSettings.supplierSource'),
+    width: 130,
   },
   {
     key: 'status',
@@ -289,6 +304,7 @@ function openCreateModal() {
     name: '',
     sort: processRows.value.length,
     status: 1,
+    supplierSource: 'Supplier',
   });
   processModalOpen.value = true;
 }
@@ -301,6 +317,7 @@ function openEditModal(item: ProcessItem) {
     name: item.name,
     sort: item.sort,
     status: item.status === 1 ? 1 : 0,
+    supplierSource: item.supplierSource,
   });
   processModalOpen.value = true;
 }
@@ -324,12 +341,14 @@ async function saveProcess() {
           name,
           sort: processDraft.sort,
           status: processDraft.status,
+          supplierSource: processDraft.supplierSource,
         })
       : createInspectionProcessApi({
           categories: processDraft.categories,
           code: processDraft.code.trim() || null,
           name,
           sort: processDraft.sort,
+          supplierSource: processDraft.supplierSource,
         }));
     processModalOpen.value = false;
     await loadSettings();
@@ -559,6 +578,15 @@ onMounted(loadSettings);
                 "
               />
             </template>
+            <template v-else-if="column.key === 'supplierSource'">
+              <span>
+                {{
+                  record.supplierSource === 'Outsourcing'
+                    ? t('sys.inspectionSettings.supplierSourceOutsourcing')
+                    : t('sys.inspectionSettings.supplierSourceSupplier')
+                }}
+              </span>
+            </template>
             <template v-else-if="column.key === 'process'">
               <Switch
                 :checked="isCategoryEnabled(record.id, 'PROCESS')"
@@ -650,6 +678,22 @@ onMounted(loadSettings);
             />
           </Form.Item>
         </div>
+        <Form.Item :label="t('sys.inspectionSettings.supplierSource')">
+          <Select
+            v-model:value="processDraft.supplierSource"
+            class="w-full"
+            :options="[
+              {
+                label: t('sys.inspectionSettings.supplierSourceSupplier'),
+                value: 'Supplier',
+              },
+              {
+                label: t('sys.inspectionSettings.supplierSourceOutsourcing'),
+                value: 'Outsourcing',
+              },
+            ]"
+          />
+        </Form.Item>
         <Form.Item
           v-if="!editingProcessId"
           :label="t('sys.inspectionSettings.visibleIn')"

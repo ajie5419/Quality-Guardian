@@ -226,6 +226,91 @@ describe('buildCloseLinkedIssueCreateResult', () => {
     );
   });
 
+  it('rejects welding defects without a responsible welder', async () => {
+    const txWithSubcategory = {
+      quality_classification_subcategories: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ code: 'WELDING_DEFECT', name: '焊接缺陷' }),
+      },
+    } as unknown as Prisma.TransactionClient;
+
+    await expect(
+      buildCloseLinkedIssueCreateResult({
+        body: { unqualifiedQuantity: 1 },
+        inspectionId: 'i-1',
+        linkedIssue: {
+          defectCategoryId: 'cat-manufacturing',
+          defectSubcategoryId: 'sub-welding',
+          ncNumber: 'NC-2026-002',
+          processName: '外购件',
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartment: '采购部',
+          responsibleDepartmentId: 'dept-purchasing',
+          responsibleWelder: '',
+          status: 'OPEN',
+        },
+        request: {
+          componentName: null,
+          partName: 'Part',
+          process: null,
+          processName: '外购件',
+          reporter: 'Reporter',
+          supplierId: 'supplier-incoming',
+          workOrderNumber: 'WO-1',
+        },
+        tx: txWithSubcategory,
+        userinfo: { id: 'user-1', username: 'admin' } as any,
+      }),
+    ).rejects.toThrow('焊接缺陷必须填写责任焊工');
+    expect(
+      txWithSubcategory.quality_classification_subcategories.findFirst,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ id: 'sub-welding' }),
+      }),
+    );
+  });
+
+  it('rejects welding defects by stable code even after the subcategory is renamed', async () => {
+    const txWithSubcategory = {
+      quality_classification_subcategories: {
+        findFirst: vi
+          .fn()
+          .mockResolvedValue({ code: 'WELDING_DEFECT', name: '焊缝缺陷' }),
+      },
+    } as unknown as Prisma.TransactionClient;
+
+    await expect(
+      buildCloseLinkedIssueCreateResult({
+        body: { unqualifiedQuantity: 1 },
+        inspectionId: 'i-1',
+        linkedIssue: {
+          defectCategoryId: 'cat-manufacturing',
+          defectSubcategoryId: 'sub-welding',
+          ncNumber: 'NC-2026-002',
+          processName: '外购件',
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartment: '采购部',
+          responsibleDepartmentId: 'dept-purchasing',
+          responsibleWelder: '',
+          status: 'OPEN',
+        },
+        request: {
+          componentName: null,
+          partName: 'Part',
+          process: null,
+          processName: '外购件',
+          reporter: 'Reporter',
+          supplierId: 'supplier-incoming',
+          workOrderNumber: 'WO-1',
+        },
+        tx: txWithSubcategory,
+        userinfo: { id: 'user-1', username: 'admin' } as any,
+      }),
+    ).rejects.toThrow('焊接缺陷必须填写责任焊工');
+  });
+
   it('uses incoming supplier as supplierName and purchasing as responsible department', async () => {
     mockResolveCanonicalProcessName.mockReturnValue('进货检验');
     const { buildInspectionIssueCreateData } = await import(

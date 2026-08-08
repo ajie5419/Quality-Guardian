@@ -93,35 +93,51 @@ const selectOptions = computed<SelectProps['options']>(() => {
 
 let legacyResolutionToken = 0;
 
-async function resolveLegacyName() {
-  const legacyName = props.legacyName?.trim();
-  if (props.valueMode !== 'id' || !legacyName) return false;
-
-  const resolutionToken = ++legacyResolutionToken;
+async function fetchExactMatches(legacyName: string, category?: string) {
   const exactMatches = new Map<string, SupplierItem>();
   const pageSize = 100;
   let page = 1;
   let total = 0;
 
+  do {
+    const result = await getSupplierList({
+      ...(category ? { category } : {}),
+      keyword: legacyName,
+      page,
+      pageSize,
+    });
+    total = result.total;
+    result.items.forEach((item) => {
+      if (item.name.trim() === legacyName) exactMatches.set(item.id, item);
+    });
+    page += 1;
+  } while ((page - 1) * pageSize < total);
+  return exactMatches;
+}
+
+async function resolveLegacyName() {
+  const legacyName = props.legacyName?.trim();
+  if (props.valueMode !== 'id' || !legacyName) return false;
+
+  const resolutionToken = ++legacyResolutionToken;
+  const selectedValue = String(props.value || '').trim();
+
   try {
-    do {
-      const result = await getSupplierList({
-        category: props.category,
-        keyword: legacyName,
-        page,
-        pageSize,
-      });
-      total = result.total;
-      result.items.forEach((item) => {
-        if (item.name.trim() === legacyName) exactMatches.set(item.id, item);
-      });
-      if (exactMatches.size > 1 && !props.value) return true;
-      page += 1;
-    } while ((page - 1) * pageSize < total);
+    let exactMatches = await fetchExactMatches(legacyName, props.category);
+    // A supplier may belong to a category that differs from the form's
+    // responsibility mapping (e.g. an Outsourcing supplier under an INCOMING
+    // request). Retry without the category filter only when the preselected
+    // supplier is missing, so the legacy name still resolves to its canonical
+    // id instead of showing the raw id. Without a preselected value we never
+    // guess across categories.
+    if (selectedValue && !exactMatches.has(selectedValue)) {
+      exactMatches = await fetchExactMatches(legacyName);
+    }
+    if (exactMatches.size > 1 && !selectedValue) return true;
 
     if (resolutionToken !== legacyResolutionToken) return true;
-    if (props.value) {
-      const currentMatch = exactMatches.get(props.value);
+    if (selectedValue) {
+      const currentMatch = exactMatches.get(selectedValue);
       if (
         currentMatch &&
         !options.value.some((item) => item.id === currentMatch.id)

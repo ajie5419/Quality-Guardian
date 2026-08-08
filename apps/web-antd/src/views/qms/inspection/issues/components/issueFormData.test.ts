@@ -1,0 +1,77 @@
+import { describe, expect, it } from 'vitest';
+
+import {
+  isWeldingDefectSubcategory,
+  isWeldingProcessName,
+} from './issueFormData';
+
+const CLASSIFICATIONS = [
+  {
+    code: 'MANUFACTURING_DEFECT',
+    id: 'cat-manufacturing',
+    name: '制造缺陷',
+    scope: 'INSPECTION_ISSUE_DEFECT' as const,
+    sort: 1,
+    status: 1 as const,
+    subcategories: [
+      {
+        code: 'WELDING_DEFECT',
+        id: 'sub-welding',
+        name: '焊接缺陷',
+        sort: 1,
+        status: 1 as const,
+      },
+      {
+        code: 'SURFACE_DEFECT',
+        id: 'sub-surface',
+        name: '表面缺陷',
+        sort: 2,
+        status: 1 as const,
+      },
+    ],
+  },
+];
+
+describe('issue form welding conditions', () => {
+  it('recognizes welding process names by the 焊 keyword', () => {
+    expect(isWeldingProcessName('焊接')).toBe(true);
+    expect(isWeldingProcessName('探伤')).toBe(false);
+    expect(isWeldingProcessName('')).toBe(false);
+  });
+
+  it('recognizes welding defect subcategories by name', () => {
+    expect(isWeldingDefectSubcategory('sub-welding', CLASSIFICATIONS)).toBe(
+      true,
+    );
+    expect(isWeldingDefectSubcategory('sub-surface', CLASSIFICATIONS)).toBe(
+      false,
+    );
+    expect(isWeldingDefectSubcategory('', CLASSIFICATIONS)).toBe(false);
+  });
+
+  it('recognizes welding defect subcategories by stable code after a rename', () => {
+    const welding = CLASSIFICATIONS[0]!.subcategories[0]!;
+    const surface = CLASSIFICATIONS[0]!.subcategories[1]!;
+    const renamed = [
+      {
+        ...CLASSIFICATIONS[0]!,
+        subcategories: [
+          {
+            ...welding,
+            name: '焊缝缺陷',
+          },
+          surface,
+        ],
+      },
+    ];
+    expect(isWeldingDefectSubcategory('sub-welding', renamed)).toBe(true);
+    expect(
+      isWeldingDefectSubcategory('sub-surface', [
+        {
+          ...CLASSIFICATIONS[0]!,
+          subcategories: [{ ...surface, code: 'SURFACE' }],
+        },
+      ]),
+    ).toBe(false);
+  });
+});

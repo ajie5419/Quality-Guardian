@@ -1,4 +1,5 @@
 import type { VxeGridPropTypes } from '#/adapter/vxe-table';
+import type { ProcessMasterOption } from '#/api/qms/process-master';
 import type { DictionaryOptionItem } from '#/api/system/dictionary';
 
 import {
@@ -15,19 +16,38 @@ export const INSPECTION_TABS = [
 ];
 
 export function mapDictionaryOptionsToInspectionProcess(
-  options: DictionaryOptionItem[] | undefined,
+  options: ProcessMasterOption[] | undefined,
   fallbackOptions: Array<{ label: string; value: string }> = [],
-) {
+): Array<{
+  inspectionRequestCategory?: null | string;
+  label: string;
+  supplierSource?: null | string;
+  value: string;
+}> {
   if (!options || options.length === 0) {
     return fallbackOptions;
   }
 
-  const merged = new Map<string, { label: string; value: string }>();
+  const merged = new Map<
+    string,
+    {
+      inspectionRequestCategory?: null | string;
+      label: string;
+      supplierSource?: null | string;
+      value: string;
+    }
+  >();
   for (const item of options) {
     const value = String(item.dictKey || '').trim();
     if (!value) continue;
     merged.set(value, {
       label: String(item.dictValue || value).trim() || value,
+      ...('supplierSource' in item
+        ? { supplierSource: item.supplierSource }
+        : {}),
+      ...('inspectionRequestCategory' in item
+        ? { inspectionRequestCategory: item.inspectionRequestCategory }
+        : {}),
       value,
     });
   }

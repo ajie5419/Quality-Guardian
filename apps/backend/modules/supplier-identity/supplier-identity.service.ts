@@ -1,10 +1,20 @@
 import type { inspection_category, Prisma } from '@prisma/client';
 
+import type { SupplierIdentityOptionsQuery } from './supplier-identity.schema';
+
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+
+import { listSupplierIdentityManagementOptions } from './supplier-identity-management-options.service';
+import {
+  resolveSuppliersByTeamIds as resolveSuppliersByTeamIdsFromMaster,
+  resolveSuppliersByUnlinkedTeamIds,
+  resolveTeamSupplierIdentity,
+  teamLinkInclude,
+} from './supplier-identity-name-resolver';
 
 export interface SupplierIdentityInput {
   supplierId: string;
@@ -85,12 +95,6 @@ async function validateLinkInput(
   return { supplier, team };
 }
 
-const linkInclude = {
-  supplier: {
-    select: { id: true, isDeleted: true, name: true },
-  },
-} satisfies Prisma.supplier_identity_linksInclude;
-
 function teamIdentityConflict() {
   return new BusinessError(
     'TEAM_IDENTITY_CONFLICT',
@@ -150,7 +154,7 @@ export const SupplierIdentityService = {
                 isDeleted: false,
                 supplierId: supplier.id,
               },
-              include: linkInclude,
+              include: teamLinkInclude,
             })
           : await tx.supplier_identity_links.create({
               data: {
@@ -159,7 +163,7 @@ export const SupplierIdentityService = {
                 identityType: 'TEAM',
                 supplierId: supplier.id,
               },
-              include: linkInclude,
+              include: teamLinkInclude,
             });
         await MetricRefreshQueue.enqueueSupplierScores(
           tx,
@@ -227,7 +231,7 @@ export const SupplierIdentityService = {
     const [items, total] = await Promise.all([
       prisma.supplier_identity_links.findMany({
         where,
-        include: linkInclude,
+        include: teamLinkInclude,
         orderBy: [{ updatedAt: 'desc' }, { id: 'asc' }],
         skip: (page - 1) * pageSize,
         take: pageSize,
@@ -235,6 +239,10 @@ export const SupplierIdentityService = {
       prisma.supplier_identity_links.count({ where }),
     ]);
     return { items, total };
+  },
+
+  async listManagementOptions(params?: SupplierIdentityOptionsQuery) {
+    return listSupplierIdentityManagementOptions(params ?? { take: 100 });
   },
 
   async resolveSupplierById(supplierId: null | string | undefined) {
@@ -270,49 +278,17 @@ export const SupplierIdentityService = {
 
   async resolveSupplierByTeamId(
     teamId: null | string | undefined,
-    client: Pick<Prisma.TransactionClient, 'supplier_identity_links'> = prisma,
+    client?: Parameters<typeof resolveTeamSupplierIdentity>[1],
   ) {
     const id = normalizeId(teamId);
     if (!id) return null;
-    const link = await client.supplier_identity_links.findFirst({
-      where: {
-        identityId: id,
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplier: { is: { isDeleted: false } },
-      },
-      include: linkInclude,
-    });
-    if (!link || link.supplier.isDeleted) return null;
-    return { id: link.supplier.id, name: link.supplier.name };
+    return resolveTeamSupplierIdentity(id, client);
   },
 
   async resolveSuppliersByTeamIds(
     teamIds: ReadonlyArray<null | string | undefined>,
   ) {
-    const ids = [
-      ...new Set(teamIds.map((teamId) => normalizeId(teamId)).filter(Boolean)),
-    ];
-    if (ids.length === 0) {
-      return new Map<string, { id: string; name: string }>();
-    }
-    const links = await prisma.supplier_identity_links.findMany({
-      where: {
-        identityId: { in: ids },
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplier: { is: { isDeleted: false } },
-      },
-      include: linkInclude,
-    });
-    return new Map(
-      links
-        .filter((link) => !link.supplier.isDeleted)
-        .map((link) => [
-          link.identityId,
-          { id: link.supplier.id, name: link.supplier.name },
-        ]),
-    );
+    return resolveSuppliersByTeamIdsFromMaster(teamIds);
   },
 
   async resolveTeamById(teamId: null | string | undefined) {
@@ -357,10 +333,16 @@ export const SupplierIdentityService = {
       select: { identityId: true },
     });
     const linkedTeamIds = new Set(links.map((link) => link.identityId));
+    const unlinkedSuppliers = await resolveSuppliersByUnlinkedTeamIds(
+      teams
+        .filter((team) => !linkedTeamIds.has(team.id))
+        .map((team) => team.id),
+    );
     return teams.map((team) => ({
-      group: linkedTeamIds.has(team.id)
-        ? ('external' as const)
-        : ('internal' as const),
+      group:
+        linkedTeamIds.has(team.id) || unlinkedSuppliers.has(team.id)
+          ? ('external' as const)
+          : ('internal' as const),
       label: team.dictKey,
       value: team.id,
     }));
@@ -470,7 +452,7 @@ export const SupplierIdentityService = {
             identityNameSnapshot: team.dictKey,
             supplierId: supplier.id,
           },
-          include: linkInclude,
+          include: teamLinkInclude,
         });
         await MetricRefreshQueue.enqueueSupplierScores(
           tx,

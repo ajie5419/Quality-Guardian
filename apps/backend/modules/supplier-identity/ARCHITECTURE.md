@@ -15,7 +15,7 @@ supplier-identity 统一维护跨身份域关联。目前支持 `TEAM -> supplie
 - 发布时先执行 Prisma migration，随后连续执行身份回填；回填按 TEAM 映射、报检任务 `teamId/supplierId`、`inspections`、`after_sales`、`quality_records` 的顺序处理。
 - apply 回填在执行前后比较 `OPEN` unresolved 审计快照：历史已知且证据未变化的记录不重复阻断发布，本次新增或证据变化的 OPEN 记录、主数据歧义和并发写入必须阻断；dry-run 未持久化审计，仍按扫描到的 conflict/unresolved 严格失败。
 - 身份回填只补 canonical ID，不得用当前供应商或 TEAM 名称覆盖历史事实快照；重复扫描不得将人工 `RESOLVED` 裁决改回 `OPEN`。
-- 映射新增、修改、删除 API 仅系统管理员可用；当前没有对应的前端管理界面。
+- 映射列表、选项、新增、修改和删除 API 仅系统管理员可用；系统设置中的管理页只用 canonical ID 提交，不通过名称推断关联。
 - unresolved 审计的分页读取和 compare-and-set 结案由本模块公开服务维护。系统设置中的治理页面只负责编排，业务字段必须由所属模块在同一事务内修复；`OPEN` 记录不得被视为已解决。
 - Supplier identity governance resolution locks the TEAM, validates the active supplier and TEAM, compares the audited supplier and name snapshot, updates or restores the mapping, queues score refreshes, and resolves the audit in one transaction.
 

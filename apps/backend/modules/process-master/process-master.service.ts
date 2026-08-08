@@ -12,6 +12,7 @@ import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
 const INSPECTION_REQUEST_CATEGORIES = ['INCOMING', 'PROCESS'] as const;
+const INCOMING_TYPE_DICT_TYPE = 'incoming_type';
 
 type ProcessReadClient = Pick<Prisma.TransactionClient, 'processes'>;
 
@@ -35,6 +36,61 @@ async function assertNameAvailable(name: string, excludedId?: string) {
       409,
     );
   }
+}
+
+/**
+ * Keep the incoming-type dictionary in sync when a process is renamed.
+ * Incoming inspection records resolve their display name through the
+ * dictionaries(incoming_type) entry id, so a dictionary entry whose value
+ * matches the previous process name must follow the rename; otherwise legacy
+ * records keep showing the old name while new records write the new one.
+ * Both dictKey and dictValue follow the rename because the governance layer
+ * resolves the canonical name from dictKey (master-data-fields.ts), and the
+ * rename is skipped when the target name is already taken by another active
+ * dictionary entry so the update never creates duplicate names.
+ */
+async function syncIncomingTypeDictionaryName(
+  tx: Prisma.TransactionClient,
+  previousName: string,
+  nextName: string,
+) {
+  const normalizedPrevious = previousName.trim();
+  const normalizedNext = nextName.trim();
+  if (
+    !normalizedPrevious ||
+    !normalizedNext ||
+    normalizedPrevious === normalizedNext
+  ) {
+    return;
+  }
+  const matched = await tx.dictionaries.findMany({
+    where: {
+      dictType: INCOMING_TYPE_DICT_TYPE,
+      isDeleted: false,
+      OR: [{ dictKey: normalizedPrevious }, { dictValue: normalizedPrevious }],
+    },
+    select: { id: true },
+  });
+  if (matched.length === 0) {
+    return;
+  }
+  const matchedIds = matched.map((item) => item.id);
+  const conflicting = await tx.dictionaries.findFirst({
+    where: {
+      dictType: INCOMING_TYPE_DICT_TYPE,
+      isDeleted: false,
+      NOT: { id: { in: matchedIds } },
+      OR: [{ dictKey: normalizedNext }, { dictValue: normalizedNext }],
+    },
+    select: { id: true },
+  });
+  if (conflicting) {
+    return;
+  }
+  await tx.dictionaries.updateMany({
+    where: { id: { in: matchedIds } },
+    data: { dictKey: normalizedNext, dictValue: normalizedNext },
+  });
 }
 
 async function configureProcessOptions(
@@ -96,7 +152,13 @@ export const ProcessMasterService = {
     return prisma.processes.findMany({
       where: { isDeleted: false, status: 1 },
       orderBy: [{ sort: 'asc' }, { name: 'asc' }],
-      select: { id: true, name: true, sort: true },
+      select: {
+        id: true,
+        inspectionRequestCategory: true,
+        name: true,
+        sort: true,
+        supplierSource: true,
+      },
     });
   },
 
@@ -117,6 +179,7 @@ export const ProcessMasterService = {
         name: true,
         sort: true,
         status: true,
+        supplierSource: true,
       },
     });
 
@@ -138,7 +201,7 @@ export const ProcessMasterService = {
       orderBy: [{ sort: 'asc' }, { process: { name: 'asc' } }],
       select: {
         category: true,
-        process: { select: { id: true, name: true } },
+        process: { select: { id: true, name: true, supplierSource: true } },
       },
     });
 
@@ -146,6 +209,7 @@ export const ProcessMasterService = {
       category: item.category as InspectionRequestProcessCategory,
       processId: item.process.id,
       processName: item.process.name,
+      supplierSource: item.process.supplierSource,
     }));
   },
 
@@ -192,6 +256,7 @@ export const ProcessMasterService = {
         name,
         sort: input.sort ?? 0,
         status: 1,
+        supplierSource: input.supplierSource,
       };
       const process = existing
         ? await tx.processes.update({
@@ -203,6 +268,7 @@ export const ProcessMasterService = {
               name: true,
               sort: true,
               status: true,
+              supplierSource: true,
             },
           })
         : await tx.processes.create({
@@ -213,6 +279,7 @@ export const ProcessMasterService = {
               name: true,
               sort: true,
               status: true,
+              supplierSource: true,
             },
           });
       await configureProcessOptions(
@@ -228,7 +295,7 @@ export const ProcessMasterService = {
   async update(id: string, input: ProcessMasterUpdateInput) {
     const existing = await prisma.processes.findFirst({
       where: { id, isDeleted: false },
-      select: { id: true },
+      select: { id: true, name: true },
     });
     if (!existing) {
       throw new BusinessError('PROCESS_NOT_FOUND', 'Process not found', 404);
@@ -245,9 +312,22 @@ export const ProcessMasterService = {
           ...(name ? { name } : {}),
           ...(input.sort === undefined ? {} : { sort: input.sort }),
           ...(input.status === undefined ? {} : { status: input.status }),
+          ...(input.supplierSource === undefined
+            ? {}
+            : { supplierSource: input.supplierSource }),
         },
-        select: { code: true, id: true, name: true, sort: true, status: true },
+        select: {
+          code: true,
+          id: true,
+          name: true,
+          sort: true,
+          status: true,
+          supplierSource: true,
+        },
       });
+      if (name && existing.name && name !== existing.name) {
+        await syncIncomingTypeDictionaryName(tx, existing.name, name);
+      }
       if (input.sort !== undefined) {
         await tx.inspection_request_process_options.updateMany({
           where: { processId: id },

@@ -15,6 +15,8 @@ export default defineEventHandler(async (event) => {
         dictValue: item.name,
         id: item.id,
         sort: item.sort,
+        supplierSource: item.supplierSource,
+        inspectionRequestCategory: item.inspectionRequestCategory,
       })),
     );
   } catch (error: unknown) {

@@ -8,6 +8,9 @@ export const inspectionRequestProcessCategorySchema = z.enum([
 const processNameSchema = z.string().trim().min(1).max(191);
 const processCodeSchema = z.string().trim().max(191).nullable().optional();
 const processSortSchema = z.number().int().min(0).max(9999).optional();
+const processSupplierSourceSchema = z
+  .enum(['Outsourcing', 'Supplier'])
+  .default('Supplier');
 
 export const processMasterCreateSchema = z.object({
   categories: z
@@ -17,6 +20,7 @@ export const processMasterCreateSchema = z.object({
   code: processCodeSchema,
   name: processNameSchema,
   sort: processSortSchema,
+  supplierSource: processSupplierSourceSchema,
 });
 
 export const processMasterUpdateSchema = z
@@ -25,13 +29,15 @@ export const processMasterUpdateSchema = z
     name: processNameSchema.optional(),
     sort: processSortSchema,
     status: z.union([z.literal(0), z.literal(1)]).optional(),
+    supplierSource: processSupplierSourceSchema.optional(),
   })
   .refine(
     (input) =>
       input.code !== undefined ||
       input.name !== undefined ||
       input.sort !== undefined ||
-      input.status !== undefined,
+      input.status !== undefined ||
+      input.supplierSource !== undefined,
     { message: 'At least one field must be provided' },
   );
 

@@ -22,6 +22,7 @@ B-TEST2|apps/backend/modules/supervision/supervision-project-issue.service.test.
 B-TEST2|apps/backend/modules/system-log/audit-log.service.test.ts
 B-TEST2|apps/backend/modules/work-order/work-order-adversarial.test.ts
 B-S1|apps/backend/modules/inspection/inspection-reporting.service.ts|520
+B-S1|apps/backend/modules/report/pass-rate.ts|504
 B-E2|apps/backend/api/qms/supervision/issues/[id]/actions/index.post.ts|catch-without-error-log|1
 B-E2|apps/backend/api/qms/task-dispatch/seed.get.ts|catch-without-error-log|1
 B-E2|apps/backend/middleware/2.request-dedupe.ts|catch-without-error-log|1

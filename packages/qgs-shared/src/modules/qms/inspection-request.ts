@@ -50,6 +50,7 @@ export interface InspectionRequestIssueResponsibility {
 
 export interface InspectionRequest {
   attachments?: InspectionRequestAttachment[];
+  category?: 'INCOMING' | 'PROCESS';
   closeAttachments?: InspectionRequestAttachment[];
   closedAt?: null | string;
   closeRemark?: null | string;

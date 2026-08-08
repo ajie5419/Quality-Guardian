@@ -32,6 +32,7 @@ import {
   InspectionIssueAccessService,
 } from './inspection-issue-access.service';
 import { InspectionIssueNumberingService } from './inspection-issue-numbering.service';
+import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 const logger = createModuleLogger('InspectionIssueMutation');
 
@@ -79,6 +80,7 @@ export const InspectionIssueMutationService = {
         serialNumber,
       });
       return prisma.$transaction(async (tx) => {
+        await assertWelderForWeldingDefect(createBody, tx);
         const record = await tx.quality_records.create({ data: createData });
         await MetricRefreshQueue.enqueueSupplierScores(
           tx,
@@ -129,9 +131,12 @@ export const InspectionIssueMutationService = {
       const current = await tx.quality_records.findUnique({
         where: ownershipWhere,
         select: {
+          defectSubcategoryId: true,
           inspection: {
             select: { category: true, supplierId: true, teamId: true },
           },
+          processName: true,
+          responsibleWelder: true,
           supplierId: true,
           supplierName: true,
         },
@@ -147,6 +152,18 @@ export const InspectionIssueMutationService = {
         body,
         existingNcNumber,
         current.inspection,
+      );
+      // The update payload is partial, so validate the merged final state
+      // (body overrides over the current record) for welding defects.
+      await assertWelderForWeldingDefect(
+        {
+          defectSubcategoryId:
+            body.defectSubcategoryId ?? current.defectSubcategoryId,
+          processName: body.processName ?? current.processName,
+          responsibleWelder:
+            body.responsibleWelder ?? current.responsibleWelder,
+        },
+        tx,
       );
       const updated = await tx.quality_records.update({
         where: ownershipWhere,

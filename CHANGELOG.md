@@ -27,6 +27,226 @@
 
 ---
 
+### 2026-08-08 修复：报检任务不合格供应商回显显示 ID（跨类别 legacyName 解析）
+
+**问题：**
+
+- 报检任务（进货检验）创建不合格项时，责任部门显示「采购部」，供应商字段显示 `SUP-1769076104668-hzne`（供应商 ID）而不是供应商名称「二十二冶集团装备制造有限公司」。
+- 根因：进货检验默认责任类型 `SUPPLIER`，前端 `IssueFormFields` 把 `targetUnitCategory` 算成 `'Supplier'`；但该供应商在主数据里 `category=Outsourcing`（外协单位）。`SupplierSelect` 用 `category='Supplier'` 按 legacyName（供应商名称）精确搜索，后端 `category='supplier'` 过滤条件排除了 Outsourcing，搜不到 → 回显失败 → 直接把 value（ID）当显示文本。
+
+**执行内容：**
+
+- `apps/web-antd/src/views/qms/shared/components/SupplierSelect.vue`：`resolveLegacyName` 在按当前类别精确搜索无匹配时，回退为不带类别过滤的按名称精确搜索（跨类别回显），保证外协供应商在进货检验表单中也能解析出名称而不是显示 ID。
+- 第二版修复（代码评审意见）：
+  - 回退条件由「带类别搜索无匹配」收紧为「选中值未命中」——覆盖同名不同 ID 的供应商：带类别搜索命中同名但不同 ID 时，仍按选中 ID 回退跨类别解析。
+  - 无选中值时不再跨类别猜选：没有 `value` 的场景保持带类别搜索原逻辑，避免静默选中外协供应商。
+- 测试：`SupplierSelect.test.ts` 新增「同名不同 ID 跨类别回退」「无 value 不跨类别猜选」两个用例，9/9 通过。
+
+**验证结果：**
+
+- 定向前端测试 `SupplierSelect` 9/9，相关 QMS 前端测试 12 文件 53 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
+
+**commit:** 待提交
+
+---
+
+### 2026-08-08 修复：进货检验记录「进货类型」显示跟随工序改名（ID 化）
+
+**问题：**
+
+- 报检工序设置里把「机加成品件」改为「机加成品件-外协」后，历史进货检验记录仍显示旧名。
+- 根因：进货检验（INCOMING）记录显示的是「进货类型」（`incomingType`），其 canonical 主数据是 `dictionaries(incoming_type)`（按 `incomingTypeId` 解析），而报检入口「进货类型」下拉绑定的是工序（`processes`）。工序改名只改了工序表，字典没同步，导致历史记录（`incomingTypeId` 指向字典）显示旧名、新记录（`incomingType=新名`）在字典中解析失败落 `incomingTypeId=NULL`。
+- 本地库验证：1132 条进货记录 `incomingType='机加成品件'`、`incomingTypeId=8e35e163…`（字典 ID）、`processId=NULL`；字典项未改名。过程检验/报检任务/不合格项均带 `processId`，改名后显示自动跟随（含既有「探伤→探伤-测试」197 条）。
+
+**执行内容：**
+
+- `process-master.service.ts`：工序改名时联动同步 `dictionaries(incoming_type)` 同名项（dictKey+dictValue），保证字典跟随工序改名。
+- `process-resolver.ts`：新增 `resolveIncomingTypeNamesByIds` / `resolveIncomingTypeName`，按 `incomingTypeId` 解析字典当前名（canonical 名称列 `dictKey`，与治理层一致），无 ID 或解析失败回退快照。
+- `inspection-record-query.service.ts`：`findAll`/`findById`/`findSupplierHistory` 对 INCOMING 记录覆盖返回 `incomingType` 为解析后的字典当前名（历史行不动）。
+- `pass-rate.ts`：进货检验合格率分桶（检验记录 + 不合格项）改为按解析后的字典当前名分桶，历史与新数据统计统一。
+- `process-options.get.ts` + `process-master.service.listActiveOptions`：选项接口补充 `supplierSource`/`inspectionRequestCategory`。
+- 前端：检验记录表单 `formData.ts` 的「进货类型」下拉改绑 INCOMING 工序选项（替代硬编码字典值）；`InspectionForm.vue` 外协单位库切换判断由硬编码「机加成品件」改为选中工序的 `supplierSource`；`config.ts`/`useProcessMasterOptions.ts`/`process-master.ts` 类型扩展。
+- `prisma/migrations/20260808000001_sync_incoming_type_dictionary`：数据 migration 把历史遗留字典名同步到工序名（条件：工序已改名为「机加成品件-外协」且字典仍是旧名且目标名未被占用），发布时自动执行、幂等；本地已应用（字典「机加成品件」→「机加成品件-外协」）。
+- `inspection-public-query.service.ts`：今日进货看板 `getTodayIncomingInspections` 改为按报检任务 `processId` 解析工序当前名（无则回退 `requestInfo` 快照），历史看板同样跟随改名。
+- 测试：新增/更新 process-resolver、process-master（改名联动 + 目标名冲突保护）、inspection-record-query（INCOMING 解析）、pass-rate（进货分桶解析）用例；`scripts/qms-architecture-baseline.txt` 登记 pass-rate.ts 行数基线（486→504）。
+
+**验证结果：**
+
+- 本地库端到端：历史 1126 条「机加成品件」进货记录解析显示「机加成品件-外协」，其余三项一致。
+- 后端 vitest 267 文件 / 2443 用例全过（含看板、migration 相关）；前端 records/shared 相关测试通过。
+- 本地 `prisma migrate deploy` 应用新 migration 成功且幂等（字典已是新名，0 行变更）。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
+
+**commit:** 待提交
+
+**遗留问题：**
+
+- 无阻塞项。后续若出现新的主数据改名，`process-master` 改名联动 + 显示层 ID 解析会自动跟随，无需再跑脚本或单独治理；检验记录查询本身没有按 `incomingType` 文本筛选入口（仅显示解析），剩余按文本匹配的链路是检验表单模板匹配（`planning/inspection-forms/match`），属于后续 ID 化范围。
+
+---
+
+### 2026-08-08 修复：供应商/班组检验记录历史未按当前工序名展示
+
+**执行内容：**
+- 根因：`findSupplierHistory`（供应商详情/班组详情里的检验记录历史）查询未 include `process` 关联，返回原始 `processName` 快照；工序改名后该入口仍显示旧名，与检验记录主列表/详情、报检任务、不合格项的「ID → 当前主数据名」解析不一致
+- `apps/backend/modules/inspection/inspection-record-query.service.ts`：`findSupplierHistory` include `process` 关联并统一走 `resolveCanonicalProcessNameByRelation` 解析
+
+**验证结果：**
+- vitest: 全量 3046/3046 通过（新增 1 用例）
+- typecheck / eslint 变更文件: 通过
+
+**commit:** 待提交
+
+**遗留问题：**
+- 历史检验记录若 `processId` 为空（旧数据未回填），主列表仍显示创建时快照名；需按名称回填 `processId` 后才会跟随改名，回填前先在生产库核对 `inspections.processId` 填充率
+
+### 2026-08-08 修复：进货类型改名后供应商外协库判定失效（工序配置化）
+
+**执行内容：**
+- 根因：进货检验报检入口的「进货类型」下拉把选项 value 绑成工序名称（`InspectionRequestEntryFormFields.vue`），供应商来源按 `incomingType === '机加成品件'` 名称硬编码判定（`useInspectionRequestIdentityOptions.ts`）；工序在系统设置改名后判定失效，回落普通供应商库
+- `apps/backend/prisma/schema.prisma` + migration `20260808000000_add_process_supplier_source`：`processes` 新增 `supplierSource`（默认 `Supplier`），并按名称回填历史「机加成品件」为 `Outsourcing`（TRIM 匹配，兼容空格差异）
+- `apps/backend/modules/process-master`：create/update schema 与 service 支持 `supplierSource`；`listInspectionRequestOptions` 返回 `supplierSource`
+- `apps/web-antd/src/views/system/inspection-settings/index.vue`：报检与检验设置新增「供应商来源」列与编辑下拉（外协加工单位/普通供应商），同步 i18n
+- 报检入口：进货类型下拉 value 改绑 `processId`（`entry-mode.ts`/`InspectionRequestEntryFormFields.vue`），供应商库按所选工序的 `supplierSource` 配置判定；提交 `requestInfo.incomingType` 保留工序名称快照（`index.vue`）；删除废弃的 `MACHINED_INCOMING_INSPECTION_TYPE` 名称常量
+- 新增/更新测试：process-master 3、entry-mode 1、identity options 3、FormFields 1、public-query 2
+
+**验证结果：**
+- vitest: 全量 3045/3045 通过
+- typecheck: 3/3 通过
+- prisma validate / check:prisma-migration: 通过
+- eslint 变更文件 / check:qms-arch: 通过
+
+**commit:** 待提交
+
+**遗留问题：**
+- 生产环境需执行新 migration 后，历史「机加成品件」工序才会回填为外协来源；部署后用户仍可在设置页手动调整任意工序的供应商来源
+
+### 2026-08-08 功能：supplier identity 映射系统设置管理 UI
+
+**执行内容：**
+- `supplier-identity` 注册系统设置动态菜单 `/system/supplier-identity-links`，页面权限为 `System:SupplierIdentity:List`，写操作声明为 `System:SupplierIdentity:Edit`；页面和所有写按钮同时要求权限码与共享 `isSystemAdmin` 判定，服务端既有 `isSystemAdmin` CRUD 边界保持不变。
+- 新增管理员专用 `GET /qms/supplier-identity-links/options`：按关键字从完整活跃 TEAM 与供应商主数据域返回 canonical ID 选项，不受供应商数据范围或类别过滤影响；查询上限为 100，表单支持远程搜索。
+- 新增 Web API client 和系统设置页面，包含分页列表、创建、编辑、删除确认、加载/错误/空态、远程选项加载和客户端必填校验；提交只传 `teamId` 与 `supplierId`。前端同时识别 `*`、`["*"]` 和 `super` 角色的菜单通配语义，且加载、刷新与分页入口会先阻断无查看权限的直达访问。
+- 将管理选项查询拆分为模块内独立 service，保持主 service 在 500 行限制内；补充模块声明、管理员路由、选项查询、API client、表单校验和非管理员写操作保护测试。
+
+**验证结果：**
+- 定向 Vitest：6/6 文件、29/29 用例通过。
+- `pnpm lint`：通过（0 error，0 warning）。
+- `pnpm run check:type`：通过（3/3 workspace tasks；weapp 为项目既有 skip）。
+- `pnpm run check:qms-arch`：通过（0 新违规）。
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无；发布后动态菜单同步会创建页面与按钮权限记录，角色授权仍由既有 RBAC 管理流程维护。
+
+### 2026-08-07 修复：独立不合格项入口缺失焊接缺陷责任焊工校验 + 焊接缺陷判定改用稳定 code
+
+**执行内容：**
+- 根因：焊接缺陷责任焊工校验只在关单弹窗与前端联动，独立不合格项新建/编辑入口（`createIssue`/`updateIssue`）仅按工序含「焊」校验，未按缺陷二级分类判定；且焊接缺陷判定依赖子分类名称含「焊」，主数据改名后失效
+- `packages/qgs-shared/src/domain-modules/qms/inspection-request.ts`：新增共享常量 `WELDING_DEFECT_CODE`
+- `apps/backend/modules/inspection/inspection-issue-welding.ts`：新增共享判定 `isWeldingDefectSubcategory` 与 `assertWelderForWeldingDefect`（code 优先、名称 fallback，抛出与关单一致的校验错误）
+- `apps/backend/modules/inspection/inspection-request-close-issue.service.ts`：关单校验改用共享函数
+- `apps/backend/modules/inspection/inspection-issue-mutation.service.ts`：`createIssue` 事务内新增焊接缺陷必填校验；`updateIssue` 合并 body 与存量记录后校验（编辑时改为焊接缺陷或存量已是焊接缺陷均强制责任焊工）
+- `apps/web-antd/src/views/qms/inspection/issues/components/issueFormData.ts`：`isWeldingDefectSubcategory` 改为 code 优先
+- 补充测试：关单 code 优先 1、独立新建/编辑校验 4、前端 code 优先 1
+
+**验证结果：**
+- vitest: 全量 3026/3026 通过
+- typecheck: 通过
+- eslint 变更文件: 通过
+- check:qms-arch: 通过
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无
+
+### 2026-08-07 修复：焊接缺陷未弹出责任焊工（完结弹窗/不合格项表单）
+
+**执行内容：**
+- 根因：责任焊工字段显示条件只判断 `processName === '焊接'`，未按缺陷分类联动；报检工序（如外购件）非焊接时，即使选「制造缺陷→焊接缺陷」也不显示责任焊工
+- `packages/qgs-shared/src/domain-modules/qms/inspection-request.ts`：新增共享常量 `WELDING_PROCESS_KEYWORD`
+- `apps/web-antd/src/views/qms/inspection/issues/components/issueFormData.ts`：新增 `isWeldingProcessName`/`isWeldingDefectSubcategory` 判定函数，初始显示条件放宽为工序含「焊」
+
+### 2026-08-07 修复：焊接缺陷未弹出责任焊工（完结弹窗/不合格项表单）
+
+**执行内容：**
+- 根因：责任焊工字段显示条件只判断 `processName === '焊接'`，未按缺陷分类联动；报检工序（如外购件）非焊接时，即使选「制造缺陷→焊接缺陷」也不显示责任焊工
+- `packages/qgs-shared/src/domain-modules/qms/inspection-request.ts`：新增共享常量 `WELDING_PROCESS_KEYWORD`
+- `apps/web-antd/src/views/qms/inspection/issues/components/issueFormData.ts`：新增 `isWeldingProcessName`/`isWeldingDefectSubcategory` 判定函数，初始显示条件放宽为工序含「焊」
+- `apps/web-antd/src/views/qms/inspection/issues/components/IssueFormFields.vue`：分类加载后责任焊工随 `processName`/`defectCategoryId`/`defectSubcategoryId` 联动显示（工序含焊 或 二级分类为焊接缺陷）
+- `apps/backend/modules/inspection/inspection-request-close-issue.service.ts`：完结关单新增 `assertWelderForWeldingDefect`，焊接工序或缺陷分类为焊接缺陷时必填责任焊工
+- `apps/backend/modules/inspection/inspection-issue.schema.ts`：新建/编辑校验条件与前端对齐（工序含「焊」）
+- 补充 3 个测试（前端判定函数 2、后端防漏校验 1）
+
+**验证结果：**
+- typecheck: 通过
+- eslint 变更文件: 通过
+- vitest: inspection + issues + shared 792/792 通过
+- check:qms-arch: 通过
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无
+
+### 2026-08-07 修复：厂内外包队按供应商主数据识别（生产 OBU 两条线）
+
+**执行内容：**
+- 根因：TEAM 字典同时容纳厂内班组（结构 BU/组装 BU 等）与厂外包队（公司名），但运行时只凭 `supplier_identity_links` 判断外协；26 家外包队有供应商主数据但缺链接，被误判为内部责任（责任部门空、入口分组错误）
+- `apps/backend/modules/supplier-identity/supplier-identity-name-resolver.ts`：新增按 TEAM 精确名称匹配供应商主数据的兜底解析（优先 `Outsourcing` 分类），并整合 `resolveTeamSupplierIdentity`/`resolveSuppliersByTeamIds`/`resolveSuppliersByUnlinkedTeamIds`
+- `apps/backend/modules/supplier-identity/supplier-identity.service.ts`：`resolveSupplierByTeamId`/`resolveSuppliersByTeamIds` 增加名称兜底；`listTeamOptions` 按供应商主数据把缺链接的外包队归入「外协加工单位」
+- `apps/backend/modules/inspection/inspection-identity-resolution.service.ts`：`InspectionTx` 补充 `dictionaries`/`suppliers` 以支持事务内名称兜底
+- 补充 5 个测试用例（名称兜底、Outsourcing 优先、批量解析、入口分组）
+
+**验证结果：**
+- typecheck: 通过
+- eslint 变更文件: 通过
+- vitest: supplier-identity + inspection 668/668 通过
+- check:qms-arch: 通过（服务文件拆分后回到 500 行内）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 24 个无供应商主数据的 TEAM（含厂内班组及少数无主数据公司）保持内部责任；公司名且无主数据的需建供应商并走 `bootstrapExactTeamLinks` 补链接（`pnpm --dir apps/backend maintenance:supplier-identities -- --mode=apply`）
+- 重复「生产 OBU」节点 `dept-r9u69gg8y64qutugxzsd8u6r` 仍待治理（43 条历史引用迁移后软删）
+
+### 2026-08-07 优化：责任部门 TreeSelect 父子独立勾选
+
+**执行内容：**
+- `apps/web-antd/src/views/qms/inspection/issues/components/issueFormData.ts`：`responsibleDepartments` TreeSelect 由 `treeCheckStrictly: false` 改为 `true`，选择父节点（如「生产 OBU」）不再级联勾选子部门，消除为绕开级联而存在的同名叶子节点需求
+
+**验证结果：**
+- vitest: issues + requests 相关 74/74 通过
+- 未改动数据；重复节点 `dept-r9u69gg8y64qutugxzsd8u6r` 的退役需走主数据治理（43 条质量记录引用迁移后再软删）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 历史 43 条 `quality_records.responsibleDepartmentId = dept-r9u69gg8y64qutugxzsd8u6r`，需迁移到主节点 `dept-1769576623191` 后软删重复节点
+- 业务上责任部门实际为单选（历史 79/79 条 `responsibleDepartments` 均为单元素数组），后续可改单选 TreeSelect 并适配表单值契约
+
+### 2026-08-07 修复：报检任务完结弹窗责任部门/供应商默认值丢失
+
+**执行内容：**
+- `packages/qgs-shared/src/domain-modules/qms/inspection-request.ts`：`resolveInspectionRequestIssueResponsibility` 增加 `category` 入参，改为使用 `isIncomingInspectionRequestCategory`（category 优先、processName 兜底），与后端 canonical 校验规则对齐
+- `packages/qgs-shared/src/modules/qms/inspection-request.ts`：`InspectionRequest` 接口补充 `category` 字段
+- `apps/backend/modules/inspection/inspection-request-query.service.ts`：列表/详情责任解析传入 `category`
+- `apps/web-antd/src/views/qms/inspection/requests/composables/useInspectionRequestTaskActions.ts`：`openClose` 兜底解析传入 `category`/`supplierId`
+- 补充三处测试（shared、backend query、web task actions），覆盖 category=INCOMING + 配置工序名（外购件/原材料）场景
+
+**验证结果：**
+- typecheck: 通过（backend + web-antd）
+- eslint 变更文件: 通过
+- vitest: 相关模块 789/789 通过（新增用例 38/38 含在总套件内）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 生产环境部门树必须包含「采购部」「生产 OBU」节点（本地数据源已验证存在），否则名称→ID 解析仍会落空
+- 存在一个「生产 OBU」疑似重复自引用节点（`dept-r9u69gg8y64qutugxzsd8u6r`），建议后续主数据治理时核对退役
+
 ## 执行记录
 
 ## [0.23.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.23.1...qgs-v0.23.2) (2026-08-07)

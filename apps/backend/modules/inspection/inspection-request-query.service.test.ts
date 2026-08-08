@@ -99,6 +99,37 @@ describe('inspection request query service', () => {
     });
   });
 
+  it('returns supplier responsibility for INCOMING category with a configured process name', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      attachments: null,
+      category: 'INCOMING',
+      closeAttachments: null,
+      dispatcher: null,
+      inspection: null,
+      inspectionId: null,
+      inspector: null,
+      linkedIssueId: null,
+      process: { name: '外购件' },
+      processName: '外购件',
+      requestNo: 'IR-1',
+      supplierId: 'supplier-1',
+      team: 'Supplier A',
+      teamId: null,
+      workOrderNumber: 'WO-001',
+      workOrders: [],
+    } as any);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    const result = await InspectionRequestQueryService.getRequestDetail('IR-1');
+
+    expect(result?.issueResponsibility).toEqual({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: '采购部',
+      supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
+    });
+  });
+
   it('maps material approval state from the request relation', async () => {
     vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([
       {

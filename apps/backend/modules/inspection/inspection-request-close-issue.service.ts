@@ -22,6 +22,7 @@ import {
   findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
 } from './inspection-issue';
+import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 import { normalizeInspectionRequestText } from './inspection-request';
 import {
   failCloseRequest,
@@ -70,6 +71,7 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     linkedIssue: options.linkedIssue,
     request: options.request,
   });
+  await assertWelderForWeldingDefect(options.linkedIssue, options.tx);
   const issueResponsibility = await resolveCloseIssueResponsibility({
     linkedInspection,
     linkedIssue: options.linkedIssue,
