@@ -201,6 +201,9 @@ export const SupplierIdentityService = {
         ) {
           throw teamIdentityConflict();
         }
+        if (existing?.isDeleted && existing.supplierId !== supplier.id) {
+          await assertNoProcessFactsForTeams([team.id], tx);
+        }
         const link = existing
           ? await tx.supplier_identity_links.update({
               where: { id: existing.id },

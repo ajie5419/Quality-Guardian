@@ -12,6 +12,7 @@ vi.mock('~/utils/prisma', () => ({
     $queryRaw: vi.fn(),
     dictionaries: { findFirst: vi.fn(), findMany: vi.fn() },
     inspections: { count: vi.fn() },
+    metric_refresh_jobs: { createMany: vi.fn() },
     qms_inspection_requests: { count: vi.fn() },
     supplier_identity_links: {
       count: vi.fn(),
@@ -379,6 +380,73 @@ describe('supplier identity service', () => {
       }),
     ).rejects.toMatchObject({ code: 'TEAM_IDENTITY_CONFLICT' });
     expect(prisma.supplier_identity_links.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks restoring a deleted TEAM link to a different supplier with PROCESS facts', async () => {
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      id: 'supplier-2',
+      name: 'Supplier B',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue({
+      id: 'source-1',
+    } as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: 'Team A',
+      id: 'team-1',
+    } as never);
+    vi.mocked(prisma.supplier_identity_links.findUnique).mockResolvedValue({
+      id: 'link-1',
+      isDeleted: true,
+      supplierId: 'supplier-1',
+    } as never);
+    vi.mocked(prisma.inspections.count).mockResolvedValue(1);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+
+    await expect(
+      SupplierIdentityService.create({
+        supplierId: 'supplier-2',
+        teamId: 'team-1',
+      }),
+    ).rejects.toMatchObject({ code: 'TEAM_IDENTITY_FACTS_EXIST' });
+    expect(prisma.supplier_identity_links.update).not.toHaveBeenCalled();
+  });
+
+  it('allows restoring a deleted TEAM link for its original supplier', async () => {
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      id: 'supplier-1',
+      name: 'Supplier A',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue({
+      id: 'source-1',
+    } as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: 'Team A',
+      id: 'team-1',
+    } as never);
+    vi.mocked(prisma.supplier_identity_links.findUnique).mockResolvedValue({
+      id: 'link-1',
+      isDeleted: true,
+      supplierId: 'supplier-1',
+    } as never);
+    vi.mocked(prisma.supplier_identity_links.update).mockResolvedValue({
+      id: 'link-1',
+    } as never);
+    vi.mocked(prisma.metric_refresh_jobs.createMany).mockResolvedValue({
+      count: 1,
+    } as never);
+
+    await expect(
+      SupplierIdentityService.create({
+        supplierId: 'supplier-1',
+        teamId: 'team-1',
+      }),
+    ).resolves.toEqual({ id: 'link-1' });
+    expect(prisma.inspections.count).not.toHaveBeenCalled();
+    expect(prisma.qms_inspection_requests.count).not.toHaveBeenCalled();
   });
 
   it('blocks supplier link mutations while TEAM participates in a merge', async () => {
