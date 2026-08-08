@@ -15,6 +15,11 @@ import {
   resolveTeamSupplierIdentity,
   teamLinkInclude,
 } from './supplier-identity-name-resolver';
+import {
+  listSupplierIdentityTeamOptions,
+  listTeamIdsBySupplierIds,
+  listTeamIdsForSupplier,
+} from './supplier-identity-team-query.service';
 
 export interface SupplierIdentityInput {
   supplierId: string;
@@ -367,30 +372,7 @@ export const SupplierIdentityService = {
   },
 
   async listTeamOptions(keyword = '') {
-    const normalizedKeyword = keyword.trim();
-    const teams = await prisma.dictionaries.findMany({
-      where: {
-        dictType: 'team',
-        isDeleted: false,
-        status: 1,
-        ...(normalizedKeyword
-          ? { dictKey: { contains: normalizedKeyword } }
-          : {}),
-      },
-      orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
-      take: 100,
-      select: { dictKey: true, id: true },
-    });
-    const linkedSuppliers = await resolveSuppliersByTeamIdsFromMaster(
-      teams.map((team) => team.id),
-    );
-    return teams.map((team) => ({
-      group: linkedSuppliers.has(team.id)
-        ? ('external' as const)
-        : ('internal' as const),
-      label: team.dictKey,
-      value: team.id,
-    }));
+    return listSupplierIdentityTeamOptions(keyword);
   },
 
   async resolveSupplierForInspection(
@@ -429,37 +411,11 @@ export const SupplierIdentityService = {
   },
 
   async teamIdsForSupplier(supplierId: string) {
-    const links = await prisma.supplier_identity_links.findMany({
-      select: { identityId: true },
-      where: {
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId,
-      },
-    });
-    return links.map((link) => link.identityId);
+    return listTeamIdsForSupplier(supplierId);
   },
 
   async teamIdsBySupplierIds(supplierIds: string[]) {
-    const ids = [
-      ...new Set(supplierIds.map((supplierId) => normalizeId(supplierId))),
-    ].filter(Boolean);
-    if (ids.length === 0) return new Map<string, string[]>();
-    const links = await prisma.supplier_identity_links.findMany({
-      select: { identityId: true, supplierId: true },
-      where: {
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId: { in: ids },
-      },
-    });
-    const result = new Map<string, string[]>();
-    for (const link of links) {
-      const teamIds = result.get(link.supplierId) || [];
-      teamIds.push(link.identityId);
-      result.set(link.supplierId, teamIds);
-    }
-    return result;
+    return listTeamIdsBySupplierIds(supplierIds);
   },
 
   async update(id: string, input: SupplierIdentityInput) {
