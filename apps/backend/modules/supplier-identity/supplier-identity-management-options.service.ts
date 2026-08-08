@@ -3,72 +3,124 @@ import type { SupplierIdentityOptionsQuery } from './supplier-identity.schema';
 import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
+type TeamOption = { dictKey: string; id: string };
+
+async function listKeywordTeamCandidates(
+  params: SupplierIdentityOptionsQuery,
+  keyword: string,
+  take: number,
+) {
+  if (params.target !== 'team') return null;
+  return prisma.dictionaries.findMany({
+    where: {
+      dictType: 'team',
+      isDeleted: false,
+      status: 1,
+      teamIdentitySources: {
+        some: { isDeleted: false, sourceType: 'SUPPLIER' },
+      },
+      ...(keyword ? { dictKey: { contains: keyword } } : {}),
+    },
+    orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
+    select: { dictKey: true, id: true },
+    take,
+  });
+}
+
+async function listBoundedSupplierSources(
+  teamIds: string[] | undefined,
+  take: number,
+) {
+  if (teamIds?.length === 0) return [];
+  return prisma.team_identity_sources.findMany({
+    where: {
+      isDeleted: false,
+      sourceType: 'SUPPLIER',
+      ...(teamIds ? { teamId: { in: teamIds } } : {}),
+    },
+    select: { sourceId: true, teamId: true },
+    take,
+  });
+}
+
+async function listSelectedTeams(
+  candidateTeams: null | TeamOption[],
+  teamIds: string[],
+  take: number,
+) {
+  if (candidateTeams) {
+    const validTeamIds = new Set(teamIds);
+    return candidateTeams.filter((team) => validTeamIds.has(team.id));
+  }
+  if (teamIds.length === 0) return [];
+  return prisma.dictionaries.findMany({
+    where: {
+      dictType: 'team',
+      id: { in: teamIds },
+      isDeleted: false,
+      status: 1,
+    },
+    orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
+    select: { dictKey: true, id: true },
+    take,
+  });
+}
+
 /**
- * Management selectors deliberately query the whole active identity domain.
- * Data-scope filtering would hide valid targets from a system-admin mapping.
+ * System administrators need cross-scope candidates, but every query remains
+ * capped at the API page size. The exact source pair is still revalidated by
+ * the mutation service, so a bounded selector can never authorize a mismatch.
  */
 export async function listSupplierIdentityManagementOptions(
   params: SupplierIdentityOptionsQuery,
 ) {
   const keyword = params.keyword?.trim() || '';
   const take = Math.min(Math.max(params.take || 100, 1), 100);
-  const sources = await prisma.team_identity_sources.findMany({
-    where: { isDeleted: false, sourceType: 'SUPPLIER' },
-    select: { sourceId: true, teamId: true },
-  });
-  const supplierRows = await prisma.suppliers.findMany({
-    where: {
-      id: { in: [...new Set(sources.map((source) => source.sourceId))] },
-      isDeleted: false,
-      ...(keyword && params.target !== 'team'
-        ? { name: { contains: keyword } }
-        : {}),
-    },
-    orderBy: { name: 'asc' },
-    select: { category: true, id: true, name: true, outsourcingMode: true },
-    take,
-  });
-  const suppliers = supplierRows.filter(
-    (supplier) =>
-      resolveSupplierInspectionPolicy(supplier).identitySource === 'team',
+  const candidateTeams = await listKeywordTeamCandidates(params, keyword, take);
+  const sourceTeamIds = params.teamId
+    ? [params.teamId]
+    : candidateTeams?.map((team) => team.id);
+  const sources = await listBoundedSupplierSources(sourceTeamIds, take);
+  const supplierRows =
+    sources.length === 0
+      ? []
+      : await prisma.suppliers.findMany({
+          where: {
+            id: { in: [...new Set(sources.map((source) => source.sourceId))] },
+            isDeleted: false,
+            ...(keyword && params.target !== 'team'
+              ? { name: { contains: keyword } }
+              : {}),
+          },
+          orderBy: { name: 'asc' },
+          select: {
+            category: true,
+            id: true,
+            name: true,
+            outsourcingMode: true,
+          },
+          take,
+        });
+  const supplierIds = new Set(
+    supplierRows
+      .filter(
+        (supplier) =>
+          resolveSupplierInspectionPolicy(supplier).identitySource === 'team',
+      )
+      .map((supplier) => supplier.id),
   );
-  const supplierIds = new Set(suppliers.map((supplier) => supplier.id));
   const validSources = sources.filter((source) =>
     supplierIds.has(source.sourceId),
   );
-  const teamIds = [
-    ...new Set(
-      validSources
-        .filter((source) => !params.teamId || source.teamId === params.teamId)
-        .map((source) => source.teamId),
-    ),
-  ];
-  const teams = await prisma.dictionaries.findMany({
-    where: {
-      dictType: 'team',
-      id: { in: teamIds },
-      isDeleted: false,
-      status: 1,
-      ...(keyword && params.target !== 'supplier'
-        ? { dictKey: { contains: keyword } }
-        : {}),
-    },
-    orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
-    select: { dictKey: true, id: true },
-    take,
-  });
+  const teamIds = [...new Set(validSources.map((source) => source.teamId))];
+  const teams = await listSelectedTeams(candidateTeams, teamIds, take);
   const supplierIdsForSelectedTeam = new Set(
-    validSources
-      .filter((source) => !params.teamId || source.teamId === params.teamId)
-      .map((source) => source.sourceId),
+    validSources.map((source) => source.sourceId),
   );
   return {
-    suppliers: suppliers
+    suppliers: supplierRows
       .filter((supplier) => supplierIdsForSelectedTeam.has(supplier.id))
-      .map((supplier) => ({
-        label: supplier.name,
-        value: supplier.id,
-      })),
+      .map((supplier) => ({ label: supplier.name, value: supplier.id })),
     teams: teams.map((team) => ({ label: team.dictKey, value: team.id })),
   };
 }

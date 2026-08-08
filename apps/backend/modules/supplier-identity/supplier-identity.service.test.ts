@@ -524,6 +524,7 @@ describe('supplier identity service', () => {
       SupplierIdentityService.listManagementOptions({
         keyword: 'A',
         take: 100,
+        target: 'team',
       }),
     ).resolves.toEqual({
       suppliers: [{ label: 'Outsourcing B', value: 'supplier-2' }],
@@ -536,7 +537,15 @@ describe('supplier identity service', () => {
       where: {
         id: { in: ['supplier-1', 'supplier-2'] },
         isDeleted: false,
-        name: { contains: 'A' },
+      },
+    });
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith({
+      select: { sourceId: true, teamId: true },
+      take: 100,
+      where: {
+        isDeleted: false,
+        sourceType: 'SUPPLIER',
+        teamId: { in: ['team-1'] },
       },
     });
     expect(prisma.dictionaries.findMany).toHaveBeenCalledWith({
@@ -546,8 +555,10 @@ describe('supplier identity service', () => {
       where: {
         dictKey: { contains: 'A' },
         dictType: 'team',
-        id: { in: ['team-1'] },
         isDeleted: false,
+        teamIdentitySources: {
+          some: { isDeleted: false, sourceType: 'SUPPLIER' },
+        },
         status: 1,
       },
     });
@@ -556,7 +567,6 @@ describe('supplier identity service', () => {
   it('lists only the source-matched supplier for a selected TEAM', async () => {
     vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
       { sourceId: 'supplier-1', teamId: 'team-1' },
-      { sourceId: 'supplier-2', teamId: 'team-2' },
     ] as never);
     vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
       {
@@ -564,12 +574,6 @@ describe('supplier identity service', () => {
         id: 'supplier-1',
         name: 'Supplier A',
         outsourcingMode: 'IN_HOUSE_TEAM',
-      },
-      {
-        category: 'Outsourcing',
-        id: 'supplier-2',
-        name: 'Supplier B',
-        outsourcingMode: 'EXTERNAL_SERVICE',
       },
     ] as never);
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
@@ -585,6 +589,15 @@ describe('supplier identity service', () => {
     ).resolves.toEqual({
       suppliers: [{ label: 'Supplier A', value: 'supplier-1' }],
       teams: [{ label: 'Resident TEAM', value: 'team-1' }],
+    });
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith({
+      select: { sourceId: true, teamId: true },
+      take: 100,
+      where: {
+        isDeleted: false,
+        sourceType: 'SUPPLIER',
+        teamId: { in: ['team-1'] },
+      },
     });
   });
 
