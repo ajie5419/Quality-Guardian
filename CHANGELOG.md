@@ -50,6 +50,22 @@
 
 ---
 
+### 2026-08-08 修复：supplier TEAM 双来源在线契约闭环
+
+**执行内容：**
+
+- 将 active `DEPARTMENT` source 排除条件统一写入单/批在线 resolver、TEAM→supplier CRUD 校验、系统设置候选查询和 supplier→TEAM 画像/评分查询；任一 dual-source TEAM 均不能作为供应商负责的 PROCESS TEAM。
+- 回填上下文以 `externalTeamIds` Set 计算 internal TEAM，避免原先对每个 DEPARTMENT source 反复扫描全部来源的 O(n²) 逻辑。
+
+**验证结果：**
+
+- 定向 Vitest：supplier identity service 与 backfill runtime `40/40` 通过，覆盖单/批解析、CRUD、候选及画像查询反例。
+- 后端 `tsc --noEmit`、`pnpm lint`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`：均通过（架构检查仅既有 baseline）。
+
+**commit:** `997e699f`
+
+---
+
 ### 2026-08-08 发布：qgs v0.24.0（身份 ID 化治理 + 报检/检验显示修复）
 
 **执行内容：**
