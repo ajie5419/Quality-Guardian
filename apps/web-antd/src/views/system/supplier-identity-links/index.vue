@@ -117,6 +117,7 @@ async function loadTeamOptions(keyword = '') {
   try {
     const options = await getSupplierIdentityManagementOptionsApi({
       keyword: keyword.trim() || undefined,
+      target: 'team',
     });
     if (token !== teamSearchToken) return;
     teamOptions.value = options.teams;
@@ -136,6 +137,8 @@ async function loadSupplierOptions(keyword = '') {
   try {
     const result = await getSupplierIdentityManagementOptionsApi({
       keyword: keyword.trim() || undefined,
+      teamId: draft.teamId || undefined,
+      target: 'supplier',
     });
     if (token !== supplierSearchToken) return;
     supplierOptions.value = result.suppliers;
@@ -147,6 +150,11 @@ async function loadSupplierOptions(keyword = '') {
   } finally {
     if (token === supplierSearchToken) supplierOptionsLoading.value = false;
   }
+}
+
+function handleTeamChange() {
+  draft.supplierId = '';
+  void loadSupplierOptions();
 }
 
 async function openForm(link: Link | null = null) {
@@ -370,6 +378,7 @@ onMounted(() => {
             placeholder="Search and select an external TEAM"
             show-search
             @search="loadTeamOptions"
+            @update:value="handleTeamChange"
           />
         </Form.Item>
         <Form.Item

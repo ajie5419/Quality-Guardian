@@ -381,17 +381,11 @@ export const SupplierIdentityService = {
       take: 100,
       select: { dictKey: true, id: true },
     });
-    const links = await prisma.supplier_identity_links.findMany({
-      where: {
-        identityId: { in: teams.map((team) => team.id) },
-        identityType: 'TEAM',
-        isDeleted: false,
-      },
-      select: { identityId: true },
-    });
-    const linkedTeamIds = new Set(links.map((link) => link.identityId));
+    const linkedSuppliers = await resolveSuppliersByTeamIdsFromMaster(
+      teams.map((team) => team.id),
+    );
     return teams.map((team) => ({
-      group: linkedTeamIds.has(team.id)
+      group: linkedSuppliers.has(team.id)
         ? ('external' as const)
         : ('internal' as const),
       label: team.dictKey,
@@ -408,7 +402,28 @@ export const SupplierIdentityService = {
     client?: Prisma.TransactionClient,
   ) {
     if (input.category === 'PROCESS') {
-      return this.resolveSupplierByTeamId(input.teamId, client);
+      const supplier = await this.resolveSupplierByTeamId(input.teamId, client);
+      if (supplier) return supplier;
+      const teamId = normalizeId(input.teamId);
+      if (!teamId) return null;
+      const externalSource = await (
+        client ?? prisma
+      ).team_identity_sources.findFirst({
+        select: { id: true },
+        where: {
+          isDeleted: false,
+          sourceType: 'SUPPLIER',
+          teamId,
+        },
+      });
+      if (externalSource) {
+        throw new BusinessError(
+          'MISSING_PROCESS_TEAM_LINK',
+          'External TEAM requires a valid supplier identity link',
+          409,
+        );
+      }
+      return null;
     }
     return this.resolveSupplierById(input.supplierId, client);
   },

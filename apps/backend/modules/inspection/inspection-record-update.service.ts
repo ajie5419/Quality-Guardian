@@ -94,11 +94,16 @@ export const InspectionRecordUpdateService = {
           'A canonical TEAM identity is required for process inspections',
         );
       }
-      const teamIdentity = teamIdForResolution
-        ? await SupplierIdentityService.resolveTeamById(teamIdForResolution, tx)
-        : null;
-      if (teamIdentity) {
-        await SupplierIdentityService.lockTeamForMutation(teamIdentity.id, tx);
+      let teamIdentity = null;
+      if (teamIdForResolution) {
+        await SupplierIdentityService.lockTeamForMutation(
+          teamIdForResolution,
+          tx,
+        );
+        teamIdentity = await SupplierIdentityService.resolveTeamById(
+          teamIdForResolution,
+          tx,
+        );
       }
       const governedFields = buildGovernedWriteFieldsForTable('inspections', {
         incomingType: data.incomingType,

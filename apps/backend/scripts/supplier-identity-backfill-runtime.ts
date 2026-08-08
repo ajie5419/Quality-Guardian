@@ -59,8 +59,20 @@ export async function loadExplicitTeamLinks(
       },
     }),
   ]);
+  const sources = await prisma.team_identity_sources.findMany({
+    where: {
+      isDeleted: false,
+      sourceId: { in: [...new Set(links.map((link) => link.supplierId))] },
+      sourceType: 'SUPPLIER',
+      teamId: { in: [...new Set(links.map((link) => link.identityId))] },
+    },
+    select: { sourceId: true, teamId: true },
+  });
 
   const activeTeamIds = new Set(teams.map((team) => team.id));
+  const supplierTeamSourcePairs = new Set(
+    sources.map((source) => `${source.teamId}:${source.sourceId}`),
+  );
   const effectiveLinks = new Map<string, EffectiveTeamLink>();
   const unresolvedAudits: UnresolvedRefInput[] = [];
   let conflicts = 0;
@@ -70,7 +82,9 @@ export async function loadExplicitTeamLinks(
     if (
       link.supplier.isDeleted ||
       !activeTeamIds.has(link.identityId) ||
-      resolveSupplierInspectionPolicy(link.supplier).identitySource !== 'team'
+      resolveSupplierInspectionPolicy(link.supplier).identitySource !==
+        'team' ||
+      !supplierTeamSourcePairs.has(`${link.identityId}:${link.supplierId}`)
     ) {
       conflicts += 1;
       unresolvedAudits.push({

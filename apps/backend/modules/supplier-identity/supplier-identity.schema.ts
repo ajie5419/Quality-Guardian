@@ -22,6 +22,8 @@ export const supplierIdentityInputSchema = {
 export const supplierIdentityOptionsQuerySchema = z.object({
   keyword: z.string().trim().max(100).optional(),
   take: z.coerce.number().int().positive().max(100).default(100),
+  teamId: z.string().trim().min(1).optional(),
+  target: z.enum(['supplier', 'team']).optional(),
 });
 
 export type SupplierIdentityOptionsQuery = z.infer<

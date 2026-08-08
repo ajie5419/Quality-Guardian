@@ -89,6 +89,7 @@ describe('supplier identity backfill runtime', () => {
         supplierId: 'supplier-linked',
       },
     ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
 
     await expect(loadExplicitTeamLinks('apply')).resolves.toMatchObject({
@@ -99,6 +100,41 @@ describe('supplier identity backfill runtime', () => {
         create: expect.objectContaining({
           entityId: 'link-1',
           entityType: 'supplier_identity_links',
+          reason: 'invalid_explicit_process_team_link',
+        }),
+      }),
+    );
+  });
+
+  it('audits a policy-valid link without its exact SUPPLIER source', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Resident Team', id: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        isDeleted: false,
+        id: 'link-1',
+        identityNameSnapshot: 'Resident Team',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-linked',
+          isDeleted: false,
+          name: 'Resident Supplier',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-linked',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+    const result = await loadExplicitTeamLinks('apply');
+    expect(result.conflicts).toBe(1);
+    expect(result.effectiveLinks).toEqual(new Map());
+    expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
           reason: 'invalid_explicit_process_team_link',
         }),
       }),

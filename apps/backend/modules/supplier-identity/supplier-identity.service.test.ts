@@ -24,7 +24,7 @@ vi.mock('~/utils/prisma', () => ({
       upsert: vi.fn(),
     },
     team_identity_merge_participants: { findUnique: vi.fn() },
-    team_identity_sources: { findFirst: vi.fn() },
+    team_identity_sources: { findFirst: vi.fn(), findMany: vi.fn() },
     suppliers: { findFirst: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
   },
@@ -53,7 +53,16 @@ describe('supplier identity service', () => {
   it('resolves a supplier through an active TEAM link', async () => {
     vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue({
       id: 'link-1',
-      supplier: { id: 'supplier-1', isDeleted: false, name: 'Supplier A' },
+      supplier: {
+        category: 'Outsourcing',
+        id: 'supplier-1',
+        isDeleted: false,
+        name: 'Supplier A',
+        outsourcingMode: 'IN_HOUSE_TEAM',
+      },
+    } as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue({
+      id: 'source-1',
     } as never);
 
     await expect(
@@ -97,10 +106,20 @@ describe('supplier identity service', () => {
   it('uses the supplied transaction client for TEAM resolution', async () => {
     const client = {
       supplier_identity_links: { findFirst: vi.fn() },
+      team_identity_sources: { findFirst: vi.fn() },
     };
     client.supplier_identity_links.findFirst.mockResolvedValue({
       id: 'link-1',
-      supplier: { id: 'supplier-1', isDeleted: false, name: 'Supplier A' },
+      supplier: {
+        category: 'Outsourcing',
+        id: 'supplier-1',
+        isDeleted: false,
+        name: 'Supplier A',
+        outsourcingMode: 'EXTERNAL_SERVICE',
+      },
+    });
+    client.team_identity_sources.findFirst.mockResolvedValue({
+      id: 'source-1',
     });
 
     await SupplierIdentityService.resolveSupplierByTeamId(
@@ -116,12 +135,30 @@ describe('supplier identity service', () => {
     vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
       {
         identityId: 'team-1',
-        supplier: { id: 'supplier-1', isDeleted: false, name: 'Supplier A' },
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-1',
+          isDeleted: false,
+          name: 'Supplier A',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-1',
       },
       {
         identityId: 'team-2',
-        supplier: { id: 'supplier-2', isDeleted: false, name: 'Supplier B' },
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-2',
+          isDeleted: false,
+          name: 'Supplier B',
+          outsourcingMode: 'EXTERNAL_SERVICE',
+        },
+        supplierId: 'supplier-2',
       },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-1', teamId: 'team-1' },
+      { sourceId: 'supplier-2', teamId: 'team-2' },
     ] as never);
 
     await expect(
@@ -152,6 +189,27 @@ describe('supplier identity service', () => {
       SupplierIdentityService.resolveSuppliersByTeamIds(['team-1', 'team-2']),
     ).resolves.toEqual(new Map());
     expect(prisma.dictionaries.findMany).not.toHaveBeenCalled();
+  });
+
+  it('excludes batch links without an exact SUPPLIER source', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-1',
+          isDeleted: false,
+          name: 'Supplier A',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-1',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
+
+    await expect(
+      SupplierIdentityService.resolveSuppliersByTeamIds(['team-1']),
+    ).resolves.toEqual(new Map());
   });
 
   it('resolves canonical supplier names by unique IDs in one query', async () => {
@@ -210,7 +268,16 @@ describe('supplier identity service', () => {
     } as never);
     vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue({
       id: 'link-1',
-      supplier: { id: 'supplier-2', isDeleted: false, name: 'Supplier B' },
+      supplier: {
+        category: 'Outsourcing',
+        id: 'supplier-2',
+        isDeleted: false,
+        name: 'Supplier B',
+        outsourcingMode: 'IN_HOUSE_TEAM',
+      },
+    } as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue({
+      id: 'source-1',
     } as never);
 
     await expect(
@@ -224,6 +291,7 @@ describe('supplier identity service', () => {
 
   it('does not accept a caller supplier ID when an unlinked TEAM is unresolved', async () => {
     vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue(null);
 
     await expect(
       SupplierIdentityService.resolveSupplierForInspection({
@@ -233,6 +301,38 @@ describe('supplier identity service', () => {
       }),
     ).resolves.toBeNull();
     expect(prisma.suppliers.findFirst).not.toHaveBeenCalled();
+  });
+
+  it('rejects a link whose supplier source belongs to another TEAM', async () => {
+    vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue({
+      id: 'link-1',
+      supplier: {
+        category: 'Outsourcing',
+        id: 'supplier-1',
+        isDeleted: false,
+        name: 'Supplier A',
+        outsourcingMode: 'IN_HOUSE_TEAM',
+      },
+    } as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue(null);
+
+    await expect(
+      SupplierIdentityService.resolveSupplierByTeamId('team-1'),
+    ).resolves.toBeNull();
+  });
+
+  it('blocks an external TEAM without a valid supplier link', async () => {
+    vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue({
+      id: 'source-1',
+    } as never);
+
+    await expect(
+      SupplierIdentityService.resolveSupplierForInspection({
+        category: 'PROCESS',
+        teamId: 'team-external',
+      }),
+    ).rejects.toMatchObject({ code: 'MISSING_PROCESS_TEAM_LINK' });
   });
 
   it('does not create a link for a non-TEAM dictionary ID', async () => {
@@ -373,9 +473,21 @@ describe('supplier identity service', () => {
       { dictKey: 'Resident Team', id: 'team-2' },
     ] as never);
     vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
-      { identityId: 'team-2' },
+      {
+        identityId: 'team-2',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-1',
+          isDeleted: false,
+          name: 'Resident Supplier',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-1',
+      },
     ] as never);
-    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-1', teamId: 'team-2' },
+    ] as never);
 
     await expect(
       SupplierIdentityService.listTeamOptions('Team'),
@@ -386,6 +498,10 @@ describe('supplier identity service', () => {
   });
 
   it('returns only process-responsible supplier management options', async () => {
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-1', teamId: 'team-1' },
+      { sourceId: 'supplier-2', teamId: 'team-1' },
+    ] as never);
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
       { dictKey: 'Assembly TEAM', id: 'team-1' },
     ] as never);
@@ -417,7 +533,11 @@ describe('supplier identity service', () => {
       orderBy: { name: 'asc' },
       select: { category: true, id: true, name: true, outsourcingMode: true },
       take: 100,
-      where: { isDeleted: false, name: { contains: 'A' } },
+      where: {
+        id: { in: ['supplier-1', 'supplier-2'] },
+        isDeleted: false,
+        name: { contains: 'A' },
+      },
     });
     expect(prisma.dictionaries.findMany).toHaveBeenCalledWith({
       orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
@@ -426,12 +546,45 @@ describe('supplier identity service', () => {
       where: {
         dictKey: { contains: 'A' },
         dictType: 'team',
+        id: { in: ['team-1'] },
         isDeleted: false,
-        teamIdentitySources: {
-          some: { isDeleted: false, sourceType: 'SUPPLIER' },
-        },
         status: 1,
       },
+    });
+  });
+
+  it('lists only the source-matched supplier for a selected TEAM', async () => {
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-1', teamId: 'team-1' },
+      { sourceId: 'supplier-2', teamId: 'team-2' },
+    ] as never);
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
+      {
+        category: 'Outsourcing',
+        id: 'supplier-1',
+        name: 'Supplier A',
+        outsourcingMode: 'IN_HOUSE_TEAM',
+      },
+      {
+        category: 'Outsourcing',
+        id: 'supplier-2',
+        name: 'Supplier B',
+        outsourcingMode: 'EXTERNAL_SERVICE',
+      },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Resident TEAM', id: 'team-1' },
+    ] as never);
+
+    await expect(
+      SupplierIdentityService.listManagementOptions({
+        take: 100,
+        teamId: 'team-1',
+        target: 'supplier',
+      }),
+    ).resolves.toEqual({
+      suppliers: [{ label: 'Supplier A', value: 'supplier-1' }],
+      teams: [{ label: 'Resident TEAM', value: 'team-1' }],
     });
   });
 

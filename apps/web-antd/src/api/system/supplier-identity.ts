@@ -52,6 +52,8 @@ export function createSupplierIdentityLinkApi(
 export function getSupplierIdentityManagementOptionsApi(params?: {
   keyword?: string;
   take?: number;
+  target?: 'supplier' | 'team';
+  teamId?: string;
 }) {
   return requestClient.get<SupplierIdentityApi.ManagementOptions>(
     `${BASE_URL}/options`,

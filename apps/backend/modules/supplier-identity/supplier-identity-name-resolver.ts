@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
+import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import prisma from '~/utils/prisma';
 
 function normalizeId(value: unknown) {
@@ -9,12 +10,38 @@ function normalizeId(value: unknown) {
 export type TeamSupplierIdentity = { id: string; name: string };
 
 export const teamLinkInclude = {
-  supplier: { select: { id: true, isDeleted: true, name: true } },
+  supplier: {
+    select: {
+      category: true,
+      id: true,
+      isDeleted: true,
+      name: true,
+      outsourcingMode: true,
+    },
+  },
 } satisfies Prisma.supplier_identity_linksInclude;
+
+type TeamLinkResolverClient = Pick<
+  Prisma.TransactionClient,
+  'supplier_identity_links' | 'team_identity_sources'
+>;
+
+function isEligibleTeamSupplier(link: {
+  supplier: {
+    category: null | string;
+    isDeleted: boolean;
+    outsourcingMode: null | string;
+  };
+}) {
+  return (
+    !link.supplier.isDeleted &&
+    resolveSupplierInspectionPolicy(link.supplier).identitySource === 'team'
+  );
+}
 
 export async function resolveTeamSupplierIdentity(
   teamId: string,
-  client: Pick<Prisma.TransactionClient, 'supplier_identity_links'> = prisma,
+  client: TeamLinkResolverClient = prisma,
 ) {
   const link = await client.supplier_identity_links.findFirst({
     where: {
@@ -25,7 +52,17 @@ export async function resolveTeamSupplierIdentity(
     },
     include: teamLinkInclude,
   });
-  if (link && !link.supplier.isDeleted) {
+  if (!link || !isEligibleTeamSupplier(link)) return null;
+  const source = await client.team_identity_sources.findFirst({
+    select: { id: true },
+    where: {
+      isDeleted: false,
+      sourceId: link.supplier.id,
+      sourceType: 'SUPPLIER',
+      teamId,
+    },
+  });
+  if (source) {
     return { id: link.supplier.id, name: link.supplier.name };
   }
   return null;
@@ -49,9 +86,27 @@ export async function resolveSuppliersByTeamIds(
     },
     include: teamLinkInclude,
   });
+  const eligibleLinks = links.filter((link) => isEligibleTeamSupplier(link));
+  if (eligibleLinks.length === 0) {
+    return new Map<string, TeamSupplierIdentity>();
+  }
+  const sources = await prisma.team_identity_sources.findMany({
+    where: {
+      isDeleted: false,
+      sourceId: {
+        in: [...new Set(eligibleLinks.map((link) => link.supplierId))],
+      },
+      sourceType: 'SUPPLIER',
+      teamId: { in: ids },
+    },
+    select: { sourceId: true, teamId: true },
+  });
+  const sourcePairs = new Set(
+    sources.map((source) => `${source.teamId}:${source.sourceId}`),
+  );
   const result = new Map<string, TeamSupplierIdentity>();
-  for (const link of links) {
-    if (link.supplier.isDeleted) continue;
+  for (const link of eligibleLinks) {
+    if (!sourcePairs.has(`${link.identityId}:${link.supplierId}`)) continue;
     result.set(link.identityId, {
       id: link.supplier.id,
       name: link.supplier.name,

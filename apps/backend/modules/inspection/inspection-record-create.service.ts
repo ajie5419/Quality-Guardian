@@ -92,16 +92,14 @@ export const InspectionRecordCreateService = {
           );
         }
         const execute = async (tx: Prisma.TransactionClient) => {
-          const teamIdentity =
-            data.category === 'PROCESS'
-              ? await SupplierIdentityService.resolveTeamById(
-                  explicitTeamId,
-                  tx,
-                )
-              : null;
-          if (teamIdentity) {
+          let teamIdentity = null;
+          if (data.category === 'PROCESS') {
             await SupplierIdentityService.lockTeamForMutation(
-              teamIdentity.id,
+              explicitTeamId,
+              tx,
+            );
+            teamIdentity = await SupplierIdentityService.resolveTeamById(
+              explicitTeamId,
               tx,
             );
           }

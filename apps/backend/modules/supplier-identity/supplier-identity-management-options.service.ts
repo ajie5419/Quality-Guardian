@@ -12,37 +12,59 @@ export async function listSupplierIdentityManagementOptions(
 ) {
   const keyword = params.keyword?.trim() || '';
   const take = Math.min(Math.max(params.take || 100, 1), 100);
-  const [supplierRows, teams] = await Promise.all([
-    prisma.suppliers.findMany({
-      where: {
-        isDeleted: false,
-        ...(keyword ? { name: { contains: keyword } } : {}),
-      },
-      orderBy: { name: 'asc' },
-      select: { category: true, id: true, name: true, outsourcingMode: true },
-      take,
-    }),
-    prisma.dictionaries.findMany({
-      where: {
-        dictType: 'team',
-        isDeleted: false,
-        status: 1,
-        teamIdentitySources: {
-          some: { isDeleted: false, sourceType: 'SUPPLIER' },
-        },
-        ...(keyword ? { dictKey: { contains: keyword } } : {}),
-      },
-      orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
-      select: { dictKey: true, id: true },
-      take,
-    }),
-  ]);
+  const sources = await prisma.team_identity_sources.findMany({
+    where: { isDeleted: false, sourceType: 'SUPPLIER' },
+    select: { sourceId: true, teamId: true },
+  });
+  const supplierRows = await prisma.suppliers.findMany({
+    where: {
+      id: { in: [...new Set(sources.map((source) => source.sourceId))] },
+      isDeleted: false,
+      ...(keyword && params.target !== 'team'
+        ? { name: { contains: keyword } }
+        : {}),
+    },
+    orderBy: { name: 'asc' },
+    select: { category: true, id: true, name: true, outsourcingMode: true },
+    take,
+  });
+  const suppliers = supplierRows.filter(
+    (supplier) =>
+      resolveSupplierInspectionPolicy(supplier).identitySource === 'team',
+  );
+  const supplierIds = new Set(suppliers.map((supplier) => supplier.id));
+  const validSources = sources.filter((source) =>
+    supplierIds.has(source.sourceId),
+  );
+  const teamIds = [
+    ...new Set(
+      validSources
+        .filter((source) => !params.teamId || source.teamId === params.teamId)
+        .map((source) => source.teamId),
+    ),
+  ];
+  const teams = await prisma.dictionaries.findMany({
+    where: {
+      dictType: 'team',
+      id: { in: teamIds },
+      isDeleted: false,
+      status: 1,
+      ...(keyword && params.target !== 'supplier'
+        ? { dictKey: { contains: keyword } }
+        : {}),
+    },
+    orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
+    select: { dictKey: true, id: true },
+    take,
+  });
+  const supplierIdsForSelectedTeam = new Set(
+    validSources
+      .filter((source) => !params.teamId || source.teamId === params.teamId)
+      .map((source) => source.sourceId),
+  );
   return {
-    suppliers: supplierRows
-      .filter(
-        (supplier) =>
-          resolveSupplierInspectionPolicy(supplier).identitySource === 'team',
-      )
+    suppliers: suppliers
+      .filter((supplier) => supplierIdsForSelectedTeam.has(supplier.id))
       .map((supplier) => ({
         label: supplier.name,
         value: supplier.id,
