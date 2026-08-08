@@ -27,6 +27,24 @@
 
 ---
 
+### 2026-08-08 发布：qgs v0.24.0（身份 ID 化治理 + 报检/检验显示修复）
+
+**执行内容：**
+
+- 提交 `b5319b8e` 经 PR #94 合入 main：SupplierSelect 跨类别 legacyName 回退、进货类型/工序按 ID 解析、supplier identity links 系统设置管理 UI、焊接缺陷责任焊工校验、责任部门 TreeSelect 独立勾选等。
+- release-please 生成发布 PR #92 → 合并 → tag `qgs-v0.24.0`。
+
+**发布过程：**
+
+- tag 触发的 deploy（run 31242204439）在 release maintenance 阶段失败：供应商身份回填完整性检查 `open-audits.new=17`。
+- 17 条新增 unresolved 均为数据缺口：PROCESS 检验引用「机加 BU」等 TEAM 但无 TEAM→供应商链接（示例：秦皇岛隽华重工科技有限公司/机加 BU、尊达，`MISSING_PROCESS_TEAM_LINK`）。backfill 脚本本版本零改动，判定为生产数据新增/变更所致，非代码回归。
+- 按仓库既定恢复路径（与 0.23.2 相同）：手动 `workflow_dispatch` 部署 `deploy_only=true` + `skip_maintenance=true`，v0.24.0 部署成功（run 31242625012）。
+- 影响：本次未运行 release maintenance（身份回填、pass-rate 投影刷新等未执行）；两条 Prisma migration 已执行；17 条及既有 unresolved 留在处置队列 `unresolved_master_data_refs`，需在部署后的 supplier identity links UI 补齐 TEAM→供应商链接后另行回填。
+
+**commit:** `b5319b8e`
+
+---
+
 ## [0.24.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.23.2...qgs-v0.24.0) (2026-08-08)
 
 

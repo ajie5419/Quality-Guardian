@@ -2,7 +2,7 @@
 
 ## 当前状态
 
-- 最新变更: 报检任务不合格供应商回显修复——`SupplierSelect` 在选中 ID 未命中时跨类别回退解析 legacyName（同名不同 ID 场景也生效），无选中值时不跨类别猜选，外协供应商在进货检验表单不再显示 ID；进货检验记录「进货类型」显示按 `incomingTypeId` 解析字典当前名（历史行不动）；工序改名联动同步 `incoming_type` 字典；进货合格率分桶统一为解析后名称。
+- 最新变更: qgs v0.24.0 已发布（PR #94 合并、release PR #92 合并、tag `qgs-v0.24.0`，手动部署 `skip_maintenance=true` 成功）。发布时供应商身份回填完整性检查因 17 条新增 unresolved（PROCESS 检验缺 TEAM→供应商链接，如机加 BU、尊达）被 tag deploy 拦截，判定为生产数据缺口而非代码回归；17 条留在处置队列，待 supplier identity links UI 补齐链接后另行回填。本版本内容：SupplierSelect 跨类别回退解析、进货类型/工序按 ID 解析、supplier identity links 管理 UI、焊接缺陷责任焊工校验、责任部门 TreeSelect 独立勾选等。
 - `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
 - 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
