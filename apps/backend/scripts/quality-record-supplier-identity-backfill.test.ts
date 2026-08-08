@@ -10,6 +10,26 @@ const supplierA = { id: 'supplier-a', name: 'Supplier A' };
 const supplierB = { id: 'supplier-b', name: 'Supplier B' };
 
 describe('quality record supplier identity backfill', () => {
+  it('clears a process quality record supplier identity for an internal TEAM', () => {
+    expect(
+      resolveQualityRecordSupplierIdentity({
+        existingSupplier: supplierA,
+        existingSupplierId: supplierA.id,
+        existingSupplierName: supplierA.name,
+        inspection: {
+          category: 'PROCESS',
+          processSupplier: null,
+          supplierById: null,
+          supplierByName: null,
+          teamIsInternal: true,
+        },
+        supplierByRecordName: null,
+      }),
+    ).toEqual({
+      action: 'clear',
+      reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS',
+    });
+  });
   it('defaults to a bounded dry run', () => {
     expect(parseBackfillOptions([], {})).toEqual({
       batchSize: 200,

@@ -63,6 +63,23 @@ describe('inspection supplier identity backfill', () => {
     });
   });
 
+  it('clears an erroneous supplier identity for a DEPARTMENT-sourced TEAM', () => {
+    expect(
+      resolve({
+        category: 'PROCESS',
+        existingSupplier: supplierA,
+        existingSupplierId: supplierA.id,
+        existingSupplierName: supplierA.name,
+        teamById: teamA,
+        teamIsInternal: true,
+      }),
+    ).toEqual({
+      action: 'clear',
+      reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS',
+      team: teamA,
+    });
+  });
+
   it('audits supplier evidence without an explicit TEAM mapping', () => {
     expect(
       resolve({

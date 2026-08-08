@@ -12,11 +12,17 @@ export interface InspectionIdentityInput {
   existingTeamName: null | string;
   processSupplier: null | SupplierIdentity;
   supplierByName: null | SupplierIdentity;
+  teamIsInternal?: boolean;
   teamById: null | TeamIdentity;
   teamByName: null | TeamIdentity;
 }
 
 export type InspectionIdentityResolution =
+  | {
+      action: 'clear';
+      reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS';
+      team: TeamIdentity;
+    }
   | {
       action: 'conflict';
       candidate: SupplierIdentity;
@@ -45,15 +51,14 @@ export type InspectionIdentityResolution =
 export function resolveInspectionSupplierIdentity(
   input: InspectionIdentityInput,
 ): InspectionIdentityResolution {
-  if (input.existingSupplierId && !input.existingSupplier) {
-    return { action: 'unresolved', reason: 'INVALID_EXISTING_ID' };
-  }
-
   if (input.category === 'SHIPMENT') {
     return { action: 'unresolved', reason: 'UNSUPPORTED_INSPECTION_CATEGORY' };
   }
 
   if (input.category === 'INCOMING') {
+    if (input.existingSupplierId && !input.existingSupplier) {
+      return { action: 'unresolved', reason: 'INVALID_EXISTING_ID' };
+    }
     const candidate = input.supplierByName;
     if (
       input.existingSupplier &&
@@ -82,6 +87,19 @@ export function resolveInspectionSupplierIdentity(
   const team = input.teamById || input.teamByName;
   if (!team) {
     return { action: 'unresolved', reason: 'MISSING_PROCESS_TEAM' };
+  }
+  if (input.teamIsInternal) {
+    if (!input.existingSupplierId && !input.existingSupplierName) {
+      return { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
+    }
+    return {
+      action: 'clear',
+      reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS',
+      team,
+    };
+  }
+  if (input.existingSupplierId && !input.existingSupplier) {
+    return { action: 'unresolved', reason: 'INVALID_EXISTING_ID' };
   }
   if (!input.processSupplier) {
     if (!input.existingSupplierId && !input.existingSupplierName) {

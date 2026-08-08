@@ -6274,3 +6274,10 @@
 
 - 显示触发条件仍按各页面现状：完成检验弹窗与新建问题页为工序精确「焊接」，检验记录页为工序含「焊」；如要统一为含「焊」，需确认工序字典口径后另行调整。
 - 完成检验弹窗的工序沿用报检单并锁定，若报检单工序名非精确「焊接」的焊接类名称，责任焊工字段不会显示（同新建问题页口径）。
+### 2026-08-08 修复：supplier identity 线上解析、维护门禁与内部 BU 历史清理
+
+- 删除 PROCESS 在线 `TEAM name -> supplier name` fallback；PROCESS 的 supplier 字段仅来自有效显式 link，调用方字段不能注入，内部 BU 维持空 supplier identity。
+- mapping 管理仅接受有匹配 `SUPPLIER` 来源的外部 TEAM 与 `Outsourcing + IN_HOUSE_TEAM/EXTERNAL_SERVICE` 供应商；有 PROCESS 事实时禁止在线删除或实质修改 mapping，历史修复必须走 backfill。
+- 回填不再按名称建立/恢复 TEAM link；内部 `DEPARTMENT` TEAM 的错误 inspection/quality record supplier 字段以审计、CAS、幂等方式清空；所有 unresolved/conflict（包括重复运行中已有 OPEN 项）均阻断维护。
+- 正常 deploy workflow 删除 `skip_maintenance`，Prisma migration 后必须连续运行 release maintenance。
+- 更正 v0.24.0 记录：`skip_maintenance=true` 的手工部署是未完成维护时的错误绕过，不是已验证的恢复路径；17 条 unresolved 的外部/内部归属尚未在生产执行本轮证据化回填。

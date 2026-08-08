@@ -18,11 +18,16 @@ export interface QualityRecordIdentityInput {
     processSupplier: null | SupplierIdentity;
     supplierById: null | SupplierIdentity;
     supplierByName: null | SupplierIdentity;
+    teamIsInternal?: boolean;
   };
   supplierByRecordName: null | SupplierIdentity;
 }
 
 export type SupplierIdentityResolution =
+  | {
+      action: 'clear';
+      reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS';
+    }
   | {
       action: 'conflict';
       candidate: SupplierIdentity;
@@ -164,6 +169,15 @@ export function resolveQualityRecordSupplierIdentity(
   const inspectionCandidate = input.inspection
     ? resolveInspectionCandidate(input.inspection)
     : null;
+
+  if (
+    input.inspection?.category === 'PROCESS' &&
+    input.inspection.teamIsInternal
+  ) {
+    return input.existingSupplierId || input.existingSupplierName
+      ? { action: 'clear', reason: 'INTERNAL_TEAM_SUPPLIER_FIELDS' }
+      : { action: 'skip', reason: 'NO_SUPPLIER_IDENTITY_REQUIRED' };
+  }
 
   if (input.existingSupplier) {
     if (

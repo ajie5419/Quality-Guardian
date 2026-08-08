@@ -154,7 +154,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 - `inspections.supplierId` 和 `quality_records.supplierId` 统一指向 `suppliers.id`，名称字段仅保留当时快照。
 - 进货检验选择供应商时，前端提交 `supplierId + supplierName`，后端以 ID 校验并重建名称快照。
-- 过程检验保存 `teamId + team`，通过 `supplier_identity_links` 解析供应商 ID；禁止比较 TEAM 名称和供应商名称。
+- 过程检验保存 `teamId + team`，并只通过有效 `supplier_identity_links` 解析供应商 ID；调用方 `supplierId/supplierName` 不得注入 PROCESS 事实。内部 BU 没有有效 link 时两个 supplier 字段必须为空，禁止比较 TEAM 名称和供应商名称。
 - 关联不合格项必须优先继承已提交检验记录返回的 canonical `supplierId/supplierName`，不信任提交前的表单快照。
 - 评分刷新任务只携带规范 `supplierId`；过程检验先在源事务内通过 `teamId -> supplierId` 显式映射生成任务。
 - 存量回填先处理报检任务的 `teamId/supplierId`，再处理 `inspections`，最后以关联检验或唯一精确供应商名称作为确定性证据处理 `quality_records`；模糊、重名、冲突和缺少 TEAM 映射的数据写入 `unresolved_master_data_refs`。
@@ -163,7 +163,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 - 本模块的进货检验、驻厂过程检验和不合格项在线写入已切换到 ID-first：进货写入 `supplierId + supplierName`，过程写入 `teamId + team`，服务端校验 ID 并生成 canonical 名称快照。
 - 检验记录、不合格项及其质量损失变更在源事务内写入持久化指标任务；名称集合不参与派发、画像或评分。
-- 存量回填支持 dry-run/apply、分批和并发条件更新；无效旧 ID 仅在存在关联检验证据或唯一精确名称候选时修复，其他无法解析、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测。
+- 存量回填支持 dry-run/apply、分批和并发条件更新；内部 `DEPARTMENT` TEAM 的错误 PROCESS supplier 字段可被审计并清空，其他无效旧 ID 仅在存在关联检验证据或该历史字段的唯一精确名称候选时修复。无法解析、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测，也不会因已存在 OPEN 审计而放行发布。
 - 本 wave 只覆盖供应商身份相关的检验链路，不代表其他主数据（部门、项目、工序等）已完成全项目 `ID_ONLY` 迁移。未纳入模块必须显式标注治理阶段并单独推进。
 
 跨模块的通用规则见 `docs/master-data-identity-governance.md`。
