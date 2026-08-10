@@ -12,6 +12,7 @@ export function useQmsPermissions(prefix: string) {
   const canList = computed(() => hasAccessByCodes([`${prefix}:List`]));
   const canCreate = computed(() => hasAccessByCodes([`${prefix}:Create`]));
   const canEdit = computed(() => hasAccessByCodes([`${prefix}:Edit`]));
+  const canConfirm = computed(() => hasAccessByCodes([`${prefix}:Confirm`]));
   const canDelete = computed(() => hasAccessByCodes([`${prefix}:Delete`]));
   const canExport = computed(() => hasAccessByCodes([`${prefix}:Export`]));
   const canImport = computed(() => hasAccessByCodes([`${prefix}:Import`]));
@@ -20,6 +21,7 @@ export function useQmsPermissions(prefix: string) {
     canList,
     canCreate,
     canEdit,
+    canConfirm,
     canDelete,
     canExport,
     canImport,

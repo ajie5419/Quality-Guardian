@@ -29,6 +29,7 @@
     "maintenance:inspection-issue-divisions": "tsx scripts/backfill-inspection-issue-divisions.ts",
     "maintenance:inspection-issue-responsibilities": "tsx scripts/backfill-inspection-issue-responsibilities.ts",
     "maintenance:role-page-permissions": "tsx scripts/backfill-role-page-permissions.ts",
+    "maintenance:work-order-confirm-permission": "tsx scripts/backfill-work-order-confirm-permission.ts",
     "maintenance:supplier-score-snapshots": "tsx scripts/reconcile-supplier-score-snapshots.ts",
     "maintenance:supplier-identities": "tsx scripts/backfill-quality-record-supplier-identities.ts",
     "maintenance:backfill-thumbnails": "tsx scripts/backfill-missing-thumbnails.ts"

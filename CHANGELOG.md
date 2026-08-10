@@ -27,6 +27,30 @@
 
 ---
 
+### 2026-08-10 修复：工单要求确认权限回归
+
+**执行内容：**
+
+- 新增独立 `QMS:WorkOrder:Confirm` 权限；前端确认/撤销按钮和后端状态变更均使用该权限，普通要求编辑继续严格要求 `QMS:WorkOrder:Edit`。
+- 工单模块声明存量 `/qms/work-order` 菜单及确认按钮，新环境 `db seed` 同步写入该按钮；发布维护通过 `ensureModuleMenus` 幂等写入菜单，Docker production image 显式校验维护脚本已随镜像发布。
+- 新增 release maintenance：同一事务中确保 `QMS:WorkOrder:List` 与 `QMS:WorkOrder:Confirm` 权限记录、为启用 `QC` 角色补齐列表和确认权限，并为所有当前持有工单编辑权限的启用角色补齐确认权限，绝不新增 QC 编辑权限；无关角色不变，菜单缓存按需失效。
+- release maintenance 顺序固定在页面权限回填之后；新增菜单、QC/编辑角色兼容、零 QC、幂等、发布顺序以及确认/编辑双向越权测试。
+
+**验证结果：**
+
+- 定向 Vitest：`4/4` 文件、`29/29` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`：均通过（架构检查仅报告既有 baseline）。
+- 后端全量 Vitest：`268/269` 文件、`2474/2475` 用例通过；唯一失败为工作树既有无关改动 `apps/backend/modules/supplier-identity/supplier-identity.service.test.ts:867` 的断言与其当前 service 查询不一致，本次未触碰该文件。
+- 排除该用户既有脏文件后，后端全量 Vitest：`268/268` 文件、`2443/2443` 用例通过。
+
+**commit:** 已按独立修复提交记录，未推送或发布。
+
+**遗留问题：**
+
+- 发布后需由 release maintenance 正常执行权限回填；未通过绕过或手工改库处理。
+
+---
+
 ### 2026-08-08 修复：supplier identity 独立验收 P1 闭环
 
 **执行内容：**

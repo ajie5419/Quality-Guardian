@@ -24,6 +24,7 @@ export const PERMISSION_CODES = {
       LIST: 'QMS:WorkOrder:List',
       CREATE: 'QMS:WorkOrder:Create',
       EDIT: 'QMS:WorkOrder:Edit',
+      CONFIRM: 'QMS:WorkOrder:Confirm',
       DELETE: 'QMS:WorkOrder:Delete',
       EXPORT: 'QMS:WorkOrder:Export',
       IMPORT: 'QMS:WorkOrder:Import',
