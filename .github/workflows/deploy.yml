@@ -148,7 +148,7 @@ jobs:
 
             deploy_prisma_migrations() {
               local migration_log="/tmp/qms-migrate-deploy.log"
-              if run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'" 2>&1 | tee "$migration_log"; then
+              if run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$MIGRATION_WRAPPER_CMD" 2>&1 | tee "$migration_log"; then
                 return 0
               fi
 
@@ -158,11 +158,12 @@ jobs:
 
               echo "Prisma migrate deploy reported P3005; baselining existing production schema and retrying migrate deploy"
               baseline_existing_prisma_schema
-              run_backend 300 "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'"
+              run_backend 300 "$MIGRATION_WRAPPER_CMD"
             }
 
             PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
             PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
+            MIGRATION_WRAPPER_CMD="cd /app/apps/backend && sh scripts/run-prisma-migrations.sh"
             RELEASE_MAINTENANCE_CMD="cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
             QUALITY_LOSS_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-loss-index.ts"
             QUALITY_LOSS_BACKFILL_CONTAINER="qms-quality-loss-backfill"

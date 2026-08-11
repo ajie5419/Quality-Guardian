@@ -34,7 +34,7 @@ echo "apple/container dependencies are ready."
 echo "MySQL: 127.0.0.1:${MYSQL_PORT}/${MYSQL_DATABASE}"
 echo "Redis: 127.0.0.1:${REDIS_PORT}"
 echo "Running database migrations..."
-pnpm --dir apps/backend exec prisma migrate deploy --schema prisma/schema.prisma
+pnpm --dir apps/backend exec sh scripts/run-prisma-migrations.sh
 
 USER_COUNT="$(pnpm --dir apps/backend exec node -e "const {PrismaClient}=require('@prisma/client'); const p=new PrismaClient(); p.users.count().then((count)=>{console.log(count);}).finally(()=>p.\$disconnect());")"
 
