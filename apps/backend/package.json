@@ -24,6 +24,7 @@
     "maintenance:team-merge": "TEAM_IDENTITY_MAINTENANCE_MODE=1 tsx scripts/merge-team-identities.ts",
     "maintenance:team-merge-confirmed": "TEAM_IDENTITY_MAINTENANCE_MODE=1 tsx scripts/merge-confirmed-team-duplicates.ts",
     "maintenance:inspection-request-categories": "tsx scripts/backfill-inspection-request-categories.ts",
+    "maintenance:inspection-request-responsibilities": "tsx scripts/backfill-inspection-request-responsibilities.ts",
     "maintenance:inspection-request-process-options": "tsx scripts/backfill-inspection-request-process-options.ts",
     "maintenance:quality-classifications": "tsx scripts/backfill-quality-classifications.ts",
     "maintenance:inspection-issue-divisions": "tsx scripts/backfill-inspection-issue-divisions.ts",
