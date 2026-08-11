@@ -6397,11 +6397,14 @@
 - 新增报检任务责任回填：完整持久 triad 优先；仅缺失完整 triad 的历史行才调用既有 legacy canonical resolver，其中 TEAM→supplier link 仅作为历史兼容证据。任何名称相同都不构成回填依据。回填采用 ID keyset 分批、字段级 CAS 和同事务审计；缺失、失效或冲突证据保持源记录并写入 `unresolved_master_data_refs` OPEN 审计，不覆盖人工已裁决项。普通 `MISSING_CANONICAL_RESPONSIBILITY_EVIDENCE` 是 nullable legacy 兼容结果：apply 仍完整扫描、执行全部确定性更新并落审计，不是跳过；运行时继续兼容读取，关单必须经受校验的显式责任裁决。失效证据、冲突、CAS 并发变更或 `--max-batches` 截断才 fail-closed 阻断发布，新写入始终 fail-closed。
 - 发布维护在报检类别和工序选项维护后、既有不合格项责任回填前运行；新增后端 maintenance 命令。
 - Prisma migration 使用缩短后的 MySQL 索引名，并新增 `inspections` 责任三元组及索引 migration，保证报检与生成检验记录可按相同 canonical 事实查询。
+- P3009 根因：旧 `20260811000000_add_inspection_request_responsibility` migration 的索引名长度为 70，超过 MySQL 64 字符上限，触发 MySQL 1059。初次仅做只读取证，确认该 migration 为 active failed、`applied_steps_count=0`、InnoDB，且两张目标表的责任字段和索引均不存在。
+- 随后由外部操作（非 Codex apply）将旧 migration row 标记为 rolled back，并重新执行 deploy 成功；`20260811000000` 与 `20260811000001` 均为 `applied_steps_count=1`，已核对两张目标表的字段和短索引完整。新增 fail-closed recovery：仅识别该 migration；`NONE` 才执行 Prisma `resolve --rolled-back`，仅当 `qms_inspection_requests` 已具 `20260811000000` 的四个字段及短索引才执行 `resolve --applied`，partial/drift 一律阻断，随后 `migrate deploy` 才应用或确认 `20260811000001` 的 `inspections` 变更。GitHub deploy、OSS deploy、local container up/dev 全部复用该 wrapper。
 
 **验证结果：**
 
 - 独立后端定向 Vitest：`10/10` 文件、`102/102` 用例；其中历史回填为 `2/2` 文件、`15/15` 用例。前端改动测试：Web `4/4` 文件、`35/35` 用例，WeApp `3/3` 文件、`14/14` 用例；修正后独立复跑 Web `1/1` 文件、`16/16` 用例，WeApp `1/1` 文件、`7/7` 用例（agent 汇总 `55/55`）。
 - 最终全量验证：backend Vitest `277/277` 文件、`2535/2535` 用例；Web `57/57` 文件、`291/291` 用例；WeApp `8/8` 文件、`31/31` 用例。`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、shared build、Prisma migration、Prisma validate 与 `rtk git diff --check` 均通过。
 - 浏览器/小程序真实点击和生产 Prisma migration 仍未验证。
+- P3009 recovery 定向测试 `10/10` 通过；root `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。当前数据库只读检测输出 `NOT_REQUIRED`。Codex 未执行任何数据库 apply；生产发布和推送均未执行。
 
-**commits:** `40070cf`（后端/共享契约）、`d84297c`（Web/WeApp 入口）、`1704d7d`（历史治理与发布维护）、`8e33910`（测试夹具修正）、`88bc724`（后端/共享契约修正）、`5311921`（Web/WeApp 选项修正）。
+**commits:** `40070cf`（后端/共享契约）、`d84297c`（Web/WeApp 入口）、`1704d7d`（历史治理与发布维护）、`8e33910`（测试夹具修正）、`88bc724`（后端/共享契约修正）、`5311921`（Web/WeApp 选项修正）、`2051341`（P3009 migration recovery）。
