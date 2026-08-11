@@ -10,6 +10,7 @@ describe('request create responsibility payload', () => {
         responsibleDepartmentId: 'dept-assembly',
         supplierId: 'supplier-stale',
         teamId: 'team-assembly',
+        teamResponsibleDepartmentId: 'dept-assembly',
       },
       {
         responsibilityType: 'INTERNAL_DEPARTMENT',
@@ -57,6 +58,29 @@ describe('request create responsibility payload', () => {
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: '',
         teamId: '',
+      }),
+    ).toBeNull();
+  });
+
+  it('allows a department without a TEAM and rejects a mismatched selected TEAM', () => {
+    expect(
+      buildRequestCreateResponsibilityPayload({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-machining',
+        supplierId: '',
+        teamId: '',
+      }),
+    ).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-machining',
+    });
+    expect(
+      buildRequestCreateResponsibilityPayload({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-machining',
+        supplierId: '',
+        teamId: 'team-structure',
+        teamResponsibleDepartmentId: 'dept-structure',
       }),
     ).toBeNull();
   });

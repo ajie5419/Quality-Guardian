@@ -116,6 +116,7 @@ function mountFields(isIncomingEntry: boolean) {
       processOptions: [],
       responsibilityDepartmentOptions: [
         { label: 'Assembly Department', value: 'dept-assembly' },
+        { label: 'Structure BU', value: 'dept-structure' },
       ],
       responsibilityLoading: false,
       responsibilityTypeOptions: [
@@ -158,16 +159,34 @@ describe('inspection request entry responsibility identity', () => {
     });
   });
 
-  it('writes TEAM and canonical department IDs for internal process responsibility', async () => {
+  it('keeps a department without a TEAM selectable and only accepts matching execution TEAMs', async () => {
     const { form, wrapper } = mountFields(false);
-    const select = wrapper
+    const departmentSelect = wrapper
       .findAllComponents({ name: 'MockSelect' })
       .find(
-        (item) => item.attributes('data-testid') === 'responsible-team-select',
+        (item) =>
+          item.attributes('data-testid') === 'responsible-department-select',
       );
 
-    expect(select).toBeDefined();
-    select?.vm.$emit('change', 'team-assembly');
+    expect(departmentSelect).toBeDefined();
+    departmentSelect?.vm.$emit('change', 'dept-structure');
+    await wrapper.vm.$nextTick();
+
+    expect(form).toMatchObject({
+      responsibleDepartmentId: 'dept-structure',
+      teamId: '',
+    });
+
+    departmentSelect?.vm.$emit('change', 'dept-assembly');
+    await wrapper.vm.$nextTick();
+    const teamSelect = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find(
+        (item) => item.attributes('data-testid') === 'execution-team-select',
+      );
+
+    expect(teamSelect).toBeDefined();
+    teamSelect?.vm.$emit('change', 'team-assembly');
     await wrapper.vm.$nextTick();
 
     expect(form).toMatchObject({

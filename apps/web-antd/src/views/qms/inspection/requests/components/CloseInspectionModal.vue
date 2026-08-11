@@ -5,7 +5,6 @@ import type {
   InspectionRequestAttachment,
   InspectionRequestResponsibilityDepartmentOption,
   InspectionRequestResponsibilitySupplierOption,
-  InspectionRequestTeamOption,
 } from '@qgs/shared';
 import type { SelectProps, UploadFile } from 'ant-design-vue';
 
@@ -27,10 +26,7 @@ import {
   Upload,
 } from 'ant-design-vue';
 
-import {
-  getPublicInspectionRequestResponsibilityOptions,
-  getPublicInspectionRequestTeams,
-} from '#/api/qms/inspection-request';
+import { getPublicInspectionRequestResponsibilityOptions } from '#/api/qms/inspection-request';
 import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { useImageCompress } from '#/composables/useImageCompress';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
@@ -140,7 +136,6 @@ const shouldCreateLinkedIssue = computed(
 const formFieldsRef = ref<InstanceType<typeof IssueFormFields> | null>(null);
 const legacyResponsibilityLoading = ref(false);
 const legacyResponsibilityError = ref('');
-const legacyInternalTeams = ref<InspectionRequestTeamOption[]>([]);
 const legacyDepartments = ref<
   InspectionRequestResponsibilityDepartmentOption[]
 >([]);
@@ -215,23 +210,24 @@ async function loadLegacyResponsibilityOptions() {
         result.departments[0]?.label || '';
       localLinkedIssueDraft.supplierId = '';
       localLinkedIssueDraft.supplierName = '';
-      legacyInternalTeams.value = [];
       return;
     }
-    const teams = await getPublicInspectionRequestTeams();
-    legacyInternalTeams.value = teams.filter(
-      (team) =>
-        team.group === 'internal' && Boolean(team.responsibleDepartmentId),
-    );
-    localLinkedIssueDraft.responsibleDepartmentId = '';
-    localLinkedIssueDraft.responsibleDepartment = '';
+    if (
+      localLinkedIssueDraft.responsibleDepartmentId &&
+      !result.departments.some(
+        (department) =>
+          department.value === localLinkedIssueDraft.responsibleDepartmentId,
+      )
+    ) {
+      localLinkedIssueDraft.responsibleDepartmentId = '';
+      localLinkedIssueDraft.responsibleDepartment = '';
+    }
     localLinkedIssueDraft.supplierId = '';
     localLinkedIssueDraft.supplierName = '';
   } catch {
     legacyResponsibilityError.value =
       '责任归属选项加载失败，无法提交不合格项。';
     legacyDepartments.value = [];
-    legacyInternalTeams.value = [];
     legacySuppliers.value = [];
     localLinkedIssueDraft.responsibleDepartmentId = '';
     localLinkedIssueDraft.supplierId = '';
@@ -253,12 +249,13 @@ async function changeLegacyResponsibilityType(value: SelectProps['value']) {
   await applyEmbeddedValues();
 }
 
-async function selectLegacyInternalTeam(value: SelectProps['value']) {
-  const teamId = typeof value === 'string' ? value : '';
-  const team = legacyInternalTeams.value.find((item) => item.value === teamId);
-  localLinkedIssueDraft.responsibleDepartmentId =
-    team?.responsibleDepartmentId || '';
-  localLinkedIssueDraft.responsibleDepartment = team?.label || '';
+async function selectLegacyInternalDepartment(value: SelectProps['value']) {
+  const departmentId = typeof value === 'string' ? value : '';
+  const department = legacyDepartments.value.find(
+    (item) => item.value === departmentId,
+  );
+  localLinkedIssueDraft.responsibleDepartmentId = department?.value || '';
+  localLinkedIssueDraft.responsibleDepartment = department?.label || '';
   await applyEmbeddedValues();
 }
 
@@ -603,23 +600,17 @@ async function handleBeforeUpload(file: File) {
                 localLinkedIssueDraft.responsibilityType ===
                 'INTERNAL_DEPARTMENT'
               "
-              label="责任班组"
+              label="责任部门"
               required
             >
               <Select
-                :value="
-                  legacyInternalTeams.find(
-                    (team) =>
-                      team.responsibleDepartmentId ===
-                      localLinkedIssueDraft.responsibleDepartmentId,
-                  )?.value
-                "
+                :value="localLinkedIssueDraft.responsibleDepartmentId"
                 :disabled="legacyResponsibilityLoading"
                 :loading="legacyResponsibilityLoading"
-                :options="legacyInternalTeams"
-                placeholder="请选择可解析责任部门的班组"
+                :options="legacyDepartments"
+                placeholder="请选择责任部门"
                 show-search
-                @change="selectLegacyInternalTeam"
+                @change="selectLegacyInternalDepartment"
               />
             </Form.Item>
             <template v-else>

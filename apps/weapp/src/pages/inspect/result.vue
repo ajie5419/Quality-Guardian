@@ -4,7 +4,6 @@ import type {
   InspectionIssueResponsibilityType,
   InspectionRequestResponsibilityDepartmentOption,
   InspectionRequestResponsibilitySupplierOption,
-  InspectionRequestTeamOption,
   QualityClassificationCategory,
 } from '@qgs/shared';
 
@@ -14,7 +13,6 @@ import {
   closeInspectionRequest,
   getInspectionRequest,
   getInspectionRequestResponsibilityOptions,
-  getTeams,
 } from '@/api/inspection';
 import { getQualityClassificationOptions } from '@/api/issues';
 import { buildResourceUrl, uploadFile } from '@/api/request';
@@ -94,8 +92,6 @@ const legacyDepartments = ref<
 const legacySuppliers = ref<InspectionRequestResponsibilitySupplierOption[]>(
   [],
 );
-const legacyInternalTeams = ref<InspectionRequestTeamOption[]>([]);
-const legacyTeamId = ref('');
 
 // ── Step 3 fields ─────────────────────────────────────────────────────────────
 const description = ref('');
@@ -135,9 +131,6 @@ const legacyResponsibilityTypeLabels = computed(() =>
     ? ['供应商']
     : ['内部部门', '供应商', '外协单位'],
 );
-const legacyInternalTeamLabels = computed(() =>
-  legacyInternalTeams.value.map((team) => team.label),
-);
 const legacySupplierLabels = computed(() =>
   legacySuppliers.value.map((supplier) => supplier.label),
 );
@@ -147,11 +140,6 @@ const legacyResponsibilityTypeIndex = computed(() => {
   if (responsibilityType.value === 'OUTSOURCING_UNIT') return 2;
   return 0;
 });
-const legacyTeamIndex = computed(() =>
-  legacyInternalTeams.value.findIndex(
-    (team) => team.value === legacyTeamId.value,
-  ),
-);
 const legacySupplierIndex = computed(() =>
   legacySuppliers.value.findIndex(
     (supplier) => supplier.value === supplierId.value,
@@ -214,7 +202,6 @@ async function fetchDetail() {
       responsibleDepartmentId.value =
         responsibility?.responsibleDepartmentId || '';
       supplierId.value = responsibility?.supplierId || '';
-      legacyTeamId.value = '';
       if (!responsibility) {
         if (hasEmptyInspectionRequestIssueResponsibilityContext(task.value)) {
           await loadLegacyResponsibilityOptions();
@@ -250,7 +237,6 @@ async function fetchClassifications() {
 function clearLegacyResponsibilityIdentity() {
   responsibleDepartmentId.value = '';
   supplierId.value = '';
-  legacyTeamId.value = '';
 }
 
 async function loadLegacyResponsibilityOptions() {
@@ -273,27 +259,22 @@ async function loadLegacyResponsibilityOptions() {
     if (isExternalResponsibility.value) {
       responsibleDepartmentId.value = res.data.departments[0]?.value || '';
       supplierId.value = '';
-      legacyTeamId.value = '';
-      legacyInternalTeams.value = [];
       return;
     }
-    const teams = await getTeams();
-    if (teams.code !== 0 || !Array.isArray(teams.data)) {
-      throw new Error('Missing internal team options');
+    if (
+      responsibleDepartmentId.value &&
+      !res.data.departments.some(
+        (department) => department.value === responsibleDepartmentId.value,
+      )
+    ) {
+      responsibleDepartmentId.value = '';
     }
-    legacyInternalTeams.value = teams.data.filter(
-      (team) =>
-        team.group === 'internal' && Boolean(team.responsibleDepartmentId),
-    );
-    responsibleDepartmentId.value = '';
     supplierId.value = '';
-    legacyTeamId.value = '';
   } catch {
     legacyResponsibilityError.value =
       '责任归属选项加载失败，无法提交不合格项。';
     legacyDepartments.value = [];
     legacySuppliers.value = [];
-    legacyInternalTeams.value = [];
     clearLegacyResponsibilityIdentity();
   } finally {
     legacyResponsibilityLoading.value = false;
@@ -372,10 +353,9 @@ function onLegacyResponsibilityTypeChange(e: { detail: { value: string } }) {
   void loadLegacyResponsibilityOptions();
 }
 
-function onLegacyInternalTeamChange(e: { detail: { value: string } }) {
-  const team = legacyInternalTeams.value[Number(e.detail.value)];
-  legacyTeamId.value = team?.value || '';
-  responsibleDepartmentId.value = team?.responsibleDepartmentId || '';
+function onLegacyInternalDepartmentChange(e: { detail: { value: string } }) {
+  const department = legacyDepartments.value[Number(e.detail.value)];
+  responsibleDepartmentId.value = department?.value || '';
   supplierId.value = '';
 }
 
@@ -411,14 +391,6 @@ function validateStep2(): boolean {
   }
   if (!responsibilityType.value || !responsibleDepartmentId.value) {
     uni.showToast({ title: '报检任务责任上下文无效', icon: 'none' });
-    return false;
-  }
-  if (
-    !responsibilityLocked.value &&
-    !isExternalResponsibility.value &&
-    !legacyTeamId.value
-  ) {
-    uni.showToast({ title: '请选择可解析责任部门的班组', icon: 'none' });
     return false;
   }
   if (isExternalResponsibility.value && !supplierId.value) {
@@ -789,20 +761,22 @@ onLoad((options) => {
             v-if="responsibilityType === 'INTERNAL_DEPARTMENT'"
             class="card"
           >
-            <view class="field-label required">责任班组</view>
+            <view class="field-label required">责任部门</view>
             <picker
               :disabled="
-                legacyResponsibilityLoading || legacyInternalTeams.length === 0
+                legacyResponsibilityLoading || legacyDepartments.length === 0
               "
-              :range="legacyInternalTeamLabels"
-              :value="legacyTeamIndex"
-              @change="onLegacyInternalTeamChange"
+              :range="legacyDepartments"
+              range-key="label"
+              :value="
+                legacyDepartments.findIndex(
+                  (department) => department.value === responsibleDepartmentId,
+                )
+              "
+              @change="onLegacyInternalDepartmentChange"
             >
               <view class="picker-val">
-                <text>{{
-                  legacyInternalTeams[legacyTeamIndex]?.label ||
-                  '请选择可解析责任部门的班组'
-                }}</text>
+                <text>{{ legacyDepartmentLabel || '请选择责任部门' }}</text>
                 <text class="picker-arrow">›</text>
               </view>
             </picker>

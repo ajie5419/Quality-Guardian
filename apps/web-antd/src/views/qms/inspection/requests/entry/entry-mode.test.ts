@@ -18,6 +18,7 @@ describe('inspection request entry identity options', () => {
         responsibleDepartmentId: 'dept-assembly',
         supplierId: 'supplier-stale',
         teamId: 'team-assembly',
+        teamResponsibleDepartmentId: 'dept-assembly',
       },
       {
         responsibilityType: 'INTERNAL_DEPARTMENT',
@@ -61,6 +62,32 @@ describe('inspection request entry identity options', () => {
       );
     },
   );
+
+  it('allows an internal department without an execution TEAM', () => {
+    expect(
+      buildInspectionRequestEntryResponsibilityPayload({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-structure',
+        supplierId: '',
+        teamId: '',
+      }),
+    ).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-structure',
+    });
+  });
+
+  it('rejects an execution TEAM assigned to a different department', () => {
+    expect(
+      buildInspectionRequestEntryResponsibilityPayload({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-structure',
+        supplierId: '',
+        teamId: 'team-assembly',
+        teamResponsibleDepartmentId: 'dept-assembly',
+      }),
+    ).toBeNull();
+  });
 
   it('keeps canonical TEAM IDs as selector values', () => {
     expect(

@@ -143,6 +143,7 @@ const supplierOptions = ref<InspectionRequestResponsibilitySupplierOption[]>(
 const processIndex = ref(-1);
 const bomPartIndex = ref(-1);
 const departmentIndex = ref(-1);
+const internalTeamIndex = ref(-1);
 const supplierIndex = ref(-1);
 const selfCheckIndex = ref(-1);
 const mutualCheckIndex = ref(-1);
@@ -168,7 +169,19 @@ const processLabels = computed(() =>
   processList.value.map((item) => item.processName),
 );
 const internalTeamLabels = computed(() =>
-  internalTeamOptions.value.map((item) => item.label),
+  internalTeamOptions.value
+    .filter(
+      (item) => item.responsibleDepartmentId === form.responsibleDepartmentId,
+    )
+    .map((item) => item.label),
+);
+const selectedInternalTeamOptions = computed(() =>
+  internalTeamOptions.value.filter(
+    (item) => item.responsibleDepartmentId === form.responsibleDepartmentId,
+  ),
+);
+const departmentLabels = computed(() =>
+  departmentOptions.value.map((item) => item.label),
 );
 const supplierLabels = computed(() =>
   supplierOptions.value.map((item) => item.label),
@@ -256,13 +269,20 @@ async function loadResponsibilityOptions() {
               Boolean(item.responsibleDepartmentId),
           )
         : [];
-    const currentIndex = internalTeamOptions.value.findIndex(
+    departmentIndex.value = departmentOptions.value.findIndex(
+      (item) => item.value === form.responsibleDepartmentId,
+    );
+    internalTeamIndex.value = selectedInternalTeamOptions.value.findIndex(
       (item) => item.value === form.teamId,
     );
-    departmentIndex.value = currentIndex;
-    if (currentIndex === -1) {
+    if (
+      form.teamId &&
+      !selectedInternalTeamOptions.value.some(
+        (item) => item.value === form.teamId,
+      )
+    ) {
       form.teamId = '';
-      form.responsibleDepartmentId = '';
+      form.team = '';
     }
     form.supplierId = '';
   } catch {
@@ -279,6 +299,7 @@ function resetResponsibilityIdentity() {
   form.team = '';
   form.teamId = '';
   departmentIndex.value = -1;
+  internalTeamIndex.value = -1;
   supplierIndex.value = -1;
 }
 
@@ -451,10 +472,27 @@ function onResponsibilityTypeChange(e: { detail: { value: string } }) {
 
 function onInternalTeamChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
-  departmentIndex.value = idx;
-  const team = internalTeamOptions.value[idx];
+  internalTeamIndex.value = idx;
+  const team = selectedInternalTeamOptions.value[idx];
   form.teamId = team?.value ?? '';
-  form.responsibleDepartmentId = team?.responsibleDepartmentId ?? '';
+  form.team = team?.label ?? '';
+  form.supplierId = '';
+  errors.team = false;
+}
+
+function onInternalDepartmentChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  departmentIndex.value = idx;
+  form.responsibleDepartmentId = departmentOptions.value[idx]?.value ?? '';
+  if (
+    !selectedInternalTeamOptions.value.some(
+      (team) => team.value === form.teamId,
+    )
+  ) {
+    form.team = '';
+    form.teamId = '';
+    internalTeamIndex.value = -1;
+  }
   form.supplierId = '';
   errors.team = false;
 }
@@ -535,7 +573,7 @@ function validate(): boolean {
   errors.reporter = !form.reporter.trim();
   errors.team =
     !form.responsibleDepartmentId ||
-    (isExternalResponsibility.value ? !form.supplierId : !form.teamId);
+    (isExternalResponsibility.value ? !form.supplierId : false);
   errors.attachments = form.attachments.length === 0;
   return (
     !errors.workOrderNumber &&
@@ -567,7 +605,12 @@ async function handleSubmit() {
     if (isIncoming.value && !form.partId) {
       payload.requestedPartName = form.requestedPartName.trim();
     }
-    const responsibilityPayload = buildRequestCreateResponsibilityPayload(form);
+    const responsibilityPayload = buildRequestCreateResponsibilityPayload({
+      ...form,
+      teamResponsibleDepartmentId: internalTeamOptions.value.find(
+        (team) => team.value === form.teamId,
+      )?.responsibleDepartmentId,
+    });
     if (!responsibilityPayload) {
       throw new Error('请填写完整的责任归属信息');
     }
@@ -801,14 +844,45 @@ async function handleSubmit() {
         >
           <view class="label-wrap">
             <text class="required-star">*</text>
-            <text class="label">责任班组</text>
+            <text class="label">责任部门</text>
+          </view>
+          <picker
+            class="picker"
+            mode="selector"
+            :range="departmentLabels"
+            :value="departmentIndex"
+            :disabled="departmentOptions.length === 0"
+            @change="onInternalDepartmentChange"
+          >
+            <view class="picker-inner">
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.responsibleDepartmentId }"
+              >
+                {{ selectedDepartmentLabel || '请选择责任部门' }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
+        </view>
+
+        <view
+          v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
+          class="form-item"
+        >
+          <view class="label-wrap">
+            <text class="label-spacer" />
+            <text class="label">执行班组（选填）</text>
           </view>
           <picker
             class="picker"
             mode="selector"
             :range="internalTeamLabels"
-            :value="departmentIndex"
-            :disabled="internalTeamOptions.length === 0"
+            :value="internalTeamIndex"
+            :disabled="
+              !form.responsibleDepartmentId ||
+              selectedInternalTeamOptions.length === 0
+            "
             @change="onInternalTeamChange"
           >
             <view class="picker-inner">
@@ -817,8 +891,9 @@ async function handleSubmit() {
                 :class="{ 'picker-placeholder': !form.teamId }"
               >
                 {{
-                  internalTeamOptions.find((item) => item.value === form.teamId)
-                    ?.label || '请选择可解析责任部门的班组'
+                  selectedInternalTeamOptions.find(
+                    (item) => item.value === form.teamId,
+                  )?.label || '请选择执行班组（选填）'
                 }}
               </text>
               <text class="picker-arrow">›</text>

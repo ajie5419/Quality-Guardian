@@ -107,4 +107,79 @@ describe('inspection request responsibility options', () => {
       teamId: '',
     });
   });
+
+  it('keeps the selected department and execution team while searching other departments', async () => {
+    const requestForm = createForm();
+    getPublicInspectionRequestResponsibilityOptions
+      .mockResolvedValueOnce({
+        departments: [{ label: 'Structure BU', value: 'dept-structure' }],
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        suppliers: [],
+      })
+      .mockResolvedValueOnce({
+        departments: [{ label: 'Machining BU', value: 'dept-machining' }],
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        suppliers: [],
+      });
+    getPublicInspectionRequestTeams.mockResolvedValue([
+      {
+        group: 'internal',
+        label: 'Structure Team',
+        responsibleDepartmentId: 'dept-structure',
+        value: 'team-structure',
+      },
+    ]);
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.loadResponsibilityOptions();
+    requestForm.responsibleDepartmentId = 'dept-structure';
+    requestForm.teamId = 'team-structure';
+    requestForm.team = 'Structure Team';
+    getPublicInspectionRequestTeams.mockClear();
+
+    await composable.loadResponsibilityOptions('machining');
+
+    expect(getPublicInspectionRequestTeams).not.toHaveBeenCalled();
+    expect(requestForm).toMatchObject({
+      responsibleDepartmentId: 'dept-structure',
+      team: 'Structure Team',
+      teamId: 'team-structure',
+    });
+    expect(composable.responsibilityDepartmentOptions.value).toEqual([
+      { label: 'Structure BU', value: 'dept-structure' },
+      { label: 'Machining BU', value: 'dept-machining' },
+    ]);
+  });
+
+  it('searches execution TEAMs without reloading or clearing the selected department', async () => {
+    const requestForm = createForm();
+    requestForm.responsibleDepartmentId = 'dept-structure';
+    getPublicInspectionRequestTeams.mockResolvedValue([
+      {
+        group: 'internal',
+        label: 'Structure Team',
+        responsibleDepartmentId: 'dept-structure',
+        value: 'team-structure',
+      },
+    ]);
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.loadInternalTeamOptions('structure team');
+
+    expect(
+      getPublicInspectionRequestResponsibilityOptions,
+    ).not.toHaveBeenCalled();
+    expect(getPublicInspectionRequestTeams).toHaveBeenCalledWith({
+      keyword: 'structure team',
+    });
+    expect(requestForm.responsibleDepartmentId).toBe('dept-structure');
+    expect(composable.internalTeamOptions.value).toEqual([
+      {
+        group: 'internal',
+        label: 'Structure Team',
+        responsibleDepartmentId: 'dept-structure',
+        value: 'team-structure',
+      },
+    ]);
+  });
 });

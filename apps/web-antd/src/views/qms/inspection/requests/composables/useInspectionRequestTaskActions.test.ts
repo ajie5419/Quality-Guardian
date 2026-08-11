@@ -204,6 +204,7 @@ describe('useInspectionRequestTaskActions', () => {
     expect(requestPayload).not.toHaveProperty('ncNumber');
     expect(requestPayload).not.toHaveProperty('responsibleDepartment');
     expect(requestPayload).not.toHaveProperty('supplierName');
+    expect(requestPayload).not.toHaveProperty('teamId');
     expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务检验完成');
   });
 

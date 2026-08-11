@@ -7,6 +7,7 @@ export function buildRequestCreateResponsibilityPayload(input: {
   responsibleDepartmentId: string;
   supplierId: string;
   teamId: string;
+  teamResponsibleDepartmentId?: string;
 }) {
   const responsibleDepartmentId = input.responsibleDepartmentId.trim();
   if (!responsibleDepartmentId) return null;
@@ -15,13 +16,20 @@ export function buildRequestCreateResponsibilityPayload(input: {
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   ) {
     const teamId = input.teamId.trim();
-    return teamId
-      ? {
-          responsibilityType: input.responsibilityType,
-          responsibleDepartmentId,
-          teamId,
-        }
-      : null;
+    if (!teamId) {
+      return {
+        responsibilityType: input.responsibilityType,
+        responsibleDepartmentId,
+      };
+    }
+    if (input.teamResponsibleDepartmentId?.trim() !== responsibleDepartmentId) {
+      return null;
+    }
+    return {
+      responsibilityType: input.responsibilityType,
+      responsibleDepartmentId,
+      teamId,
+    };
   }
   const supplierId = input.supplierId.trim();
   return supplierId

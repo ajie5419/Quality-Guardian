@@ -58,42 +58,84 @@ export function useInspectionRequestIdentityOptions(options: {
     requestForm.teamId = '';
   }
 
-  function applyResponsibilityOptions(options: {
-    departments: InspectionRequestResponsibilityDepartmentOption[];
-    responsibilityType: InspectionIssueResponsibilityType;
-    suppliers: InspectionRequestResponsibilitySupplierOption[];
+  function preserveSelectedOption<T extends { value: string }>(options: {
+    currentId: string;
+    next: T[];
+    previous: T[];
   }) {
-    responsibilityDepartmentOptions.value = options.departments;
-    supplierOptions.value = options.suppliers;
+    const currentId = options.currentId.trim();
+    if (!currentId || options.next.some((item) => item.value === currentId)) {
+      return options.next;
+    }
+    const selected = options.previous.find((item) => item.value === currentId);
+    return selected ? [selected, ...options.next] : options.next;
+  }
+
+  function applyResponsibilityOptions(
+    options: {
+      departments: InspectionRequestResponsibilityDepartmentOption[];
+      responsibilityType: InspectionIssueResponsibilityType;
+      suppliers: InspectionRequestResponsibilitySupplierOption[];
+    },
+    preserveSelection = false,
+  ) {
+    responsibilityDepartmentOptions.value = preserveSelection
+      ? preserveSelectedOption({
+          currentId: requestForm.responsibleDepartmentId,
+          next: options.departments,
+          previous: responsibilityDepartmentOptions.value,
+        })
+      : options.departments;
+    supplierOptions.value = preserveSelection
+      ? preserveSelectedOption({
+          currentId: requestForm.supplierId,
+          next: options.suppliers,
+          previous: supplierOptions.value,
+        })
+      : options.suppliers;
 
     if (isExternalResponsibility(options.responsibilityType)) {
-      const [department] = options.departments;
-      requestForm.responsibleDepartmentId = department?.value || '';
+      if (!preserveSelection) {
+        const [department] = options.departments;
+        requestForm.responsibleDepartmentId = department?.value || '';
+      }
       requestForm.team = '';
       requestForm.teamId = '';
       return;
     }
 
-    if (!requestForm.teamId) {
+    if (
+      !preserveSelection &&
+      requestForm.responsibleDepartmentId &&
+      !options.departments.some(
+        (department) =>
+          department.value === requestForm.responsibleDepartmentId,
+      )
+    ) {
       requestForm.responsibleDepartmentId = '';
+      requestForm.team = '';
+      requestForm.teamId = '';
     }
     requestForm.supplierId = '';
   }
 
   async function loadResponsibilityOptions(keyword = '') {
+    const normalizedKeyword = keyword.trim();
+    const preserveSelection = Boolean(normalizedKeyword);
     responsibilityLoading.value = true;
     try {
       const result = await getPublicInspectionRequestResponsibilityOptions({
-        keyword: keyword.trim() || undefined,
+        keyword: normalizedKeyword || undefined,
         responsibilityType: requestForm.responsibilityType,
       });
       if (result.responsibilityType !== requestForm.responsibilityType) return;
       if (
         requestForm.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+        !preserveSelection
       ) {
         const teams = await getPublicInspectionRequestTeams({
-          keyword: keyword.trim() || undefined,
+          keyword: undefined,
         });
         if (
           requestForm.responsibilityType !==
@@ -106,23 +148,53 @@ export function useInspectionRequestIdentityOptions(options: {
             team.group === 'internal' && Boolean(team.responsibleDepartmentId),
         );
         if (
+          requestForm.teamId &&
           !internalTeamOptions.value.some(
-            (team) => team.value === requestForm.teamId,
+            (team) =>
+              team.value === requestForm.teamId &&
+              team.responsibleDepartmentId ===
+                requestForm.responsibleDepartmentId,
           )
         ) {
+          requestForm.team = '';
           requestForm.teamId = '';
-          requestForm.responsibleDepartmentId = '';
         }
       } else {
-        internalTeamOptions.value = [];
+        if (!preserveSelection) internalTeamOptions.value = [];
       }
-      applyResponsibilityOptions(result);
+      applyResponsibilityOptions(result, preserveSelection);
     } catch (error: unknown) {
       handleApiError(error, 'Load Inspection Request Responsibility Options');
-      responsibilityDepartmentOptions.value = [];
+      if (!preserveSelection) {
+        responsibilityDepartmentOptions.value = [];
+        internalTeamOptions.value = [];
+        supplierOptions.value = [];
+        clearResponsibilityIdentity();
+      }
+    } finally {
+      responsibilityLoading.value = false;
+    }
+  }
+
+  async function loadInternalTeamOptions(keyword = '') {
+    if (
+      requestForm.responsibilityType !==
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+    ) {
+      return;
+    }
+    responsibilityLoading.value = true;
+    try {
+      const teams = await getPublicInspectionRequestTeams({
+        keyword: keyword.trim() || undefined,
+      });
+      internalTeamOptions.value = teams.filter(
+        (team) =>
+          team.group === 'internal' && Boolean(team.responsibleDepartmentId),
+      );
+    } catch (error: unknown) {
+      handleApiError(error, 'Load Inspection Request Internal Teams');
       internalTeamOptions.value = [];
-      supplierOptions.value = [];
-      clearResponsibilityIdentity();
     } finally {
       responsibilityLoading.value = false;
     }
@@ -142,6 +214,7 @@ export function useInspectionRequestIdentityOptions(options: {
     clearResponsibilityIdentity,
     loadResponsibilityOptions,
     internalTeamOptions,
+    loadInternalTeamOptions,
     responsibilityDepartmentOptions,
     responsibilityLoading,
     supplierOptions,

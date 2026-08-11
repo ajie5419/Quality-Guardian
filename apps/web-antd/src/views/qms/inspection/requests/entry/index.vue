@@ -136,6 +136,7 @@ const {
   changeResponsibilityType,
   clearResponsibilityIdentity,
   internalTeamOptions,
+  loadInternalTeamOptions,
   loadResponsibilityOptions,
   responsibilityDepartmentOptions,
   responsibilityLoading,
@@ -317,7 +318,12 @@ async function submitRequest() {
   submitting.value = true;
   try {
     const responsibilityPayload =
-      buildInspectionRequestEntryResponsibilityPayload(requestForm);
+      buildInspectionRequestEntryResponsibilityPayload({
+        ...requestForm,
+        teamResponsibleDepartmentId: internalTeamOptions.value.find(
+          (team) => team.value === requestForm.teamId,
+        )?.responsibleDepartmentId,
+      });
     if (!responsibilityPayload) {
       message.warning('请选择完整的责任归属信息');
       return;
@@ -471,6 +477,7 @@ watch(
         :work-order-options="workOrderOptions"
         :work-order-processes-loading="workOrderProcessesLoading"
         @attachment-change="handleAttachmentUploadChange"
+        @internal-team-search="loadInternalTeamOptions"
         @part-search="searchCanonicalPartOptions"
         @responsibility-type-change="changeResponsibilityType"
         @responsibility-options-search="loadResponsibilityOptions"

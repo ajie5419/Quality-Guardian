@@ -73,6 +73,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   attachmentChange: [info: UploadChangeParam<UploadFile>];
+  internalTeamSearch: [keyword: string];
   partSearch: [keyword: string];
   responsibilityOptionsSearch: [keyword: string];
   responsibilityTypeChange: [value: InspectionIssueResponsibilityType];
@@ -118,6 +119,12 @@ const incomingTypeOptions = computed(() =>
 
 const responsibilityUnitCopy = computed(() =>
   getInspectionRequestResponsibilityUnitCopy(form.value.responsibilityType),
+);
+const selectedInternalTeamOptions = computed(() =>
+  props.internalTeamOptions.filter(
+    (team) =>
+      team.responsibleDepartmentId === form.value.responsibleDepartmentId,
+  ),
 );
 
 function handleWorkOrderChange(value: SelectProps['value']) {
@@ -165,9 +172,25 @@ function handleResponsibilityTypeChange(value: SelectProps['value']) {
 
 function handleInternalTeamChange(value: SelectProps['value']) {
   const teamId = typeof value === 'string' ? value : '';
-  const team = props.internalTeamOptions.find((item) => item.value === teamId);
+  const team = selectedInternalTeamOptions.value.find(
+    (item) => item.value === teamId,
+  );
   form.value.teamId = teamId;
-  form.value.responsibleDepartmentId = team?.responsibleDepartmentId || '';
+  form.value.team = team?.label || '';
+  form.value.supplierId = '';
+}
+
+function handleInternalDepartmentChange(value: SelectProps['value']) {
+  const responsibleDepartmentId = typeof value === 'string' ? value : '';
+  form.value.responsibleDepartmentId = responsibleDepartmentId;
+  if (
+    !selectedInternalTeamOptions.value.some(
+      (team) => team.value === form.value.teamId,
+    )
+  ) {
+    form.value.team = '';
+    form.value.teamId = '';
+  }
   form.value.supplierId = '';
 }
 
@@ -342,21 +365,40 @@ function handleProcessIdentityChange(
     </Form.Item>
     <Form.Item
       v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
-      label="责任班组"
+      label="责任部门"
       required
     >
       <Select
-        data-testid="responsible-team-select"
-        :value="form.teamId"
+        data-testid="responsible-department-select"
+        :value="form.responsibleDepartmentId"
         :filter-option="false"
         :loading="props.responsibilityLoading"
-        :options="props.internalTeamOptions"
+        :options="props.responsibilityDepartmentOptions"
         class="w-full"
-        placeholder="请选择可解析责任部门的班组"
+        placeholder="请选择责任部门"
+        show-search
+        allow-clear
+        @change="handleInternalDepartmentChange"
+        @search="(value) => emit('responsibilityOptionsSearch', value)"
+      />
+    </Form.Item>
+    <Form.Item
+      v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
+      label="执行班组（选填）"
+    >
+      <Select
+        data-testid="execution-team-select"
+        :value="form.teamId"
+        :disabled="!form.responsibleDepartmentId"
+        :filter-option="false"
+        :loading="props.responsibilityLoading"
+        :options="selectedInternalTeamOptions"
+        class="w-full"
+        placeholder="请选择执行班组（选填）"
         show-search
         allow-clear
         @change="handleInternalTeamChange"
-        @search="(value) => emit('responsibilityOptionsSearch', value)"
+        @search="(value) => emit('internalTeamSearch', value)"
       />
     </Form.Item>
     <Form.Item v-else label="责任部门" required>
