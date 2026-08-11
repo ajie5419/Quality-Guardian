@@ -1,6 +1,9 @@
 import type { Prisma } from '@prisma/client';
 
-import { resolveInspectionRequestIssueResponsibility } from '@qgs/shared';
+import {
+  normalizeInspectionIssueResponsibilityType,
+  resolveInspectionRequestIssueResponsibility,
+} from '@qgs/shared';
 import { DeptService } from '~/modules/dept';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { TeamIdentityService } from '~/modules/team';
@@ -8,7 +11,11 @@ import { TeamIdentityService } from '~/modules/team';
 type RequestSource = {
   category?: null | string;
   processName?: null | string;
+  responsibilityType?: null | string;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   supplierId?: null | string;
+  supplierName?: null | string;
   team?: null | string;
   teamId?: null | string;
 };
@@ -31,7 +38,14 @@ export async function resolveInspectionRequestIssueResponsibilities(
     teamSupplierByTeamId?: ReadonlyMap<string, { id: string; name: string }>;
   } = {},
 ): Promise<Responsibility[]> {
-  const teamIds = requests.map((request) => request.teamId);
+  const persisted = requests.map((request) =>
+    resolvePersistedResponsibility(request),
+  );
+  const legacyIndexes = requests.flatMap((request, index) =>
+    persisted[index] ? [] : [index],
+  );
+  const legacyRequests = legacyIndexes.map((index) => requests[index]);
+  const teamIds = legacyRequests.map((request) => request?.teamId);
   const teamSupplierByTeamId =
     options.teamSupplierByTeamId ??
     (options.client
@@ -60,7 +74,7 @@ export async function resolveInspectionRequestIssueResponsibilities(
       teamIds,
       options.client,
     );
-  const base = requests.map((request) =>
+  const base = legacyRequests.map((request) =>
     resolveInspectionRequestIssueResponsibility({
       category: request.category,
       processName: request.processName,
@@ -71,11 +85,16 @@ export async function resolveInspectionRequestIssueResponsibilities(
         : null,
     }),
   );
-  const departmentIds = base.flatMap((item, index) =>
-    item.responsibilityType === 'INTERNAL_DEPARTMENT'
-      ? (departmentSourceIds.get(requests[index]?.teamId || '') ?? [])
-      : [],
-  );
+  const departmentIds = [
+    ...persisted.flatMap((item) =>
+      item ? [item.responsibleDepartmentId] : [],
+    ),
+    ...base.flatMap((item, index) =>
+      item.responsibilityType === 'INTERNAL_DEPARTMENT'
+        ? (departmentSourceIds.get(legacyRequests[index]?.teamId || '') ?? [])
+        : [],
+    ),
+  ];
   const fixedNames = base
     .filter((item) => item.responsibilityType !== 'INTERNAL_DEPARTMENT')
     .map((item) => item.responsibleDepartment);
@@ -83,12 +102,12 @@ export async function resolveInspectionRequestIssueResponsibilities(
     { ids: departmentIds, names: fixedNames },
     options.client,
   );
-  return base.map((item, index) => {
+  const legacyResponsibilities = base.map((item, index) => {
     const candidates =
       item.responsibilityType === 'INTERNAL_DEPARTMENT'
         ? departments.filter((department) =>
             (
-              departmentSourceIds.get(requests[index]?.teamId || '') ?? []
+              departmentSourceIds.get(legacyRequests[index]?.teamId || '') ?? []
             ).includes(department.id),
           )
         : departments.filter(
@@ -105,6 +124,62 @@ export async function resolveInspectionRequestIssueResponsibilities(
       responsibleDepartmentId,
     };
   });
+  return requests.map((request, index) => {
+    const persistedResponsibility = persisted[index];
+    if (!persistedResponsibility) {
+      const legacyIndex = legacyIndexes.indexOf(index);
+      return legacyResponsibilities[legacyIndex] ?? unresolvedResponsibility();
+    }
+    const department = departments.find(
+      (item) => item.id === persistedResponsibility.responsibleDepartmentId,
+    );
+    if (!department) return unresolvedResponsibility();
+    return {
+      ...persistedResponsibility,
+      responsibleDepartment: request.responsibleDepartment || department.name,
+    };
+  });
+}
+
+function resolvePersistedResponsibility(
+  request: RequestSource,
+): null | Responsibility {
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    request.responsibilityType,
+  );
+  const responsibleDepartmentId = String(
+    request.responsibleDepartmentId || '',
+  ).trim();
+  const supplierId = String(request.supplierId || '').trim() || null;
+  if (!responsibilityType || !responsibleDepartmentId) return null;
+  if (responsibilityType === 'INTERNAL_DEPARTMENT') {
+    if (supplierId) return null;
+    return {
+      responsibilityType,
+      responsibleDepartment: String(request.responsibleDepartment || '').trim(),
+      responsibleDepartmentId,
+      supplierId: null,
+      supplierName: '',
+    };
+  }
+  if (!supplierId) return null;
+  return {
+    responsibilityType,
+    responsibleDepartment: String(request.responsibleDepartment || '').trim(),
+    responsibleDepartmentId,
+    supplierId,
+    supplierName: String(request.supplierName || '').trim(),
+  };
+}
+
+function unresolvedResponsibility(): Responsibility {
+  return {
+    responsibilityType: 'INTERNAL_DEPARTMENT',
+    responsibleDepartment: '',
+    responsibleDepartmentId: null,
+    supplierId: null,
+    supplierName: '',
+  };
 }
 
 export async function resolveInspectionRequestIssueResponsibilityInTransaction(

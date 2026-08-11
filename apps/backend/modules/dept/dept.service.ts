@@ -41,6 +41,24 @@ interface DeptItem {
 }
 
 export const DeptService = {
+  async listActiveOptions(keyword = '') {
+    const normalizedKeyword = keyword.trim();
+    const departments = await prisma.departments.findMany({
+      where: {
+        isDeleted: false,
+        status: 1,
+        ...(normalizedKeyword ? { name: { contains: normalizedKeyword } } : {}),
+      },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+      take: 100,
+    });
+    return departments.map((department) => ({
+      label: department.name,
+      value: department.id,
+    }));
+  },
+
   async findActiveById(id: string, client: DepartmentReadClient = prisma) {
     return client.departments.findFirst({
       where: { id: id.trim(), isDeleted: false, status: 1 },

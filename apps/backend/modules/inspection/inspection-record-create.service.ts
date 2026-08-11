@@ -85,15 +85,20 @@ export const InspectionRecordCreateService = {
           processName: data.processName,
         });
         const explicitTeamId = String(data.teamId || '').trim();
-        if (data.category === 'PROCESS' && !explicitTeamId) {
+        const explicitSupplierId = String(data.supplierId || '').trim();
+        if (
+          data.category === 'PROCESS' &&
+          !explicitTeamId &&
+          !explicitSupplierId
+        ) {
           throw new BusinessError(
             'TEAM_ID_REQUIRED',
-            'A canonical TEAM identity is required for process inspections',
+            'A canonical TEAM or supplier identity is required for process inspections',
           );
         }
         const execute = async (tx: Prisma.TransactionClient) => {
           let teamIdentity = null;
-          if (data.category === 'PROCESS') {
+          if (data.category === 'PROCESS' && explicitTeamId) {
             await SupplierIdentityService.lockTeamForMutation(
               explicitTeamId,
               tx,
@@ -126,15 +131,22 @@ export const InspectionRecordCreateService = {
               ? governedCanonicalIds.supplierId
               : data.supplierId;
           const supplierIdentity =
-            await SupplierIdentityService.resolveSupplierForInspection(
-              {
-                category: data.category,
-                supplierId:
-                  data.category === 'PROCESS' ? undefined : governedSupplierId,
-                teamId: teamIdentity?.id,
-              },
-              tx,
-            );
+            data.category === 'PROCESS' && !teamIdentity
+              ? await SupplierIdentityService.resolveSupplierById(
+                  governedSupplierId,
+                  tx,
+                )
+              : await SupplierIdentityService.resolveSupplierForInspection(
+                  {
+                    category: data.category,
+                    supplierId:
+                      data.category === 'PROCESS'
+                        ? undefined
+                        : governedSupplierId,
+                    teamId: teamIdentity?.id,
+                  },
+                  tx,
+                );
           if (data.category === 'INCOMING' && !supplierIdentity) {
             throw new BusinessError(
               'SUPPLIER_ID_REQUIRED',

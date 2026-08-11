@@ -71,6 +71,22 @@ export interface InspectionRequestTeamOption {
   value: string;
 }
 
+export interface InspectionRequestResponsibilityDepartmentOption {
+  label: string;
+  value: string;
+}
+
+export interface InspectionRequestResponsibilitySupplierOption {
+  label: string;
+  value: string;
+}
+
+export interface InspectionRequestResponsibilityOptions {
+  departments: InspectionRequestResponsibilityDepartmentOption[];
+  responsibilityType: InspectionIssueResponsibilityType;
+  suppliers: InspectionRequestResponsibilitySupplierOption[];
+}
+
 export interface InspectionRequest {
   attachments?: InspectionRequestAttachment[];
   category?: 'INCOMING' | 'PROCESS';
@@ -108,11 +124,16 @@ export interface InspectionRequest {
   requestedPartName?: null | string;
   requestInfo?: null | string;
   requestNo: string;
+  /** Server-validated responsibility fact. Legacy requests omit these fields. */
+  responsibilityType?: InspectionIssueResponsibilityType | null;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection | null;
   status: InspectionRequestStatus;
   submittedAt: string;
   supplierId?: null | string;
+  supplierName?: null | string;
   team?: null | string;
   teamId?: null | string;
   unqualifiedQuantity?: null | number;
@@ -132,10 +153,13 @@ export interface CreateInspectionRequestParams {
   reporter: string;
   requestedPartName?: string;
   requestInfo?: string;
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
   selfCheckResult?: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection;
   supplierId?: string;
-  team: string;
+  /** Optional PROCESS internal context. External responsibility is supplier-led. */
+  team?: string;
   teamId?: string;
   workOrderNumber: string;
   workOrderNumbers?: string[];

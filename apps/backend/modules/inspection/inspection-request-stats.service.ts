@@ -5,6 +5,12 @@ import { TeamIdentityService } from '~/modules/team';
 import prisma from '~/utils/prisma';
 
 import {
+  addInspectionRequestStatsDays as addDays,
+  inspectionRequestDurationMinutes as durationMinutes,
+  formatInspectionRequestStatsDate as formatShanghaiDate,
+  resolveInspectionRequestStatsRange as resolveStatsRange,
+} from './inspection-request-stats-date';
+import {
   collectIdentityIds,
   createIdentityCountRows,
   createInspectorHistoryRows,
@@ -18,81 +24,6 @@ import {
 } from './inspection-request-stats-identity';
 
 const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
-
-function getShanghaiTodayRange(now = new Date()) {
-  const shanghaiDate = new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-  }).format(now);
-  const start = new Date(`${shanghaiDate}T00:00:00+08:00`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { end, start };
-}
-
-function parseShanghaiDate(value?: null | string) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00+08:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function addDays(date: Date, days: number) {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-function formatShanghaiDate(date: Date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-  }).format(date);
-}
-
-function getPeriodRange(period?: null | string, now = new Date()) {
-  const today = getShanghaiTodayRange(now).start;
-  switch (period) {
-    case 'halfYear': {
-      const start = new Date(today);
-      start.setMonth(start.getMonth() - 5, 1);
-      return { end: addDays(today, 1), start };
-    }
-    case 'quarter': {
-      const start = new Date(today);
-      start.setMonth(start.getMonth() - 2, 1);
-      return { end: addDays(today, 1), start };
-    }
-    case 'year': {
-      const start = new Date(today);
-      start.setMonth(0, 1);
-      return { end: addDays(today, 1), start };
-    }
-    default: {
-      const start = new Date(today);
-      start.setDate(1);
-      return { end: addDays(today, 1), start };
-    }
-  }
-}
-
-function resolveStatsRange(query: {
-  endDate?: string;
-  period?: string;
-  startDate?: string;
-}) {
-  const customStart = parseShanghaiDate(query.startDate || '');
-  const customEnd = parseShanghaiDate(query.endDate || '');
-  if (customStart && customEnd && customEnd >= customStart)
-    return { end: addDays(customEnd, 1), start: customStart };
-  return query.period ? getPeriodRange(query.period) : getShanghaiTodayRange();
-}
-
-function durationMinutes(start: Date, end: Date) {
-  const diff = end.getTime() - start.getTime();
-  if (!Number.isFinite(diff) || diff < 0) return 0;
-  return Math.floor(diff / 60_000);
-}
 
 function hasInspectionExecutionCode(codes: string[]) {
   return codes.some((code) => INSPECTION_EXECUTION_CODES.has(code));
@@ -125,6 +56,7 @@ export const InspectionRequestStatsService = {
           status: true,
           submittedAt: true,
           supplierId: true,
+          responsibilityType: true,
           teamId: true,
         },
         where: {
@@ -317,8 +249,8 @@ export const InspectionRequestStatsService = {
       string,
       { closedCount: number; date: string; submittedCount: number }
     >();
-    let todaySubmittedCount = 0;
     let todayClosedCount = 0;
+    let todaySubmittedCount = 0;
     let todaySubmittedIncomingCount = 0;
     let todaySubmittedProcessCount = 0;
     let todayClosedIncomingCount = 0;
@@ -342,18 +274,22 @@ export const InspectionRequestStatsService = {
         const daily = dailyTrendMap.get(date);
         if (daily) daily.submittedCount += 1;
         const isIncoming = isIncomingInspectionRequest(item);
+        const isExternalResponsibility =
+          item.responsibilityType === 'SUPPLIER' ||
+          item.responsibilityType === 'OUTSOURCING_UNIT';
+        const usesSupplierIdentity = isExternalResponsibility || isIncoming;
         if (isIncoming) {
           todaySubmittedIncomingCount += 1;
         } else {
           todaySubmittedProcessCount += 1;
         }
         const identityId = normalizeIdentityId(
-          isIncoming
+          usesSupplierIdentity
             ? item.supplierId
             : (teamCanonicalById.get(item.teamId) ?? item.teamId),
         );
         const identityKey = identityId || UNRESOLVED_IDENTITY_KEY;
-        const countMap = isIncoming ? supplierMap : teamMap;
+        const countMap = usesSupplierIdentity ? supplierMap : teamMap;
         countMap.set(identityKey, (countMap.get(identityKey) || 0) + 1);
         if (!isIncoming) {
           historyTeamMap.set(
@@ -361,7 +297,7 @@ export const InspectionRequestStatsService = {
             (historyTeamMap.get(identityKey) || 0) + 1,
           );
         }
-        const reinspectionMap = isIncoming
+        const reinspectionMap = usesSupplierIdentity
           ? supplierReinspectionMap
           : teamReinspectionMap;
         const reinspectionStat = reinspectionMap.get(identityKey) || {

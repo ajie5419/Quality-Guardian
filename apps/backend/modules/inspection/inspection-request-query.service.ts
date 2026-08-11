@@ -139,7 +139,11 @@ const requestQueryIncludeWithWorkOrders = {
 type RequestResponsibilitySource = {
   category?: null | string;
   processName?: null | string;
+  responsibilityType?: null | string;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   supplierId?: null | string;
+  supplierName?: null | string;
   team?: null | string;
   teamId?: null | string;
 };

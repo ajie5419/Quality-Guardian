@@ -165,6 +165,24 @@ async function buildSupplierGlobalStats(
 }
 
 export const SupplierService = {
+  async listActiveOptions(options: { category: string; keyword?: string }) {
+    const keyword = String(options.keyword || '').trim();
+    const suppliers = await prisma.suppliers.findMany({
+      where: {
+        category: options.category,
+        isDeleted: false,
+        ...(keyword ? { name: { contains: keyword } } : {}),
+      },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+      take: 100,
+    });
+    return suppliers.map((supplier) => ({
+      label: supplier.name,
+      value: supplier.id,
+    }));
+  },
+
   createSupplierWithOutcome: SupplierMutationService.createWithOutcome,
 
   async createSupplier(payload: Record<string, unknown>) {

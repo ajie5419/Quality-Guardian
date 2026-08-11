@@ -23,6 +23,7 @@ import {
 } from './inspection-request-close-effects.service';
 import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
 import { createCloseInspectionRecords } from './inspection-request-close-records.service';
+import { resolveLegacyCloseRequestResponsibility } from './inspection-request-close-responsibility.service';
 import {
   failCloseRequest,
   parseCloseRequestNumber,
@@ -125,6 +126,15 @@ export const InspectionRequestCloseService = {
           failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
 
         let inspectionId = explicitInspectionId;
+        const responsibilityResolution =
+          result === 'FAIL' && linkedIssue
+            ? await resolveLegacyCloseRequestResponsibility({
+                linkedIssue,
+                request,
+                tx,
+              })
+            : { request, resolvedLegacy: false };
+        const requestWithResponsibility = responsibilityResolution.request;
         let inspectionLinks: CloseInspectionRecordLink[] = explicitInspectionId
           ? [
               {
@@ -139,7 +149,7 @@ export const InspectionRequestCloseService = {
           // orphan inspection records behind.
           inspectionLinks = await createCloseInspectionRecords({
             body,
-            request,
+            request: requestWithResponsibility,
             tx,
           });
           inspectionId = inspectionLinks[0]?.inspectionId || '';
@@ -154,7 +164,7 @@ export const InspectionRequestCloseService = {
             body,
             inspectionId,
             linkedIssue,
-            request,
+            request: requestWithResponsibility,
             tx,
             userinfo,
           });
@@ -277,6 +287,7 @@ export const InspectionRequestCloseService = {
           inspectionLinks,
           issue: issueRecord,
           issueAuditVariables,
+          resolvedLegacyResponsibility: responsibilityResolution.resolvedLegacy,
           record,
         };
       });
@@ -287,6 +298,7 @@ export const InspectionRequestCloseService = {
       inspectionLinks,
       issue,
       issueAuditVariables,
+      resolvedLegacyResponsibility,
       record: updated,
     } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
 
@@ -317,6 +329,16 @@ export const InspectionRequestCloseService = {
       targetType: 'inspection_request',
       userId: userinfo?.id,
     });
+    if (resolvedLegacyResponsibility) {
+      await recordBusinessAuditLog(event, {
+        action: 'UPDATE',
+        detailsTemplate: '关闭报检时裁决并固化责任事实: {{requestNo}}',
+        detailsVariables: { requestNo: updated.requestNo },
+        targetId: String(updated.id),
+        targetType: 'inspection_request',
+        userId: userinfo?.id,
+      });
+    }
     return mapInspectionRequest(updated);
   },
 };

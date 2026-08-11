@@ -43,7 +43,11 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     process?: null | { name?: null | string };
     processName: string;
     reporter: string;
+    responsibilityType?: null | string;
+    responsibleDepartment?: null | string;
+    responsibleDepartmentId?: null | string;
     supplierId?: null | string;
+    supplierName?: null | string;
     team?: null | string;
     teamId?: null | string;
     work_order?: null | { projectName?: null | string };
@@ -105,6 +109,9 @@ function buildCloseLinkedIssueBody(options: {
     process?: null | { name?: null | string };
     processName: string;
     reporter: string;
+    responsibilityType?: null | string;
+    responsibleDepartment?: null | string;
+    responsibleDepartmentId?: null | string;
     team?: null | string;
     teamId?: null | string;
     work_order?: null | { projectName?: null | string };
@@ -206,7 +213,11 @@ async function resolveCloseIssueResponsibility(options: {
   request: {
     category?: null | string;
     processName?: null | string;
+    responsibilityType?: null | string;
+    responsibleDepartment?: null | string;
+    responsibleDepartmentId?: null | string;
     supplierId?: null | string;
+    supplierName?: null | string;
     teamId?: null | string;
   };
   tx: Prisma.TransactionClient;
@@ -218,26 +229,19 @@ async function resolveCloseIssueResponsibility(options: {
       options.request.processName || options.linkedInspection?.processName,
     supplierId:
       options.request.supplierId || options.linkedInspection?.supplierId,
+    supplierName: options.request.supplierName,
     team: options.linkedInspection?.team,
     teamId: options.request.teamId || options.linkedInspection?.teamId,
+    responsibilityType: options.request.responsibilityType,
+    responsibleDepartment: options.request.responsibleDepartment,
+    responsibleDepartmentId: options.request.responsibleDepartmentId,
   };
   const canonical =
     await resolveInspectionRequestIssueResponsibilityInTransaction(
       requestContext,
       options.tx,
     );
-  const teamSupplier =
-    canonical.supplierId &&
-    canonical.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-      ? { id: canonical.supplierId, name: canonical.supplierName }
-      : null;
-  const contextType = resolveContextResponsibilityType({
-    linkedInspection: options.linkedInspection,
-    requestSupplierId: options.request.supplierId,
-    teamSupplier,
-  });
-  if (explicitType && contextType && explicitType !== contextType) {
+  if (explicitType && explicitType !== canonical.responsibilityType) {
     failCloseRequest(
       'VALIDATION',
       '责任类型与报检任务的 canonical 责任单位不一致',
@@ -263,11 +267,9 @@ async function resolveCloseIssueResponsibility(options: {
     );
   }
   const supplier = await resolveCanonicalResponsibleSupplier({
-    linkedInspection: options.linkedInspection,
     linkedIssue: options.linkedIssue,
-    requestSupplierId: options.request.supplierId,
+    canonicalSupplierId: canonical.supplierId,
     responsibilityType,
-    teamSupplier,
     tx: options.tx,
   });
 
@@ -294,40 +296,10 @@ function resolveExplicitResponsibilityType(
   return normalizedType;
 }
 
-function resolveContextResponsibilityType(options: {
-  linkedInspection: Awaited<ReturnType<typeof findInspectionForIssue>>;
-  requestSupplierId?: null | string;
-  teamSupplier: null | { id: string; name: string };
-}): InspectionIssueResponsibilityType | null {
-  const requestSupplierId = normalizeInspectionRequestText(
-    options.requestSupplierId,
-  );
-  if (requestSupplierId && options.teamSupplier) {
-    failCloseRequest('VALIDATION', '报检任务存在冲突的 canonical 责任单位');
-  }
-  if (
-    requestSupplierId ||
-    (options.linkedInspection?.category === 'INCOMING' &&
-      options.linkedInspection.supplierId)
-  ) {
-    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER;
-  }
-  if (
-    options.teamSupplier ||
-    (options.linkedInspection?.category === 'PROCESS' &&
-      options.linkedInspection.supplierId)
-  ) {
-    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
-  }
-  return null;
-}
-
 async function resolveCanonicalResponsibleSupplier(options: {
-  linkedInspection: Awaited<ReturnType<typeof findInspectionForIssue>>;
+  canonicalSupplierId: null | string;
   linkedIssue: Record<string, unknown>;
-  requestSupplierId?: null | string;
   responsibilityType: InspectionIssueResponsibilityType;
-  teamSupplier: null | { id: string; name: string };
   tx: Prisma.TransactionClient;
 }) {
   const explicitSupplierId = normalizeInspectionRequestText(
@@ -342,18 +314,17 @@ async function resolveCanonicalResponsibleSupplier(options: {
     }
     return null;
   }
-  const canonicalSupplierId = resolveContextSupplierId(options);
   if (
-    canonicalSupplierId &&
+    options.canonicalSupplierId &&
     explicitSupplierId &&
-    canonicalSupplierId !== explicitSupplierId
+    options.canonicalSupplierId !== explicitSupplierId
   ) {
     failCloseRequest(
       'VALIDATION',
       '供应商 ID 与报检任务的 canonical 责任单位不一致',
     );
   }
-  const supplierId = canonicalSupplierId || explicitSupplierId;
+  const supplierId = options.canonicalSupplierId || explicitSupplierId;
   if (!supplierId) {
     failCloseRequest('VALIDATION', '外部责任单位缺少 canonical 供应商 ID');
   }
@@ -365,24 +336,4 @@ async function resolveCanonicalResponsibleSupplier(options: {
     failCloseRequest('VALIDATION', '不合格项供应商 ID 无效');
   }
   return supplier;
-}
-
-function resolveContextSupplierId(options: {
-  linkedInspection: Awaited<ReturnType<typeof findInspectionForIssue>>;
-  requestSupplierId?: null | string;
-  responsibilityType: InspectionIssueResponsibilityType;
-  teamSupplier: null | { id: string; name: string };
-}) {
-  if (
-    options.responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
-  ) {
-    return (
-      normalizeInspectionRequestText(options.requestSupplierId) ||
-      normalizeInspectionRequestText(options.linkedInspection?.supplierId)
-    );
-  }
-  return (
-    normalizeInspectionRequestText(options.teamSupplier?.id) ||
-    normalizeInspectionRequestText(options.linkedInspection?.supplierId)
-  );
 }

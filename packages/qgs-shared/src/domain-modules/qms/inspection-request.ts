@@ -495,6 +495,7 @@ export interface InspectionRecordPayloadInput {
     selfCheckResult: string;
     stationSelection?: null | string;
     supplierId?: null | string;
+    supplierName?: null | string;
     team?: null | string;
     teamId?: null | string;
     work_order?: null | { projectName?: null | string };
@@ -610,6 +611,8 @@ export function buildInspectionRecordPayloadCore(
     level1Component: input.request.partName,
     level2Component: componentName || undefined,
     processName: input.request.processName,
+    supplierId: normalizeInspectionRequestText(input.request.supplierId),
+    supplierName: normalizeInspectionRequestText(input.request.supplierName),
     team: normalizeInspectionRequestText(input.request.team),
     teamId: normalizeInspectionRequestText(input.request.teamId),
   };

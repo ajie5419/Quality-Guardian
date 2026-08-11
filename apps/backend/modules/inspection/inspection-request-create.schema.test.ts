@@ -19,6 +19,8 @@ function buildValidPayload() {
     processName: '焊接',
     quantity: '2',
     reporter: '张三',
+    responsibilityType: 'INTERNAL_DEPARTMENT',
+    responsibleDepartmentId: 'dept-1',
     selfCheckResult: 'PASS',
     stationSelection: { indexes: [1, 2], mode: 'PARTIAL' },
     team: '生产一班',
@@ -59,6 +61,8 @@ describe('inspection request create schema', () => {
       processId: 'incoming-process-1',
       requestedPartName: 'Unregistered bearing',
       supplierId: 'supplier-1',
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartmentId: 'dept-purchasing',
       teamId: undefined,
     });
 
@@ -74,6 +78,8 @@ describe('inspection request create schema', () => {
         processId: 'incoming-process-1',
         requestedPartName: 'Unregistered bearing',
         supplierId: 'supplier-1',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
       }),
     ).toThrow();
   });

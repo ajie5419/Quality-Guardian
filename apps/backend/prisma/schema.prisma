@@ -1728,8 +1728,12 @@ model qms_inspection_requests {
   processId           String?
   category            inspection_category?
   supplierId          String?
+  supplierName        String?
   teamId              String?
   team                String?
+  responsibilityType  String?
+  responsibleDepartmentId String?
+  responsibleDepartment String?
   quantity            Int                                  @default(1)
   stationSelection    String?                              @db.Text
   reporter            String
@@ -1779,6 +1783,7 @@ model qms_inspection_requests {
   @@index([category])
   @@index([supplierId])
   @@index([teamId])
+  @@index([responsibilityType, responsibleDepartmentId])
   @@index([partId])
   @@index([componentId])
 }
