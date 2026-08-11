@@ -2,14 +2,14 @@
 
 ## 职责
 
-supplier-identity 统一维护跨身份域关联。目前支持 `TEAM -> supplier`，业务模块只能通过公开 service 解析，禁止在运行时比较名称建立关联。`supplier_identity_links` 是 TEAM 与供应商之间的唯一在线关联事实源。
+supplier-identity 统一维护跨身份域关联。目前支持 `TEAM -> supplier`，业务模块只能通过公开 service 解析，禁止在运行时比较名称建立关联。`supplier_identity_links` 是 legacy TEAM-to-supplier resolution 的唯一在线关联事实源；它不是新报检外部责任的前置条件。
 
 ## 约束
 
 - `supplierId`、`teamId` 都必须先校验存在、类型和启用状态。
 - 同一个 TEAM 只能关联一个未删除供应商。
 - 名称仅保存为映射快照，查询、统计和事件使用 ID。
-- 在线 resolver、批量 resolver、管理候选和 PROCESS 写入只能消费有效 `supplier_identity_links`：link 必须同时有匹配的活跃 `SUPPLIER` source 和受支持的供应商策略；无效 link 等同无 link，禁止以 TEAM 与供应商同名建立关联。
+- Online TEAM-to-supplier resolvers, legacy batch resolvers, and management candidates can consume `supplier_identity_links` only when an active TEAM (`dictType=team`, `isDeleted=false`, `status=1`), an active link, a matching active exact `SUPPLIER` source, and a supported PROCESS supplier policy all exist. Any active `DEPARTMENT` source makes the TEAM a conflict, never an external candidate. An invalid link is equivalent to no link, and a matching TEAM and supplier name must never establish an association. New inspection-request responsibility facts persist their external `supplierId` and policy department directly, with no TEAM or link; links remain raw-empty legacy TEAM compatibility evidence only.
 - 新增或变更 link 必须证明 TEAM 有匹配供应商 ID 的有效 `SUPPLIER` 来源，目标必须是 `Outsourcing + IN_HOUSE_TEAM/EXTERNAL_SERVICE`。`DEPARTMENT` 或 `MANUAL` TEAM 不能因名称相同被视为外部队伍。
 - 无法解析、无效旧 ID 和证据冲突必须写入 `unresolved_master_data_refs`，不得静默覆盖。
 - 迁移工具必须支持有界分批、dry-run/apply、幂等重试和并发写保护。

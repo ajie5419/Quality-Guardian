@@ -6385,3 +6385,21 @@
 - 登录后关单页浏览器验收因无登录态尚未验证；真实运行库的 source/link apply 未执行，不得以本地非等价数据库结果替代现场证据。
 
 **commit:** `f500973`
+
+### 2026-08-11 报检任务显式责任契约、关单裁决与历史回填
+
+**执行内容：**
+
+- `qms_inspection_requests` 新增显式责任事实 `responsibilityType + responsibleDepartmentId + responsibleDepartment`，外部供应商复用既有 `supplierId`。三类责任均由服务端按 canonical ID 重建快照：PROCESS 内部责任必须提交 internal TEAM 与部门；SUPPLIER/OUTSOURCING_UNIT 直接提交供应商和受策略约束的责任部门，不提交 TEAM，也不依赖 TEAM→supplier link。
+- Web 与 WeApp 统一改为显式三态责任表单、公共/鉴权责任选项 API 和 ID-only payload；选项、创建、查询、统计及检验记录消费同一 external supplier 事实，禁止名称推断。
+- 关闭报检会锁定完整 canonical responsibility context。仅 raw responsibility triad 全空的 legacy 请求可在关闭事务内经 CAS 裁决并写入明确事实；任一 partial triad 都拒绝，避免用残缺历史字段混合推断。
+- 新增报检任务责任回填：完整持久 triad 优先；仅缺失完整 triad 的历史行才调用既有 legacy canonical resolver，其中 TEAM→supplier link 仅作为历史兼容证据。任何名称相同都不构成回填依据。回填采用 ID keyset 分批、字段级 CAS 和同事务审计；缺失、失效或冲突证据保持源记录并写入 `unresolved_master_data_refs` OPEN 审计，不覆盖人工已裁决项。普通 `MISSING_CANONICAL_RESPONSIBILITY_EVIDENCE` 是 nullable legacy 兼容结果：apply 仍完整扫描、执行全部确定性更新并落审计，不是跳过；运行时继续兼容读取，关单必须经受校验的显式责任裁决。失效证据、冲突、CAS 并发变更或 `--max-batches` 截断才 fail-closed 阻断发布，新写入始终 fail-closed。
+- 发布维护在报检类别和工序选项维护后、既有不合格项责任回填前运行；新增后端 maintenance 命令。
+
+**验证结果：**
+
+- 独立后端定向 Vitest：`10/10` 文件、`102/102` 用例；其中历史回填为 `2/2` 文件、`15/15` 用例。前端改动测试：Web `4/4` 文件、`35/35` 用例，WeApp `3/3` 文件、`14/14` 用例；修正后独立复跑 Web `1/1` 文件、`16/16` 用例，WeApp `1/1` 文件、`7/7` 用例（agent 汇总 `55/55`）。
+- 最终全量验证：backend Vitest `275/275` 文件、`2526/2526` 用例；Web `57/57` 文件、`287/287` 用例；WeApp `8/8` 文件、`30/30` 用例。shared build、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、backend/web typecheck 与 `rtk git diff --check` 均通过。
+- 浏览器/小程序真实点击仍未验证：尝试访问 `localhost:5320` 被客户端阻止，Chrome 不可用。真实运行库 dry-run/apply 尚未执行。
+
+**commits:** `40070cf`（后端/共享契约）、`d84297c`（Web/WeApp 入口）、`1704d7d`（历史治理与发布维护）、`8e33910`（测试夹具修正）。
