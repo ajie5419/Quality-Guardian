@@ -728,6 +728,7 @@ model quality_records {
   responsibleDepartment                   String
   responsibleDepartments                  String?                               @db.Text // @module inspection - JSON array
   responsibleDepartmentId                 String?
+  responsibilityType                      String?
   responsibleBU                           String?
   inspector                               String?
   analysis                                String?                               @db.Text
@@ -787,6 +788,7 @@ model quality_records {
   @@index([workOrderNumber])
   @@index([responsibleDepartment])
   @@index([responsibleDepartmentId])
+  @@index([responsibilityType])
   @@index([responsibleBU])
   @@index([supplierId])
   @@index([projectId])

@@ -120,6 +120,38 @@ async function retireActiveTeam(
 }
 
 export const TeamIdentityService = {
+  async resolveActiveDepartmentSourceIdsByTeamIds(
+    teamIds: ReadonlyArray<null | string | undefined>,
+    client: Pick<Prisma.TransactionClient, 'team_identity_sources'> = prisma,
+  ) {
+    const ids = [
+      ...new Set(teamIds.map((id) => String(id || '').trim()).filter(Boolean)),
+    ];
+    if (ids.length === 0) return new Map<string, string[]>();
+    const sources = await client.team_identity_sources.findMany({
+      where: {
+        isDeleted: false,
+        sourceType: 'DEPARTMENT',
+        teamId: { in: ids },
+        team: {
+          is: {
+            dictType: TEAM_DICT_TYPE,
+            isDeleted: false,
+            status: ACTIVE_STATUS,
+          },
+        },
+      },
+      select: { sourceId: true, teamId: true },
+    });
+    const result = new Map<string, string[]>();
+    for (const source of sources) {
+      const values = result.get(source.teamId) ?? [];
+      values.push(source.sourceId);
+      result.set(source.teamId, values);
+    }
+    return result;
+  },
+
   async resolveById(teamId: null | string | undefined) {
     const id = String(teamId || '').trim();
     if (!id) return null;

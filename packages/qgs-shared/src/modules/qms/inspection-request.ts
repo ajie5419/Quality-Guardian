@@ -44,6 +44,8 @@ export interface InspectionStationSelection {
 export interface InspectionRequestIssueResponsibility {
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartment: string;
+  /** Null means the request context is incomplete or ambiguous and cannot create an issue. */
+  responsibleDepartmentId: null | string;
   supplierId: null | string;
   supplierName: string;
 }
@@ -177,7 +179,6 @@ export interface CloseInspectionRequestParams {
     division?: string;
     divisionId?: string;
     lossAmount?: number;
-    ncNumber?: string;
     partName?: string;
     photos?: string[];
     processName?: string;
@@ -185,16 +186,14 @@ export interface CloseInspectionRequestParams {
     quantity?: number;
     reportDate?: string;
     reportedBy?: string;
-    responsibilityType?: InspectionIssueResponsibilityType;
-    responsibleDepartment?: string;
-    responsibleDepartmentId?: string;
+    responsibilityType: InspectionIssueResponsibilityType;
+    responsibleDepartmentId: string;
     responsibleWelder?: string;
     rootCause?: string;
     severity?: string;
     solution?: string;
     status?: string;
     supplierId?: string;
-    supplierName?: string;
     unqualifiedQuantity?: number;
   };
   qualifiedQuantity?: number;

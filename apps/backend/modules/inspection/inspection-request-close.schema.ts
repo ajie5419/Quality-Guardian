@@ -23,21 +23,16 @@ const linkedIssueResponsibilitySchema = z
   .object({
     responsibilityType: z.preprocess(
       (value) => normalizeInspectionIssueResponsibilityType(value) || value,
-      z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE).optional(),
+      z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE),
     ),
-    responsibleDepartmentId: z.string().trim().min(1).optional(),
+    responsibleDepartmentId: z.preprocess(
+      (value) => value ?? '',
+      z.string().trim().min(1, '不合格项责任部门 ID 不能为空'),
+    ),
     supplierId: z.string().trim().min(1).optional(),
   })
   .passthrough()
   .superRefine((value, context) => {
-    if (!value.responsibilityType) return;
-    if (!value.responsibleDepartmentId) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: '不合格项责任部门 ID 不能为空',
-        path: ['responsibleDepartmentId'],
-      });
-    }
     if (
       value.responsibilityType ===
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
@@ -46,6 +41,17 @@ const linkedIssueResponsibilitySchema = z
       context.addIssue({
         code: z.ZodIssueCode.custom,
         message: '内部责任部门不能同时指定供应商 ID',
+        path: ['supplierId'],
+      });
+    }
+    if (
+      value.responsibilityType !==
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+      !value.supplierId
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: '外部责任单位缺少 canonical 供应商 ID',
         path: ['supplierId'],
       });
     }
@@ -102,7 +108,6 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
   for (const [key, label] of [
     ['partName', '组件名称'],
     ['processName', '工序'],
-    ['responsibleDepartment', '责任部门'],
     ['defectCategoryId', '缺陷分类'],
     ['defectSubcategoryId', '二级分类'],
     ['severity', '严重程度'],

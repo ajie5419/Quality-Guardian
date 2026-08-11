@@ -145,7 +145,7 @@ export const InspectionRequestCloseService = {
           inspectionId = inspectionLinks[0]?.inspectionId || '';
         }
 
-        let issueCreateData: Prisma.quality_recordsCreateInput | undefined;
+        let issueRecord = null;
         let issueAuditVariables:
           | undefined
           | { issue: string; nonConformanceNumber: string };
@@ -158,13 +158,10 @@ export const InspectionRequestCloseService = {
             tx,
             userinfo,
           });
-          issueCreateData = built.createData;
+          issueRecord = built.record;
           issueAuditVariables = built.auditVariables;
         }
 
-        const issueRecord = issueCreateData
-          ? await tx.quality_records.create({ data: issueCreateData })
-          : null;
         const linkedIssueWhere = buildLinkedIssueWhere(
           request,
           issueRecord?.id,

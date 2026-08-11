@@ -48,6 +48,39 @@ export const DeptService = {
     });
   },
 
+  async findActiveByIdsOrNames(
+    input: {
+      ids?: ReadonlyArray<null | string | undefined>;
+      names?: ReadonlyArray<null | string | undefined>;
+    },
+    client: DepartmentReadClient = prisma,
+  ) {
+    const ids = [
+      ...new Set(
+        (input.ids ?? []).map((id) => String(id || '').trim()).filter(Boolean),
+      ),
+    ];
+    const names = [
+      ...new Set(
+        (input.names ?? [])
+          .map((name) => String(name || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (ids.length === 0 && names.length === 0) return [];
+    return client.departments.findMany({
+      where: {
+        isDeleted: false,
+        status: 1,
+        OR: [
+          ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+          ...(names.length > 0 ? [{ name: { in: names } }] : []),
+        ],
+      },
+      select: { businessUnit: true, id: true, name: true },
+    });
+  },
+
   /**
    * Get all departments as a tree
    */

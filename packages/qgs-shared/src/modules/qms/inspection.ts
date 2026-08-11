@@ -1,3 +1,4 @@
+import type { InspectionIssueResponsibilityType } from '../../domain-modules/qms/inspection-request';
 import type { InspectionStationSelection } from './inspection-request';
 
 import { InspectionIssueStatusEnum } from './enums';
@@ -26,8 +27,10 @@ export interface InspectionIssue {
   quantity: number; // 数量
   reportDate: string;
   reportedBy: string; // 检验员 (Legacy?)
+  responsibilityType?: InspectionIssueResponsibilityType | null;
   responsibleDepartment: string; // 责任部门
-  responsibleDepartments?: string[]; // 责任部门多选
+  responsibleDepartmentId?: null | string; // Canonical responsibility department
+  responsibleDepartments?: string[]; // Legacy read compatibility only
   responsibleWelder?: string; // 责任焊工
   rootCause: string; // 原因分析
   severity: 'Critical' | 'Major' | 'Minor';

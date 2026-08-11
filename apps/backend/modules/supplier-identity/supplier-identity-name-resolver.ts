@@ -23,7 +23,7 @@ export const teamLinkInclude = {
 
 type TeamLinkResolverClient = Pick<
   Prisma.TransactionClient,
-  'supplier_identity_links' | 'team_identity_sources'
+  'dictionaries' | 'supplier_identity_links' | 'team_identity_sources'
 >;
 
 function isEligibleTeamSupplier(link: {
@@ -43,6 +43,16 @@ export async function resolveTeamSupplierIdentity(
   teamId: string,
   client: TeamLinkResolverClient = prisma,
 ) {
+  const team = await client.dictionaries.findFirst({
+    select: { id: true },
+    where: {
+      dictType: 'team',
+      id: teamId,
+      isDeleted: false,
+      status: 1,
+    },
+  });
+  if (!team) return null;
   const link = await client.supplier_identity_links.findFirst({
     where: {
       identityId: teamId,
@@ -84,9 +94,22 @@ export async function resolveSuppliersByTeamIds(
   if (ids.length === 0) {
     return new Map<string, TeamSupplierIdentity>();
   }
+  const teams = await prisma.dictionaries.findMany({
+    select: { id: true },
+    where: {
+      dictType: 'team',
+      id: { in: ids },
+      isDeleted: false,
+      status: 1,
+    },
+  });
+  const activeTeamIds = teams.map((team) => team.id);
+  if (activeTeamIds.length === 0) {
+    return new Map<string, TeamSupplierIdentity>();
+  }
   const links = await prisma.supplier_identity_links.findMany({
     where: {
-      identityId: { in: ids },
+      identityId: { in: activeTeamIds },
       identityType: 'TEAM',
       isDeleted: false,
       supplier: { is: { isDeleted: false } },
@@ -104,7 +127,7 @@ export async function resolveSuppliersByTeamIds(
         in: [...new Set(eligibleLinks.map((link) => link.supplierId))],
       },
       sourceType: 'SUPPLIER',
-      teamId: { in: ids },
+      teamId: { in: activeTeamIds },
       team: {
         is: {
           teamIdentitySources: {

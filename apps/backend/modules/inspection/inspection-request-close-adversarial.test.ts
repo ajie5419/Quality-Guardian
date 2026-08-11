@@ -126,23 +126,10 @@ vi.mock(
 vi.mock('~/modules/inspection/inspection-request-close-issue.service', () => ({
   buildCloseLinkedIssueCreateResult: vi.fn().mockResolvedValue({
     auditVariables: { issue: 'test', nonConformanceNumber: 'NC-001' },
-    createData: {
-      claim: 'No',
-      description: 'defect',
-      inspectionId: 'i-1',
-      lossAmount: 0,
-      partName: 'Bearing',
-      processName: 'Welding',
-      projectName: 'Project A',
-      quantity: 2,
-      reportedBy: 'Reporter A',
-      responsibleDepartment: 'Prod',
-      rootCause: 'fatigue',
-      severity: 'Minor',
-      solution: 'rework',
-      sourceType: 'INSPECTION_REQUEST',
+    record: {
+      id: 'issue-1',
+      nonConformanceNumber: 'NC-001',
       status: 'OPEN',
-      workOrderNumber: 'WO-1',
     },
   }),
 }));

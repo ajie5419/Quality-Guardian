@@ -14,6 +14,10 @@ const SOURCE = {
 
 type IndexRow = Prisma.quality_loss_indexUncheckedCreateInput;
 type Source = (typeof SOURCE)[keyof typeof SOURCE];
+type QualityLossIndexClient = Pick<
+  Prisma.TransactionClient,
+  'quality_loss_index'
+>;
 
 interface AfterSalesInput {
   actualClaim?: null | number | Prisma.Decimal;
@@ -99,9 +103,13 @@ function num(value: null | number | Prisma.Decimal | undefined) {
   return value === null || value === undefined ? 0 : Number(value);
 }
 
-async function upsertIndexRow(row: IndexRow) {
+async function upsertIndexRow(
+  row: IndexRow,
+  client: QualityLossIndexClient = prisma,
+  suppressErrors = true,
+) {
   try {
-    await prisma.quality_loss_index.upsert({
+    await client.quality_loss_index.upsert({
       where: {
         source_sourcePk: { source: row.source, sourcePk: row.sourcePk },
       },
@@ -109,6 +117,7 @@ async function upsertIndexRow(row: IndexRow) {
       update: row,
     });
   } catch (error) {
+    if (!suppressErrors) throw error;
     logger.warn(
       { err: error, source: row.source, sourcePk: row.sourcePk },
       'failed to upsert quality_loss_index row',
@@ -116,18 +125,62 @@ async function upsertIndexRow(row: IndexRow) {
   }
 }
 
-async function softDelete(source: Source, sourcePk: string) {
+async function softDelete(
+  source: Source,
+  sourcePk: string,
+  client: QualityLossIndexClient = prisma,
+  suppressErrors = true,
+) {
   try {
-    await prisma.quality_loss_index.updateMany({
+    await client.quality_loss_index.updateMany({
       where: { source, sourcePk },
       data: { isDeleted: true, indexedAt: new Date() },
     });
   } catch (error) {
+    if (!suppressErrors) throw error;
     logger.warn(
       { err: error, source, sourcePk },
       'failed to soft-delete quality_loss_index row',
     );
   }
+}
+
+async function upsertInternal(
+  row: InternalInput | null | undefined,
+  client: QualityLossIndexClient,
+  suppressErrors: boolean,
+) {
+  if (!row) return;
+  const amount = num(row.lossAmount);
+  if (row.isDeleted || amount <= 0) {
+    await softDelete(SOURCE.INTERNAL, row.id, client, suppressErrors);
+    return;
+  }
+  await upsertIndexRow(
+    {
+      id: `INT-${row.id}`,
+      source: SOURCE.INTERNAL,
+      sourcePk: row.id,
+      occurDate: row.date,
+      amount,
+      actualClaim: num(row.recoveredAmount),
+      status: row.status || 'OPEN',
+      projectId: row.projectId ?? null,
+      projectName: row.projectName,
+      workOrderNumber: row.workOrderNumber,
+      respDept: row.responsibleDepartment,
+      respDeptId: row.responsibleDepartmentId ?? null,
+      partId: row.partId ?? null,
+      partName: row.partName || null,
+      description: row.description || null,
+      supplierBrandId: null,
+      createdBy: row.createdBy,
+      isDeleted: false,
+      indexedAt: new Date(),
+    },
+    client,
+    suppressErrors,
+  );
 }
 
 export const QualityLossIndexService = {
@@ -163,33 +216,14 @@ export const QualityLossIndexService = {
   },
 
   async upsertFromInternal(row: InternalInput | null | undefined) {
-    if (!row) return;
-    const amount = num(row.lossAmount);
-    if (row.isDeleted || amount <= 0) {
-      await softDelete(SOURCE.INTERNAL, row.id);
-      return;
-    }
-    await upsertIndexRow({
-      id: `INT-${row.id}`,
-      source: SOURCE.INTERNAL,
-      sourcePk: row.id,
-      occurDate: row.date,
-      amount,
-      actualClaim: num(row.recoveredAmount),
-      status: row.status || 'OPEN',
-      projectId: row.projectId ?? null,
-      projectName: row.projectName,
-      workOrderNumber: row.workOrderNumber,
-      respDept: row.responsibleDepartment,
-      respDeptId: row.responsibleDepartmentId ?? null,
-      partId: row.partId ?? null,
-      partName: row.partName || null,
-      description: row.description || null,
-      supplierBrandId: null,
-      createdBy: row.createdBy,
-      isDeleted: false,
-      indexedAt: new Date(),
-    });
+    await upsertInternal(row, prisma, true);
+  },
+
+  async upsertFromInternalInTransaction(
+    row: InternalInput | null | undefined,
+    client: QualityLossIndexClient,
+  ) {
+    await upsertInternal(row, client, false);
   },
 
   async upsertFromCommissioning(row: CommissioningInput | null | undefined) {

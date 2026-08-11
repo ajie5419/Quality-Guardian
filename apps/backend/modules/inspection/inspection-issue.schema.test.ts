@@ -15,7 +15,8 @@ const validCreateBody = {
   processName: 'Welding',
   quantity: 1,
   reportDate: '2026-07-10',
-  responsibleDepartment: 'Production',
+  responsibilityType: 'INTERNAL_DEPARTMENT',
+  responsibleDepartmentId: 'dept-production',
   rootCause: '参数设置不正确',
   severity: 'Major',
   solution: '返修并重新检验',
@@ -44,14 +45,13 @@ describe('inspection issue schema', () => {
     expect(() => inspectionIssueListQuerySchema.parse(input)).toThrow(message);
   });
 
-  it('accepts the desktop create fields and normalizes an empty NC number', () => {
+  it('accepts the canonical online create payload', () => {
     const result = parseInspectionIssueCreateBody({
       ...validCreateBody,
-      ncNumber: '  ',
       photos: ['/api/uploads/issue.jpg'],
     });
 
-    expect(result.ncNumber).toBeUndefined();
+    expect(result.responsibleDepartmentId).toBe('dept-production');
     expect(result.quantity).toBe(1);
   });
 
@@ -63,20 +63,17 @@ describe('inspection issue schema', () => {
       divisionId: 'dept-vehicle',
       inspector: 'Inspector Name',
       lossAmount: 12.5,
-      ncNumber: 'NC-26KJ-001',
       photos: ['/api/uploads/issue.jpg'],
       projectName: 'Project A',
-      responsibleDepartments: ['dept-1', 'dept-2'],
       responsibleWelder: 'Welder A',
       supplierId: 'supplier-1',
-      supplierName: 'Supplier A',
+      responsibilityType: 'SUPPLIER',
     });
 
     expect(result).toMatchObject({
       claim: 'No',
       divisionId: 'dept-vehicle',
-      ncNumber: 'NC-26KJ-001',
-      responsibleDepartments: ['dept-1', 'dept-2'],
+      responsibilityType: 'SUPPLIER',
       supplierId: 'supplier-1',
     });
   });
@@ -94,6 +91,20 @@ describe('inspection issue schema', () => {
         unsupported: true,
       }),
     ).toThrow();
+  });
+
+  it.each([
+    [{ responsibleDepartments: ['dept-1'] }, 'Unrecognized key'],
+    [{ responsibleDepartmentId: { value: 'dept-1' } }, 'Expected string'],
+    [
+      { responsibilityType: 'INTERNAL_DEPARTMENT', supplierId: 'supplier-1' },
+      '内部责任部门',
+    ],
+    [{ responsibilityType: 'SUPPLIER', supplierId: undefined }, '外部责任单位'],
+  ])('rejects invalid responsibility input', (override, message) => {
+    expect(() =>
+      parseInspectionIssueCreateBody({ ...validCreateBody, ...override }),
+    ).toThrow(message);
   });
 
   it('requires a responsible welder for welding process creates', () => {
