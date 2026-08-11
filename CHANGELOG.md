@@ -6343,3 +6343,28 @@
 - 文档更正提交：`29418e0`。最终验证：后端全量 Vitest `267/267` 文件、`2451/2451` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。
 - 后续提交：`bd5c59c` 将 supplier identity 管理候选的 TEAM、SUPPLIER source 和 supplier 查询全部限制为数据库侧 `take <= 100`；选定 TEAM 仍只返回其精确 source 匹配的 supplier。`dbe962a` 将同模块 TEAM 查询拆出，主 service 保持在 500 行内。`55b816a` 定点更正 v0.24.0 发布历史（重复 feature、未提交标记、重复焊接记录、已废止名称规则和未打 tag 的 v0.23.3 时间线）。验证：supplier-identity 定向 Vitest `1/1` 文件、`24/24` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
 - 后续提交：`906f788` 修正 supplier keyword 搜索顺序：先在数据库按 PROCESS 可用的 canonical supplier policy 与关键词分页，再按返回 supplier IDs（及可选 TEAM）查询 source，避免 source 前 100 条截断后遗漏后续匹配供应商。新增回归测试覆盖该顺序与查询条件。
+
+### 2026-08-10 不合格项双入口统一与责任部门脏数据治理
+
+**执行内容：**
+
+- 根因：桌面端责任部门严格树选择返回对象，但旧提交转换直接字符串化，导致 `responsibleDepartment` 或历史 JSON 数组落入 `[object Object]`；同时独立新建与报检关闭分别维护创建逻辑，编号、责任身份和下游指标行为发生漂移。
+- 两个在线入口统一使用事务内不合格项创建服务。NC 编号由服务端在写事务内分配；责任契约统一为 `responsibilityType + responsibleDepartmentId + supplierId?`，在线只允许一个主责部门，部门和供应商名称均由 canonical ID 重建。
+- 新增 `quality_records.responsibilityType` migration 与责任部门脏数据维护命令。维护只处理精确 `[object Object]` 哨兵，优先有效部门 ID，再以关联报检/检验的唯一 canonical 证据恢复；缺证据或冲突保留原记录并写入或重开 `unresolved_master_data_refs` OPEN 审计。
+- 维护脚本支持 dry-run/apply、ID keyset 分批、字段 CAS 与同一事务内的源记录/审计一致性；release maintenance 在既有不合格项责任回填后执行 remediation。
+- 审查加固：TEAM→supplier 解析统一复用 supplier-identity 公共服务，并强制 active TEAM、active link、精确 active `SUPPLIER` source 与 PROCESS policy 四条件交集；含 active `DEPARTMENT` source 的 TEAM 绝不作为外部候选。外部候选和 CAS 同时保存 supplier ID/name，内部责任清空这两个字段；外部证据缺失、候选冲突或既有 supplier 快照不完整时保留 OPEN unresolved。在线编辑不再写 legacy `responsibleDepartments`，小程序编辑明确回填全部可编辑字段且不把旧责任快照重新提交。
+- release maintenance 对 dry-run 和 apply 均 fail-closed：`unresolved`、`conflicts` 或 `concurrentChanges` 任一非零即以非零退出，阻断不完整的维护发布。
+
+**验证结果：**
+
+- 后端全量 Vitest：`272/272` 文件、`2500/2500` 用例通过。
+- Web 定向 Vitest：`57/57` 文件、`277/277` 用例通过；小程序定向 Vitest：`6/6` 文件、`20/20` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`：通过。
+- 审查修复定向回归：后端 `3/3` 文件、`76/76` 用例通过；小程序 `1/1` 文件、`2/2` 用例通过。`git diff --check` 通过。
+- 浏览器页面验收及生产环境 release maintenance 的 dry-run/apply：尚未验证。
+
+**commit:** `9ddce79`（统一后端/共享契约）、`928d666`（Web/WeApp 入口）、`fcb4044`（历史治理）、`46cfe31`（发布维护接线）。
+
+**遗留问题：**
+
+- 生产环境必须先 dry-run 审核 unresolved 清单，再通过正式 release maintenance 执行 apply；无稳定 ID 或唯一关联证据的记录不得按名称猜测恢复。

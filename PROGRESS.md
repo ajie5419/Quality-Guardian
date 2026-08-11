@@ -7,6 +7,7 @@
 - `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
 - 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
+- 本轮不合格项双入口统一已完成代码集成：独立新建与报检关闭收敛到同一事务创建服务，NC 编号由服务端事务内分配，责任事实使用 `responsibilityType + responsibleDepartmentId + supplierId?` 的 canonical ID 契约并限定一个主责部门。`quality_records.responsibilityType` migration、`[object Object]` 精确哨兵治理、release maintenance 接入均已实现。审查后，TEAM→supplier 修复候选与在线 resolver 统一为 active TEAM + active link + exact active `SUPPLIER` source + PROCESS-policy supplier 的四条件交集；`DEPARTMENT+SUPPLIER` 双来源为冲突。维护脚本以同一字段级 CAS 写入/清空 supplier 事实，并在 dry-run 与 apply 对 unresolved、conflict、并发 CAS 失败统一 fail-closed。小程序编辑完整恢复业务字段且只提交 canonical responsibility；在线编辑不再写 `responsibleDepartments`。实现提交：`9ddce79`、`928d666`、`fcb4044`、`46cfe31`。最终门禁已通过：后端全量 Vitest `272/272` 文件、`2500/2500` 用例，Web 定向 Vitest `57/57` 文件、`277/277` 用例，小程序定向 Vitest `6/6` 文件、`20/20` 用例；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。桌面/移动端浏览器页面验收和生产 dry-run/apply 尚未验证。
 - 测试状态: 本轮后端全仓 Vitest `267/267` 文件、`2461/2461` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `pnpm run check:qms-arch:all` 均通过。前端未运行 dev/build/start。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
@@ -95,6 +96,7 @@ apps/backend/
 
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）；微信开发者工具的权限、列表、详情、编辑、新增页面已验证
 - [ ] 持续补强端到端业务流程验证
+- [ ] 通过正式发布链路执行不合格项责任类型 migration 与 `[object Object]` remediation：先 dry-run 审核 OPEN unresolved 清单，再 apply 并核对无错误责任部门显示、NC 编号及质量损失索引。
 - [x] 核对事业部生产回填汇总（工单修复 142 条，不合格项修复 46 条，无冲突和并发覆盖）
 - [ ] 人工处置事业部回填遗留的 124 条工单和不合格项侧 8 个无法解析计数
 - [ ] 完成 supplier identity wave 的生产回填与健康检查：v0.24.0 的 migration 已执行，但 maintenance 被 17 条未核实的 PROCESS supplier identity 阻断后又被错误绕过；本轮修复上线后必须通过正常发布链路重新运行。
