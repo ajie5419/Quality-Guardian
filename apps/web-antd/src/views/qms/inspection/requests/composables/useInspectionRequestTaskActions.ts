@@ -32,6 +32,10 @@ import {
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
+import {
+  buildInspectionIssuePayload,
+  isExternalInspectionIssueResponsibility,
+} from '../../issues/components/issueFormPayload';
 import { DEFAULT_VALUES } from '../../issues/constants';
 import { normalizeIssuePhotoUrls } from '../../issues/utils/photo-upload';
 import { resolveTreeDepartmentIdentity } from '../inspection-request-responsibility';
@@ -259,6 +263,16 @@ export function useInspectionRequestTaskActions(
       return false;
     }
 
+    if (
+      isExternalInspectionIssueResponsibility(
+        linkedIssueDraft.value.responsibilityType,
+      ) &&
+      !normalizeCloseText(linkedIssueDraft.value.supplierId)
+    ) {
+      message.warning('不合格项责任单位不能为空');
+      return false;
+    }
+
     if (normalizeIssuePhotoUrls(linkedIssueDraft.value.photos).length === 0) {
       message.warning('不合格项照片不能为空');
       return false;
@@ -467,21 +481,13 @@ export function useInspectionRequestTaskActions(
     submitting.value = true;
     try {
       syncLinkedIssueQuantities();
-      const hasInternalResponsibility =
-        linkedIssueDraft.value.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
       const payloadLinkedIssue = shouldCreateLinkedIssue.value
-        ? {
+        ? buildInspectionIssuePayload({
             ...linkedIssueDraft.value,
             photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
             quantity: linkedIssueDraft.value.unqualifiedQuantity,
-            supplierId: hasInternalResponsibility
-              ? undefined
-              : linkedIssueDraft.value.supplierId || undefined,
-            supplierName: hasInternalResponsibility
-              ? ''
-              : linkedIssueDraft.value.supplierName,
-          }
+            responsibilityType: linkedIssueDraft.value.responsibilityType,
+          })
         : undefined;
 
       await closeInspectionRequest(currentRequest.value.id, {

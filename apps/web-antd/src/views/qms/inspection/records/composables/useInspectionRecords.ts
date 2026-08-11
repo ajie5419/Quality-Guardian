@@ -2,6 +2,11 @@ import type { QmsInspectionApi } from '#/api/qms/inspection';
 
 import { ref } from 'vue';
 
+import {
+  buildInspectionIssuePayload,
+  normalizeInspectionIssueCanonicalId,
+  normalizeInspectionIssueText,
+} from '@qgs/shared';
 import { message } from 'ant-design-vue';
 
 import {
@@ -40,38 +45,10 @@ interface LinkedIssuePayload {
   photos?: string[];
   status?: string;
   supplierId?: string;
-  supplierName?: string;
-  responsibleDepartment?: string;
+  responsibilityType?: string;
+  responsibleDepartmentId?: string;
   severity?: 'Critical' | 'Major' | 'Minor';
 }
-
-type InspectionIssueCreatePayload = {
-  claim?: string;
-  defectCategoryId?: string;
-  defectSubcategoryId?: string;
-  defectSubtype?: string;
-  defectType?: string;
-  description?: string;
-  inspectionId?: string;
-  lossAmount?: number;
-  partName?: string;
-  photos?: string[];
-  processName?: string;
-  projectName?: string;
-  quantity?: number;
-  reportDate?: string;
-  reportedBy?: string;
-  responsibleDepartment?: string;
-  responsibleWelder?: string;
-  rootCause?: string;
-  severity?: 'Critical' | 'Major' | 'Minor';
-  solution?: string;
-  sourceType?: string;
-  status?: string;
-  supplierId?: string;
-  supplierName?: string;
-  workOrderNumber?: string;
-};
 
 export function useInspectionRecords() {
   const { handleApiError } = useErrorHandler();
@@ -121,7 +98,13 @@ export function useInspectionRecords() {
       );
       if (linkedIssue.enabled && inspectionId) {
         try {
-          const issuePayload: InspectionIssueCreatePayload = {
+          const supplierId =
+            normalizeInspectionIssueCanonicalId(
+              persistedSupplierIdentity.supplierId,
+            ) ||
+            normalizeInspectionIssueCanonicalId(linkedIssue.supplierId) ||
+            normalizeInspectionIssueCanonicalId(values.supplierId);
+          const issuePayload = buildInspectionIssuePayload({
             claim: linkedIssue.claim || 'No',
             defectCategoryId: linkedIssue.defectCategoryId,
             defectSubcategoryId: linkedIssue.defectSubcategoryId,
@@ -130,41 +113,37 @@ export function useInspectionRecords() {
             description: linkedIssue.description,
             inspectionId,
             lossAmount: Number(linkedIssue.lossAmount || 0),
-            partName: linkedIssue.partName || String(values.materialName || ''),
+            partName:
+              linkedIssue.partName ||
+              normalizeInspectionIssueText(values.materialName),
             processName:
               linkedIssue.processName ||
-              String(values.processName || values.incomingType || '成品检验'),
-            projectName: String(values.projectName || ''),
+              normalizeInspectionIssueText(values.processName) ||
+              normalizeInspectionIssueText(values.incomingType) ||
+              '成品检验',
+            projectName: normalizeInspectionIssueText(values.projectName),
             quantity: Number(linkedIssue.quantity || values.quantity || 1),
             reportDate:
-              linkedIssue.reportDate || String(values.inspectionDate || ''),
+              linkedIssue.reportDate ||
+              normalizeInspectionIssueText(values.inspectionDate),
             reportedBy:
-              linkedIssue.reportedBy || String(values.inspector || ''),
-            responsibleDepartment:
-              linkedIssue.responsibleDepartment ||
-              String(values.team || '质量部'),
+              linkedIssue.reportedBy ||
+              normalizeInspectionIssueText(values.inspector),
+            responsibilityType: linkedIssue.responsibilityType,
+            responsibleDepartmentId: linkedIssue.responsibleDepartmentId,
             responsibleWelder: linkedIssue.responsibleWelder || undefined,
             rootCause: linkedIssue.rootCause || '',
             severity: linkedIssue.severity || 'Minor',
             solution: linkedIssue.solution || '',
             status: linkedIssue.status || 'OPEN',
-            supplierId:
-              persistedSupplierIdentity.supplierId ||
-              linkedIssue.supplierId ||
-              String(values.supplierId || '') ||
-              undefined,
-            supplierName:
-              persistedSupplierIdentity.supplierName ||
-              linkedIssue.supplierName ||
-              String(values.supplierName || '') ||
-              undefined,
+            supplierId: supplierId || undefined,
             sourceType: 'INSPECTION_RECORD',
             photos: Array.isArray(linkedIssue.photos) ? linkedIssue.photos : [],
-            workOrderNumber: String(values.workOrderNumber || ''),
-          };
-          await createInspectionIssue(
-            issuePayload as Partial<QmsInspectionApi.InspectionIssue>,
-          );
+            workOrderNumber: normalizeInspectionIssueText(
+              values.workOrderNumber,
+            ),
+          });
+          await createInspectionIssue(issuePayload);
           message.success('已自动创建关联不合格项');
         } catch (issueError) {
           handleApiError(issueError, 'Create Linked Inspection Issue');

@@ -1,9 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import {
+  getIssueFormSchema,
   isWeldingDefectSubcategory,
   isWeldingProcessName,
 } from './issueFormData';
+
+vi.mock('@vben/locales', () => ({
+  useI18n: () => ({ t: (key: string) => key }),
+}));
 
 const CLASSIFICATIONS = [
   {
@@ -72,6 +77,24 @@ describe('issue form welding conditions', () => {
           subcategories: [{ ...surface, code: 'SURFACE' }],
         },
       ]),
+    ).toBe(false);
+  });
+
+  it('uses a single canonical TreeSelect department field', () => {
+    const schema = getIssueFormSchema();
+    const department = schema.find(
+      (field) => field.fieldName === 'responsibleDepartmentId',
+    );
+
+    expect(department?.component).toBe('TreeSelect');
+    expect(department?.componentProps).not.toMatchObject({
+      treeCheckable: true,
+    });
+    expect(department?.componentProps).not.toMatchObject({
+      treeCheckStrictly: true,
+    });
+    expect(
+      schema.some((field) => field.fieldName === 'responsibleDepartments'),
     ).toBe(false);
   });
 });

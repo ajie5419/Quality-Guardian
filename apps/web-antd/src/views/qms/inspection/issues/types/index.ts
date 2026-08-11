@@ -2,6 +2,7 @@
  * 质量问题管理模块类型定义
  */
 
+import type { InspectionIssueResponsibilityType } from '@qgs/shared';
 import type { UploadFile } from 'ant-design-vue';
 
 import {
@@ -58,7 +59,9 @@ export interface InspectionIssue {
   solution?: string;
   lossAmount: number;
   responsibleDepartment: string;
+  responsibleDepartmentId?: null | string;
   responsibleDepartments?: string[];
+  responsibilityType?: InspectionIssueResponsibilityType | null;
   responsibleWelder?: string;
   supplierId?: null | string;
   supplierName?: string;

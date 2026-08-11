@@ -153,7 +153,6 @@ describe('useInspectionRequestTaskActions', () => {
     composable.closeForm.result = 'FAIL';
     composable.linkedIssueDraft.value.defectCategoryId = 'category-1';
     composable.linkedIssueDraft.value.defectSubcategoryId = 'subcategory-1';
-    composable.linkedIssueDraft.value.ncNumber = 'NC-2026-001';
     composable.linkedIssueDraft.value.description = 'Weld pore';
     composable.linkedIssueDraft.value.division = 'Vehicle OBU';
     composable.linkedIssueDraft.value.divisionId = 'dept-vehicle';
@@ -179,11 +178,9 @@ describe('useInspectionRequestTaskActions', () => {
       expect.objectContaining({
         linkedIssue: expect.objectContaining({
           photos: ['/api/uploads/defect.jpg'],
-          ncNumber: 'NC-2026-001',
           quantity: 2,
           division: 'Vehicle OBU',
           divisionId: 'dept-vehicle',
-          responsibleDepartment: 'Assembly Team A',
           responsibleDepartmentId: 'dept-assembly',
           responsibilityType: 'INTERNAL_DEPARTMENT',
         }),
@@ -193,6 +190,11 @@ describe('useInspectionRequestTaskActions', () => {
         unqualifiedQuantity: 2,
       }),
     );
+    const requestPayload =
+      mockCloseInspectionRequest.mock.calls[0]?.[1]?.linkedIssue;
+    expect(requestPayload).not.toHaveProperty('ncNumber');
+    expect(requestPayload).not.toHaveProperty('responsibleDepartment');
+    expect(requestPayload).not.toHaveProperty('supplierName');
     expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务检验完成');
   });
 
@@ -311,10 +313,8 @@ describe('useInspectionRequestTaskActions', () => {
       expect.objectContaining({
         linkedIssue: expect.objectContaining({
           responsibilityType: 'OUTSOURCING_UNIT',
-          responsibleDepartment: '生产 OBU',
           responsibleDepartmentId: 'dept-production',
           supplierId: 'supplier-team-1',
-          supplierName: 'Mapped Outsourcing Plant',
         }),
       }),
     );

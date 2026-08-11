@@ -1,21 +1,22 @@
 <script setup lang="ts">
-import type { DepartmentNode } from '@/api/inspection';
 import type {
   CloseInspectionRequestParams,
+  InspectionIssueResponsibilityType,
   QualityClassificationCategory,
 } from '@qgs/shared';
 
 import { computed, ref, watch } from 'vue';
 
-import {
-  closeInspectionRequest,
-  getDepartments,
-  getInspectionRequest,
-} from '@/api/inspection';
+import { closeInspectionRequest, getInspectionRequest } from '@/api/inspection';
 import { getQualityClassificationOptions } from '@/api/issues';
 import { buildResourceUrl, uploadFile } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
-import { QUALITY_CLASSIFICATION_SCOPE } from '@qgs/shared';
+import {
+  isExternalInspectionIssueResponsibility,
+  QUALITY_CLASSIFICATION_SCOPE,
+} from '@qgs/shared';
+
+import { resolveLockedInspectionRequestIssueResponsibility } from './result-responsibility';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -25,6 +26,12 @@ interface TaskDetail {
   partName: string;
   processName: string;
   quantity: number;
+  issueResponsibility: null | {
+    responsibilityType: string;
+    responsibleDepartment: string;
+    responsibleDepartmentId?: string;
+    supplierId?: null | string;
+  };
 }
 
 interface Attachment {
@@ -40,7 +47,6 @@ const taskId = ref('');
 const task = ref<null | TaskDetail>(null);
 const loading = ref(false);
 const submitting = ref(false);
-const departments = ref<Array<{ id: string; name: string }>>([]);
 const classificationCategories = ref<QualityClassificationCategory[]>([]);
 
 // Step: 1-indexed; only meaningful when result === 'FAIL'
@@ -60,8 +66,9 @@ const defectSubcategoryId = ref('');
 const defectType = ref('');
 const defectSubtype = ref('');
 const severity = ref('Minor-轻微');
-const responsibleDepartment = ref('');
 const responsibleDepartmentId = ref('');
+const responsibilityType = ref<'' | InspectionIssueResponsibilityType>('');
+const supplierId = ref('');
 
 // ── Step 3 fields ─────────────────────────────────────────────────────────────
 const description = ref('');
@@ -92,8 +99,6 @@ const currentSubtypeOptions = computed(() =>
   })),
 );
 
-const departmentNames = computed(() => departments.value.map((d) => d.name));
-
 // ─── Watchers ────────────────────────────────────────────────────────────────
 
 // When switching back to PASS, go back to step 1
@@ -115,7 +120,18 @@ async function fetchDetail() {
         partName: ((d.partName ?? d.componentName) as string) || '',
         processName: (d.processName as string) || '',
         quantity: (d.quantity as number) || 1,
+        issueResponsibility:
+          d.issueResponsibility && typeof d.issueResponsibility === 'object'
+            ? (d.issueResponsibility as TaskDetail['issueResponsibility'])
+            : null,
       };
+      const responsibility = resolveLockedInspectionRequestIssueResponsibility(
+        d.issueResponsibility,
+      );
+      responsibilityType.value = responsibility?.responsibilityType || '';
+      responsibleDepartmentId.value =
+        responsibility?.responsibleDepartmentId || '';
+      supplierId.value = responsibility?.supplierId || '';
       quantity.value = task.value.quantity;
     } else {
       uni.showToast({ title: res.message || '加载失败', icon: 'none' });
@@ -124,21 +140,6 @@ async function fetchDetail() {
     uni.showToast({ title: '网络错误', icon: 'none' });
   } finally {
     loading.value = false;
-  }
-}
-
-async function fetchDepartments() {
-  try {
-    const res = await getDepartments();
-    if (res.code === 0 && Array.isArray(res.data)) {
-      departments.value = flattenDepartments(res.data);
-      if (departments.value.length > 0) {
-        responsibleDepartment.value = departments.value[0]?.name || '';
-        responsibleDepartmentId.value = departments.value[0]?.id || '';
-      }
-    }
-  } catch {
-    // Non-fatal: leave departments empty, user can still submit
   }
 }
 
@@ -153,18 +154,6 @@ async function fetchClassifications() {
   } catch {
     classificationCategories.value = [];
   }
-}
-
-function flattenDepartments(nodes: DepartmentNode[]) {
-  const result: Array<{ id: string; name: string }> = [];
-  const visit = (items: DepartmentNode[]) => {
-    for (const item of items) {
-      result.push({ id: item.id, name: item.name });
-      if (item.children?.length) visit(item.children);
-    }
-  };
-  visit(nodes);
-  return result;
 }
 
 // ─── Photo upload ─────────────────────────────────────────────────────────────
@@ -225,12 +214,6 @@ function onSeverityChange(e: { detail: { value: string } }) {
     SEVERITY_OPTIONS[Number(e.detail.value)] ?? SEVERITY_OPTIONS[0];
 }
 
-function onDepartmentChange(e: { detail: { value: string } }) {
-  const department = departments.value[Number(e.detail.value)];
-  responsibleDepartment.value = department?.name || '';
-  responsibleDepartmentId.value = department?.id || '';
-}
-
 // ─── Step navigation ──────────────────────────────────────────────────────────
 
 function validateStep1(): boolean {
@@ -250,8 +233,8 @@ function validateStep2(): boolean {
     uni.showToast({ title: '请选择缺陷分类和二级分类', icon: 'none' });
     return false;
   }
-  if (!responsibleDepartment.value || !responsibleDepartmentId.value) {
-    uni.showToast({ title: '请选择责任部门', icon: 'none' });
+  if (!responsibilityType.value || !responsibleDepartmentId.value) {
+    uni.showToast({ title: '报检任务责任上下文无效', icon: 'none' });
     return false;
   }
   return true;
@@ -315,9 +298,13 @@ async function submitResult() {
     payload.linkedIssue = {
       partName: task.value.partName,
       processName: task.value.processName,
-      responsibleDepartment: responsibleDepartment.value,
       responsibleDepartmentId: responsibleDepartmentId.value,
-      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibilityType: responsibilityType.value,
+      supplierId: isExternalInspectionIssueResponsibility(
+        responsibilityType.value,
+      )
+        ? supplierId.value || undefined
+        : undefined,
       defectCategoryId: defectCategoryId.value,
       defectSubcategoryId: defectSubcategoryId.value,
       severity: severityCode,
@@ -355,7 +342,6 @@ async function submitResult() {
 onLoad((options) => {
   taskId.value = options?.id ?? '';
   fetchDetail();
-  fetchDepartments();
   fetchClassifications();
 });
 </script>
@@ -580,19 +566,11 @@ onLoad((options) => {
         <!-- 责任部门 -->
         <view class="card">
           <view class="field-label required">责任部门</view>
-          <picker
-            v-if="departmentNames.length > 0"
-            :value="departmentNames.indexOf(responsibleDepartment)"
-            :range="departmentNames"
-            @change="onDepartmentChange"
-          >
-            <view class="picker-val">
-              <text>{{ responsibleDepartment || '请选择责任部门' }}</text>
-              <text class="picker-arrow">›</text>
-            </view>
-          </picker>
-          <view v-else class="picker-val picker-val--placeholder">
-            <text>加载中...</text>
+          <view class="picker-val">
+            <text>{{
+              task?.issueResponsibility?.responsibleDepartment ||
+              '责任上下文加载中'
+            }}</text>
           </view>
         </view>
       </view>

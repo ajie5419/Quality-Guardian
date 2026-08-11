@@ -29,12 +29,14 @@ import { useImageCompress } from '#/composables/useImageCompress';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 
 import IssueFormFields from '../../issues/components/IssueFormFields.vue';
+import {
+  buildInspectionIssuePayload,
+  isExternalInspectionIssueResponsibility,
+  normalizeInspectionIssueText,
+} from '../../issues/components/issueFormPayload';
 import { useStatusOptions } from '../../issues/constants';
 import { resolveDivisionIdentity } from '../composables/useInspectionRequestTaskActions';
-import {
-  resolveLinkedIssueResponsibilitySelection,
-  resolveTreeDepartmentIdentity,
-} from '../inspection-request-responsibility';
+import { resolveTreeDepartmentIdentity } from '../inspection-request-responsibility';
 
 interface Props {
   open: boolean;
@@ -170,10 +172,8 @@ function buildEmbeddedIssueValues() {
     quantity: total,
     inspector: localLinkedIssueDraft.reportedBy,
     reportDate: localLinkedIssueDraft.reportDate,
-    responsibleDepartment: responsibleDepartment.name,
-    responsibleDepartments: responsibleDepartment.id
-      ? [responsibleDepartment.id]
-      : [],
+    responsibilityType: localLinkedIssueDraft.responsibilityType,
+    responsibleDepartmentId: responsibleDepartment.id,
     responsibleWelder: localLinkedIssueDraft.responsibleWelder,
     supplierId: localLinkedIssueDraft.supplierId,
     supplierName: localLinkedIssueDraft.supplierName,
@@ -182,7 +182,6 @@ function buildEmbeddedIssueValues() {
     defectCategoryId: localLinkedIssueDraft.defectCategoryId,
     defectSubcategoryId: localLinkedIssueDraft.defectSubcategoryId,
     lossAmount: localLinkedIssueDraft.lossAmount,
-    ncNumber: localLinkedIssueDraft.ncNumber,
     claim: localLinkedIssueDraft.claim,
     description: localLinkedIssueDraft.description,
     rootCause: localLinkedIssueDraft.rootCause,
@@ -195,7 +194,6 @@ async function applyEmbeddedValues() {
   await nextTick();
   const fields = formFieldsRef.value;
   if (!fields) return;
-  fields.resetAutoNc();
   await fields.setValues(buildEmbeddedIssueValues());
   await fillWorkOrderInfo();
 }
@@ -293,47 +291,49 @@ async function collectIssueFromForm() {
   const { valid } = await fields.validate();
   if (!valid) return false;
   const values = (await fields.getValues()) as Record<string, unknown>;
-  const responsibleDepartments = Array.isArray(values.responsibleDepartments)
-    ? (values.responsibleDepartments as string[])
-        .map((id) => String(id || '').trim())
-        .filter(Boolean)
-    : [];
-  const responsibleDepartment =
-    responsibleDepartments[0] ||
-    String(values.responsibleDepartment || '') ||
-    localLinkedIssueDraft.responsibleDepartmentId ||
-    localLinkedIssueDraft.responsibleDepartment ||
-    '';
-  const responsibility = resolveLinkedIssueResponsibilitySelection(
+  const responsibilityPayload = buildInspectionIssuePayload({
+    ...values,
+    responsibilityType: localLinkedIssueDraft.responsibilityType,
+  });
+  const responsibleDepartment = resolveTreeDepartmentIdentity(
     props.deptTreeData,
     {
-      responsibilityType: localLinkedIssueDraft.responsibilityType,
-      responsibleDepartment: localLinkedIssueDraft.responsibleDepartment,
-      responsibleDepartmentId: responsibleDepartment,
-      supplierId: values.supplierId,
-      supplierName: values.supplierName,
+      department: localLinkedIssueDraft.responsibleDepartment,
+      departmentId: responsibilityPayload.responsibleDepartmentId,
     },
   );
+  const responsibilityType =
+    responsibilityPayload.responsibilityType ||
+    localLinkedIssueDraft.responsibilityType;
+  const isExternal =
+    isExternalInspectionIssueResponsibility(responsibilityType);
   const divisionIdentity = resolveDivisionIdentity(props.deptTreeData, {
     division: String(values.division || localLinkedIssueDraft.division || ''),
     divisionId: localLinkedIssueDraft.divisionId,
   });
   Object.assign(localLinkedIssueDraft, {
     ...divisionIdentity,
-    ...responsibility,
-    partName: String(values.partName || ''),
-    processName: String(values.processName || ''),
-    responsibleWelder: String(values.responsibleWelder || ''),
-    status: String(values.status || 'OPEN'),
-    severity: String(values.severity || ''),
-    defectCategoryId: String(values.defectCategoryId || ''),
-    defectSubcategoryId: String(values.defectSubcategoryId || ''),
+    responsibilityType,
+    responsibleDepartment: responsibleDepartment.name,
+    responsibleDepartmentId: responsibilityPayload.responsibleDepartmentId,
+    supplierId: responsibilityPayload.supplierId || '',
+    supplierName: isExternal
+      ? normalizeInspectionIssueText(values.supplierName)
+      : '',
+    partName: normalizeInspectionIssueText(values.partName),
+    processName: normalizeInspectionIssueText(values.processName),
+    responsibleWelder: normalizeInspectionIssueText(values.responsibleWelder),
+    status: normalizeInspectionIssueText(values.status) || 'OPEN',
+    severity: normalizeInspectionIssueText(values.severity),
+    defectCategoryId: normalizeInspectionIssueText(values.defectCategoryId),
+    defectSubcategoryId: normalizeInspectionIssueText(
+      values.defectSubcategoryId,
+    ),
     lossAmount: Number(values.lossAmount) || 0,
-    ncNumber: String(values.ncNumber || ''),
-    claim: String(values.claim || ''),
-    description: String(values.description || ''),
-    rootCause: String(values.rootCause || ''),
-    solution: String(values.solution || ''),
+    claim: normalizeInspectionIssueText(values.claim),
+    description: normalizeInspectionIssueText(values.description),
+    rootCause: normalizeInspectionIssueText(values.rootCause),
+    solution: normalizeInspectionIssueText(values.solution),
     photos: Array.isArray(values.photos) ? (values.photos as UploadFile[]) : [],
   });
   return true;
