@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DeptService } from '~/modules/dept';
 import prisma from '~/utils/prisma';
 
 import { SupplierIdentityService } from './supplier-identity.service';
@@ -33,6 +34,10 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('~/utils/prisma-error', () => ({
   isPrismaUniqueConstraintError,
+}));
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: { findActiveByIdsOrNames: vi.fn().mockResolvedValue([]) },
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -766,14 +771,119 @@ describe('supplier identity service', () => {
       },
     ] as never);
     vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
-      { sourceId: 'supplier-1', teamId: 'team-2' },
+      {
+        sourceId: 'dept-1',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-1',
+      },
+      { sourceId: 'supplier-1', sourceType: 'SUPPLIER', teamId: 'team-2' },
+    ] as never);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { id: 'dept-1', name: 'Assembly' },
     ] as never);
 
     await expect(
       SupplierIdentityService.listTeamOptions('Team'),
     ).resolves.toEqual([
-      { group: 'internal', label: 'Internal Team', value: 'team-1' },
-      { group: 'external', label: 'Resident Team', value: 'team-2' },
+      {
+        group: 'internal',
+        label: 'Internal Team',
+        responsibleDepartmentId: 'dept-1',
+        value: 'team-1',
+      },
+      {
+        group: 'external',
+        label: 'Resident Team',
+        supplierId: 'supplier-1',
+        value: 'team-2',
+      },
+    ]);
+  });
+
+  it('returns unresolved TEAM options instead of classifying incomplete sources as internal', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Unlinked external TEAM', id: 'team-external' },
+      { dictKey: 'Ambiguous internal TEAM', id: 'team-ambiguous' },
+      { dictKey: 'Inactive department TEAM', id: 'team-inactive' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      {
+        sourceId: 'supplier-1',
+        sourceType: 'SUPPLIER',
+        teamId: 'team-external',
+      },
+      {
+        sourceId: 'dept-a',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-ambiguous',
+      },
+      {
+        sourceId: 'dept-b',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-ambiguous',
+      },
+      {
+        sourceId: 'dept-inactive',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-inactive',
+      },
+    ] as never);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { id: 'dept-a', name: 'A' },
+      { id: 'dept-b', name: 'B' },
+    ] as never);
+
+    await expect(SupplierIdentityService.listTeamOptions('')).resolves.toEqual([
+      {
+        group: 'unresolved',
+        label: 'Unlinked external TEAM',
+        reason: 'INVALID_EXTERNAL_SUPPLIER_MAPPING',
+        value: 'team-external',
+      },
+      {
+        group: 'unresolved',
+        label: 'Ambiguous internal TEAM',
+        reason: 'AMBIGUOUS_DEPARTMENT_SOURCE',
+        value: 'team-ambiguous',
+      },
+      {
+        group: 'unresolved',
+        label: 'Inactive department TEAM',
+        reason: 'INACTIVE_DEPARTMENT_SOURCE',
+        value: 'team-inactive',
+      },
+    ]);
+  });
+
+  it('classifies a TEAM with one active and one inactive department source as internal', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Assembly TEAM', id: 'team-assembly' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      {
+        sourceId: 'dept-active',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-assembly',
+      },
+      {
+        sourceId: 'dept-retired',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-assembly',
+      },
+    ] as never);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { id: 'dept-active', name: 'Assembly' },
+    ] as never);
+
+    await expect(SupplierIdentityService.listTeamOptions('')).resolves.toEqual([
+      {
+        group: 'internal',
+        label: 'Assembly TEAM',
+        responsibleDepartmentId: 'dept-active',
+        value: 'team-assembly',
+      },
     ]);
   });
 
@@ -1000,12 +1110,13 @@ describe('supplier identity service', () => {
     );
   });
 
-  it('classifies an unlinked TEAM as internal even when a supplier has the same name', async () => {
+  it('returns an unlinked TEAM without a department source as unresolved even when a supplier has the same name', async () => {
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
       { dictKey: '秦皇岛吉兴机械制造有限公司', id: 'team-1' },
       { dictKey: '组装 BU', id: 'team-2' },
     ] as never);
     vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
     vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
       {
         category: 'Outsourcing',
@@ -1016,11 +1127,17 @@ describe('supplier identity service', () => {
 
     await expect(SupplierIdentityService.listTeamOptions('')).resolves.toEqual([
       {
-        group: 'internal',
+        group: 'unresolved',
         label: '秦皇岛吉兴机械制造有限公司',
+        reason: 'MISSING_RESPONSIBILITY_SOURCE',
         value: 'team-1',
       },
-      { group: 'internal', label: '组装 BU', value: 'team-2' },
+      {
+        group: 'unresolved',
+        label: '组装 BU',
+        reason: 'MISSING_RESPONSIBILITY_SOURCE',
+        value: 'team-2',
+      },
     ]);
   });
 });

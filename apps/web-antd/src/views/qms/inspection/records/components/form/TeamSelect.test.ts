@@ -81,6 +81,35 @@ describe('team select', () => {
     expect(wrapper.emitted('resolved')).toEqual([['team-1', teams[0]]]);
   });
 
+  it('shows unresolved TEAM identities as disabled with an actionable reason', async () => {
+    getPublicInspectionRequestTeams.mockResolvedValue([
+      {
+        group: 'unresolved',
+        label: 'Conflicted Team',
+        reason: 'CONFLICTING_TEAM_SOURCES',
+        value: 'team-conflicted',
+      },
+    ]);
+    const wrapper = mount(TeamSelect);
+    await flushPromises();
+
+    const select = wrapper.findComponent({ name: 'MockTeamSelectProbe' });
+    expect(select.props('options')).toEqual([
+      {
+        label: '待治理班组（不可选）',
+        options: [
+          {
+            disabled: true,
+            group: 'unresolved',
+            label: 'Conflicted Team（同时存在内部部门和供应商来源）',
+            reason: 'CONFLICTING_TEAM_SOURCES',
+            value: 'team-conflicted',
+          },
+        ],
+      },
+    ]);
+  });
+
   it('keeps an id-only legacy edit value outside the first option page', async () => {
     getPublicInspectionRequestTeams.mockResolvedValue([]);
     const wrapper = mount(TeamSelect, {

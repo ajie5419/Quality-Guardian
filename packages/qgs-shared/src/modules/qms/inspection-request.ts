@@ -50,6 +50,27 @@ export interface InspectionRequestIssueResponsibility {
   supplierName: string;
 }
 
+export type InspectionRequestTeamResolution =
+  | 'external'
+  | 'internal'
+  | 'unresolved';
+
+export type InspectionRequestTeamResolutionReason =
+  | 'AMBIGUOUS_DEPARTMENT_SOURCE'
+  | 'CONFLICTING_TEAM_SOURCES'
+  | 'INACTIVE_DEPARTMENT_SOURCE'
+  | 'INVALID_EXTERNAL_SUPPLIER_MAPPING'
+  | 'MISSING_RESPONSIBILITY_SOURCE';
+
+export interface InspectionRequestTeamOption {
+  group: InspectionRequestTeamResolution;
+  label: string;
+  reason?: InspectionRequestTeamResolutionReason;
+  responsibleDepartmentId?: string;
+  supplierId?: string;
+  value: string;
+}
+
 export interface InspectionRequest {
   attachments?: InspectionRequestAttachment[];
   category?: 'INCOMING' | 'PROCESS';

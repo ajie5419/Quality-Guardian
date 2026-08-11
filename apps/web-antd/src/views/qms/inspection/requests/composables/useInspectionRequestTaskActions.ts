@@ -14,10 +14,7 @@ import type { TreeSelectNode } from '#/types';
 
 import { computed, reactive, ref, watch } from 'vue';
 
-import {
-  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
-  resolveInspectionRequestIssueResponsibility,
-} from '@qgs/shared';
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { message, Modal } from 'ant-design-vue';
 import dayjs from 'dayjs';
 
@@ -66,6 +63,13 @@ type LinkedIssueDraftState = {
   supplierId: string;
   supplierName: string;
   unqualifiedQuantity: number;
+};
+
+type CompleteIssueResponsibility = Omit<
+  NonNullable<InspectionRequest['issueResponsibility']>,
+  'responsibleDepartmentId'
+> & {
+  responsibleDepartmentId: string;
 };
 
 type DivisionIdentitySource = {
@@ -350,7 +354,7 @@ export function useInspectionRequestTaskActions(
 
   function openCloseFromDispatchDetail() {
     if (!currentRequest.value) return;
-    openClose(currentRequest.value);
+    void openClose(currentRequest.value);
   }
 
   async function submitDispatch() {
@@ -412,27 +416,57 @@ export function useInspectionRequestTaskActions(
     });
   }
 
-  function openClose(record: InspectionRequest) {
-    const issueResponsibility =
-      record.issueResponsibility ||
-      resolveInspectionRequestIssueResponsibility({
-        category: record.category,
-        processName: record.processName,
-        supplierId: record.supplierId,
-        team: record.team,
-      });
-    const responsibleDepartment = resolveTreeDepartmentIdentity(
-      options.deptTreeData.value,
-      { department: issueResponsibility.responsibleDepartment },
+  function hasCompleteIssueResponsibility(
+    request: InspectionRequest,
+  ): request is InspectionRequest & {
+    issueResponsibility: CompleteIssueResponsibility;
+  } {
+    const responsibility = request.issueResponsibility;
+    if (
+      !responsibility ||
+      !normalizeCloseText(responsibility.responsibleDepartmentId)
+    ) {
+      return false;
+    }
+    return (
+      !isExternalInspectionIssueResponsibility(
+        responsibility.responsibilityType,
+      ) || !!normalizeCloseText(responsibility.supplierId)
     );
-    currentRequest.value = record;
+  }
+
+  async function resolveCloseRequest(record: InspectionRequest): Promise<
+    | (InspectionRequest & {
+        issueResponsibility: CompleteIssueResponsibility;
+      })
+    | null
+  > {
+    if (hasCompleteIssueResponsibility(record)) return record;
+    try {
+      const refreshed = await getInspectionRequest(record.id);
+      if (refreshed && hasCompleteIssueResponsibility(refreshed)) {
+        return refreshed;
+      }
+      message.warning('报检任务责任上下文不完整，无法关闭');
+    } catch (error: unknown) {
+      handleApiError(error, 'Load Inspection Request Responsibility');
+      message.warning('无法获取报检任务责任上下文，暂不能关闭');
+    }
+    return null;
+  }
+
+  async function openClose(record: InspectionRequest) {
+    const request = await resolveCloseRequest(record);
+    if (!request) return;
+    const issueResponsibility = request.issueResponsibility;
+    currentRequest.value = request;
     closeAttachmentFileList.value = [];
     closeForm.attachments = [];
     closeForm.closeRemark = '';
     closeForm.hasDocuments = true;
-    closeForm.inspectionId = record.inspectionId || '';
-    closeForm.inspector = record.inspectorName || getCurrentUserName();
-    closeForm.quantity = record.quantity || 1;
+    closeForm.inspectionId = request.inspectionId || '';
+    closeForm.inspector = request.inspectorName || getCurrentUserName();
+    closeForm.quantity = request.quantity || 1;
     closeForm.result = 'PASS';
 
     linkedIssueDraft.value = {
@@ -444,22 +478,22 @@ export function useInspectionRequestTaskActions(
       divisionId: '',
       lossAmount: 0,
       ncNumber: '',
-      partName: record.componentName || record.partName || '',
-      processName: record.processName || '',
+      partName: request.componentName || request.partName || '',
+      processName: request.processName || '',
       qualifiedQuantity: 0,
       reportDate: dayjs().format('YYYY-MM-DD'),
-      reportedBy: record.inspectorName || getCurrentUserName() || '',
+      reportedBy: request.inspectorName || getCurrentUserName() || '',
       responsibilityType: issueResponsibility.responsibilityType,
-      responsibleDepartment: responsibleDepartment.name,
-      responsibleDepartmentId: responsibleDepartment.id,
+      responsibleDepartment: issueResponsibility.responsibleDepartment,
+      responsibleDepartmentId: issueResponsibility.responsibleDepartmentId,
       responsibleWelder: '',
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierId: issueResponsibility.supplierId || record.supplierId || '',
+      supplierId: issueResponsibility.supplierId || '',
       supplierName: issueResponsibility.supplierName,
       photos: [] as UploadFileWithResponse[],
-      unqualifiedQuantity: record.quantity || 1,
+      unqualifiedQuantity: request.quantity || 1,
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
     };
 

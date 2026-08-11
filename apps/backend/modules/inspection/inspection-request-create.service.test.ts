@@ -11,6 +11,10 @@ import { ProcessMasterService } from '~/modules/process-master';
 import { SystemService } from '~/modules/system';
 import prisma from '~/utils/prisma';
 
+const { resolveIssueResponsibilities } = vi.hoisted(() => ({
+  resolveIssueResponsibilities: vi.fn(),
+}));
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     $transaction: vi.fn(),
@@ -53,6 +57,10 @@ vi.mock('~/modules/supplier-identity', () => ({
       name: 'Team A',
     }),
   },
+}));
+
+vi.mock('./inspection-request-responsibility.service', () => ({
+  resolveInspectionRequestIssueResponsibilities: resolveIssueResponsibilities,
 }));
 
 vi.mock('~/modules/system-log/audit-log', () => ({
@@ -142,6 +150,80 @@ describe('inspectionRequestCreateService', () => {
       name: 'Canonical Part',
     });
     vi.mocked(PartMasterService.findActiveByExactName).mockResolvedValue(null);
+    resolveIssueResponsibilities.mockImplementation(
+      async ([request]: Array<{ category?: string }>) => [
+        request?.category === 'INCOMING'
+          ? {
+              responsibilityType: 'SUPPLIER',
+              responsibleDepartmentId: 'dept-purchasing',
+              supplierId: 'supplier-1',
+            }
+          : {
+              responsibilityType: 'INTERNAL_DEPARTMENT',
+              responsibleDepartmentId: 'dept-assembly',
+              supplierId: null,
+            },
+      ],
+    );
+  });
+
+  it('rejects a PROCESS TEAM without a complete canonical issue responsibility', async () => {
+    resolveIssueResponsibilities.mockResolvedValue([
+      {
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: null,
+        supplierId: null,
+      },
+    ]);
+
+    await expect(
+      InspectionRequestCreateService.createRequest(
+        {} as any,
+        { id: 'user-1', username: 'admin' } as any,
+        {
+          category: 'PROCESS',
+          componentName: 'Component A',
+          partId: 'part-1',
+          processId: 'process-1',
+          teamId: 'team-1',
+          workOrderNumber: 'WO-001',
+        },
+        false,
+        'V2',
+      ),
+    ).rejects.toMatchObject({
+      code: 'INSPECTION_REQUEST_RESPONSIBILITY_UNRESOLVED',
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it('rejects an INCOMING request when the fixed purchasing department is unresolved', async () => {
+    resolveIssueResponsibilities.mockResolvedValue([
+      {
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: null,
+        supplierId: 'supplier-1',
+      },
+    ]);
+
+    await expect(
+      InspectionRequestCreateService.createRequest(
+        {} as any,
+        { id: 'user-1', username: 'admin' } as any,
+        {
+          category: 'INCOMING',
+          partId: 'part-1',
+          processId: 'process-1',
+          supplierId: 'supplier-1',
+          workOrderNumber: 'WO-001',
+        },
+        false,
+        'V2',
+      ),
+    ).rejects.toMatchObject({
+      code: 'INSPECTION_REQUEST_RESPONSIBILITY_UNRESOLVED',
+    });
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
   it('rejects a V2 process that is hidden for the requested category', async () => {

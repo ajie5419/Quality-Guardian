@@ -26,6 +26,31 @@ describe('inspection request entry identity options', () => {
     ]);
   });
 
+  it('retains unresolved TEAMs as disabled options with their canonical IDs and reasons', () => {
+    expect(
+      mapInspectionRequestEntryTeamOptions([
+        {
+          group: 'unresolved',
+          label: 'Conflicted Team',
+          reason: 'CONFLICTING_TEAM_SOURCES',
+          value: 'team-conflicted',
+        },
+      ]),
+    ).toEqual([
+      {
+        label: '待治理班组（不可选）',
+        options: [
+          {
+            disabled: true,
+            label: 'Conflicted Team（同时存在内部部门和供应商来源）',
+            title: '同时存在内部部门和供应商来源',
+            value: 'team-conflicted',
+          },
+        ],
+      },
+    ]);
+  });
+
   it('uses canonical part IDs instead of names or BOM row IDs', () => {
     expect(
       mapInspectionRequestEntryBomPartOptions([

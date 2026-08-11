@@ -32,6 +32,7 @@ import {
   serializeInspectionStationSelection,
 } from './inspection-request';
 import { publishInspectionRequestCreated } from './inspection-request-events';
+import { resolveInspectionRequestIssueResponsibilities } from './inspection-request-responsibility.service';
 import {
   assertWorkOrdersExist,
   inspectionRequestWorkOrdersInclude,
@@ -289,6 +290,28 @@ async function buildCreateRequestPayload(
     );
   }
   const team = supplier?.name || teamIdentity?.name || '';
+  const [responsibility] = await resolveInspectionRequestIssueResponsibilities([
+    {
+      category,
+      processName,
+      supplierId: supplier?.id,
+      team,
+      teamId: teamIdentity?.id,
+    },
+  ]);
+  const hasExternalResponsibility =
+    responsibility?.responsibilityType !== 'INTERNAL_DEPARTMENT';
+  if (
+    !responsibility?.responsibleDepartmentId ||
+    (hasExternalResponsibility && !responsibility.supplierId) ||
+    (isIncoming && responsibility?.responsibilityType !== 'SUPPLIER')
+  ) {
+    throw new BusinessError(
+      'INSPECTION_REQUEST_RESPONSIBILITY_UNRESOLVED',
+      'The selected inspection request identity has no complete canonical responsibility',
+      409,
+    );
+  }
   const quantity = parseInspectionRequestQuantity(body.quantity);
   const normalizedStationSelection = normalizeInspectionStationSelection(
     body.stationSelection,

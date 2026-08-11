@@ -6368,3 +6368,20 @@
 **遗留问题：**
 
 - 生产环境必须先 dry-run 审核 unresolved 清单，再通过正式 release maintenance 执行 apply；无稳定 ID 或唯一关联证据的记录不得按名称猜测恢复。
+
+### 2026-08-11 不合格项责任身份现场定位与入口收口
+
+**执行内容：**
+
+- 现场 5320 public API 证实目标 TEAM 仍是旧的 internal 分类，且存在同名 Outsourcing supplier；canonical `SUPPLIER` source 与 `supplier_identity_links` 尚不完整，必须走主数据治理确认，禁止按名称自动补绑。
+- 报检入口的责任选项改为三态表达，其中 `MISSING` 表示“未关联内部部门或外协供应商”；创建链路对无法证明的责任身份 fail-closed。
+- 打开关单前，如列表项缺少 context，先拉取详情及 canonical ID，避免使用缺失或过期的名称、对象快照。
+
+**验证结果：**
+
+- 后端全量 Vitest：`272/272` 文件、`2504/2504` 用例通过；Web 全量 Vitest：`57/57` 文件、`281/281` 用例通过；小程序全量 Vitest：`6/6` 文件、`20/20` 用例通过。
+- shared build、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`：通过。
+- 本地过程报检浏览器已验证：目标项位于待治理分组且 disabled。
+- 登录后关单页浏览器验收因无登录态尚未验证；真实运行库的 source/link apply 未执行，不得以本地非等价数据库结果替代现场证据。
+
+**commit:** 待提交。

@@ -1,3 +1,8 @@
+import type {
+  InspectionRequestTeamOption,
+  InspectionRequestTeamResolutionReason,
+} from '@qgs/shared';
+
 import type { LocationQuery, LocationQueryRaw } from 'vue-router';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
@@ -16,11 +21,16 @@ type WorkOrderOptionSource = {
   workOrderNumber: string;
 };
 
-type TeamOptionSource = {
-  group: 'external' | 'internal';
-  label: string;
-  value: string;
-};
+const unresolvedTeamReasonLabels: Record<
+  InspectionRequestTeamResolutionReason,
+  string
+> = {
+  AMBIGUOUS_DEPARTMENT_SOURCE: '关联了多个责任部门',
+  CONFLICTING_TEAM_SOURCES: '同时存在内部部门和供应商来源',
+  INACTIVE_DEPARTMENT_SOURCE: '关联责任部门已停用',
+  INVALID_EXTERNAL_SUPPLIER_MAPPING: '外协供应商映射无效',
+  MISSING_RESPONSIBILITY_SOURCE: '未关联内部部门或外协供应商',
+} as const;
 
 type BomPartOptionSource = {
   partId?: null | string;
@@ -61,7 +71,7 @@ export function mapInspectionRequestEntryWorkOrderOptions(
 }
 
 export function mapInspectionRequestEntryTeamOptions(
-  items: TeamOptionSource[],
+  items: InspectionRequestTeamOption[],
 ) {
   const internalOptions = items
     .filter((item) => item.group === 'internal')
@@ -69,10 +79,24 @@ export function mapInspectionRequestEntryTeamOptions(
   const externalOptions = items
     .filter((item) => item.group === 'external')
     .map((item) => ({ label: item.label, value: item.value }));
+  const unresolvedOptions = items
+    .filter((item) => item.group === 'unresolved')
+    .map((item) => {
+      const reason = item.reason
+        ? unresolvedTeamReasonLabels[item.reason]
+        : '责任身份未解析';
+      return {
+        disabled: true,
+        label: `${item.label}（${reason}）`,
+        title: reason,
+        value: item.value,
+      };
+    });
 
   return [
     { label: '内部生产车间', options: internalOptions },
     { label: '外协加工单位', options: externalOptions },
+    { label: '待治理班组（不可选）', options: unresolvedOptions },
   ].filter((group) => group.options.length > 0);
 }
 
