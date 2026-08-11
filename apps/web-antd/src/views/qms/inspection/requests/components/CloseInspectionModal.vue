@@ -3,8 +3,11 @@ import type {
   InspectionIssueResponsibilityType,
   InspectionRequest,
   InspectionRequestAttachment,
+  InspectionRequestResponsibilityDepartmentOption,
+  InspectionRequestResponsibilitySupplierOption,
+  InspectionRequestTeamOption,
 } from '@qgs/shared';
-import type { UploadFile } from 'ant-design-vue';
+import type { SelectProps, UploadFile } from 'ant-design-vue';
 
 import type { TreeSelectNode } from '#/types';
 
@@ -24,6 +27,10 @@ import {
   Upload,
 } from 'ant-design-vue';
 
+import {
+  getPublicInspectionRequestResponsibilityOptions,
+  getPublicInspectionRequestTeams,
+} from '#/api/qms/inspection-request';
 import { getWorkOrderListPage } from '#/api/qms/work-order';
 import { useImageCompress } from '#/composables/useImageCompress';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
@@ -131,6 +138,34 @@ const shouldCreateLinkedIssue = computed(
   () => localCloseForm.result === 'FAIL',
 );
 const formFieldsRef = ref<InstanceType<typeof IssueFormFields> | null>(null);
+const legacyResponsibilityLoading = ref(false);
+const legacyResponsibilityError = ref('');
+const legacyInternalTeams = ref<InspectionRequestTeamOption[]>([]);
+const legacyDepartments = ref<
+  InspectionRequestResponsibilityDepartmentOption[]
+>([]);
+const legacySuppliers = ref<InspectionRequestResponsibilitySupplierOption[]>(
+  [],
+);
+
+const hasLockedResponsibility = computed(() => {
+  const responsibility = props.currentRequest?.issueResponsibility;
+  if (!responsibility?.responsibleDepartmentId) return false;
+  return (
+    !isExternalInspectionIssueResponsibility(
+      responsibility.responsibilityType,
+    ) || Boolean(responsibility.supplierId)
+  );
+});
+
+const responsibilityTypeOptions = [
+  {
+    label: '内部部门',
+    value: 'INTERNAL_DEPARTMENT' as const,
+  },
+  { label: '供应商', value: 'SUPPLIER' as const },
+  { label: '外协单位', value: 'OUTSOURCING_UNIT' as const },
+];
 
 function syncLocalLinkedIssueQuantities(unqualifiedValue?: unknown) {
   const totalQuantity = normalizeQuantity(localCloseForm.quantity);
@@ -152,6 +187,89 @@ function syncFromProps() {
     localLinkedIssueDraft,
     cloneLinkedIssueDraft(props.linkedIssueDraft),
   );
+}
+
+async function loadLegacyResponsibilityOptions() {
+  if (hasLockedResponsibility.value) return;
+  legacyResponsibilityLoading.value = true;
+  legacyResponsibilityError.value = '';
+  try {
+    const result = await getPublicInspectionRequestResponsibilityOptions({
+      responsibilityType: localLinkedIssueDraft.responsibilityType,
+    });
+    if (
+      result.responsibilityType !== localLinkedIssueDraft.responsibilityType
+    ) {
+      return;
+    }
+    legacyDepartments.value = result.departments;
+    legacySuppliers.value = result.suppliers;
+    if (
+      isExternalInspectionIssueResponsibility(
+        localLinkedIssueDraft.responsibilityType,
+      )
+    ) {
+      localLinkedIssueDraft.responsibleDepartmentId =
+        result.departments[0]?.value || '';
+      localLinkedIssueDraft.responsibleDepartment =
+        result.departments[0]?.label || '';
+      localLinkedIssueDraft.supplierId = '';
+      localLinkedIssueDraft.supplierName = '';
+      legacyInternalTeams.value = [];
+      return;
+    }
+    const teams = await getPublicInspectionRequestTeams();
+    legacyInternalTeams.value = teams.filter(
+      (team) =>
+        team.group === 'internal' && Boolean(team.responsibleDepartmentId),
+    );
+    localLinkedIssueDraft.responsibleDepartmentId = '';
+    localLinkedIssueDraft.responsibleDepartment = '';
+    localLinkedIssueDraft.supplierId = '';
+    localLinkedIssueDraft.supplierName = '';
+  } catch {
+    legacyResponsibilityError.value =
+      '责任归属选项加载失败，无法提交不合格项。';
+    legacyDepartments.value = [];
+    legacyInternalTeams.value = [];
+    legacySuppliers.value = [];
+    localLinkedIssueDraft.responsibleDepartmentId = '';
+    localLinkedIssueDraft.supplierId = '';
+  } finally {
+    legacyResponsibilityLoading.value = false;
+  }
+}
+
+async function changeLegacyResponsibilityType(value: SelectProps['value']) {
+  if (
+    value !== 'INTERNAL_DEPARTMENT' &&
+    value !== 'SUPPLIER' &&
+    value !== 'OUTSOURCING_UNIT'
+  ) {
+    return;
+  }
+  localLinkedIssueDraft.responsibilityType = value;
+  await loadLegacyResponsibilityOptions();
+  await applyEmbeddedValues();
+}
+
+async function selectLegacyInternalTeam(value: SelectProps['value']) {
+  const teamId = typeof value === 'string' ? value : '';
+  const team = legacyInternalTeams.value.find((item) => item.value === teamId);
+  localLinkedIssueDraft.responsibleDepartmentId =
+    team?.responsibleDepartmentId || '';
+  localLinkedIssueDraft.responsibleDepartment = team?.label || '';
+  await applyEmbeddedValues();
+}
+
+async function selectLegacySupplier(value: SelectProps['value']) {
+  const supplierId = typeof value === 'string' ? value : '';
+  const supplier = legacySuppliers.value.find(
+    (item) => item.value === supplierId,
+  );
+  localLinkedIssueDraft.supplierId = supplier?.value || '';
+  localLinkedIssueDraft.supplierName = supplier?.label || '';
+  await applyEmbeddedValues();
 }
 
 function buildEmbeddedIssueValues() {
@@ -232,6 +350,9 @@ watch(
     if (open) {
       syncFromProps();
       if (shouldCreateLinkedIssue.value) {
+        if (!hasLockedResponsibility.value) {
+          await loadLegacyResponsibilityOptions();
+        }
         await applyEmbeddedValues();
       }
     }
@@ -241,6 +362,9 @@ watch(
 
 watch(shouldCreateLinkedIssue, async (val) => {
   if (val) {
+    if (!hasLockedResponsibility.value) {
+      await loadLegacyResponsibilityOptions();
+    }
     await applyEmbeddedValues();
   }
 });
@@ -342,6 +466,10 @@ async function collectIssueFromForm() {
 async function handleSubmit() {
   if (props.submitting) return;
   if (shouldCreateLinkedIssue.value) {
+    if (!hasLockedResponsibility.value && legacyResponsibilityError.value) {
+      message.error('责任归属选项加载失败，无法提交不合格项');
+      return;
+    }
     const ok = await collectIssueFromForm();
     if (!ok) {
       message.error('请补全不合格项必填信息');
@@ -447,6 +575,92 @@ async function handleBeforeUpload(file: File) {
       >
         <div class="mb-3 font-medium text-orange-700">
           当前判定为“不合格”，请补充不合格项信息（保存时自动建立关联）
+        </div>
+        <div
+          v-if="!hasLockedResponsibility"
+          class="mb-4 rounded border border-orange-200 bg-white p-3"
+        >
+          <div class="mb-3 text-sm font-medium text-gray-700">
+            历史报检任务未保存责任归属，请补充后提交
+          </div>
+          <div
+            v-if="legacyResponsibilityError"
+            class="mb-3 text-sm text-red-600"
+          >
+            {{ legacyResponsibilityError }}
+          </div>
+          <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Form.Item label="责任归属类型" required>
+              <Select
+                :value="localLinkedIssueDraft.responsibilityType"
+                :disabled="legacyResponsibilityLoading"
+                :options="responsibilityTypeOptions"
+                @change="changeLegacyResponsibilityType"
+              />
+            </Form.Item>
+            <Form.Item
+              v-if="
+                localLinkedIssueDraft.responsibilityType ===
+                'INTERNAL_DEPARTMENT'
+              "
+              label="责任班组"
+              required
+            >
+              <Select
+                :value="
+                  legacyInternalTeams.find(
+                    (team) =>
+                      team.responsibleDepartmentId ===
+                      localLinkedIssueDraft.responsibleDepartmentId,
+                  )?.value
+                "
+                :disabled="legacyResponsibilityLoading"
+                :loading="legacyResponsibilityLoading"
+                :options="legacyInternalTeams"
+                placeholder="请选择可解析责任部门的班组"
+                show-search
+                @change="selectLegacyInternalTeam"
+              />
+            </Form.Item>
+            <template v-else>
+              <Form.Item label="责任部门" required>
+                <Input
+                  :value="
+                    legacyDepartments.find(
+                      (department) =>
+                        department.value ===
+                        localLinkedIssueDraft.responsibleDepartmentId,
+                    )?.label || '责任部门策略加载中'
+                  "
+                  readonly
+                />
+              </Form.Item>
+              <Form.Item
+                :label="
+                  localLinkedIssueDraft.responsibilityType ===
+                  'OUTSOURCING_UNIT'
+                    ? '外协单位'
+                    : '供应商'
+                "
+                required
+              >
+                <Select
+                  :value="localLinkedIssueDraft.supplierId"
+                  :disabled="legacyResponsibilityLoading"
+                  :loading="legacyResponsibilityLoading"
+                  :options="legacySuppliers"
+                  :placeholder="
+                    localLinkedIssueDraft.responsibilityType ===
+                    'OUTSOURCING_UNIT'
+                      ? '请选择外协单位'
+                      : '请选择供应商'
+                  "
+                  show-search
+                  @change="selectLegacySupplier"
+                />
+              </Form.Item>
+            </template>
+          </div>
         </div>
         <IssueFormFields
           ref="formFieldsRef"

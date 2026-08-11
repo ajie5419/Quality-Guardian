@@ -2,12 +2,66 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildInspectionRequestEntryProcessOptions,
+  buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
+  getInspectionRequestResponsibilityUnitCopy,
   mapInspectionRequestEntryBomPartOptions,
   mapInspectionRequestEntryTeamOptions,
 } from './entry-mode';
 
 describe('inspection request entry identity options', () => {
+  it.each([
+    [
+      'internal',
+      {
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-assembly',
+        supplierId: 'supplier-stale',
+        teamId: 'team-assembly',
+      },
+      {
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-assembly',
+        teamId: 'team-assembly',
+      },
+    ],
+    [
+      'supplier',
+      {
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
+        supplierId: 'supplier-a',
+        teamId: 'team-stale',
+      },
+      {
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
+        supplierId: 'supplier-a',
+      },
+    ],
+    [
+      'outsourcing',
+      {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-b',
+        teamId: 'team-stale',
+      },
+      {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-b',
+      },
+    ],
+  ] as const)(
+    'assembles canonical %s request responsibility without name inference',
+    (_, input, expected) => {
+      expect(buildInspectionRequestEntryResponsibilityPayload(input)).toEqual(
+        expected,
+      );
+    },
+  );
+
   it('keeps canonical TEAM IDs as selector values', () => {
     expect(
       mapInspectionRequestEntryTeamOptions([
@@ -25,6 +79,19 @@ describe('inspection request entry identity options', () => {
       },
     ]);
   });
+
+  it.each([
+    ['SUPPLIER', '供应商', '请选择或搜索供应商'],
+    ['OUTSOURCING_UNIT', '外协单位', '请选择或搜索外协单位'],
+  ] as const)(
+    'uses %s unit wording instead of a TEAM label',
+    (type, label, placeholder) => {
+      expect(getInspectionRequestResponsibilityUnitCopy(type)).toEqual({
+        label,
+        placeholder,
+      });
+    },
+  );
 
   it('retains unresolved TEAMs as disabled options with their canonical IDs and reasons', () => {
     expect(

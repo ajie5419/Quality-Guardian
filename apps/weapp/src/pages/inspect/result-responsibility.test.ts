@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveLockedInspectionRequestIssueResponsibility } from './result-responsibility';
+import {
+  hasEmptyInspectionRequestIssueResponsibilityContext,
+  resolveLockedInspectionRequestIssueResponsibility,
+} from './result-responsibility';
 
 describe('mobile inspection result responsibility context', () => {
   it.each([
@@ -51,5 +54,36 @@ describe('mobile inspection result responsibility context', () => {
         supplierName: '外协单位',
       }),
     ).toBeNull();
+  });
+
+  it('permits legacy reconstruction from an all-empty raw triad even when the derived context is unresolved', () => {
+    expect(
+      hasEmptyInspectionRequestIssueResponsibilityContext({
+        issueResponsibility: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: null,
+        },
+        responsibleDepartmentId: null,
+        responsibleDepartment: null,
+        responsibilityType: null,
+      }),
+    ).toBe(true);
+  });
+
+  it('rejects a partial raw responsibility triad without considering the legacy supplier field', () => {
+    expect(
+      hasEmptyInspectionRequestIssueResponsibilityContext({
+        supplierId: 'legacy-supplier-only',
+        responsibleDepartmentId: null,
+        responsibilityType: 'OUTSOURCING_UNIT',
+      }),
+    ).toBe(false);
+    expect(
+      hasEmptyInspectionRequestIssueResponsibilityContext({
+        supplierId: 'legacy-supplier-only',
+        responsibleDepartmentId: null,
+        responsibilityType: null,
+      }),
+    ).toBe(true);
   });
 });

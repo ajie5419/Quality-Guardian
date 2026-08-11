@@ -1,107 +1,149 @@
-import type { SelectProps } from 'ant-design-vue';
+import type {
+  InspectionIssueResponsibilityType,
+  InspectionRequestResponsibilityDepartmentOption,
+  InspectionRequestResponsibilitySupplierOption,
+  InspectionRequestTeamOption,
+} from '@qgs/shared';
 
-import type { Ref } from 'vue';
+import { ref } from 'vue';
 
-import { ref, watch } from 'vue';
-
-import { SUPPLIER_CATEGORY } from '@qgs/shared';
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 
 import {
-  getPublicInspectionRequestSuppliers,
+  getPublicInspectionRequestResponsibilityOptions,
   getPublicInspectionRequestTeams,
 } from '#/api/qms/inspection-request';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
-import { mapInspectionRequestEntryTeamOptions } from './entry-mode';
-
-interface InspectionRequestProcessOption {
-  processName: string;
-  supplierSource: null | string;
-  value: string;
-}
-
 interface InspectionRequestIdentityForm {
-  incomingType: string;
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
   supplierId: string;
   team: string;
   teamId: string;
 }
 
+function isExternalResponsibility(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
+  return (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  );
+}
+
+/**
+ * Request entry obtains its department and supplier choices from one server
+ * policy endpoint. This keeps the responsibility ID authoritative instead of
+ * recreating it from TEAM or supplier display names in either client.
+ */
 export function useInspectionRequestIdentityOptions(options: {
-  isIncomingEntry: Readonly<Ref<boolean>>;
-  processOptions: Readonly<Ref<InspectionRequestProcessOption[]>>;
   requestForm: InspectionRequestIdentityForm;
 }) {
-  const { isIncomingEntry, processOptions, requestForm } = options;
+  const { requestForm } = options;
   const { handleApiError } = useErrorHandler();
-  const teamLoading = ref(false);
-  const teamOptions = ref<SelectProps['options']>([]);
+  const responsibilityLoading = ref(false);
+  const responsibilityDepartmentOptions = ref<
+    InspectionRequestResponsibilityDepartmentOption[]
+  >([]);
+  const supplierOptions = ref<InspectionRequestResponsibilitySupplierOption[]>(
+    [],
+  );
+  const internalTeamOptions = ref<InspectionRequestTeamOption[]>([]);
 
-  function clearResponsibleUnitIdentity(clearName = false) {
+  function clearResponsibilityIdentity() {
+    requestForm.responsibleDepartmentId = '';
     requestForm.supplierId = '';
+    requestForm.team = '';
     requestForm.teamId = '';
-    if (clearName) requestForm.team = '';
   }
 
-  async function loadTeamOptions(keyword = '') {
-    teamLoading.value = true;
-    try {
-      const list = await getPublicInspectionRequestTeams({
-        keyword: keyword.trim() || undefined,
-      });
-      teamOptions.value = mapInspectionRequestEntryTeamOptions(list);
-    } catch (error: unknown) {
-      handleApiError(error, 'Load Inspection Request Teams');
-      teamOptions.value = [];
-    } finally {
-      teamLoading.value = false;
-    }
-  }
+  function applyResponsibilityOptions(options: {
+    departments: InspectionRequestResponsibilityDepartmentOption[];
+    responsibilityType: InspectionIssueResponsibilityType;
+    suppliers: InspectionRequestResponsibilitySupplierOption[];
+  }) {
+    responsibilityDepartmentOptions.value = options.departments;
+    supplierOptions.value = options.suppliers;
 
-  async function loadSupplierOptions(keyword = '') {
-    teamLoading.value = true;
-    try {
-      const selectedProcess = processOptions.value.find(
-        (item) => item.value === requestForm.incomingType,
-      );
-      teamOptions.value = await getPublicInspectionRequestSuppliers({
-        category:
-          selectedProcess?.supplierSource === SUPPLIER_CATEGORY.OUTSOURCING
-            ? SUPPLIER_CATEGORY.OUTSOURCING
-            : SUPPLIER_CATEGORY.SUPPLIER,
-        keyword: keyword.trim() || undefined,
-      });
-    } catch (error: unknown) {
-      handleApiError(error, 'Load Inspection Request Suppliers');
-      teamOptions.value = [];
-    } finally {
-      teamLoading.value = false;
-    }
-  }
-
-  async function loadResponsibleUnitOptions(keyword = '') {
-    if (isIncomingEntry.value) {
-      await loadSupplierOptions(keyword);
+    if (isExternalResponsibility(options.responsibilityType)) {
+      const [department] = options.departments;
+      requestForm.responsibleDepartmentId = department?.value || '';
+      requestForm.team = '';
+      requestForm.teamId = '';
       return;
     }
-    await loadTeamOptions(keyword);
+
+    if (!requestForm.teamId) {
+      requestForm.responsibleDepartmentId = '';
+    }
+    requestForm.supplierId = '';
   }
 
-  watch(
-    () => requestForm.incomingType,
-    (nextValue, previousValue) => {
-      if (!isIncomingEntry.value) return;
-      if (nextValue !== previousValue && previousValue !== undefined) {
-        clearResponsibleUnitIdentity(true);
+  async function loadResponsibilityOptions(keyword = '') {
+    responsibilityLoading.value = true;
+    try {
+      const result = await getPublicInspectionRequestResponsibilityOptions({
+        keyword: keyword.trim() || undefined,
+        responsibilityType: requestForm.responsibilityType,
+      });
+      if (result.responsibilityType !== requestForm.responsibilityType) return;
+      if (
+        requestForm.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+      ) {
+        const teams = await getPublicInspectionRequestTeams({
+          keyword: keyword.trim() || undefined,
+        });
+        if (
+          requestForm.responsibilityType !==
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+        ) {
+          return;
+        }
+        internalTeamOptions.value = teams.filter(
+          (team) =>
+            team.group === 'internal' && Boolean(team.responsibleDepartmentId),
+        );
+        if (
+          !internalTeamOptions.value.some(
+            (team) => team.value === requestForm.teamId,
+          )
+        ) {
+          requestForm.teamId = '';
+          requestForm.responsibleDepartmentId = '';
+        }
+      } else {
+        internalTeamOptions.value = [];
       }
-      void loadSupplierOptions(requestForm.team);
-    },
-  );
+      applyResponsibilityOptions(result);
+    } catch (error: unknown) {
+      handleApiError(error, 'Load Inspection Request Responsibility Options');
+      responsibilityDepartmentOptions.value = [];
+      internalTeamOptions.value = [];
+      supplierOptions.value = [];
+      clearResponsibilityIdentity();
+    } finally {
+      responsibilityLoading.value = false;
+    }
+  }
+
+  async function changeResponsibilityType(
+    responsibilityType: InspectionIssueResponsibilityType,
+  ) {
+    if (requestForm.responsibilityType === responsibilityType) return;
+    requestForm.responsibilityType = responsibilityType;
+    clearResponsibilityIdentity();
+    await loadResponsibilityOptions();
+  }
 
   return {
-    teamLoading,
-    teamOptions,
-    clearResponsibleUnitIdentity,
-    loadResponsibleUnitOptions,
+    changeResponsibilityType,
+    clearResponsibilityIdentity,
+    loadResponsibilityOptions,
+    internalTeamOptions,
+    responsibilityDepartmentOptions,
+    responsibilityLoading,
+    supplierOptions,
   };
 }

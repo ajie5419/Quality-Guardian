@@ -1,9 +1,12 @@
 import type {
+  InspectionIssueResponsibilityType,
   InspectionRequestTeamOption,
   InspectionRequestTeamResolutionReason,
 } from '@qgs/shared';
 
 import type { LocationQuery, LocationQueryRaw } from 'vue-router';
+
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
@@ -12,6 +15,55 @@ export const inspectionRequestEntryCheckResultOptions = [
   { label: '不合格', value: 'FAIL' },
   { label: '不适用', value: 'NA' },
 ];
+
+export const inspectionRequestResponsibilityTypeOptions: Array<{
+  label: string;
+  value: InspectionIssueResponsibilityType;
+}> = [
+  {
+    label: '内部部门',
+    value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+  },
+  {
+    label: '供应商',
+    value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+  },
+  {
+    label: '外协单位',
+    value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+  },
+];
+
+export function buildInspectionRequestEntryResponsibilityPayload(input: {
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
+  supplierId: string;
+  teamId: string;
+}) {
+  const responsibleDepartmentId = input.responsibleDepartmentId.trim();
+  if (!responsibleDepartmentId) return null;
+  if (
+    input.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+  ) {
+    const teamId = input.teamId.trim();
+    return teamId
+      ? {
+          responsibilityType: input.responsibilityType,
+          responsibleDepartmentId,
+          teamId,
+        }
+      : null;
+  }
+  const supplierId = input.supplierId.trim();
+  return supplierId
+    ? {
+        responsibilityType: input.responsibilityType,
+        responsibleDepartmentId,
+        supplierId,
+      }
+    : null;
+}
 
 type WorkOrderOptionSource = {
   division?: null | string;
@@ -179,6 +231,23 @@ export function getInspectionRequestEntryCopy(isIncoming: boolean) {
         teamLabel: '班组',
         teamPlaceholder: '请选择或搜索班组/外协单位',
       };
+}
+
+export function getInspectionRequestResponsibilityUnitCopy(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
+  if (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return {
+      label: '外协单位',
+      placeholder: '请选择或搜索外协单位',
+    };
+  }
+  return {
+    label: '供应商',
+    placeholder: '请选择或搜索供应商',
+  };
 }
 
 export function buildInspectionRequestEntryRequiredMessage(

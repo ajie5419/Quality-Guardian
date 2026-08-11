@@ -1,12 +1,18 @@
 <script setup lang="ts">
+import type {
+  InspectionRequestResponsibilityDepartmentOption,
+  InspectionRequestResponsibilitySupplierOption,
+  InspectionRequestTeamOption,
+} from '@qgs/shared';
+
 import { computed, reactive, ref } from 'vue';
 
 import {
   getBomParts,
+  getInspectionRequestResponsibilityOptions,
   getInspectionRequestSettings,
   getPartOptions,
   getProcesses,
-  getSuppliers,
   getTeams,
   searchWorkOrders,
   submitInspectionRequest,
@@ -14,7 +20,12 @@ import {
 import { buildResourceUrl, uploadFile } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import { onLoad } from '@dcloudio/uni-app';
-import { isInspectionRequestAssemblyProcess } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  isInspectionRequestAssemblyProcess,
+} from '@qgs/shared';
+
+import { buildRequestCreateResponsibilityPayload } from './create-responsibility';
 
 interface WorkOrderItem {
   workOrderNumber: string;
@@ -40,12 +51,6 @@ interface PartOptionItem {
   name: string;
 }
 
-interface TeamItem {
-  group: string;
-  label: string;
-  value: string;
-}
-
 interface AttachmentItem {
   url: string;
   name: string;
@@ -63,6 +68,8 @@ interface FormState {
   team: string;
   teamId: string;
   reporter: string;
+  responsibilityType: 'INTERNAL_DEPARTMENT' | 'OUTSOURCING_UNIT' | 'SUPPLIER';
+  responsibleDepartmentId: string;
   requestedPartName: string;
   selfCheckResult: string;
   supplierId: string;
@@ -86,6 +93,8 @@ const form = reactive<FormState>({
   team: '',
   teamId: '',
   reporter: '',
+  responsibilityType: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+  responsibleDepartmentId: '',
   requestedPartName: '',
   selfCheckResult: '',
   supplierId: '',
@@ -122,12 +131,19 @@ let partSearchSequence = 0;
 // Cascade data
 const processList = ref<ProcessItem[]>([]);
 const bomPartList = ref<BomPartItem[]>([]);
-const teamList = ref<TeamItem[]>([]);
+const departmentOptions = ref<
+  InspectionRequestResponsibilityDepartmentOption[]
+>([]);
+const internalTeamOptions = ref<InspectionRequestTeamOption[]>([]);
+const supplierOptions = ref<InspectionRequestResponsibilitySupplierOption[]>(
+  [],
+);
 
 // Picker indices
 const processIndex = ref(-1);
 const bomPartIndex = ref(-1);
-const teamIndex = ref(-1);
+const departmentIndex = ref(-1);
+const supplierIndex = ref(-1);
 const selfCheckIndex = ref(-1);
 const mutualCheckIndex = ref(-1);
 
@@ -151,16 +167,37 @@ const incomingPartOptions = computed(() => {
 const processLabels = computed(() =>
   processList.value.map((item) => item.processName),
 );
-const teamLabels = computed(() => teamList.value.map((t) => t.label));
-const isIncoming = computed(() => form.category === 'INCOMING');
-const selectedResponsibleIdentityId = computed(() =>
-  isIncoming.value ? form.supplierId : form.teamId,
+const internalTeamLabels = computed(() =>
+  internalTeamOptions.value.map((item) => item.label),
 );
-const selectedResponsibleIdentityLabel = computed(
+const supplierLabels = computed(() =>
+  supplierOptions.value.map((item) => item.label),
+);
+const isIncoming = computed(() => form.category === 'INCOMING');
+const isExternalResponsibility = computed(
+  () => form.responsibilityType !== 'INTERNAL_DEPARTMENT',
+);
+const selectedDepartmentLabel = computed(
   () =>
-    teamList.value.find(
-      (item) => item.value === selectedResponsibleIdentityId.value,
+    departmentOptions.value.find(
+      (item) => item.value === form.responsibleDepartmentId,
     )?.label || '',
+);
+const selectedSupplierLabel = computed(
+  () =>
+    supplierOptions.value.find((item) => item.value === form.supplierId)
+      ?.label || '',
+);
+const responsibilityTypeLabels = computed(() =>
+  isIncoming.value ? ['供应商'] : ['内部部门', '供应商', '外协单位'],
+);
+const responsibilityUnitLabel = computed(() =>
+  form.responsibilityType === 'OUTSOURCING_UNIT' ? '外协单位' : '供应商',
+);
+const responsibilityUnitPlaceholder = computed(() =>
+  form.responsibilityType === 'OUTSOURCING_UNIT'
+    ? '请选择外协单位'
+    : '请选择供应商',
 );
 
 // Whether componentName is required
@@ -177,10 +214,7 @@ onLoad(async () => {
   if (userStore.userInfo?.realName) {
     form.reporter = userStore.userInfo.realName;
   }
-  const [settings] = await Promise.all([
-    getInspectionRequestSettings(),
-    loadTeams(),
-  ]);
+  const settings = await getInspectionRequestSettings();
   incomingMaterialFreeInputEnabled.value =
     settings.code === 0 &&
     settings.data?.incomingMaterialFreeInputEnabled === true;
@@ -192,24 +226,60 @@ function syncMaterialInputMode() {
     form.category === 'INCOMING' && incomingMaterialFreeInputEnabled.value;
 }
 
-async function loadTeams() {
-  const res = await getTeams();
-  if (form.category && form.category !== 'PROCESS') return;
-  if (res.code === 0 && Array.isArray(res.data)) {
-    teamList.value = res.data;
+async function loadResponsibilityOptions() {
+  try {
+    const res = await getInspectionRequestResponsibilityOptions({
+      responsibilityType: form.responsibilityType,
+    });
+    if (res.code !== 0 || !res.data) {
+      resetResponsibilityIdentity();
+      departmentOptions.value = [];
+      internalTeamOptions.value = [];
+      supplierOptions.value = [];
+      return;
+    }
+    departmentOptions.value = res.data.departments;
+    supplierOptions.value = res.data.suppliers;
+    if (isExternalResponsibility.value) {
+      form.responsibleDepartmentId = res.data.departments[0]?.value || '';
+      departmentIndex.value = 0;
+      form.team = '';
+      form.teamId = '';
+      return;
+    }
+    const teams = await getTeams();
+    internalTeamOptions.value =
+      teams.code === 0 && Array.isArray(teams.data)
+        ? teams.data.filter(
+            (item) =>
+              item.group === 'internal' &&
+              Boolean(item.responsibleDepartmentId),
+          )
+        : [];
+    const currentIndex = internalTeamOptions.value.findIndex(
+      (item) => item.value === form.teamId,
+    );
+    departmentIndex.value = currentIndex;
+    if (currentIndex === -1) {
+      form.teamId = '';
+      form.responsibleDepartmentId = '';
+    }
+    form.supplierId = '';
+  } catch {
+    resetResponsibilityIdentity();
+    departmentOptions.value = [];
+    internalTeamOptions.value = [];
+    supplierOptions.value = [];
   }
 }
 
-async function loadSuppliers() {
-  const res = await getSuppliers();
-  if (form.category !== 'INCOMING') return;
-  if (res.code === 0 && Array.isArray(res.data)) {
-    teamList.value = res.data.map((item) => ({
-      group: 'supplier',
-      label: item.label,
-      value: item.value,
-    }));
-  }
+function resetResponsibilityIdentity() {
+  form.responsibleDepartmentId = '';
+  form.supplierId = '';
+  form.team = '';
+  form.teamId = '';
+  departmentIndex.value = -1;
+  supplierIndex.value = -1;
 }
 
 function onWorkOrderInput(e: { detail: { value: string } }) {
@@ -266,9 +336,7 @@ async function selectWorkOrder(item: WorkOrderItem) {
   form.requestedPartName = '';
   incomingPartKeyword.value = '';
   syncMaterialInputMode();
-  form.supplierId = '';
-  form.teamId = '';
-  form.team = '';
+  resetResponsibilityIdentity();
   processIndex.value = -1;
   bomPartIndex.value = -1;
   processList.value = [];
@@ -302,16 +370,13 @@ function onProcessChange(e: { detail: { value: string } }) {
   form.requestedPartName = '';
   incomingPartKeyword.value = '';
   syncMaterialInputMode();
-  form.supplierId = '';
-  form.teamId = '';
-  form.team = '';
-  teamIndex.value = -1;
+  form.responsibilityType =
+    form.category === 'INCOMING'
+      ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+      : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+  resetResponsibilityIdentity();
   bomPartIndex.value = -1;
-  if (form.category === 'INCOMING') {
-    void loadSuppliers();
-  } else {
-    void loadTeams();
-  }
+  void loadResponsibilityOptions();
 }
 
 function onBomPartChange(e: { detail: { value: string } }) {
@@ -371,13 +436,33 @@ function selectIncomingPart(item: PartOptionItem) {
   errors.componentName = false;
 }
 
-function onTeamChange(e: { detail: { value: string } }) {
+function onResponsibilityTypeChange(e: { detail: { value: string } }) {
+  const values = [
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+  ] as const;
+  const responsibilityType = values[Number(e.detail.value)];
+  if (!responsibilityType) return;
+  form.responsibilityType = responsibilityType;
+  resetResponsibilityIdentity();
+  void loadResponsibilityOptions();
+}
+
+function onInternalTeamChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
-  teamIndex.value = idx;
-  const identityId = teamList.value[idx]?.value ?? '';
-  form.supplierId = isIncoming.value ? identityId : '';
-  form.teamId = isIncoming.value ? '' : identityId;
-  form.team = teamList.value[idx]?.label ?? '';
+  departmentIndex.value = idx;
+  const team = internalTeamOptions.value[idx];
+  form.teamId = team?.value ?? '';
+  form.responsibleDepartmentId = team?.responsibleDepartmentId ?? '';
+  form.supplierId = '';
+  errors.team = false;
+}
+
+function onSupplierChange(e: { detail: { value: string } }) {
+  const idx = Number(e.detail.value);
+  supplierIndex.value = idx;
+  form.supplierId = supplierOptions.value[idx]?.value ?? '';
   errors.team = false;
 }
 
@@ -448,7 +533,9 @@ function validate(): boolean {
       : !form.partId) ||
     (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
-  errors.team = isIncoming.value ? !form.supplierId : !form.teamId;
+  errors.team =
+    !form.responsibleDepartmentId ||
+    (isExternalResponsibility.value ? !form.supplierId : !form.teamId);
   errors.attachments = form.attachments.length === 0;
   return (
     !errors.workOrderNumber &&
@@ -480,8 +567,11 @@ async function handleSubmit() {
     if (isIncoming.value && !form.partId) {
       payload.requestedPartName = form.requestedPartName.trim();
     }
-    if (isIncoming.value) payload.supplierId = form.supplierId;
-    else payload.teamId = form.teamId;
+    const responsibilityPayload = buildRequestCreateResponsibilityPayload(form);
+    if (!responsibilityPayload) {
+      throw new Error('请填写完整的责任归属信息');
+    }
+    Object.assign(payload, responsibilityPayload);
     if (form.quantity !== null) payload.quantity = form.quantity;
     if (form.componentName) payload.componentName = form.componentName;
     if (form.selfCheckResult) payload.selfCheckResult = form.selfCheckResult;
@@ -666,33 +756,110 @@ async function handleSubmit() {
           />
         </view>
 
-        <!-- Responsible identity -->
+        <!-- Responsibility identity is explicit; display names never cross the write boundary. -->
         <view class="form-item" :class="{ error: errors.team }">
           <view class="label-wrap">
             <text class="required-star">*</text>
-            <text class="label">{{ isIncoming ? '供应商' : '班组' }}</text>
+            <text class="label">责任归属类型</text>
+          </view>
+          <picker
+            v-if="!isIncoming"
+            class="picker"
+            mode="selector"
+            :range="responsibilityTypeLabels"
+            :value="
+              form.responsibilityType === 'SUPPLIER'
+                ? 1
+                : form.responsibilityType === 'OUTSOURCING_UNIT'
+                  ? 2
+                  : 0
+            "
+            @change="onResponsibilityTypeChange"
+          >
+            <view class="picker-inner">
+              <text class="picker-text">{{
+                responsibilityTypeLabels[
+                  form.responsibilityType === 'SUPPLIER'
+                    ? 1
+                    : form.responsibilityType === 'OUTSOURCING_UNIT'
+                      ? 2
+                      : 0
+                ]
+              }}</text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
+          <view v-else class="picker-inner">
+            <text class="picker-text">供应商</text>
+          </view>
+        </view>
+
+        <view
+          v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
+          class="form-item"
+          :class="{ error: errors.team }"
+        >
+          <view class="label-wrap">
+            <text class="required-star">*</text>
+            <text class="label">责任班组</text>
           </view>
           <picker
             class="picker"
             mode="selector"
-            :range="teamLabels"
-            :value="teamIndex"
-            :disabled="teamList.length === 0"
-            @change="onTeamChange"
+            :range="internalTeamLabels"
+            :value="departmentIndex"
+            :disabled="internalTeamOptions.length === 0"
+            @change="onInternalTeamChange"
           >
             <view class="picker-inner">
               <text
                 class="picker-text"
-                :class="{ 'picker-placeholder': !form.team }"
+                :class="{ 'picker-placeholder': !form.teamId }"
               >
                 {{
-                  selectedResponsibleIdentityLabel ||
-                  (isIncoming ? '请选择供应商' : '请选择班组')
+                  internalTeamOptions.find((item) => item.value === form.teamId)
+                    ?.label || '请选择可解析责任部门的班组'
                 }}
               </text>
               <text class="picker-arrow">›</text>
             </view>
           </picker>
+        </view>
+
+        <view v-else class="form-item" :class="{ error: errors.team }">
+          <view class="label-wrap">
+            <text class="required-star">*</text>
+            <text class="label">{{ responsibilityUnitLabel }}</text>
+          </view>
+          <picker
+            class="picker"
+            mode="selector"
+            :range="supplierLabels"
+            :value="supplierIndex"
+            :disabled="supplierOptions.length === 0"
+            @change="onSupplierChange"
+          >
+            <view class="picker-inner">
+              <text
+                class="picker-text"
+                :class="{ 'picker-placeholder': !form.supplierId }"
+              >
+                {{ selectedSupplierLabel || responsibilityUnitPlaceholder }}
+              </text>
+              <text class="picker-arrow">›</text>
+            </view>
+          </picker>
+        </view>
+        <view v-if="isExternalResponsibility" class="form-item">
+          <view class="label-wrap">
+            <text class="label-spacer" />
+            <text class="label">责任部门</text>
+          </view>
+          <view class="picker-inner">
+            <text class="picker-text">{{
+              selectedDepartmentLabel || '责任部门策略加载中'
+            }}</text>
+          </view>
         </view>
 
         <!-- 报检人 -->

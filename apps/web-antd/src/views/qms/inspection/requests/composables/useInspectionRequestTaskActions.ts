@@ -435,16 +435,24 @@ export function useInspectionRequestTaskActions(
     );
   }
 
-  async function resolveCloseRequest(record: InspectionRequest): Promise<
-    | (InspectionRequest & {
-        issueResponsibility: CompleteIssueResponsibility;
-      })
-    | null
-  > {
+  function hasEmptyIssueResponsibilityContext(request: InspectionRequest) {
+    return ![
+      request.responsibilityType,
+      request.responsibleDepartment,
+      request.responsibleDepartmentId,
+    ].some((value) => normalizeCloseText(value));
+  }
+
+  async function resolveCloseRequest(
+    record: InspectionRequest,
+  ): Promise<InspectionRequest | null> {
     if (hasCompleteIssueResponsibility(record)) return record;
     try {
       const refreshed = await getInspectionRequest(record.id);
       if (refreshed && hasCompleteIssueResponsibility(refreshed)) {
+        return refreshed;
+      }
+      if (refreshed && hasEmptyIssueResponsibilityContext(refreshed)) {
         return refreshed;
       }
       message.warning('报检任务责任上下文不完整，无法关闭');
@@ -483,15 +491,18 @@ export function useInspectionRequestTaskActions(
       qualifiedQuantity: 0,
       reportDate: dayjs().format('YYYY-MM-DD'),
       reportedBy: request.inspectorName || getCurrentUserName() || '',
-      responsibilityType: issueResponsibility.responsibilityType,
-      responsibleDepartment: issueResponsibility.responsibleDepartment,
-      responsibleDepartmentId: issueResponsibility.responsibleDepartmentId,
+      responsibilityType:
+        issueResponsibility?.responsibilityType ||
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+      responsibleDepartment: issueResponsibility?.responsibleDepartment || '',
+      responsibleDepartmentId:
+        issueResponsibility?.responsibleDepartmentId || '',
       responsibleWelder: '',
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierId: issueResponsibility.supplierId || '',
-      supplierName: issueResponsibility.supplierName,
+      supplierId: issueResponsibility?.supplierId || '',
+      supplierName: issueResponsibility?.supplierName || '',
       photos: [] as UploadFileWithResponse[],
       unqualifiedQuantity: request.quantity || 1,
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,

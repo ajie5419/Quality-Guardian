@@ -1,17 +1,19 @@
-import { nextTick, reactive, ref } from 'vue';
+import { reactive } from 'vue';
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useInspectionRequestIdentityOptions } from './useInspectionRequestIdentityOptions';
 
-const { getPublicInspectionRequestSuppliers, getPublicInspectionRequestTeams } =
-  vi.hoisted(() => ({
-    getPublicInspectionRequestSuppliers: vi.fn(),
-    getPublicInspectionRequestTeams: vi.fn(),
-  }));
+const {
+  getPublicInspectionRequestResponsibilityOptions,
+  getPublicInspectionRequestTeams,
+} = vi.hoisted(() => ({
+  getPublicInspectionRequestResponsibilityOptions: vi.fn(),
+  getPublicInspectionRequestTeams: vi.fn(),
+}));
 
 vi.mock('#/api/qms/inspection-request', () => ({
-  getPublicInspectionRequestSuppliers,
+  getPublicInspectionRequestResponsibilityOptions,
   getPublicInspectionRequestTeams,
 }));
 
@@ -23,88 +25,86 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe('inspection request identity options', () => {
-  it('loads outsourcing suppliers when the selected process is configured as outsourcing', async () => {
-    const requestForm = {
-      incomingType: 'proc-machined',
-      supplierId: '',
-      team: '',
-      teamId: '',
-    };
-    const composable = useInspectionRequestIdentityOptions({
-      isIncomingEntry: ref(true),
-      processOptions: ref([
-        {
-          processName: '机加成品件',
-          supplierSource: 'Outsourcing',
-          value: 'proc-machined',
-        },
-      ]),
-      requestForm,
+function createForm() {
+  return reactive({
+    responsibilityType: 'INTERNAL_DEPARTMENT' as
+      | 'INTERNAL_DEPARTMENT'
+      | 'OUTSOURCING_UNIT'
+      | 'SUPPLIER',
+    responsibleDepartmentId: '',
+    supplierId: '',
+    team: '',
+    teamId: '',
+  });
+}
+
+describe('inspection request responsibility options', () => {
+  it('keeps internal responsibility supplier-free and selects a canonical department ID', async () => {
+    const requestForm = createForm();
+    requestForm.supplierId = 'supplier-stale';
+    getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+      departments: [{ label: 'Assembly Department', value: 'dept-assembly' }],
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      suppliers: [],
     });
-    getPublicInspectionRequestSuppliers.mockResolvedValue([]);
+    getPublicInspectionRequestTeams.mockResolvedValue([]);
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
 
-    await composable.loadResponsibleUnitOptions();
+    await composable.loadResponsibilityOptions();
 
-    expect(getPublicInspectionRequestSuppliers).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'Outsourcing' }),
-    );
+    expect(
+      getPublicInspectionRequestResponsibilityOptions,
+    ).toHaveBeenCalledWith({
+      keyword: undefined,
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+    });
+    expect(composable.responsibilityDepartmentOptions.value).toEqual([
+      { label: 'Assembly Department', value: 'dept-assembly' },
+    ]);
+    expect(requestForm.supplierId).toBe('');
   });
 
-  it('loads regular suppliers when the selected process is not configured as outsourcing', async () => {
-    const requestForm = {
-      incomingType: 'proc-raw',
+  it('locks the server policy department and only retains supplier ID for outsourcing', async () => {
+    const requestForm = createForm();
+    getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+      departments: [{ label: 'Production OBU', value: 'dept-production' }],
+      responsibilityType: 'OUTSOURCING_UNIT',
+      suppliers: [{ label: 'Outsource A', value: 'supplier-a' }],
+    });
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.changeResponsibilityType('OUTSOURCING_UNIT');
+
+    expect(requestForm).toMatchObject({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartmentId: 'dept-production',
       supplierId: '',
       team: '',
       teamId: '',
-    };
-    const composable = useInspectionRequestIdentityOptions({
-      isIncomingEntry: ref(true),
-      processOptions: ref([
-        {
-          processName: '原材料',
-          supplierSource: null,
-          value: 'proc-raw',
-        },
-      ]),
-      requestForm,
     });
-    getPublicInspectionRequestSuppliers.mockResolvedValue([]);
-
-    await composable.loadResponsibleUnitOptions();
-
-    expect(getPublicInspectionRequestSuppliers).toHaveBeenCalledWith(
-      expect.objectContaining({ category: 'Supplier' }),
-    );
+    expect(composable.supplierOptions.value).toEqual([
+      { label: 'Outsource A', value: 'supplier-a' },
+    ]);
   });
 
-  it('reloads the supplier category when the incoming type changes', async () => {
-    const requestForm = reactive({
-      incomingType: '',
+  it('clears an internal department ID no longer returned by the server', async () => {
+    const requestForm = createForm();
+    requestForm.responsibleDepartmentId = 'dept-assembly';
+    getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+      departments: [{ label: 'Purchasing', value: 'dept-purchasing' }],
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      suppliers: [],
+    });
+    getPublicInspectionRequestTeams.mockResolvedValue([]);
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.loadResponsibilityOptions();
+
+    expect(requestForm).toMatchObject({
+      responsibleDepartmentId: '',
       supplierId: '',
       team: '',
       teamId: '',
-    });
-    useInspectionRequestIdentityOptions({
-      isIncomingEntry: ref(true),
-      processOptions: ref([
-        {
-          processName: '机加成品件',
-          supplierSource: 'Outsourcing',
-          value: 'proc-machined',
-        },
-      ]),
-      requestForm,
-    });
-    getPublicInspectionRequestSuppliers.mockResolvedValue([]);
-
-    requestForm.incomingType = 'proc-machined';
-    await nextTick();
-
-    await vi.waitFor(() => {
-      expect(getPublicInspectionRequestSuppliers).toHaveBeenCalledWith(
-        expect.objectContaining({ category: 'Outsourcing' }),
-      );
     });
   });
 });

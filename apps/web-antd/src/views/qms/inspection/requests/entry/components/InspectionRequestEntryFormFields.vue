@@ -1,5 +1,11 @@
 <script lang="ts" setup>
-import type { InspectionRequestCheckResult } from '@qgs/shared';
+import type {
+  InspectionIssueResponsibilityType,
+  InspectionRequestCheckResult,
+  InspectionRequestResponsibilityDepartmentOption,
+  InspectionRequestResponsibilitySupplierOption,
+  InspectionRequestTeamOption,
+} from '@qgs/shared';
 import type {
   SelectProps,
   UploadChangeParam,
@@ -10,6 +16,7 @@ import { computed } from 'vue';
 
 import { Form, Input, InputNumber, Select } from 'ant-design-vue';
 
+import { getInspectionRequestResponsibilityUnitCopy } from '../entry-mode';
 import InspectionRequestEntryUploadActions from './InspectionRequestEntryUploadActions.vue';
 
 type EntryCopy = {
@@ -33,6 +40,7 @@ const props = defineProps<{
   bomPartsLoading: boolean;
   checkResultOptions: Array<{ label: string; value: string }>;
   entryCopy: EntryCopy;
+  internalTeamOptions: InspectionRequestTeamOption[];
   isIncomingEntry: boolean;
   partSearchLoading: boolean;
   processOptions: Array<{
@@ -42,10 +50,15 @@ const props = defineProps<{
   }>;
   requiresComponentName: boolean;
   requiresStationSelection: boolean;
+  responsibilityDepartmentOptions: InspectionRequestResponsibilityDepartmentOption[];
+  responsibilityLoading: boolean;
+  responsibilityTypeOptions: Array<{
+    label: string;
+    value: InspectionIssueResponsibilityType;
+  }>;
   stationQuantity: number;
   submitting: boolean;
-  teamLoading: boolean;
-  teamOptions: SelectProps['options'];
+  supplierOptions: InspectionRequestResponsibilitySupplierOption[];
   uploadAction: string;
   workOrderLoading: boolean;
   workOrderOptions: Array<{
@@ -61,7 +74,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   attachmentChange: [info: UploadChangeParam<UploadFile>];
   partSearch: [keyword: string];
-  responsibleUnitSearch: [keyword: string];
+  responsibilityOptionsSearch: [keyword: string];
+  responsibilityTypeChange: [value: InspectionIssueResponsibilityType];
   workOrderSearch: [keyword: string];
 }>();
 
@@ -78,6 +92,8 @@ const form = defineModel<{
   requestedPartName: string;
   requestInfo: string;
   requestNewPart: boolean;
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection: null | StationSelection;
   supplierId: string;
@@ -98,6 +114,10 @@ const incomingTypeOptions = computed(() =>
     label: item.processName,
     value: item.value,
   })),
+);
+
+const responsibilityUnitCopy = computed(() =>
+  getInspectionRequestResponsibilityUnitCopy(form.value.responsibilityType),
 );
 
 function handleWorkOrderChange(value: SelectProps['value']) {
@@ -132,23 +152,29 @@ function resolveStationValue() {
   return form.value.stationSelection.indexes.map(String);
 }
 
-function handleResponsibleUnitChange(
-  value: SelectProps['value'],
-  option: unknown,
-) {
-  const identityId = typeof value === 'string' ? value : '';
-  const label =
-    option && typeof option === 'object' && 'label' in option
-      ? String((option as { label?: unknown }).label || '').trim()
-      : '';
-  form.value.team = label;
-  if (props.isIncomingEntry) {
-    form.value.supplierId = identityId;
-    form.value.teamId = '';
+function handleResponsibilityTypeChange(value: SelectProps['value']) {
+  if (
+    value !== 'INTERNAL_DEPARTMENT' &&
+    value !== 'SUPPLIER' &&
+    value !== 'OUTSOURCING_UNIT'
+  ) {
     return;
   }
+  emit('responsibilityTypeChange', value);
+}
+
+function handleInternalTeamChange(value: SelectProps['value']) {
+  const teamId = typeof value === 'string' ? value : '';
+  const team = props.internalTeamOptions.find((item) => item.value === teamId);
+  form.value.teamId = teamId;
+  form.value.responsibleDepartmentId = team?.responsibleDepartmentId || '';
   form.value.supplierId = '';
-  form.value.teamId = identityId;
+}
+
+function handleSupplierChange(value: SelectProps['value']) {
+  form.value.supplierId = typeof value === 'string' ? value : '';
+  form.value.team = '';
+  form.value.teamId = '';
 }
 
 function handlePartIdentityChange(
@@ -303,19 +329,64 @@ function handleProcessIdentityChange(
         @change="handleStationChange"
       />
     </Form.Item>
-    <Form.Item :label="props.entryCopy.teamLabel" required>
+    <Form.Item v-if="!props.isIncomingEntry" label="责任归属类型" required>
       <Select
-        data-testid="responsible-unit-select"
-        :value="props.isIncomingEntry ? form.supplierId : form.teamId"
-        :filter-option="false"
-        :loading="props.teamLoading"
-        :options="props.teamOptions"
+        :value="form.responsibilityType"
+        :options="props.responsibilityTypeOptions"
         class="w-full"
-        :placeholder="props.entryCopy.teamPlaceholder"
+        @change="handleResponsibilityTypeChange"
+      />
+    </Form.Item>
+    <Form.Item v-else label="责任归属类型">
+      <Input value="供应商" class="w-full" readonly />
+    </Form.Item>
+    <Form.Item
+      v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
+      label="责任班组"
+      required
+    >
+      <Select
+        data-testid="responsible-team-select"
+        :value="form.teamId"
+        :filter-option="false"
+        :loading="props.responsibilityLoading"
+        :options="props.internalTeamOptions"
+        class="w-full"
+        placeholder="请选择可解析责任部门的班组"
         show-search
         allow-clear
-        @change="handleResponsibleUnitChange"
-        @search="(value) => emit('responsibleUnitSearch', value)"
+        @change="handleInternalTeamChange"
+        @search="(value) => emit('responsibilityOptionsSearch', value)"
+      />
+    </Form.Item>
+    <Form.Item v-else label="责任部门" required>
+      <Input
+        :value="
+          props.responsibilityDepartmentOptions.find(
+            (item) => item.value === form.responsibleDepartmentId,
+          )?.label || '责任部门策略加载中'
+        "
+        class="w-full"
+        readonly
+      />
+    </Form.Item>
+    <Form.Item
+      v-if="form.responsibilityType !== 'INTERNAL_DEPARTMENT'"
+      :label="responsibilityUnitCopy.label"
+      required
+    >
+      <Select
+        data-testid="responsible-supplier-select"
+        :value="form.supplierId"
+        :filter-option="false"
+        :loading="props.responsibilityLoading"
+        :options="props.supplierOptions"
+        class="w-full"
+        :placeholder="responsibilityUnitCopy.placeholder"
+        show-search
+        allow-clear
+        @change="handleSupplierChange"
+        @search="(value) => emit('responsibilityOptionsSearch', value)"
       />
     </Form.Item>
   </div>

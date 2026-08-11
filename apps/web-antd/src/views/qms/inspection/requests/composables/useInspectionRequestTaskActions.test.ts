@@ -392,15 +392,19 @@ describe('useInspectionRequestTaskActions', () => {
     });
   });
 
-  it('fails closed when the request detail has no complete responsibility context', async () => {
+  it('opens legacy requests with an empty responsibility context after refetch', async () => {
     const composable = createComposable();
     mockGetInspectionRequest.mockResolvedValue({
       id: 'request-1',
+      responsibilityType: null,
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      supplierId: 'legacy-supplier-only',
       issueResponsibility: {
-        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartment: '生产 OBU',
         responsibleDepartmentId: null,
-        supplierId: 'supplier-team-1',
+        supplierId: null,
         supplierName: 'Mapped Outsourcing Plant',
       },
     } as any);
@@ -411,6 +415,31 @@ describe('useInspectionRequestTaskActions', () => {
       team: 'Mapped Outsourcing Plant',
       teamId: 'team-external-1',
     } as any);
+
+    expect(mockGetInspectionRequest).toHaveBeenCalledWith('request-1');
+    expect(composable.closeOpen.value).toBe(true);
+    expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: '',
+      supplierId: '',
+    });
+  });
+
+  it('fails closed for a partially stored responsibility context', async () => {
+    const composable = createComposable();
+    mockGetInspectionRequest.mockResolvedValue({
+      id: 'request-1',
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      issueResponsibility: {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: null,
+        supplierId: 'supplier-team-1',
+      },
+    } as any);
+
+    await composable.openClose({ id: 'request-1' } as any);
 
     expect(composable.closeOpen.value).toBe(false);
     expect(mockMessageWarning).toHaveBeenCalledWith(

@@ -2,12 +2,20 @@
 import type {
   CloseInspectionRequestParams,
   InspectionIssueResponsibilityType,
+  InspectionRequestResponsibilityDepartmentOption,
+  InspectionRequestResponsibilitySupplierOption,
+  InspectionRequestTeamOption,
   QualityClassificationCategory,
 } from '@qgs/shared';
 
 import { computed, ref, watch } from 'vue';
 
-import { closeInspectionRequest, getInspectionRequest } from '@/api/inspection';
+import {
+  closeInspectionRequest,
+  getInspectionRequest,
+  getInspectionRequestResponsibilityOptions,
+  getTeams,
+} from '@/api/inspection';
 import { getQualityClassificationOptions } from '@/api/issues';
 import { buildResourceUrl, uploadFile } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
@@ -16,11 +24,19 @@ import {
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 
-import { resolveLockedInspectionRequestIssueResponsibility } from './result-responsibility';
+import {
+  hasEmptyInspectionRequestIssueResponsibilityContext,
+  resolveLockedInspectionRequestIssueResponsibility,
+} from './result-responsibility';
+import { buildInspectionResultResponsibilityPayload } from './result-responsibility-selection';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 interface TaskDetail {
+  category?: 'INCOMING' | 'PROCESS';
+  responsibilityType?: null | string;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   requestNo: string;
   workOrderNumber: string;
   partName: string;
@@ -69,6 +85,17 @@ const severity = ref('Minor-轻微');
 const responsibleDepartmentId = ref('');
 const responsibilityType = ref<'' | InspectionIssueResponsibilityType>('');
 const supplierId = ref('');
+const responsibilityLocked = ref(false);
+const legacyResponsibilityLoading = ref(false);
+const legacyResponsibilityError = ref('');
+const legacyDepartments = ref<
+  InspectionRequestResponsibilityDepartmentOption[]
+>([]);
+const legacySuppliers = ref<InspectionRequestResponsibilitySupplierOption[]>(
+  [],
+);
+const legacyInternalTeams = ref<InspectionRequestTeamOption[]>([]);
+const legacyTeamId = ref('');
 
 // ── Step 3 fields ─────────────────────────────────────────────────────────────
 const description = ref('');
@@ -98,6 +125,47 @@ const currentSubtypeOptions = computed(() =>
     value: item.id,
   })),
 );
+const isExternalResponsibility = computed(() =>
+  responsibilityType.value
+    ? isExternalInspectionIssueResponsibility(responsibilityType.value)
+    : false,
+);
+const legacyResponsibilityTypeLabels = computed(() =>
+  task.value?.category === 'INCOMING'
+    ? ['供应商']
+    : ['内部部门', '供应商', '外协单位'],
+);
+const legacyInternalTeamLabels = computed(() =>
+  legacyInternalTeams.value.map((team) => team.label),
+);
+const legacySupplierLabels = computed(() =>
+  legacySuppliers.value.map((supplier) => supplier.label),
+);
+const legacyResponsibilityTypeIndex = computed(() => {
+  if (task.value?.category === 'INCOMING') return 0;
+  if (responsibilityType.value === 'SUPPLIER') return 1;
+  if (responsibilityType.value === 'OUTSOURCING_UNIT') return 2;
+  return 0;
+});
+const legacyTeamIndex = computed(() =>
+  legacyInternalTeams.value.findIndex(
+    (team) => team.value === legacyTeamId.value,
+  ),
+);
+const legacySupplierIndex = computed(() =>
+  legacySuppliers.value.findIndex(
+    (supplier) => supplier.value === supplierId.value,
+  ),
+);
+const legacyDepartmentLabel = computed(
+  () =>
+    legacyDepartments.value.find(
+      (department) => department.value === responsibleDepartmentId.value,
+    )?.label || '',
+);
+const legacyExternalUnitLabel = computed(() =>
+  responsibilityType.value === 'OUTSOURCING_UNIT' ? '外协单位' : '供应商',
+);
 
 // ─── Watchers ────────────────────────────────────────────────────────────────
 
@@ -115,11 +183,20 @@ async function fetchDetail() {
     if (res.code === 0) {
       const d = res.data as Record<string, unknown>;
       task.value = {
+        category:
+          d.category === 'INCOMING' || d.category === 'PROCESS'
+            ? d.category
+            : undefined,
         requestNo: (d.requestNo as string) || '',
         workOrderNumber: (d.workOrderNumber as string) || '',
         partName: ((d.partName ?? d.componentName) as string) || '',
         processName: (d.processName as string) || '',
         quantity: (d.quantity as number) || 1,
+        responsibilityType: (d.responsibilityType as null | string) || null,
+        responsibleDepartment:
+          (d.responsibleDepartment as null | string) || null,
+        responsibleDepartmentId:
+          (d.responsibleDepartmentId as null | string) || null,
         issueResponsibility:
           d.issueResponsibility && typeof d.issueResponsibility === 'object'
             ? (d.issueResponsibility as TaskDetail['issueResponsibility'])
@@ -128,10 +205,24 @@ async function fetchDetail() {
       const responsibility = resolveLockedInspectionRequestIssueResponsibility(
         d.issueResponsibility,
       );
-      responsibilityType.value = responsibility?.responsibilityType || '';
+      responsibilityLocked.value = Boolean(responsibility);
+      responsibilityType.value =
+        responsibility?.responsibilityType ||
+        (task.value.category === 'INCOMING'
+          ? 'SUPPLIER'
+          : 'INTERNAL_DEPARTMENT');
       responsibleDepartmentId.value =
         responsibility?.responsibleDepartmentId || '';
       supplierId.value = responsibility?.supplierId || '';
+      legacyTeamId.value = '';
+      if (!responsibility) {
+        if (hasEmptyInspectionRequestIssueResponsibilityContext(task.value)) {
+          await loadLegacyResponsibilityOptions();
+        } else {
+          legacyResponsibilityError.value =
+            '报检任务责任上下文不完整，无法关闭。';
+        }
+      }
       quantity.value = task.value.quantity;
     } else {
       uni.showToast({ title: res.message || '加载失败', icon: 'none' });
@@ -153,6 +244,59 @@ async function fetchClassifications() {
     }
   } catch {
     classificationCategories.value = [];
+  }
+}
+
+function clearLegacyResponsibilityIdentity() {
+  responsibleDepartmentId.value = '';
+  supplierId.value = '';
+  legacyTeamId.value = '';
+}
+
+async function loadLegacyResponsibilityOptions() {
+  if (responsibilityLocked.value || !responsibilityType.value) return;
+  legacyResponsibilityLoading.value = true;
+  legacyResponsibilityError.value = '';
+  try {
+    const res = await getInspectionRequestResponsibilityOptions({
+      responsibilityType: responsibilityType.value,
+    });
+    if (
+      res.code !== 0 ||
+      !res.data ||
+      res.data.responsibilityType !== responsibilityType.value
+    ) {
+      throw new Error('Missing responsibility options');
+    }
+    legacyDepartments.value = res.data.departments;
+    legacySuppliers.value = res.data.suppliers;
+    if (isExternalResponsibility.value) {
+      responsibleDepartmentId.value = res.data.departments[0]?.value || '';
+      supplierId.value = '';
+      legacyTeamId.value = '';
+      legacyInternalTeams.value = [];
+      return;
+    }
+    const teams = await getTeams();
+    if (teams.code !== 0 || !Array.isArray(teams.data)) {
+      throw new Error('Missing internal team options');
+    }
+    legacyInternalTeams.value = teams.data.filter(
+      (team) =>
+        team.group === 'internal' && Boolean(team.responsibleDepartmentId),
+    );
+    responsibleDepartmentId.value = '';
+    supplierId.value = '';
+    legacyTeamId.value = '';
+  } catch {
+    legacyResponsibilityError.value =
+      '责任归属选项加载失败，无法提交不合格项。';
+    legacyDepartments.value = [];
+    legacySuppliers.value = [];
+    legacyInternalTeams.value = [];
+    clearLegacyResponsibilityIdentity();
+  } finally {
+    legacyResponsibilityLoading.value = false;
   }
 }
 
@@ -214,6 +358,31 @@ function onSeverityChange(e: { detail: { value: string } }) {
     SEVERITY_OPTIONS[Number(e.detail.value)] ?? SEVERITY_OPTIONS[0];
 }
 
+function onLegacyResponsibilityTypeChange(e: { detail: { value: string } }) {
+  const options =
+    task.value?.category === 'INCOMING'
+      ? ['SUPPLIER']
+      : ['INTERNAL_DEPARTMENT', 'SUPPLIER', 'OUTSOURCING_UNIT'];
+  const type = options[Number(e.detail.value)] as
+    | InspectionIssueResponsibilityType
+    | undefined;
+  if (!type) return;
+  responsibilityType.value = type;
+  clearLegacyResponsibilityIdentity();
+  void loadLegacyResponsibilityOptions();
+}
+
+function onLegacyInternalTeamChange(e: { detail: { value: string } }) {
+  const team = legacyInternalTeams.value[Number(e.detail.value)];
+  legacyTeamId.value = team?.value || '';
+  responsibleDepartmentId.value = team?.responsibleDepartmentId || '';
+  supplierId.value = '';
+}
+
+function onLegacySupplierChange(e: { detail: { value: string } }) {
+  supplierId.value = legacySuppliers.value[Number(e.detail.value)]?.value || '';
+}
+
 // ─── Step navigation ──────────────────────────────────────────────────────────
 
 function validateStep1(): boolean {
@@ -233,8 +402,30 @@ function validateStep2(): boolean {
     uni.showToast({ title: '请选择缺陷分类和二级分类', icon: 'none' });
     return false;
   }
+  if (!responsibilityLocked.value && legacyResponsibilityError.value) {
+    uni.showToast({
+      title: '责任归属选项加载失败，无法提交不合格项',
+      icon: 'none',
+    });
+    return false;
+  }
   if (!responsibilityType.value || !responsibleDepartmentId.value) {
     uni.showToast({ title: '报检任务责任上下文无效', icon: 'none' });
+    return false;
+  }
+  if (
+    !responsibilityLocked.value &&
+    !isExternalResponsibility.value &&
+    !legacyTeamId.value
+  ) {
+    uni.showToast({ title: '请选择可解析责任部门的班组', icon: 'none' });
+    return false;
+  }
+  if (isExternalResponsibility.value && !supplierId.value) {
+    uni.showToast({
+      title: `请选择${legacyExternalUnitLabel.value}`,
+      icon: 'none',
+    });
     return false;
   }
   return true;
@@ -295,16 +486,21 @@ async function submitResult() {
 
   if (isFail.value && task.value) {
     const severityCode = severity.value.split('-')[0] ?? 'Minor';
+    const responsibilityPayload = buildInspectionResultResponsibilityPayload({
+      responsibilityType: responsibilityType.value,
+      responsibleDepartmentId: responsibleDepartmentId.value,
+      supplierId: supplierId.value,
+    });
+    if (!responsibilityPayload) {
+      uni.hideLoading();
+      submitting.value = false;
+      uni.showToast({ title: '责任归属无效', icon: 'none' });
+      return;
+    }
     payload.linkedIssue = {
       partName: task.value.partName,
       processName: task.value.processName,
-      responsibleDepartmentId: responsibleDepartmentId.value,
-      responsibilityType: responsibilityType.value,
-      supplierId: isExternalInspectionIssueResponsibility(
-        responsibilityType.value,
-      )
-        ? supplierId.value || undefined
-        : undefined,
+      ...responsibilityPayload,
       defectCategoryId: defectCategoryId.value,
       defectSubcategoryId: defectSubcategoryId.value,
       severity: severityCode,
@@ -563,8 +759,7 @@ onLoad((options) => {
           </picker>
         </view>
 
-        <!-- 责任部门 -->
-        <view class="card">
+        <view v-if="responsibilityLocked" class="card">
           <view class="field-label required">责任部门</view>
           <view class="picker-val">
             <text>{{
@@ -573,6 +768,78 @@ onLoad((options) => {
             }}</text>
           </view>
         </view>
+        <template v-else>
+          <view class="card">
+            <view class="field-label required">责任归属类型</view>
+            <picker
+              :disabled="legacyResponsibilityLoading"
+              :range="legacyResponsibilityTypeLabels"
+              :value="legacyResponsibilityTypeIndex"
+              @change="onLegacyResponsibilityTypeChange"
+            >
+              <view class="picker-val">
+                <text>{{
+                  legacyResponsibilityTypeLabels[legacyResponsibilityTypeIndex]
+                }}</text>
+                <text class="picker-arrow">›</text>
+              </view>
+            </picker>
+          </view>
+          <view
+            v-if="responsibilityType === 'INTERNAL_DEPARTMENT'"
+            class="card"
+          >
+            <view class="field-label required">责任班组</view>
+            <picker
+              :disabled="
+                legacyResponsibilityLoading || legacyInternalTeams.length === 0
+              "
+              :range="legacyInternalTeamLabels"
+              :value="legacyTeamIndex"
+              @change="onLegacyInternalTeamChange"
+            >
+              <view class="picker-val">
+                <text>{{
+                  legacyInternalTeams[legacyTeamIndex]?.label ||
+                  '请选择可解析责任部门的班组'
+                }}</text>
+                <text class="picker-arrow">›</text>
+              </view>
+            </picker>
+          </view>
+          <template v-else>
+            <view class="card">
+              <view class="field-label required">责任部门</view>
+              <view class="picker-val">
+                <text>{{ legacyDepartmentLabel || '责任部门策略加载中' }}</text>
+              </view>
+            </view>
+            <view class="card">
+              <view class="field-label required">{{
+                legacyExternalUnitLabel
+              }}</view>
+              <picker
+                :disabled="
+                  legacyResponsibilityLoading || legacySuppliers.length === 0
+                "
+                :range="legacySupplierLabels"
+                :value="legacySupplierIndex"
+                @change="onLegacySupplierChange"
+              >
+                <view class="picker-val">
+                  <text>{{
+                    legacySuppliers[legacySupplierIndex]?.label ||
+                    `请选择${legacyExternalUnitLabel}`
+                  }}</text>
+                  <text class="picker-arrow">›</text>
+                </view>
+              </picker>
+            </view>
+          </template>
+          <view v-if="legacyResponsibilityError" class="card">
+            <text class="error-text">{{ legacyResponsibilityError }}</text>
+          </view>
+        </template>
       </view>
 
       <!-- ── STEP 3 - 补充信息 ──────────────────────────────────────────── -->
@@ -808,6 +1075,11 @@ $fail-color: #f5222d;
   background: $bg-card;
   border-radius: 16rpx;
   box-shadow: 0 2rpx 12rpx rgb(0 0 0 / 6%);
+}
+
+.error-text {
+  font-size: 26rpx;
+  color: $fail-color;
 }
 
 .field-label {
