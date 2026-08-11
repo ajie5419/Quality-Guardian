@@ -177,6 +177,9 @@ export async function buildInspectionRecordFromRequest(
     quantity?: number;
     reporter: string;
     requestInfo?: null | string;
+    responsibilityType?: null | string;
+    responsibleDepartment?: null | string;
+    responsibleDepartmentId?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
     supplierId?: null | string;

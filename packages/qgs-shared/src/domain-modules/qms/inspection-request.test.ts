@@ -82,6 +82,7 @@ describe('buildInspectionRecordPayloadCore', () => {
         }),
         selfCheckResult: 'PASS',
         stationSelection: JSON.stringify({ indexes: [1, 2], mode: 'PARTIAL' }),
+        supplierName: 'Supplier A',
         team: 'Supplier A',
         work_order: { projectName: 'Project A' },
         workOrderNumber: 'WO-001',
@@ -149,7 +150,34 @@ describe('buildInspectionRecordPayloadCore', () => {
     });
 
     expect(incoming.category).toBe('INCOMING');
+    expect(incoming.supplierName).toBe('Supplier A');
     expect(process.category).toBe('PROCESS');
+  });
+
+  it('carries a direct internal department to a PROCESS inspection without TEAM', () => {
+    const payload = buildInspectionRecordPayloadCore({
+      body: { result: 'PASS' },
+      request: {
+        category: 'PROCESS',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        processName: 'Machining',
+        reporter: 'Reporter A',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Machining BU',
+        responsibleDepartmentId: 'dept-machining',
+        selfCheckResult: 'PASS',
+        workOrderNumber: 'WO-001',
+      },
+    });
+
+    expect(payload).toMatchObject({
+      category: 'PROCESS',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Machining BU',
+      responsibleDepartmentId: 'dept-machining',
+    });
+    expect(payload.teamId).toBe('');
   });
 });
 

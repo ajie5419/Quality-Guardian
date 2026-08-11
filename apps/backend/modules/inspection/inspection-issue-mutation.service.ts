@@ -30,9 +30,9 @@ import {
 } from './inspection-issue-access.service';
 import {
   InspectionIssueCreateService,
-  resolveInspectionIssueResponsibility,
   validateOnlineInspectionIssueResponsibilityInput,
 } from './inspection-issue-create.service';
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 const logger = createModuleLogger('InspectionIssueMutation');

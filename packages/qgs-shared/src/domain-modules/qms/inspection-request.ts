@@ -492,6 +492,9 @@ export interface InspectionRecordPayloadInput {
     quantity?: number;
     reporter: string;
     requestInfo?: null | string;
+    responsibilityType?: null | string;
+    responsibleDepartment?: null | string;
+    responsibleDepartmentId?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
     supplierId?: null | string;
@@ -568,6 +571,15 @@ export function buildInspectionRecordPayloadCore(
           ],
     projectName:
       input.request.work_order?.projectName || input.request.workOrderNumber,
+    responsibilityType: normalizeInspectionIssueResponsibilityType(
+      input.request.responsibilityType,
+    ),
+    responsibleDepartment: normalizeInspectionRequestText(
+      input.request.responsibleDepartment,
+    ),
+    responsibleDepartmentId: normalizeInspectionRequestText(
+      input.request.responsibleDepartmentId,
+    ),
     partId: normalizeInspectionRequestText(input.request.partId),
     partName: input.request.partName,
     quantity,
@@ -601,7 +613,9 @@ export function buildInspectionRecordPayloadCore(
         requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
       materialName: input.request.partName,
       supplierId: normalizeInspectionRequestText(input.request.supplierId),
-      supplierName: normalizeInspectionRequestText(input.request.team),
+      supplierName:
+        normalizeInspectionRequestText(input.request.supplierName) ||
+        normalizeInspectionRequestText(input.request.team),
     };
   }
 

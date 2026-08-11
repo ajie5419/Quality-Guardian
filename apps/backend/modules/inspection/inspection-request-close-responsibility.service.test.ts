@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   resolveResponsibility: vi.fn(),
 }));
 
-vi.mock('./inspection-issue-create.service', () => ({
+vi.mock('./inspection-issue-responsibility.service', () => ({
   resolveInspectionIssueResponsibility: mocks.resolveResponsibility,
 }));
 vi.mock('./inspection-request-responsibility-policy.service', () => ({

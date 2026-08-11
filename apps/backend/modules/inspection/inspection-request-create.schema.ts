@@ -140,13 +140,6 @@ export const inspectionRequestCreateV2BodySchema =
           path: ['teamId'],
         });
       }
-      if (body.category === 'PROCESS' && isInternal && !body.teamId) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'Internal process responsibility requires teamId',
-          path: ['teamId'],
-        });
-      }
     });
 
 export type InspectionRequestCreateBody = z.infer<

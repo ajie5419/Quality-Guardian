@@ -43,6 +43,19 @@ describe('inspection request create schema', () => {
     expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
   });
 
+  it('accepts PROCESS internal responsibility without an execution TEAM', () => {
+    const parsed = inspectionRequestCreateV2BodySchema.parse({
+      ...buildValidPayload(),
+      category: 'PROCESS',
+      partId: 'part-1',
+      processId: 'process-1',
+      team: undefined,
+      teamId: undefined,
+    });
+
+    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  });
+
   it('rejects a V2 request without canonical IDs', () => {
     expect(() =>
       inspectionRequestCreateV2BodySchema.parse({

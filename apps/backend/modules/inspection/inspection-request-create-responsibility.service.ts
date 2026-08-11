@@ -3,7 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 
-import { resolveInspectionIssueResponsibility } from './inspection-issue-create.service';
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
 export type V2RequestResponsibilityInput = {
@@ -12,7 +12,7 @@ export type V2RequestResponsibilityInput = {
     responsibilityType: string;
     responsibleDepartmentId: string;
     supplierId: string;
-    teamId: string;
+    teamId?: null | string;
   };
 };
 
@@ -44,17 +44,6 @@ export async function resolveV2RequestResponsibility(
     throw new BusinessError(
       'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
       'External responsibility must not depend on teamId',
-      400,
-    );
-  }
-  if (
-    payload.category === 'PROCESS' &&
-    isInternal &&
-    !payload.v2Responsibility.teamId
-  ) {
-    throw new BusinessError(
-      'TEAM_ID_REQUIRED',
-      'Internal process responsibility requires teamId',
       400,
     );
   }

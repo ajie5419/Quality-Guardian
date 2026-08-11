@@ -1,5 +1,6 @@
 export const UNRESOLVED_IDENTITY_KEY = '';
 export const UNRESOLVED_INSPECTOR_NAME = 'Unresolved inspector';
+export const UNRESOLVED_DEPARTMENT_NAME = 'Unresolved department';
 export const UNRESOLVED_SUPPLIER_NAME = 'Unresolved supplier';
 export const UNRESOLVED_TEAM_NAME = 'Unresolved team';
 
@@ -13,6 +14,23 @@ export interface InspectorHistoryCounts {
   averageTaskMinutes: number;
   completedTaskCount: number;
   totalTaskMinutes: number;
+}
+
+export function incrementReinspectionCounts(
+  counts: Map<string, ReinspectionCounts>,
+  key: string,
+  hasInspectionResult: boolean,
+  hasReinspection: boolean,
+) {
+  const stat = counts.get(key) || {
+    inspectedCount: 0,
+    reinspectionCount: 0,
+    submittedCount: 0,
+  };
+  stat.submittedCount += 1;
+  if (hasInspectionResult) stat.inspectedCount += 1;
+  if (hasReinspection) stat.reinspectionCount += 1;
+  counts.set(key, stat);
 }
 
 export function normalizeIdentityId(value?: null | string) {

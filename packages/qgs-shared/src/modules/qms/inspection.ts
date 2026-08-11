@@ -63,6 +63,9 @@ export interface IncomingInspection {
   remarks?: string;
   reportDate: string;
   reporter: string;
+  responsibilityType?: InspectionIssueResponsibilityType | null;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   stationSelection?: InspectionStationSelection | null;
   supplierName: string;
   templateId?: string;
@@ -92,6 +95,9 @@ export interface ProcessInspection {
   quantity: number;
   remarks?: string;
   reporter: string;
+  responsibilityType?: InspectionIssueResponsibilityType | null;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   stationSelection?: InspectionStationSelection | null;
   team: string;
   templateId?: string;
@@ -121,6 +127,9 @@ export interface ShipmentInspection {
   remarks?: string;
   reportDate: string;
   reporter: string;
+  responsibilityType?: InspectionIssueResponsibilityType | null;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   stationSelection?: InspectionStationSelection | null;
   templateId?: string;
   templateName?: string;

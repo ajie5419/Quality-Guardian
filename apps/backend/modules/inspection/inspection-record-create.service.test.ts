@@ -4,6 +4,8 @@ import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     inspections: {
@@ -31,6 +33,9 @@ vi.mock('~/utils/process-resolver', () => ({
 
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: {
+    resolveSupplierById: vi
+      .fn()
+      .mockResolvedValue({ id: 'supplier-1', name: 'Supplier A' }),
     resolveSupplierForInspection: vi
       .fn()
       .mockResolvedValue({ id: 'supplier-1', name: 'Supplier A' }),
@@ -39,6 +44,10 @@ vi.mock('~/modules/supplier-identity', () => ({
       .mockResolvedValue({ id: 'team-1', name: 'Team A' }),
     lockTeamForMutation: vi.fn(),
   },
+}));
+
+vi.mock('./inspection-issue-responsibility.service', () => ({
+  resolveInspectionIssueResponsibility: vi.fn(),
 }));
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
@@ -89,6 +98,13 @@ vi.mock('~/modules/inspection/inspection-record-types', () => ({
 describe('inspectionRecordCreateService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValue({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Machining BU',
+      responsibleDepartmentId: 'dept-machining',
+      supplierId: null,
+      supplierName: null,
+    });
   });
 
   describe('generateSerialNumber', () => {
@@ -216,6 +232,48 @@ describe('inspectionRecordCreateService', () => {
         }),
       ).rejects.toMatchObject({ code: 'TEAM_ID_REQUIRED' });
       expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('persists direct internal responsibility without an execution TEAM', async () => {
+      const create = vi.fn().mockImplementation(({ data }) => ({
+        id: 'insp-direct-internal',
+        ...data,
+      }));
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback({ inspections: { create, findFirst: vi.fn() } }),
+      );
+
+      await InspectionRecordCreateService.create({
+        category: 'PROCESS',
+        inspector: 'Tester',
+        inspectionDate: '2026-01-01',
+        items: [],
+        processName: 'Machining',
+        quantity: 10,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-machining',
+        workOrderNumber: 'WO-1',
+      });
+
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-machining',
+          supplierId: undefined,
+        },
+        expect.any(Object),
+      );
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            responsibilityType: 'INTERNAL_DEPARTMENT',
+            responsibleDepartment: 'Machining BU',
+            responsibleDepartmentId: 'dept-machining',
+            supplierId: null,
+            teamId: null,
+          }),
+        }),
+      );
     });
 
     it('should generate distinct serial numbers for consecutive creates in one transaction', async () => {

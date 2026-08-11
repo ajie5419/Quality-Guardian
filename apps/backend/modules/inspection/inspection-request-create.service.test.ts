@@ -497,27 +497,39 @@ describe('inspectionRequestCreateService', () => {
     );
   });
 
-  it('rejects PROCESS internal responsibility without teamId', async () => {
-    resolveV2Responsibility.mockRejectedValueOnce(
-      Object.assign(new Error('missing team'), { code: 'TEAM_ID_REQUIRED' }),
+  it('persists PROCESS internal responsibility without an execution TEAM', async () => {
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
     );
-    await expect(
-      InspectionRequestCreateService.createRequest(
-        {} as any,
-        { id: 'user-1', username: 'admin' } as any,
-        {
-          category: 'PROCESS',
-          componentName: 'Component A',
-          partId: 'part-1',
-          processId: 'process-1',
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'PROCESS',
+        componentName: 'Component A',
+        partId: 'part-1',
+        processId: 'process-1',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-assembly',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(SupplierIdentityService.resolveTeamById).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
           responsibilityType: 'INTERNAL_DEPARTMENT',
           responsibleDepartmentId: 'dept-assembly',
-          workOrderNumber: 'WO-001',
-        },
-        false,
-        'V2',
-      ),
-    ).rejects.toMatchObject({ code: 'TEAM_ID_REQUIRED' });
+          supplierId: null,
+          teamId: null,
+        }),
+      }),
+    );
   });
 
   it('creates a pending material application in the request transaction', async () => {

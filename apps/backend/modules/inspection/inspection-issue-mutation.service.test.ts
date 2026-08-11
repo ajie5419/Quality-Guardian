@@ -113,6 +113,10 @@ vi.mock('~/modules/inspection/inspection-issue-create.service', () => ({
       return { ncNumber: record.nonConformanceNumber, record };
     }),
   },
+  validateOnlineInspectionIssueResponsibilityInput: vi.fn(),
+}));
+
+vi.mock('~/modules/inspection/inspection-issue-responsibility.service', () => ({
   resolveInspectionIssueResponsibility: vi.fn().mockResolvedValue({
     responsibleDepartment: 'Assembly',
     responsibleDepartmentId: 'dept-assembly',
@@ -120,7 +124,6 @@ vi.mock('~/modules/inspection/inspection-issue-create.service', () => ({
     supplierId: null,
     supplierName: null,
   }),
-  validateOnlineInspectionIssueResponsibilityInput: vi.fn(),
 }));
 
 const mockLoggerFns = vi.hoisted(() => ({
@@ -427,7 +430,7 @@ describe('inspectionIssueMutationService', () => {
 
     it('persists canonical responsibility identity on update', async () => {
       const { resolveInspectionIssueResponsibility } = await import(
-        '~/modules/inspection/inspection-issue-create.service'
+        '~/modules/inspection/inspection-issue-responsibility.service'
       );
       await InspectionIssueMutationService.updateIssue(
         { id: 'user-1', username: 'admin', roles: [] } as any,

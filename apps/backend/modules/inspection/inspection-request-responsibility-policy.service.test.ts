@@ -72,4 +72,18 @@ describe('inspection request responsibility policy', () => {
       }),
     ).resolves.toBeUndefined();
   });
+
+  it('accepts a direct internal department when no execution TEAM is provided', async () => {
+    await expect(
+      assertInspectionRequestResponsibilityPolicy({
+        client: {} as any,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-machining',
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(
+      TeamIdentityService.resolveActiveDepartmentSourceIdsByTeamIds,
+    ).not.toHaveBeenCalled();
+  });
 });

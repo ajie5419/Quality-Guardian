@@ -5,4 +5,4 @@ ALTER TABLE `qms_inspection_requests`
   ADD COLUMN `responsibilityType` VARCHAR(191) NULL,
   ADD COLUMN `responsibleDepartmentId` VARCHAR(191) NULL,
   ADD COLUMN `responsibleDepartment` VARCHAR(191) NULL,
-  ADD INDEX `qms_inspection_requests_responsibilityType_responsibleDepartmentId_idx` (`responsibilityType`, `responsibleDepartmentId`);
+  ADD INDEX `qms_inspection_requests_resp_dept_idx` (`responsibilityType`, `responsibleDepartmentId`);

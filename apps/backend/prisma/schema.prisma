@@ -16,6 +16,9 @@ model inspections {
   projectId              String?
   supplierName           String?
   supplierId             String?
+  responsibilityType    String?
+  responsibleDepartmentId String?
+  responsibleDepartment String?
   partName               String?
   partId                 String?
   materialName           String?
@@ -62,6 +65,7 @@ model inspections {
   @@index([processId])
   @@index([teamId])
   @@index([supplierId])
+  @@index([responsibilityType, responsibleDepartmentId], map: "inspections_responsibilityType_responsibleDepartmentId_idx")
   @@index([partId])
   @@index([projectId])
   @@index([materialNameId])
@@ -1783,7 +1787,7 @@ model qms_inspection_requests {
   @@index([category])
   @@index([supplierId])
   @@index([teamId])
-  @@index([responsibilityType, responsibleDepartmentId])
+  @@index([responsibilityType, responsibleDepartmentId], map: "qms_inspection_requests_resp_dept_idx")
   @@index([partId])
   @@index([componentId])
 }

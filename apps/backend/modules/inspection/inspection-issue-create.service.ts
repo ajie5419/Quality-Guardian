@@ -1,15 +1,8 @@
-import type { InspectionIssueResponsibilityType } from '@qgs/shared';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { Prisma } from '@prisma/client';
-import {
-  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
-  normalizeInspectionIssueResponsibilityType,
-} from '@qgs/shared';
-import { DeptService } from '~/modules/dept';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss';
-import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 
 import {
@@ -19,17 +12,10 @@ import {
   getNextInspectionIssueSerialNumber,
   normalizeOptionalInspectionIssueString,
 } from './inspection-issue';
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 type IssueCreateTransaction = Prisma.TransactionClient;
-
-export interface ResolvedInspectionIssueResponsibility {
-  responsibleDepartment: string;
-  responsibleDepartmentId: string;
-  responsibilityType: InspectionIssueResponsibilityType;
-  supplierId: null | string;
-  supplierName: null | string;
-}
 
 export interface InspectionIssueCreateResult {
   ncNumber: string;
@@ -127,75 +113,6 @@ export function validateOnlineInspectionIssueResponsibilityInput(
   if (body.responsibleDepartments !== undefined) {
     throw new BusinessError('VALIDATION', '不支持多个责任部门', 400);
   }
-}
-
-export async function resolveInspectionIssueResponsibility(
-  body: Record<string, unknown>,
-  tx: IssueCreateTransaction,
-): Promise<ResolvedInspectionIssueResponsibility> {
-  const responsibilityType = normalizeInspectionIssueResponsibilityType(
-    body.responsibilityType,
-  );
-  if (!responsibilityType) {
-    throw new BusinessError('VALIDATION', '不合格项责任类型无效', 400);
-  }
-  const responsibleDepartmentId = normalizeOptionalInspectionIssueString(
-    body.responsibleDepartmentId,
-  );
-  if (!responsibleDepartmentId) {
-    throw new BusinessError('VALIDATION', '不合格项责任部门 ID 不能为空', 400);
-  }
-  const department = await DeptService.findActiveById(
-    responsibleDepartmentId,
-    tx,
-  );
-  if (!department) {
-    throw new BusinessError('VALIDATION', '不合格项责任部门 ID 无效', 400);
-  }
-
-  const submittedSupplierId = normalizeOptionalInspectionIssueString(
-    body.supplierId,
-  );
-  if (
-    responsibilityType ===
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
-  ) {
-    if (submittedSupplierId) {
-      throw new BusinessError(
-        'VALIDATION',
-        '内部责任部门不能同时指定供应商 ID',
-        400,
-      );
-    }
-    return {
-      responsibleDepartment: department.name,
-      responsibleDepartmentId: department.id,
-      responsibilityType,
-      supplierId: null,
-      supplierName: null,
-    };
-  }
-  if (!submittedSupplierId) {
-    throw new BusinessError(
-      'VALIDATION',
-      '外部责任单位缺少 canonical 供应商 ID',
-      400,
-    );
-  }
-  const supplier = await SupplierIdentityService.resolveSupplierById(
-    submittedSupplierId,
-    tx,
-  );
-  if (!supplier) {
-    throw new BusinessError('VALIDATION', '不合格项供应商 ID 无效', 400);
-  }
-  return {
-    responsibleDepartment: department.name,
-    responsibleDepartmentId: department.id,
-    responsibilityType,
-    supplierId: supplier.id,
-    supplierName: supplier.name,
-  };
 }
 
 async function reserveInspectionIssueNcNumber(tx: IssueCreateTransaction) {

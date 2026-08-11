@@ -2,7 +2,7 @@ import type { Prisma } from '@prisma/client';
 
 import { normalizeInspectionIssueResponsibilityType } from '@qgs/shared';
 
-import { resolveInspectionIssueResponsibility } from './inspection-issue-create.service';
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { normalizeInspectionRequestText } from './inspection-request';
 import { failCloseRequest } from './inspection-request-close.schema';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';

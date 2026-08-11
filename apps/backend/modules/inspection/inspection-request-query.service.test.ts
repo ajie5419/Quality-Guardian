@@ -118,6 +118,49 @@ describe('inspection request query service', () => {
     });
   });
 
+  it('returns persisted direct internal responsibility without a TEAM', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      attachments: null,
+      category: 'PROCESS',
+      closeAttachments: null,
+      dispatcher: null,
+      inspection: null,
+      inspectionId: null,
+      inspector: null,
+      linkedIssueId: null,
+      process: { name: 'Machining' },
+      processName: 'Machining',
+      requestNo: 'IR-1',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Machining BU',
+      responsibleDepartmentId: 'dept-machining',
+      supplierId: null,
+      supplierName: null,
+      team: null,
+      teamId: null,
+      workOrderNumber: 'WO-001',
+      workOrders: [],
+    } as any);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-machining', name: 'Machining BU' },
+    ]);
+
+    const result = await InspectionRequestQueryService.getRequestDetail('IR-1');
+
+    expect(result?.issueResponsibility).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Machining BU',
+      responsibleDepartmentId: 'dept-machining',
+      supplierId: null,
+      supplierName: '',
+    });
+    expect(resolveActiveDepartmentSourceIdsByTeamIds).toHaveBeenCalledWith(
+      [],
+      undefined,
+    );
+  });
+
   it('returns supplier responsibility for INCOMING category with a configured process name', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       attachments: null,
