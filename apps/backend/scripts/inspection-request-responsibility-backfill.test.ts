@@ -372,24 +372,19 @@ describe('inspection request responsibility backfill', () => {
     ).toEqual({ action: 'skip' });
   });
 
-  it('runs after request category backfill and before issue responsibility backfill', () => {
+  it('does not rerun historical responsibility backfills in every release', () => {
     const maintenanceScript = readFileSync(
       resolve(backendRoot(), 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
-    const categoryIndex = maintenanceScript.indexOf(
+    expect(maintenanceScript).not.toContain(
       'scripts/backfill-inspection-request-categories.ts',
     );
-    const requestResponsibilityIndex = maintenanceScript.indexOf(
+    expect(maintenanceScript).not.toContain(
       'scripts/backfill-inspection-request-responsibilities.ts',
     );
-    const issueResponsibilityIndex = maintenanceScript.indexOf(
+    expect(maintenanceScript).not.toContain(
       'scripts/backfill-inspection-issue-responsibilities.ts',
-    );
-    expect(categoryIndex).toBeGreaterThan(-1);
-    expect(requestResponsibilityIndex).toBeGreaterThan(categoryIndex);
-    expect(issueResponsibilityIndex).toBeGreaterThan(
-      requestResponsibilityIndex,
     );
   });
 

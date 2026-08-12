@@ -377,6 +377,28 @@ model team_identity_merges {
   @@index([status, leaseUntil, isDeleted])
 }
 
+// Durable release-task state. Business data belongs to the task implementation,
+// never to the schema migration that creates this execution ledger.
+model release_maintenance_tasks {
+  id           String                     @id @default(cuid())
+  taskKey      String
+  revision     Int
+  checksum     String                     @db.Char(64)
+  status       release_maintenance_status @default(RUNNING)
+  attemptToken String?                    @db.VarChar(191)
+  attempts     Int                        @default(0)
+  startedAt    DateTime?
+  completedAt  DateTime?
+  leaseUntil   DateTime?
+  lastError    String?                    @db.Text
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  @@unique([taskKey, revision])
+  @@index([status, leaseUntil])
+  @@index([taskKey, status])
+}
+
 // @module team
 model team_identity_merge_participants {
   teamId    String               @id
@@ -2103,6 +2125,12 @@ enum team_identity_merge_status {
   COMPLETED
   FAILED
   CANCELLED
+}
+
+enum release_maintenance_status {
+  RUNNING
+  COMPLETED
+  FAILED
 }
 
 enum master_data_resolution_status {
