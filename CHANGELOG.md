@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.2...qgs-v0.24.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** run identity source remediation before the supplier gate ([f0bb8dc](https://github.com/ajie5419/Quality-Guardian/commit/f0bb8dc2dac906e667c773b85da89c46005bd393))
+* **@qgs/backend:** run identity source remediation before the supplier gate ([1f292ed](https://github.com/ajie5419/Quality-Guardian/commit/1f292ed4809440fc8f85b88bd3b99c335a983d50))
+
 ## [0.24.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.1...qgs-v0.24.2) (2026-08-12)
 
 
