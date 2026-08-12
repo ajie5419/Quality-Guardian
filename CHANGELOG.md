@@ -27,6 +27,29 @@
 
 ---
 
+### 2026-08-12 修复：发布维护全量 sidecar 重建与日志噪声
+
+**执行内容：**
+
+- 根因修复：从 `apps/backend/scripts/run-release-maintenance.sh` 移除 `historical-identity-sidecar-bootstrap.ts --apply --rebuild`。该脚本是历史身份旁路的一次性初始化/受控重建工具，数据库文档明确禁止纳入常规 release maintenance；每次部署执行全量重建会延长维护窗口并可能触发 Prisma 事务超时 `P2028`。
+- 新增 release maintenance 回归保护，禁止该 sidecar 重回发布链路；同时锁定 supplier identity 三类回填的批次进度使用 debug、最终汇总保留 info，以及三项检验责任维护只由 CLI 输出一次最终汇总。
+- 普通 legacy TEAM remark 不再尝试 JSON 解析并逐条告警；仅保留对以 `{` 开头但 JSON 语法损坏的遗留元数据的告警，仍安全忽略该条来源声明。
+- 降低 inspection、after-sales、quality-record supplier identity 回填的每批成功日志到 debug；去除报检责任、不合格项责任和损坏责任修复 service 层与 CLI 重复的 finished summary，业务处理和最终汇总不变。
+
+**验证结果：**
+
+- 定向 Vitest：`7/7` 文件、`73/73` 用例通过。
+- 后端全量 Vitest：`281/281` 文件、`2571/2571` 用例通过。
+- `pnpm -C apps/backend typecheck`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all` 与 `rtk git diff --check` 均通过。
+
+**commit:** `01ceaf44` fix(@qgs/backend): keep sidecar rebuild out of release maintenance
+
+**遗留问题：**
+
+- 未推送、未执行生产发布；sidecar 如需首次初始化或全量重建，必须通过独立、受控的维护任务执行，不得重新接入常规发布。
+
+---
+
 ## [0.24.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.1...qgs-v0.24.2) (2026-08-12)
 
 
