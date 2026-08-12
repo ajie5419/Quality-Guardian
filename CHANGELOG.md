@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.1...qgs-v0.24.2) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** revive soft-deleted TEAM identity sources ([f2cc530](https://github.com/ajie5419/Quality-Guardian/commit/f2cc53074325995e458cca218051ea66fa791563))
+* **@qgs/backend:** revive soft-deleted TEAM identity sources ([4e8e996](https://github.com/ajie5419/Quality-Guardian/commit/4e8e996774c6acd02f9d28f0f924c884b9c299b0))
+
 ## [0.24.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.0...qgs-v0.24.1) (2026-08-12)
 
 
