@@ -27,6 +27,15 @@
 
 ---
 
+## [0.24.11](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.10...qgs-v0.24.11) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** close connections when maintenance scripts fail ([5228950](https://github.com/ajie5419/Quality-Guardian/commit/522895095d4d9b450ff77c5d686533ef8bebfd55))
+* **@qgs/backend:** make identity projection maintenance resilient ([46fe2db](https://github.com/ajie5419/Quality-Guardian/commit/46fe2db75ed0d4ade42e32f4d7c932f1ba0b021a))
+* **@qgs/backend:** skip identity projection upsert without active generation ([de65ad1](https://github.com/ajie5419/Quality-Guardian/commit/de65ad160a66460942df37a6bd601a323f5b5063))
+
 ## [0.24.10](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.9...qgs-v0.24.10) (2026-08-12)
 
 
