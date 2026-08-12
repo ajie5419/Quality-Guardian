@@ -19,6 +19,7 @@ TEAM_IDENTITY_MAINTENANCE_MODE=1 "$TSX_BIN" scripts/merge-confirmed-team-duplica
 "$TSX_BIN" scripts/bootstrap-pass-rate-identities.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-request-categories.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-request-process-options.ts --apply
+"$TSX_BIN" scripts/remediate-team-identity-sources.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-request-responsibilities.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-issue-responsibilities.ts --apply
 "$TSX_BIN" scripts/remediate-inspection-issue-responsibilities.ts --apply

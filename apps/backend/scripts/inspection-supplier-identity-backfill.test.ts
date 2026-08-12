@@ -80,6 +80,17 @@ describe('inspection supplier identity backfill', () => {
     });
   });
 
+  it('keeps a PROCESS record with a canonical supplier and no TEAM', () => {
+    expect(
+      resolve({
+        category: 'PROCESS',
+        existingSupplier: supplierA,
+        existingSupplierId: 'supplier-a',
+        existingSupplierName: 'Supplier A',
+      }),
+    ).toEqual({ action: 'skip', reason: 'EXISTING_VALID_ID' });
+  });
+
   it('audits supplier evidence without an explicit TEAM mapping', () => {
     expect(
       resolve({

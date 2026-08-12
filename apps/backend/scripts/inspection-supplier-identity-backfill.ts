@@ -87,6 +87,11 @@ export function resolveInspectionSupplierIdentity(
   }
   const team = input.teamById || input.teamByName;
   if (!team) {
+    if (input.existingSupplier) {
+      // PROCESS with a canonical supplier and no execution TEAM is valid
+      // under the optional-TEAM contract; the supplier fact is already set.
+      return { action: 'skip', reason: 'EXISTING_VALID_ID' };
+    }
     return { action: 'unresolved', reason: 'MISSING_PROCESS_TEAM' };
   }
   if (input.teamIsInternal) {
