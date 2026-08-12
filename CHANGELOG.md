@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.12](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.11...qgs-v0.24.12) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** raise sidecar bootstrap transaction timeout ([74c3b2e](https://github.com/ajie5419/Quality-Guardian/commit/74c3b2e9a80eb74b8aa1862f99e32898eb16afc0))
+* **@qgs/backend:** raise sidecar bootstrap transaction timeout ([629e77e](https://github.com/ajie5419/Quality-Guardian/commit/629e77e564af0deb476639d0ffc80977dac74789))
+
 ## [0.24.11](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.10...qgs-v0.24.11) (2026-08-12)
 
 
