@@ -1,6 +1,7 @@
 import type { MigrationRecoverySnapshot } from './inspection-request-responsibility-migration-recovery';
 
 import { execFile } from 'node:child_process';
+import { basename, dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 
 import { describe, expect, it, vi } from 'vitest';
@@ -13,6 +14,13 @@ import {
 } from './inspection-request-responsibility-migration-recovery';
 
 const execFileAsync = promisify(execFile);
+
+function getBackendRoot() {
+  const cwd = process.cwd();
+  return basename(cwd) === 'backend' && basename(dirname(cwd)) === 'apps'
+    ? cwd
+    : resolve(cwd, 'apps/backend');
+}
 
 const noneSnapshot: MigrationRecoverySnapshot = {
   activeFailedMigrationCount: 1,
@@ -269,11 +277,12 @@ describe('inspection request responsibility migration recovery', () => {
   });
 
   it('runs under POSIX sh and invokes deploy after the recovery command succeeds', async () => {
+    const backendRoot = getBackendRoot();
     const { stdout } = await execFileAsync(
       'sh',
-      ['scripts/run-prisma-migrations.sh'],
+      [resolve(backendRoot, 'scripts/run-prisma-migrations.sh')],
       {
-        cwd: process.cwd(),
+        cwd: backendRoot,
         env: {
           ...process.env,
           PRISMA_BIN: '/bin/echo',
