@@ -109,8 +109,10 @@ export function collectTeamSourceCandidates(
 
 function parseLegacySources(remark: null | string, teamId: string) {
   if (!remark) return [];
+  const trimmedRemark = remark.trim();
+  if (!trimmedRemark.startsWith('{')) return [];
   try {
-    const parsed: unknown = JSON.parse(remark);
+    const parsed: unknown = JSON.parse(trimmedRemark);
     if (
       !parsed ||
       typeof parsed !== 'object' ||
