@@ -91,8 +91,10 @@ async function ensureSource(
     where: { sourceId: item.sourceId, sourceType: item.sourceType },
     select: { isDeleted: true, teamId: true },
   });
-  if (existing && existing.teamId !== item.teamId) {
-    conflicts.value += 1;
+  if (existing) {
+    if (existing.teamId !== item.teamId) {
+      conflicts.value += 1;
+    }
     return;
   }
   await tx.team_identity_sources.create({
