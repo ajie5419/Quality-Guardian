@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.5](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.4...qgs-v0.24.5) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** log confirmed TEAM link skip reasons in maintenance ([429f4ad](https://github.com/ajie5419/Quality-Guardian/commit/429f4ad094ce8ddc4450cdfe2fc274ec305c9566))
+* **@qgs/backend:** log confirmed TEAM link skip reasons in maintenance ([2c2d895](https://github.com/ajie5419/Quality-Guardian/commit/2c2d895627afcf1721e5e2eebfbd1a418475423a))
+
 ## [0.24.4](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.3...qgs-v0.24.4) (2026-08-12)
 
 
