@@ -10,6 +10,7 @@ APP_DIR="/opt/qms"
 RELEASE_DIR="/opt/qms/releases"
 HEALTH_URL="http://127.0.0.1:3000/api/status"
 OSSUTIL_BIN="ossutil"
+EXECUTOR_PATH="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/run-remote-release.sh"
 
 usage() {
   cat <<USAGE
@@ -23,7 +24,8 @@ Usage:
     [--app-dir /opt/qms] \
     [--release-dir /opt/qms/releases] \
     [--health-url http://127.0.0.1:3000/api/status] \
-    [--ossutil-bin ossutil]
+    [--ossutil-bin ossutil] \
+    [--executor-path /tmp/run-remote-release.sh]
 USAGE
 }
 
@@ -65,6 +67,10 @@ while [[ $# -gt 0 ]]; do
       OSSUTIL_BIN="$2"
       shift 2
       ;;
+    --executor-path)
+      EXECUTOR_PATH="$2"
+      shift 2
+      ;;
     -h|--help)
       usage
       exit 0
@@ -100,6 +106,27 @@ else
   exit 1
 fi
 
+if [[ ! -x "$EXECUTOR_PATH" ]]; then
+  echo "bounded release executor is missing or not executable: $EXECUTOR_PATH" >&2
+  exit 1
+fi
+
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "GNU timeout is required for bounded artifact loading" >&2
+  exit 1
+fi
+
+if ! timeout --signal=TERM --kill-after=1s 1s true >/dev/null 2>&1; then
+  echo "GNU timeout with --signal and --kill-after is required" >&2
+  exit 1
+fi
+
+run_with_timeout() {
+  local seconds="$1"
+  shift
+  timeout --signal=TERM --kill-after=30s "${seconds}s" "$@"
+}
+
 release_local_dir="$RELEASE_DIR/$VERSION"
 mkdir -p "$release_local_dir"
 release_oss_dir="${OSS_RELEASE_PREFIX%/}/${VERSION}"
@@ -122,19 +149,10 @@ checksum_verify() {
   exit 1
 }
 
-echo "[remote] docker disk usage before cleanup"
-docker system df || true
-docker container prune -f || true
-docker image prune -af || true
-docker builder prune -af || true
-find "$RELEASE_DIR" -mindepth 1 -maxdepth 1 -type d -mtime +14 -exec rm -rf {} + || true
-echo "[remote] docker disk usage after cleanup"
-docker system df || true
-
 echo "[remote] download artifacts from $release_oss_dir"
-"$OSSUTIL_BIN" cp -f "${release_oss_dir}/backend-${VERSION}.tar.gz" "$backend_archive"
-"$OSSUTIL_BIN" cp -f "${release_oss_dir}/frontend-${VERSION}.tar.gz" "$frontend_archive"
-"$OSSUTIL_BIN" cp -f "${release_oss_dir}/checksums-${VERSION}.txt" "$checksum_file"
+run_with_timeout 300 "$OSSUTIL_BIN" cp -f "${release_oss_dir}/backend-${VERSION}.tar.gz" "$backend_archive"
+run_with_timeout 300 "$OSSUTIL_BIN" cp -f "${release_oss_dir}/frontend-${VERSION}.tar.gz" "$frontend_archive"
+run_with_timeout 120 "$OSSUTIL_BIN" cp -f "${release_oss_dir}/checksums-${VERSION}.txt" "$checksum_file"
 
 (
   cd "$release_local_dir"
@@ -142,8 +160,8 @@ echo "[remote] download artifacts from $release_oss_dir"
 )
 
 echo "[remote] load docker images"
-gunzip -c "$backend_archive" | docker load
-gunzip -c "$frontend_archive" | docker load
+run_with_timeout 300 docker load --input "$backend_archive"
+run_with_timeout 300 docker load --input "$frontend_archive"
 
 backend_ref="${BACKEND_IMAGE}:${VERSION}"
 frontend_ref="${FRONTEND_IMAGE}:${VERSION}"
@@ -152,83 +170,13 @@ if [[ -n "$IMAGE_REPO" ]]; then
   frontend_ref="${IMAGE_REPO}:frontend-${VERSION}"
 fi
 
-docker image inspect "$backend_ref" >/dev/null
-docker image inspect "$frontend_ref" >/dev/null
+run_with_timeout 30 docker image inspect "$backend_ref" >/dev/null
+run_with_timeout 30 docker image inspect "$frontend_ref" >/dev/null
 
 backup_file="$compose_file.bak"
-cp "$compose_file" "$backup_file"
-
-rollback() {
-  echo "[remote] deploy failed, rolling back"
-  if [[ -f "$backup_file" ]]; then
-    cp "$backup_file" "$compose_file"
-    docker compose -f "$compose_file" up -d backend frontend redis || true
-  fi
-}
-trap rollback ERR
-
-update_compose_images() {
-  local src="$1"
-  local dst="$2"
-  local backend="$3"
-  local frontend="$4"
-
-  awk -v backend="$backend" -v frontend="$frontend" '
-    BEGIN { in_backend=0; in_frontend=0 }
-    /^  backend:/ { in_backend=1; in_frontend=0; print; next }
-    /^  frontend:/ { in_frontend=1; in_backend=0; print; next }
-    /^  [^ ]/ { in_backend=0; in_frontend=0; print; next }
-    {
-      if (in_backend && $1 == "image:") {
-        print "    image: " backend;
-        next;
-      }
-      if (in_frontend && $1 == "image:") {
-        print "    image: " frontend;
-        next;
-      }
-      print;
-    }
-  ' "$src" > "$dst"
-}
-
-tmp_compose="$compose_file.tmp"
-update_compose_images "$compose_file" "$tmp_compose" "$backend_ref" "$frontend_ref"
-mv "$tmp_compose" "$compose_file"
-
-run_backend() {
-  local command="$1"
-  docker compose -f "$compose_file" run --rm backend sh -lc "$command"
-}
-
-MIGRATION_WRAPPER_CMD="cd /app/apps/backend && sh scripts/run-prisma-migrations.sh"
-RELEASE_MAINTENANCE_CMD="cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
-
-echo "[remote] start database dependencies"
-docker compose -f "$compose_file" up -d redis
-
-echo "[remote] stop application writes before identity maintenance"
-docker compose -f "$compose_file" stop backend
-
-echo "[remote] run database migrations"
-run_backend "$MIGRATION_WRAPPER_CMD"
-
-echo "[remote] run ordered release maintenance"
-run_backend "$RELEASE_MAINTENANCE_CMD"
-
-echo "[remote] restart services"
-docker compose -f "$compose_file" up -d redis backend frontend
-
-for i in {1..30}; do
-  if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
-    echo "[remote] healthcheck passed"
-    echo "$VERSION" > "$APP_DIR/.deployed-version"
-    rm -f "$backup_file"
-    trap - ERR
-    exit 0
-  fi
-  sleep 2
-done
-
-echo "[remote] healthcheck failed: $HEALTH_URL"
-exit 1
+"$EXECUTOR_PATH" \
+  --compose-file "$compose_file" \
+  --backend-image "$backend_ref" \
+  --frontend-image "$frontend_ref" \
+  --version "$VERSION" \
+  --health-url "$HEALTH_URL"

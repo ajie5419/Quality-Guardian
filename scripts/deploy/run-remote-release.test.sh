@@ -1,0 +1,155 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+RUNNER="$ROOT_DIR/scripts/deploy/run-remote-release.sh"
+WORKFLOW="$ROOT_DIR/.github/workflows/deploy.yml"
+OSS_ENTRYPOINT="$ROOT_DIR/scripts/deploy/one-click-oss.sh"
+TEST_DIRECTORIES=()
+
+cleanup() {
+  local directory
+  for directory in "${TEST_DIRECTORIES[@]}"; do
+    rm -rf "$directory"
+  done
+}
+trap cleanup EXIT
+
+assert_contains() {
+  local needle="$1"
+  local file="$2"
+  grep -Fq "$needle" "$file" || { echo "missing '$needle' in $file" >&2; exit 1; }
+}
+
+assert_outer_timeout_budget() {
+  assert_contains 'command_timeout: 60m' "$WORKFLOW"
+  assert_contains '120m' "$OSS_ENTRYPOINT"
+  assert_contains 'timeout --signal=TERM --kill-after=30s' "$RUNNER"
+}
+
+make_fake_commands() {
+  local bin_dir="$1"
+  mkdir -p "$bin_dir"
+
+  cat > "$bin_dir/docker" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+log="${FAKE_LOG:?}"
+containers="${FAKE_CONTAINERS:?}"
+printf '%s\n' "$*" >> "$log"
+if [[ "$1" == container && "$2" == inspect ]]; then
+  name="${@: -1}"
+  [[ -e "$containers/$name" ]]
+  exit
+fi
+if [[ "$1" == rm ]]; then
+  rm -f "$containers/${@: -1}"
+  exit 0
+fi
+if [[ "$1" == system ]]; then exit 0; fi
+if [[ "$1" == compose ]]; then
+  arguments="$*"
+  if [[ " $arguments " == *" run "* ]]; then
+    name="$(sed -n 's/.*--name \([^ ]*\).*/\1/p' <<< "$arguments")"
+    touch "$containers/$name"
+    if [[ "$arguments" == *run-prisma-migrations* && "${FAKE_SCENARIO:-}" == migration-failure ]]; then exit 1; fi
+    if [[ "$arguments" == *run-release-maintenance* && "${FAKE_SCENARIO:-}" == maintenance-failure ]]; then exit 1; fi
+  fi
+fi
+SCRIPT
+  cat > "$bin_dir/timeout" <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+while [[ "$1" == --* ]]; do shift; done
+shift
+if [[ "$*" == *run-release-maintenance* && "${FAKE_SCENARIO:-}" == maintenance-timeout ]]; then
+  "$@" || true
+  exit 124
+fi
+"$@"
+SCRIPT
+cat > "$bin_dir/curl" <<'SCRIPT'
+#!/usr/bin/env bash
+printf 'curl scenario=%s\n' "${FAKE_SCENARIO:-}" >> "${FAKE_LOG:?}"
+[[ "${FAKE_SCENARIO:-}" != health-failure ]]
+SCRIPT
+  cat > "$bin_dir/sleep" <<'SCRIPT'
+#!/usr/bin/env bash
+exit 0
+SCRIPT
+  cat > "$bin_dir/flock" <<'SCRIPT'
+#!/usr/bin/env bash
+exit 0
+SCRIPT
+  chmod +x "$bin_dir/docker" "$bin_dir/timeout" "$bin_dir/curl" "$bin_dir/sleep" "$bin_dir/flock"
+}
+
+run_case() {
+  local scenario="$1"
+  local expected_status="$2"
+  local existing_directory="${3:-}"
+  local directory
+  directory="${existing_directory:-$(mktemp -d)}"
+  if [[ -z "$existing_directory" ]]; then
+    TEST_DIRECTORIES+=("$directory")
+    mkdir -p "$directory/bin" "$directory/containers"
+    make_fake_commands "$directory/bin"
+    cat > "$directory/docker-compose.yml" <<'YAML'
+services:
+  backend:
+    image: old-backend
+  frontend:
+    image: old-frontend
+  redis:
+    image: redis
+YAML
+  fi
+  if [[ "$scenario" == residual ]]; then touch "$directory/containers/qms-release-maintenance"; fi
+
+  set +e
+  PATH="$directory/bin:$PATH" FAKE_LOG="$directory/docker.log" FAKE_CONTAINERS="$directory/containers" FAKE_SCENARIO="$scenario" \
+    HEALTHCHECK_TIMEOUT_SECONDS=1 \
+    bash "$RUNNER" --compose-file "$directory/docker-compose.yml" --backend-image backend:new --frontend-image frontend:new --version test >"$directory/output.log" 2>&1
+  local status=$?
+  set -e
+  [[ "$status" == "$expected_status" ]] || { cat "$directory/output.log"; exit 1; }
+
+  CASE_DIRECTORY="$directory"
+}
+
+run_case success 0
+assert_contains 'stage=release-maintenance state=complete' "$CASE_DIRECTORY/output.log"
+assert_contains 'image: backend:new' "$CASE_DIRECTORY/docker-compose.yml"
+[[ ! -e "$CASE_DIRECTORY/containers/qms-release-migration" ]]
+[[ ! -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
+
+run_case migration-failure 1
+assert_contains 'stage=prisma-migrate state=failed' "$CASE_DIRECTORY/output.log"
+assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
+assert_contains 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
+
+run_case maintenance-timeout 1
+assert_contains 'stage=release-maintenance state=failed' "$CASE_DIRECTORY/output.log"
+[[ ! -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
+
+run_case health-failure 1
+assert_contains 'stage=healthcheck state=failed' "$CASE_DIRECTORY/output.log"
+assert_contains 'image: old-frontend' "$CASE_DIRECTORY/docker-compose.yml"
+
+run_case residual 1
+assert_contains 'pre-existing one-off container: qms-release-maintenance' "$CASE_DIRECTORY/output.log"
+[[ -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
+if grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
+  echo 'residual container preflight stopped backend' >&2
+  exit 1
+fi
+
+# A timeout must leave no release container behind, so the next invocation can proceed.
+run_case maintenance-timeout 1
+timeout_directory="$CASE_DIRECTORY"
+run_case success 0 "$timeout_directory"
+assert_contains 'stage=healthcheck state=complete' "$CASE_DIRECTORY/output.log"
+assert_outer_timeout_budget
+
+echo "run-remote-release shell behavior tests passed"

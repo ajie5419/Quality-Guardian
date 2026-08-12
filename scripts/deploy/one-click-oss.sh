@@ -144,10 +144,18 @@ release_oss_dir="${OSS_RELEASE_PREFIX%/}/${VERSION}"
 echo "[6/8] Uploading remote deploy runner"
 scp -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no \
   "$SCRIPT_DIR/deploy-from-oss.sh" \
-  "$REMOTE_USER@$REMOTE_HOST:/tmp/qg-deploy-from-oss.sh"
+  "$SCRIPT_DIR/run-remote-release.sh" \
+  "$REMOTE_USER@$REMOTE_HOST:/tmp/"
 
 echo "[7/8] Triggering remote deployment"
-ssh -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" \
+SSH_TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
+if [[ -z "$SSH_TIMEOUT_BIN" ]]; then
+  echo "GNU timeout (timeout or gtimeout) is required for the bounded SSH envelope" >&2
+  exit 1
+fi
+# 120 minutes exceeds bounded artifact transfer/loading plus the 60-minute executor envelope.
+"$SSH_TIMEOUT_BIN" --signal=TERM --kill-after=30s 120m \
+  ssh -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" \
   "bash /tmp/qg-deploy-from-oss.sh \
     --version '$VERSION' \
     --oss-release-prefix '$OSS_RELEASE_PREFIX' \
@@ -157,7 +165,8 @@ ssh -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST"
     --app-dir '$SERVER_APP_DIR' \
     --release-dir '$SERVER_RELEASE_DIR' \
     --health-url '$HEALTHCHECK_URL' \
-    --ossutil-bin '$OSSUTIL_BIN'"
+    --ossutil-bin '$OSSUTIL_BIN' \
+    --executor-path /tmp/run-remote-release.sh"
 
 echo "[8/8] Done"
 echo "Release version: $VERSION"

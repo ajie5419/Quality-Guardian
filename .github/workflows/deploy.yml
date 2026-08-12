@@ -91,18 +91,27 @@ jobs:
           docker push "$IMAGE_REPO:backend-${{ steps.version.outputs.version }}"
           docker push "$IMAGE_REPO:frontend-${{ steps.version.outputs.version }}"
 
+      - name: Copy bounded release executor to ECS
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.ECS_HOST }}
+          username: ${{ env.ECS_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          source: scripts/deploy/run-remote-release.sh
+          target: /tmp/qms-release-executor
+          strip_components: 2
+
       - name: Deploy to ECS
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.ECS_HOST }}
           username: ${{ env.ECS_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # This envelope must exceed the sum of the bounded migration,
-          # maintenance, service restart, and health-check stages below.
-          command_timeout: 45m
+          # 60 minutes exceeds the executor's 51-minute worst-case budget,
+          # including preflight, guarded Prisma baseline/retry, and rollback.
+          command_timeout: 60m
           script: |
             set -euo pipefail
-            set -x
             TAG='${{ steps.version.outputs.version }}'
             IMAGE_REPO='${{ env.IMAGE_REPO }}'
             COMPOSE_FILE='${{ env.COMPOSE_FILE }}'
@@ -118,92 +127,10 @@ jobs:
               fi
             fi
 
-            cp "$COMPOSE_FILE" "$COMPOSE_FILE.bak"
-            rollback() {
-              cp "$COMPOSE_FILE.bak" "$COMPOSE_FILE" || true
-              docker compose -f "$COMPOSE_FILE" up -d redis backend frontend || true
-            }
-            trap 'echo "deploy failed, rolling back compose and containers"; rollback' ERR
-
-            run_with_timeout() {
-              local seconds="$1"
-              shift
-              if command -v timeout >/dev/null 2>&1; then
-                timeout "$seconds" "$@"
-              else
-                "$@"
-              fi
-            }
-
-            run_backend() {
-              local seconds="$1"
-              shift
-              run_with_timeout "$seconds" docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$1"
-            }
-
-            baseline_existing_prisma_schema() {
-              echo "checking production schema before Prisma migration baseline"
-              run_backend 300 "set -e; cd /app/apps/backend; $PRISMA_CMD db pull --print --schema '$PRISMA_SCHEMA' > /tmp/qms-introspection.prisma; require_model() { if ! grep -q \"^model \$1 {\" /tmp/qms-introspection.prisma; then echo \"required production table is missing: \$1\"; exit 1; fi; }; mark_applied() { local migration=\"\$1\"; local resolve_log=\"/tmp/qms-resolve-\${migration}.log\"; if $PRISMA_CMD migrate resolve --schema '$PRISMA_SCHEMA' --applied \"\$migration\" >\"\$resolve_log\" 2>&1; then cat \"\$resolve_log\"; return 0; fi; if grep -Eiq 'already (applied|recorded|resolved)|has already been applied' \"\$resolve_log\"; then cat \"\$resolve_log\"; echo \"migration already tracked: \$migration\"; return 0; fi; cat \"\$resolve_log\"; return 1; }; require_model after_sales; require_model quality_records; require_model quality_losses; require_model qms_inspection_requests; require_model supplier_score_snapshots; if ! grep -q '^  selfCheckDocuments ' /tmp/qms-introspection.prisma; then echo 'production schema is older than qgs-v0.10.2; refusing automatic baseline'; exit 1; fi; baseline_through='20260617000100_add_inspection_self_check_documents'; echo \"baselining migrations through \${baseline_through}\"; for migration in \$(ls -1 prisma/migrations | sort); do if [ \"\$migration\" = 'migration_lock.toml' ]; then continue; fi; if [ ! -d \"prisma/migrations/\$migration\" ]; then continue; fi; mark_applied \"\$migration\"; if [ \"\$migration\" = \"\$baseline_through\" ]; then exit 0; fi; done; echo \"baseline migration not found: \${baseline_through}\"; exit 1"
-            }
-
-            deploy_prisma_migrations() {
-              local migration_log="/tmp/qms-migrate-deploy.log"
-              if run_with_timeout 300 docker compose -f "$COMPOSE_FILE" run --rm backend sh -lc "$MIGRATION_WRAPPER_CMD" 2>&1 | tee "$migration_log"; then
-                return 0
-              fi
-
-              if ! grep -q 'P3005' "$migration_log"; then
-                return 1
-              fi
-
-              echo "Prisma migrate deploy reported P3005; baselining existing production schema and retrying migrate deploy"
-              baseline_existing_prisma_schema
-              run_backend 300 "$MIGRATION_WRAPPER_CMD"
-            }
-
-            PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
-            PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
-            MIGRATION_WRAPPER_CMD="cd /app/apps/backend && sh scripts/run-prisma-migrations.sh"
-            RELEASE_MAINTENANCE_CMD="cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
-            QUALITY_LOSS_BACKFILL_CMD="cd /app/apps/backend && /app/apps/backend/node_modules/.bin/tsx scripts/backfill-quality-loss-index.ts"
-            QUALITY_LOSS_BACKFILL_CONTAINER="qms-quality-loss-backfill"
-
-            echo "docker disk usage before cleanup"
-            docker system df || true
-            docker container prune -f || true
-            docker image prune -af || true
-            docker builder prune -af || true
-            echo "docker disk usage after cleanup"
-            docker system df || true
-
-            sed -i.qms "/^  backend:/,/^  [^ ]/ s#^    image:.*#    image: ${IMAGE_REPO}:backend-${TAG}#" "$COMPOSE_FILE"
-            sed -i.qms "/^  frontend:/,/^  [^ ]/ s#^    image:.*#    image: ${IMAGE_REPO}:frontend-${TAG}#" "$COMPOSE_FILE"
-            rm -f "${COMPOSE_FILE}.qms"
-
-            run_with_timeout 300 docker compose -f "$COMPOSE_FILE" pull backend frontend || { echo "image pull failed, rolling back"; rollback; exit 1; }
-            run_with_timeout 120 docker compose -f "$COMPOSE_FILE" up -d redis
-            run_with_timeout 120 docker compose -f "$COMPOSE_FILE" stop backend
-            deploy_prisma_migrations || { echo "prisma migration failed, rolling back"; rollback; exit 1; }
-            run_backend 600 "$RELEASE_MAINTENANCE_CMD" || { echo "release maintenance failed, rolling back"; rollback; exit 1; }
-            run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d backend frontend || { echo "service startup failed, rolling back"; rollback; exit 1; }
-
-            ok=0
-            for _ in {1..30}; do
-              if curl -sf "$HEALTH_URL" >/dev/null 2>&1; then
-                ok=1
-                break
-              fi
-              sleep 2
-            done
-
-            if [ "$ok" -ne 1 ]; then
-              echo "healthcheck failed"
-              rollback
-              exit 1
-            fi
-
-            docker rm -f "$QUALITY_LOSS_BACKFILL_CONTAINER" >/dev/null 2>&1 || true
-            docker compose -f "$COMPOSE_FILE" run --rm -d --name "$QUALITY_LOSS_BACKFILL_CONTAINER" backend sh -lc "$QUALITY_LOSS_BACKFILL_CMD"
-
-            trap - ERR
-            rm -f "$COMPOSE_FILE.bak"
+            chmod +x /tmp/qms-release-executor/run-remote-release.sh
+            /tmp/qms-release-executor/run-remote-release.sh \
+              --compose-file "$COMPOSE_FILE" \
+              --backend-image "${IMAGE_REPO}:backend-${TAG}" \
+              --frontend-image "${IMAGE_REPO}:frontend-${TAG}" \
+              --version "$TAG" \
+              --health-url "$HEALTH_URL"
