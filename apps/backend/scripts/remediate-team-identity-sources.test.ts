@@ -182,6 +182,26 @@ describe('remediateTeamIdentitySources', () => {
     expect(summary.supplierSources).toEqual([]);
   });
 
+  it('does not recreate an active source already owned by the same team', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue(
+      linkOnlyTeam,
+    );
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      { sourceId: 'supplier-1', sourceType: 'SUPPLIER', teamId: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: '秦皇岛利强机械制造有限公司', id: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue({
+      isDeleted: false,
+      teamId: 'team-1',
+    } as never);
+
+    await remediateTeamIdentitySources({ mode: 'apply' });
+
+    expect(prisma.team_identity_sources.create).not.toHaveBeenCalled();
+  });
+
   it('plans a confirmed TEAM supplier link when the mapping is missing', async () => {
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
       {
