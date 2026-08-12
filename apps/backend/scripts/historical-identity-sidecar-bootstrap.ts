@@ -434,17 +434,22 @@ export async function bootstrapHistoricalIdentitySidecar(
   let decisions = 0;
   for (const item of limitedValid) {
     const observed = await resolveObservedIdentity(item);
-    await prisma.$transaction(async (tx) => {
-      await HistoricalIdentityResolutionService.append(
-        {
-          ...item,
-          canonicalId: observed.canonicalId,
-          decisionSource: 'OBSERVED_VALID_ID',
-          state: observed.state,
-        },
-        tx,
-      );
-    });
+    // Each append performs several reads plus writes; on a loaded RDS the
+    // default 5s interactive-transaction timeout is too tight for a batch run.
+    await prisma.$transaction(
+      async (tx) => {
+        await HistoricalIdentityResolutionService.append(
+          {
+            ...item,
+            canonicalId: observed.canonicalId,
+            decisionSource: 'OBSERVED_VALID_ID',
+            state: observed.state,
+          },
+          tx,
+        );
+      },
+      { maxWait: 5000, timeout: 60_000 },
+    );
     decisions += 1;
   }
   for (const audit of limitedAudits) {
@@ -466,22 +471,25 @@ export async function bootstrapHistoricalIdentitySidecar(
     } else {
       state = audit.status === 'OPEN' ? 'UNRESOLVED' : 'UNKNOWN_PROVENANCE';
     }
-    await prisma.$transaction(async (tx) => {
-      await HistoricalIdentityResolutionService.append(
-        {
-          canonicalId,
-          decisionSource: 'LEGACY_AUDIT',
-          entityId: audit.entityId,
-          entityType: audit.entityType,
-          evidence: audit.evidence || undefined,
-          fieldName: audit.fieldName,
-          rawId: audit.rawId,
-          rawName: audit.rawName,
-          state,
-        },
-        tx,
-      );
-    });
+    await prisma.$transaction(
+      async (tx) => {
+        await HistoricalIdentityResolutionService.append(
+          {
+            canonicalId,
+            decisionSource: 'LEGACY_AUDIT',
+            entityId: audit.entityId,
+            entityType: audit.entityType,
+            evidence: audit.evidence || undefined,
+            fieldName: audit.fieldName,
+            rawId: audit.rawId,
+            rawName: audit.rawName,
+            state,
+          },
+          tx,
+        );
+      },
+      { maxWait: 5000, timeout: 60_000 },
+    );
     decisions += 1;
   }
   const projection = options.rebuild
