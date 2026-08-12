@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.10](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.9...qgs-v0.24.10) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** disconnect redis in issue responsibility remediation CLI ([58f9fc9](https://github.com/ajie5419/Quality-Guardian/commit/58f9fc9fda307c3785fa3642dc7310482aacc086))
+* **@qgs/backend:** disconnect redis in issue responsibility remediation CLI ([95b3eb9](https://github.com/ajie5419/Quality-Guardian/commit/95b3eb9fb44c9726864a2bc3b5ecc73f18c631cb))
+
 ## [0.24.9](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.8...qgs-v0.24.9) (2026-08-12)
 
 
