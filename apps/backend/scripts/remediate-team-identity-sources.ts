@@ -1,3 +1,5 @@
+import type { Prisma } from '@prisma/client';
+
 import process from 'node:process';
 
 import { resolveSupplierInspectionPolicy } from '@qgs/shared';
@@ -9,20 +11,141 @@ const logger = createModuleLogger('team-identity-source-remediation');
 type Mode = 'apply' | 'dry-run';
 
 function parseOptions(args: string[]): { mode: Mode } {
-  const mode: Mode = args.includes('--apply') ? 'apply' : 'dry-run';
-  return { mode };
+  return { mode: args.includes('--apply') ? 'apply' : 'dry-run' };
+}
+
+/**
+ * Confirmed TEAM -> supplier mappings reviewed by the business owner. The
+ * team name exactly equals the supplier master name and the supplier is a
+ * PROCESS-policy TEAM identity source.
+ */
+const CONFIRMED_TEAM_SUPPLIER_LINKS: Array<{
+  supplierId: string;
+  teamId: string;
+  teamName: string;
+}> = [
+  {
+    supplierId: 'SUP-1769076104551-s4sh',
+    teamId: '0e9b4248568311f1881c00163e37355f',
+    teamName: '卢龙县强盛科技有限公司',
+  },
+  {
+    supplierId: 'SUP-2026--XAOX2',
+    teamId: '0e9b42b9568311f1881c00163e37355f',
+    teamName: '秦皇岛秦开文旅发展集团有限公司龙海道分公司',
+  },
+  {
+    supplierId: 'SUP-1769076104249-hbq4',
+    teamId: '0e9b42f3568311f1881c00163e37355f',
+    teamName: '秦皇岛旭哲金属加工有限公司',
+  },
+  {
+    supplierId: 'SUP-1769076104529-s2x5',
+    teamId: '0e9b4221568311f1881c00163e37355f',
+    teamName: '秦皇岛弘旺设备安装工程有限公司',
+  },
+];
+
+type SourcePlan = {
+  sourceId: string;
+  sourceType: 'DEPARTMENT' | 'SUPPLIER';
+  teamId: string;
+};
+
+async function ensureSource(
+  tx: Prisma.TransactionClient,
+  item: SourcePlan,
+  revived: SourcePlan[],
+  conflicts: { value: number },
+) {
+  // (sourceType, sourceId) is globally unique, so a soft-deleted row for the
+  // same source must be revived instead of created.
+  const revivedCount = await tx.team_identity_sources.updateMany({
+    where: {
+      isDeleted: true,
+      sourceId: item.sourceId,
+      sourceType: item.sourceType,
+    },
+    data: { isDeleted: false, teamId: item.teamId },
+  });
+  if (revivedCount.count === 1) {
+    revived.push(item);
+    return;
+  }
+  const existing = await tx.team_identity_sources.findFirst({
+    where: { sourceId: item.sourceId, sourceType: item.sourceType },
+    select: { isDeleted: true, teamId: true },
+  });
+  if (existing && existing.teamId !== item.teamId) {
+    conflicts.value += 1;
+    return;
+  }
+  await tx.team_identity_sources.create({
+    data: {
+      sourceId: item.sourceId,
+      sourceType: item.sourceType,
+      teamId: item.teamId,
+    },
+  });
+}
+
+async function ensureLink(
+  tx: Prisma.TransactionClient,
+  input: { supplierId: string; teamId: string; teamName: string },
+) {
+  const updated = await tx.supplier_identity_links.updateMany({
+    where: {
+      identityId: input.teamId,
+      identityType: 'TEAM',
+      isDeleted: false,
+      supplierId: { not: input.supplierId },
+    },
+    data: {
+      identityNameSnapshot: input.teamName,
+      supplierId: input.supplierId,
+    },
+  });
+  if (updated.count > 0) return;
+  const restored = await tx.supplier_identity_links.updateMany({
+    where: {
+      identityId: input.teamId,
+      identityType: 'TEAM',
+      isDeleted: true,
+    },
+    data: {
+      identityNameSnapshot: input.teamName,
+      isDeleted: false,
+      supplierId: input.supplierId,
+    },
+  });
+  if (restored.count > 0) return;
+  const existing = await tx.supplier_identity_links.findFirst({
+    where: { identityId: input.teamId, identityType: 'TEAM' },
+    select: { supplierId: true },
+  });
+  if (existing && existing.supplierId === input.supplierId) return;
+  await tx.supplier_identity_links.create({
+    data: {
+      identityId: input.teamId,
+      identityNameSnapshot: input.teamName,
+      identityType: 'TEAM',
+      supplierId: input.supplierId,
+    },
+  });
 }
 
 /**
  * Completes the identity metadata for confirmed TEAM mappings:
- * - A TEAM with a single valid explicit supplier link must carry the matching
- *   SUPPLIER source row; legacy link-only rows are missing that source.
+ * - Confirmed external TEAMs get their TEAM -> supplier link and SUPPLIER
+ *   source row (repairing wrong or soft-deleted rows).
+ * - A TEAM with a valid explicit link must carry the matching SUPPLIER source;
+ *   legacy link-only rows are missing that source.
  * - A TEAM with no link/source whose name exactly matches one active
  *   department is an internal BU and gets the DEPARTMENT source.
  * Nothing is derived from ambiguous names; unresolved cases are left audited.
  */
 export async function remediateTeamIdentitySources(options: { mode: Mode }) {
-  const [links, sources, teams, departments] = await Promise.all([
+  const [links, sources, teams, departments, suppliers] = await Promise.all([
     prisma.supplier_identity_links.findMany({
       where: { identityType: 'TEAM' },
       include: {
@@ -49,6 +172,14 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
       where: { isDeleted: false, status: 1 },
       select: { id: true, name: true },
     }),
+    prisma.suppliers.findMany({
+      where: { isDeleted: false },
+      select: {
+        category: true,
+        id: true,
+        outsourcingMode: true,
+      },
+    }),
   ]);
 
   const sourceByTeam = new Map<
@@ -67,18 +198,22 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
     departmentByName.set(department.name, list);
   }
   const teamNameById = new Map(teams.map((team) => [team.id, team.dictKey]));
+  const supplierById = new Map(
+    suppliers.map((supplier) => [supplier.id, supplier]),
+  );
 
   const plannedSupplierSources: Array<{ sourceId: string; teamId: string }> =
     [];
   const plannedDepartmentSources: Array<{ sourceId: string; teamId: string }> =
     [];
+  const plannedLinks: Array<{
+    supplierId: string;
+    teamId: string;
+    teamName: string;
+  }> = [];
   let conflicts = 0;
   let skipped = 0;
-  const revived: Array<{
-    sourceId: string;
-    sourceType: string;
-    teamId: string;
-  }> = [];
+  const revived: SourcePlan[] = [];
 
   for (const link of links) {
     if (link.isDeleted) continue;
@@ -125,6 +260,39 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
     });
   }
 
+  for (const confirmed of CONFIRMED_TEAM_SUPPLIER_LINKS) {
+    if (!teamNameById.has(confirmed.teamId)) {
+      skipped += 1;
+      continue;
+    }
+    const supplier = supplierById.get(confirmed.supplierId);
+    if (
+      !supplier ||
+      resolveSupplierInspectionPolicy(supplier).identitySource !== 'team'
+    ) {
+      skipped += 1;
+      continue;
+    }
+    const teamSources = sourceByTeam.get(confirmed.teamId) || [];
+    if (teamSources.some((source) => source.sourceType === 'DEPARTMENT')) {
+      conflicts += 1;
+      continue;
+    }
+    const hasCorrectLink = links.some(
+      (link) =>
+        link.identityId === confirmed.teamId &&
+        !link.isDeleted &&
+        link.supplierId === confirmed.supplierId,
+    );
+    const hasCorrectSource = teamSources.some(
+      (source) =>
+        source.sourceType === 'SUPPLIER' &&
+        source.sourceId === confirmed.supplierId,
+    );
+    if (hasCorrectLink && hasCorrectSource) continue;
+    plannedLinks.push(confirmed);
+  }
+
   if (options.mode === 'apply') {
     const planned = [
       ...plannedSupplierSources.map((item) => ({
@@ -136,39 +304,26 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
         sourceType: 'DEPARTMENT' as const,
       })),
     ];
+    const conflictCounter = { value: 0 };
     await prisma.$transaction(async (tx) => {
       for (const item of planned) {
-        // (sourceType, sourceId) is globally unique, so a soft-deleted row for
-        // the same source must be revived instead of created.
-        const revivedCount = await tx.team_identity_sources.updateMany({
-          where: {
-            isDeleted: true,
-            sourceId: item.sourceId,
-            sourceType: item.sourceType,
-          },
-          data: { isDeleted: false, teamId: item.teamId },
-        });
-        if (revivedCount.count === 1) {
-          revived.push(item);
-          continue;
-        }
-        const existing = await tx.team_identity_sources.findFirst({
-          where: { sourceId: item.sourceId, sourceType: item.sourceType },
-          select: { isDeleted: true, teamId: true },
-        });
-        if (existing && existing.teamId !== item.teamId) {
-          conflicts += 1;
-          continue;
-        }
-        await tx.team_identity_sources.create({
-          data: {
-            sourceId: item.sourceId,
-            sourceType: item.sourceType,
+        await ensureSource(tx, item, revived, conflictCounter);
+      }
+      for (const item of plannedLinks) {
+        await ensureLink(tx, item);
+        await ensureSource(
+          tx,
+          {
+            sourceId: item.supplierId,
+            sourceType: 'SUPPLIER',
             teamId: item.teamId,
           },
-        });
+          revived,
+          conflictCounter,
+        );
       }
     });
+    conflicts += conflictCounter.value;
   }
 
   const summary = {
@@ -177,6 +332,11 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
       sourceId: item.sourceId,
       teamId: item.teamId,
       teamName: teamNameById.get(item.teamId) || null,
+    })),
+    links: plannedLinks.map((item) => ({
+      supplierId: item.supplierId,
+      teamId: item.teamId,
+      teamName: item.teamName,
     })),
     mode: options.mode,
     revived: revived.map((item) => ({
