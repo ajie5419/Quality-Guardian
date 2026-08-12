@@ -8,7 +8,13 @@ vi.mock('~/utils/prisma', () => ({
     departments: { findMany: vi.fn() },
     dictionaries: { findMany: vi.fn() },
     supplier_identity_links: { findMany: vi.fn() },
-    team_identity_sources: { createMany: vi.fn(), findMany: vi.fn() },
+    $transaction: vi.fn(),
+    team_identity_sources: {
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      findMany: vi.fn(),
+      updateMany: vi.fn(),
+    },
   },
 }));
 
@@ -26,6 +32,18 @@ const outsourcingSupplier = {
   outsourcingMode: 'IN_HOUSE_TEAM',
 };
 
+const linkOnlyTeam = [
+  {
+    id: 'link-1',
+    identityId: 'team-1',
+    identityNameSnapshot: '秦皇岛利强机械制造有限公司',
+    identityType: 'TEAM',
+    isDeleted: false,
+    supplierId: 'supplier-1',
+    supplier: outsourcingSupplier,
+  },
+] as never;
+
 describe('remediateTeamIdentitySources', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -33,20 +51,19 @@ describe('remediateTeamIdentitySources', () => {
     vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([]);
     vi.mocked(prisma.departments.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.$transaction).mockImplementation((callback) =>
+      callback(prisma as never),
+    );
+    vi.mocked(prisma.team_identity_sources.updateMany).mockResolvedValue({
+      count: 0,
+    });
+    vi.mocked(prisma.team_identity_sources.findFirst).mockResolvedValue(null);
   });
 
   it('plans a SUPPLIER source for a link-only external TEAM', async () => {
-    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
-      {
-        id: 'link-1',
-        identityId: 'team-1',
-        identityNameSnapshot: '秦皇岛利强机械制造有限公司',
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId: 'supplier-1',
-        supplier: outsourcingSupplier,
-      },
-    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue(
+      linkOnlyTeam,
+    );
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
       { dictKey: '秦皇岛利强机械制造有限公司', id: 'team-1' },
     ] as never);
@@ -60,33 +77,57 @@ describe('remediateTeamIdentitySources', () => {
         teamName: '秦皇岛利强机械制造有限公司',
       },
     ]);
-    expect(prisma.team_identity_sources.createMany).not.toHaveBeenCalled();
+    expect(prisma.$transaction).not.toHaveBeenCalled();
   });
 
-  it('creates the planned sources in apply mode', async () => {
-    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
-      {
-        id: 'link-1',
-        identityId: 'team-1',
-        identityNameSnapshot: '秦皇岛利强机械制造有限公司',
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId: 'supplier-1',
-        supplier: outsourcingSupplier,
-      },
-    ] as never);
+  it('creates a source when no row exists', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue(
+      linkOnlyTeam,
+    );
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
       { dictKey: '秦皇岛利强机械制造有限公司', id: 'team-1' },
     ] as never);
 
     await remediateTeamIdentitySources({ mode: 'apply' });
 
-    expect(prisma.team_identity_sources.createMany).toHaveBeenCalledWith({
-      data: [
-        { sourceId: 'supplier-1', sourceType: 'SUPPLIER', teamId: 'team-1' },
-      ],
-      skipDuplicates: true,
+    expect(prisma.team_identity_sources.create).toHaveBeenCalledWith({
+      data: {
+        sourceId: 'supplier-1',
+        sourceType: 'SUPPLIER',
+        teamId: 'team-1',
+      },
     });
+  });
+
+  it('revives a soft-deleted source row instead of creating a duplicate', async () => {
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue(
+      linkOnlyTeam,
+    );
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: '秦皇岛利强机械制造有限公司', id: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.updateMany).mockResolvedValue({
+      count: 1,
+    });
+
+    const summary = await remediateTeamIdentitySources({ mode: 'apply' });
+
+    expect(prisma.team_identity_sources.updateMany).toHaveBeenCalledWith({
+      where: {
+        isDeleted: true,
+        sourceId: 'supplier-1',
+        sourceType: 'SUPPLIER',
+      },
+      data: { isDeleted: false, teamId: 'team-1' },
+    });
+    expect(summary.revived).toEqual([
+      {
+        sourceId: 'supplier-1',
+        sourceType: 'SUPPLIER',
+        teamId: 'team-1',
+        teamName: '秦皇岛利强机械制造有限公司',
+      },
+    ]);
   });
 
   it('plans a DEPARTMENT source for a link-less internal TEAM with a unique department', async () => {
@@ -105,17 +146,9 @@ describe('remediateTeamIdentitySources', () => {
   });
 
   it('does not touch a TEAM that already carries the matching source', async () => {
-    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
-      {
-        id: 'link-1',
-        identityId: 'team-1',
-        identityNameSnapshot: '秦皇岛利强机械制造有限公司',
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId: 'supplier-1',
-        supplier: outsourcingSupplier,
-      },
-    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue(
+      linkOnlyTeam,
+    );
     vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
       { sourceId: 'supplier-1', sourceType: 'SUPPLIER', teamId: 'team-1' },
     ] as never);
