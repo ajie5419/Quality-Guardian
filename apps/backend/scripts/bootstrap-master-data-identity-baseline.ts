@@ -37,6 +37,8 @@ if (process.argv[1]?.endsWith('bootstrap-master-data-identity-baseline.ts')) {
     })
     .catch((error: unknown) => {
       console.error(error);
-      process.exitCode = 1;
+      void closeConnections().finally(() => {
+        process.exitCode = 1;
+      });
     });
 }
