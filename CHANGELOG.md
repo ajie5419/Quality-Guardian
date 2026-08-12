@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.9](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.8...qgs-v0.24.9) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** log unresolved issue responsibility remediation samples ([2228631](https://github.com/ajie5419/Quality-Guardian/commit/222863184761d5d9fc0b5b747c4455dc7e82f471))
+* **@qgs/backend:** log unresolved issue responsibility remediation samples ([2053bed](https://github.com/ajie5419/Quality-Guardian/commit/2053bed19b334b90725c4c3144f9831d0ec43eaf))
+
 ## [0.24.8](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.7...qgs-v0.24.8) (2026-08-12)
 
 
