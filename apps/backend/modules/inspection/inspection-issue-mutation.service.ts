@@ -111,6 +111,8 @@ export const InspectionIssueMutationService = {
             select: { category: true, supplierId: true, teamId: true },
           },
           processName: true,
+          responsibilityType: true,
+          responsibleDepartmentId: true,
           responsibleWelder: true,
           supplierId: true,
           supplierName: true,
@@ -124,7 +126,10 @@ export const InspectionIssueMutationService = {
         );
       }
       const responsibility = hasInspectionIssueResponsibilityUpdate(body)
-        ? await resolveInspectionIssueResponsibility(body, tx)
+        ? await resolveInspectionIssueResponsibility(
+            mergeResponsibilityInput(body, current),
+            tx,
+          )
         : null;
       const canonicalBody = responsibility
         ? {
@@ -410,6 +415,25 @@ function hasInspectionIssueResponsibilityUpdate(body: RequestBody) {
     body.responsibleDepartmentId !== undefined ||
     body.supplierId !== undefined
   );
+}
+
+function mergeResponsibilityInput(
+  body: RequestBody,
+  current: {
+    responsibilityType: null | string;
+    responsibleDepartmentId: null | string;
+    supplierId: null | string;
+  },
+) {
+  return {
+    responsibilityType: String(
+      body.responsibilityType ?? current.responsibilityType ?? '',
+    ).trim(),
+    responsibleDepartmentId: String(
+      body.responsibleDepartmentId ?? current.responsibleDepartmentId ?? '',
+    ).trim(),
+    supplierId: String(body.supplierId ?? current.supplierId ?? '').trim(),
+  };
 }
 
 /**

@@ -54,11 +54,16 @@ function createTx(
       })),
     },
     sequences: {
-      update: vi.fn(async ({ data }) => {
-        currentValue = data.currentValue;
+      create: vi.fn(async () => {
+        currentValue = 1;
         return { currentValue };
       }),
-      upsert: vi.fn(async () => ({ currentValue: ++currentValue })),
+      findUnique: vi.fn(async () => ({ currentValue })),
+      updateMany: vi.fn(async ({ data, where }) => {
+        if (where.currentValue !== currentValue) return { count: 0 };
+        currentValue = data.currentValue;
+        return { count: 1 };
+      }),
     },
     $queryRaw: vi.fn().mockResolvedValue([{ value: options.legacyMax ?? 40 }]),
   } as unknown as Prisma.TransactionClient;
@@ -229,5 +234,49 @@ describe('inspectionIssueCreateService', () => {
     });
 
     expect(result.ncNumber).toBe('NC-26KJ-1001');
+  });
+
+  it('retries the CAS loop when the sequence row moved concurrently', async () => {
+    let currentValue = 40;
+    const updateMany = vi
+      .fn()
+      .mockImplementationOnce(async () => {
+        // Simulate a concurrent winner advancing 40 -> 41 before this CAS.
+        currentValue = 41;
+        return { count: 0 };
+      })
+      .mockImplementationOnce(
+        async ({ data }: { data: { currentValue: number } }) => {
+          currentValue = data.currentValue;
+          return { count: 1 };
+        },
+      );
+    const tx = {
+      quality_records: {
+        create: vi.fn(
+          async ({ data }: { data: { nonConformanceNumber: string } }) => ({
+            id: 'issue-1',
+            nonConformanceNumber: data.nonConformanceNumber,
+            supplierId: null,
+            lossAmount: 100,
+          }),
+        ),
+      },
+      sequences: {
+        create: vi.fn(),
+        findUnique: vi.fn(async () => ({ currentValue })),
+        updateMany,
+      },
+      $queryRaw: vi.fn().mockResolvedValue([{ value: 40 }]),
+    } as unknown as Prisma.TransactionClient;
+
+    const result = await InspectionIssueCreateService.createInTransaction({
+      body: { ...baseBody, responsibilityType: 'INTERNAL_DEPARTMENT' },
+      tx,
+      userinfo: { id: 'u-1', username: 'qc' } as never,
+    });
+
+    expect(result.ncNumber).toBe('NC-26KJ-042');
+    expect(updateMany).toHaveBeenCalledTimes(2);
   });
 });

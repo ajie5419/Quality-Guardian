@@ -494,6 +494,79 @@ describe('inspectionIssueMutationService', () => {
       expect(prisma.quality_records.update).not.toHaveBeenCalled();
     });
 
+    it('merges the current triad for a partial supplierId update', async () => {
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        inspection: null,
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchase',
+        supplierId: 'supplier-old',
+        supplierName: 'Old Supplier',
+      });
+      const { resolveInspectionIssueResponsibility } = await import(
+        '~/modules/inspection/inspection-issue-responsibility.service'
+      );
+      (resolveInspectionIssueResponsibility as any).mockResolvedValue({
+        responsibleDepartment: 'Purchase',
+        responsibleDepartmentId: 'dept-purchase',
+        responsibilityType: 'SUPPLIER',
+        supplierId: 'supplier-new',
+        supplierName: 'New Supplier',
+      });
+
+      await InspectionIssueMutationService.updateIssue(
+        { id: 'user-1', username: 'admin', roles: [] } as any,
+        'rec-1',
+        { supplierId: 'supplier-new' },
+        null,
+      );
+
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        {
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchase',
+          supplierId: 'supplier-new',
+        },
+        expect.any(Object),
+      );
+      expect(prisma.quality_records.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            responsibleDepartmentId: 'dept-purchase',
+            responsibilityType: 'SUPPLIER',
+          }),
+        }),
+      );
+    });
+
+    it('merges the current external supplier for a partial type update', async () => {
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        inspection: null,
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchase',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      });
+      const { resolveInspectionIssueResponsibility } = await import(
+        '~/modules/inspection/inspection-issue-responsibility.service'
+      );
+
+      await InspectionIssueMutationService.updateIssue(
+        { id: 'user-1', username: 'admin', roles: [] } as any,
+        'rec-1',
+        { responsibilityType: 'OUTSOURCING_UNIT' },
+        null,
+      );
+
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-purchase',
+          supplierId: 'supplier-1',
+        },
+        expect.any(Object),
+      );
+    });
+
     it('rejects updates when the current record already holds a welding defect without a welder', async () => {
       (
         prisma.quality_classification_subcategories.findFirst as any
@@ -612,6 +685,8 @@ describe('inspectionIssueMutationService', () => {
             select: { category: true, supplierId: true, teamId: true },
           },
           processName: true,
+          responsibilityType: true,
+          responsibleDepartmentId: true,
           responsibleWelder: true,
           supplierId: true,
           supplierName: true,

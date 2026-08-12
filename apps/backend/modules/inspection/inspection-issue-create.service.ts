@@ -4,6 +4,8 @@ import { Prisma } from '@prisma/client';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss';
 import { BusinessError } from '~/utils/business-error';
+import { createModuleLogger } from '~/utils/logger';
+import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 import {
   buildInspectionIssueCreateData,
@@ -16,6 +18,8 @@ import { resolveInspectionIssueResponsibility } from './inspection-issue-respons
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 type IssueCreateTransaction = Prisma.TransactionClient;
+
+const logger = createModuleLogger('InspectionIssueCreate');
 
 export interface InspectionIssueCreateResult {
   ncNumber: string;
@@ -119,11 +123,6 @@ async function reserveInspectionIssueNcNumber(tx: IssueCreateTransaction) {
   const year = new Date().getFullYear();
   const prefix = `NC-${String(year).slice(-2)}KJ-`;
   const name = `inspection_issue_nc_${year}`;
-  let sequence = await tx.sequences.upsert({
-    where: { name },
-    create: { currentValue: 1, name, prefix },
-    update: { currentValue: { increment: 1 } },
-  });
   const latestLegacyRows = await tx.$queryRaw<
     Array<{ value: bigint | null | number }>
   >(Prisma.sql`
@@ -132,14 +131,35 @@ async function reserveInspectionIssueNcNumber(tx: IssueCreateTransaction) {
     WHERE nonConformanceNumber LIKE ${`${prefix}%`}
   `);
   const latestLegacyValue = Number(latestLegacyRows[0]?.value ?? 0);
-  if (
-    Number.isFinite(latestLegacyValue) &&
-    latestLegacyValue >= sequence.currentValue
-  ) {
-    sequence = await tx.sequences.update({
-      where: { name },
-      data: { currentValue: latestLegacyValue + 1, prefix },
+  const floorValue = Number.isFinite(latestLegacyValue)
+    ? latestLegacyValue + 1
+    : 1;
+  // Compare-and-set loop keeps NC allocation race-free: each transaction
+  // reads the current sequence, computes a candidate above the legacy MAX,
+  // and only wins when it writes the value it just read. Losers retry and
+  // observe the winner's value, so concurrent creates always diverge.
+  for (let attempt = 1; attempt <= 5; attempt++) {
+    const existing = await tx.sequences.findUnique({ where: { name } });
+    if (!existing) {
+      try {
+        await tx.sequences.create({ data: { currentValue: 1, name, prefix } });
+      } catch (error) {
+        logger.error(
+          { err: error },
+          'inspection issue NC sequence row could not be created',
+        );
+        if (!isPrismaUniqueConstraintError(error)) throw error;
+      }
+      continue;
+    }
+    const candidate = Math.max(existing.currentValue + 1, floorValue);
+    const updated = await tx.sequences.updateMany({
+      where: { name, currentValue: existing.currentValue },
+      data: { currentValue: candidate },
     });
+    if (updated.count === 1) {
+      return `${prefix}${String(candidate).padStart(3, '0')}`;
+    }
   }
-  return `${prefix}${String(sequence.currentValue).padStart(3, '0')}`;
+  throw new BusinessError('CONFLICT', '不合格项编号生成失败，请重试', 409);
 }
