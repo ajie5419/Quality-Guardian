@@ -137,9 +137,13 @@ finish() {
 trap finish EXIT
 
 preflight_release_containers() {
-  local container
+  local container existing
   for container in "$MIGRATION_CONTAINER" "$MAINTENANCE_CONTAINER"; do
-    if run_with_timeout 30 docker container inspect "$container" >/dev/null 2>&1; then
+    if ! existing="$(run_with_timeout 30 docker container ls -a --filter "name=^/${container}$" --format '{{.Names}}')"; then
+      echo "refusing release: unable to inspect one-off container state: $container" >&2
+      return 1
+    fi
+    if [[ -n "$existing" ]]; then
       echo "refusing release: pre-existing one-off container: $container" >&2
       return 1
     fi

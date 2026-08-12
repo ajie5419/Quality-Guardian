@@ -19,13 +19,22 @@ trap cleanup EXIT
 assert_contains() {
   local needle="$1"
   local file="$2"
-  grep -Fq "$needle" "$file" || { echo "missing '$needle' in $file" >&2; exit 1; }
+  grep -Fq -- "$needle" "$file" || { echo "missing '$needle' in $file" >&2; exit 1; }
 }
 
 assert_outer_timeout_budget() {
   assert_contains 'command_timeout: 60m' "$WORKFLOW"
   assert_contains '120m' "$OSS_ENTRYPOINT"
   assert_contains 'timeout --signal=TERM --kill-after=30s' "$RUNNER"
+}
+
+assert_oss_runner_paths() {
+  assert_contains 'REMOTE_DEPLOY_RUNNER="/tmp/qg-deploy-from-oss.sh"' "$OSS_ENTRYPOINT"
+  assert_contains 'REMOTE_RELEASE_EXECUTOR="/tmp/qg-run-remote-release.sh"' "$OSS_ENTRYPOINT"
+  assert_contains '"$REMOTE_USER@$REMOTE_HOST:$REMOTE_DEPLOY_RUNNER"' "$OSS_ENTRYPOINT"
+  assert_contains '"$REMOTE_USER@$REMOTE_HOST:$REMOTE_RELEASE_EXECUTOR"' "$OSS_ENTRYPOINT"
+  assert_contains '"bash $REMOTE_DEPLOY_RUNNER' "$OSS_ENTRYPOINT"
+  assert_contains "--executor-path \$REMOTE_RELEASE_EXECUTOR" "$OSS_ENTRYPOINT"
 }
 
 make_fake_commands() {
@@ -38,9 +47,10 @@ set -euo pipefail
 log="${FAKE_LOG:?}"
 containers="${FAKE_CONTAINERS:?}"
 printf '%s\n' "$*" >> "$log"
-if [[ "$1" == container && "$2" == inspect ]]; then
-  name="${@: -1}"
-  [[ -e "$containers/$name" ]]
+if [[ "$1" == container && "$2" == ls ]]; then
+  if [[ "${FAKE_SCENARIO:-}" == preflight-error ]]; then exit 1; fi
+  name="$(sed -n 's/.*name=\^\/\([^$]*\)\$.*/\1/p' <<< "$*")"
+  if [[ -e "$containers/$name" ]]; then printf '%s\n' "$name"; fi
   exit
 fi
 if [[ "$1" == rm ]]; then
@@ -65,6 +75,9 @@ while [[ "$1" == --* ]]; do shift; done
 shift
 if [[ "$*" == *run-release-maintenance* && "${FAKE_SCENARIO:-}" == maintenance-timeout ]]; then
   "$@" || true
+  exit 124
+fi
+if [[ "$*" == *'docker container ls'* && "${FAKE_SCENARIO:-}" == preflight-timeout ]]; then
   exit 124
 fi
 "$@"
@@ -145,11 +158,22 @@ if grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
   exit 1
 fi
 
+for scenario in preflight-error preflight-timeout; do
+  run_case "$scenario" 1
+  assert_contains 'unable to inspect one-off container state' "$CASE_DIRECTORY/output.log"
+  assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
+  if [[ -f "$CASE_DIRECTORY/docker.log" ]] && grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
+    echo "$scenario preflight stopped backend" >&2
+    exit 1
+  fi
+done
+
 # A timeout must leave no release container behind, so the next invocation can proceed.
 run_case maintenance-timeout 1
 timeout_directory="$CASE_DIRECTORY"
 run_case success 0 "$timeout_directory"
 assert_contains 'stage=healthcheck state=complete' "$CASE_DIRECTORY/output.log"
 assert_outer_timeout_budget
+assert_oss_runner_paths
 
 echo "run-remote-release shell behavior tests passed"

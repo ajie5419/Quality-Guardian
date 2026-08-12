@@ -66,6 +66,8 @@ FRONTEND_IMAGE_REPO="${FRONTEND_IMAGE_REPO:-qg/frontend}"
 SERVER_APP_DIR="${SERVER_APP_DIR:-/opt/qms}"
 SERVER_RELEASE_DIR="${SERVER_RELEASE_DIR:-/opt/qms/releases}"
 HEALTHCHECK_URL="${HEALTHCHECK_URL:-http://127.0.0.1:3000/api/status}"
+REMOTE_DEPLOY_RUNNER="/tmp/qg-deploy-from-oss.sh"
+REMOTE_RELEASE_EXECUTOR="/tmp/qg-run-remote-release.sh"
 
 REMOTE_SSH_KEY="${REMOTE_SSH_KEY/#\~/$HOME}"
 if [[ ! -f "$REMOTE_SSH_KEY" ]]; then
@@ -144,8 +146,10 @@ release_oss_dir="${OSS_RELEASE_PREFIX%/}/${VERSION}"
 echo "[6/8] Uploading remote deploy runner"
 scp -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no \
   "$SCRIPT_DIR/deploy-from-oss.sh" \
+  "$REMOTE_USER@$REMOTE_HOST:$REMOTE_DEPLOY_RUNNER"
+scp -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no \
   "$SCRIPT_DIR/run-remote-release.sh" \
-  "$REMOTE_USER@$REMOTE_HOST:/tmp/"
+  "$REMOTE_USER@$REMOTE_HOST:$REMOTE_RELEASE_EXECUTOR"
 
 echo "[7/8] Triggering remote deployment"
 SSH_TIMEOUT_BIN="$(command -v timeout || command -v gtimeout || true)"
@@ -156,7 +160,7 @@ fi
 # 120 minutes exceeds bounded artifact transfer/loading plus the 60-minute executor envelope.
 "$SSH_TIMEOUT_BIN" --signal=TERM --kill-after=30s 120m \
   ssh -i "$REMOTE_SSH_KEY" -o StrictHostKeyChecking=no "$REMOTE_USER@$REMOTE_HOST" \
-  "bash /tmp/qg-deploy-from-oss.sh \
+  "bash $REMOTE_DEPLOY_RUNNER \
     --version '$VERSION' \
     --oss-release-prefix '$OSS_RELEASE_PREFIX' \
     --backend-image '$BACKEND_IMAGE_REPO' \
@@ -166,7 +170,7 @@ fi
     --release-dir '$SERVER_RELEASE_DIR' \
     --health-url '$HEALTHCHECK_URL' \
     --ossutil-bin '$OSSUTIL_BIN' \
-    --executor-path /tmp/run-remote-release.sh"
+    --executor-path $REMOTE_RELEASE_EXECUTOR"
 
 echo "[8/8] Done"
 echo "Release version: $VERSION"
