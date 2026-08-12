@@ -230,6 +230,11 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
   let conflicts = 0;
   let skipped = 0;
   const revived: SourcePlan[] = [];
+  const qualityRecordsAligned: Array<{
+    supplierId: string;
+    teamId: string;
+    teamName: string;
+  }> = [];
 
   for (const link of links) {
     if (link.isDeleted) continue;
@@ -371,6 +376,22 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
           conflictCounter,
         );
       }
+      // Confirmed external TEAMs are the canonical identity source for their
+      // inspection records: align linked quality records to the confirmed
+      // supplier so a stale record snapshot cannot conflict with the TEAM.
+      for (const item of CONFIRMED_TEAM_SUPPLIER_LINKS) {
+        const updated = await tx.quality_records.updateMany({
+          where: {
+            isDeleted: false,
+            inspection: { isDeleted: false, teamId: item.teamId },
+            NOT: { supplierId: item.supplierId },
+          },
+          data: { supplierId: item.supplierId, supplierName: item.teamName },
+        });
+        if (updated.count > 0) {
+          qualityRecordsAligned.push(item);
+        }
+      }
     });
     conflicts += conflictCounter.value;
   }
@@ -388,6 +409,7 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
       teamName: item.teamName,
     })),
     mode: options.mode,
+    qualityRecordsAligned,
     revived: revived.map((item) => ({
       sourceId: item.sourceId,
       sourceType: item.sourceType,
