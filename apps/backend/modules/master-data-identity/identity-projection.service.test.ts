@@ -96,4 +96,37 @@ describe('identity projection generation service', () => {
       db.identity_projection_generations.updateMany,
     ).not.toHaveBeenCalled();
   });
+
+  it('skips the projection upsert when no active generation exists', async () => {
+    const { IdentityProjectionService } = await import(
+      './identity-projection.service'
+    );
+    db.identity_projection_generation_pointer.upsert.mockResolvedValue({
+      activeGenerationId: null,
+      resolutionVersion: 0,
+    });
+    db.identity_projection_generation_pointer.update.mockResolvedValue({});
+
+    const projection = await IdentityProjectionService.recordDecision(
+      db as never,
+      {
+        canonicalId: 'process-1',
+        entityId: 'inspection-1',
+        entityType: 'inspections',
+        fieldName: 'processId',
+        id: 'decision-1',
+        sourceFingerprint: 'fingerprint-1',
+        state: 'RESOLVED',
+      },
+    );
+
+    expect(projection).toBeNull();
+    expect(db.identity_resolution_projection.upsert).not.toHaveBeenCalled();
+    expect(
+      db.identity_projection_generation_pointer.update,
+    ).toHaveBeenCalledWith({
+      where: { key: 'historical-identity' },
+      data: { resolutionVersion: { increment: 1 } },
+    });
+  });
 });
