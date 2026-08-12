@@ -79,6 +79,7 @@ export function useInspectionRequestIdentityOptions(options: {
     },
     preserveSelection = false,
   ) {
+    const isExternal = isExternalResponsibility(options.responsibilityType);
     responsibilityDepartmentOptions.value = preserveSelection
       ? preserveSelectedOption({
           currentId: requestForm.responsibleDepartmentId,
@@ -94,16 +95,6 @@ export function useInspectionRequestIdentityOptions(options: {
         })
       : options.suppliers;
 
-    if (isExternalResponsibility(options.responsibilityType)) {
-      if (!preserveSelection) {
-        const [department] = options.departments;
-        requestForm.responsibleDepartmentId = department?.value || '';
-      }
-      requestForm.team = '';
-      requestForm.teamId = '';
-      return;
-    }
-
     if (
       !preserveSelection &&
       requestForm.responsibleDepartmentId &&
@@ -116,6 +107,13 @@ export function useInspectionRequestIdentityOptions(options: {
       requestForm.team = '';
       requestForm.teamId = '';
     }
+
+    if (isExternal) {
+      requestForm.team = '';
+      requestForm.teamId = '';
+      return;
+    }
+
     requestForm.supplierId = '';
   }
 

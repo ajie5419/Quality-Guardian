@@ -64,7 +64,7 @@ describe('inspection request responsibility options', () => {
     expect(requestForm.supplierId).toBe('');
   });
 
-  it('locks the server policy department and only retains supplier ID for outsourcing', async () => {
+  it('loads outsourcing canonical department and supplier choices without preselecting either', async () => {
     const requestForm = createForm();
     getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
       departments: [{ label: 'Production OBU', value: 'dept-production' }],
@@ -77,13 +77,71 @@ describe('inspection request responsibility options', () => {
 
     expect(requestForm).toMatchObject({
       responsibilityType: 'OUTSOURCING_UNIT',
-      responsibleDepartmentId: 'dept-production',
+      responsibleDepartmentId: '',
       supplierId: '',
       team: '',
       teamId: '',
     });
     expect(composable.supplierOptions.value).toEqual([
       { label: 'Outsource A', value: 'supplier-a' },
+    ]);
+  });
+
+  it.each([
+    ['SUPPLIER', 'dept-incoming', 'supplier-incoming'],
+    ['OUTSOURCING_UNIT', 'dept-outsourcing', 'supplier-outsourcing'],
+  ] as const)(
+    'clears a stale %s department when a complete options reload no longer contains it',
+    async (responsibilityType, departmentId, supplierId) => {
+      const requestForm = createForm();
+      requestForm.responsibilityType = responsibilityType;
+      requestForm.responsibleDepartmentId = 'dept-stale';
+      requestForm.supplierId = supplierId;
+      getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+        departments: [{ label: 'Current department', value: departmentId }],
+        responsibilityType,
+        suppliers: [{ label: 'Current supplier', value: supplierId }],
+      });
+      const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+      await composable.loadResponsibilityOptions();
+
+      expect(requestForm).toMatchObject({
+        responsibleDepartmentId: '',
+        supplierId,
+        team: '',
+        teamId: '',
+      });
+      expect(composable.responsibilityDepartmentOptions.value).toEqual([
+        { label: 'Current department', value: departmentId },
+      ]);
+    },
+  );
+
+  it('retains an external department while searching suppliers', async () => {
+    const requestForm = createForm();
+    requestForm.responsibilityType = 'SUPPLIER';
+    requestForm.responsibleDepartmentId = 'dept-structure';
+    requestForm.supplierId = 'supplier-a';
+    getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+      departments: [{ label: 'Purchasing', value: 'dept-purchasing' }],
+      responsibilityType: 'SUPPLIER',
+      suppliers: [{ label: 'Supplier A', value: 'supplier-a' }],
+    });
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+    composable.responsibilityDepartmentOptions.value = [
+      { label: 'Structure BU', value: 'dept-structure' },
+    ];
+
+    await composable.loadResponsibilityOptions('supplier a');
+
+    expect(requestForm).toMatchObject({
+      responsibleDepartmentId: 'dept-structure',
+      supplierId: 'supplier-a',
+    });
+    expect(composable.responsibilityDepartmentOptions.value).toEqual([
+      { label: 'Structure BU', value: 'dept-structure' },
+      { label: 'Purchasing', value: 'dept-purchasing' },
     ]);
   });
 

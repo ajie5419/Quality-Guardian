@@ -139,6 +139,38 @@ function mountFields(isIncomingEntry: boolean) {
 }
 
 describe('inspection request entry responsibility identity', () => {
+  it('keeps all responsibility types and canonical department selection available for incoming entry', async () => {
+    const { wrapper } = mountFields(true);
+    const typeSelect = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find(
+        (item) =>
+          item.attributes('data-testid') === 'responsibility-type-select',
+      );
+    const departmentSelect = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find(
+        (item) =>
+          item.attributes('data-testid') === 'responsible-department-select',
+      );
+
+    expect(typeSelect?.props('options')).toEqual([
+      { label: 'Internal department', value: 'INTERNAL_DEPARTMENT' },
+      { label: 'Supplier', value: 'SUPPLIER' },
+      { label: 'Outsourcing', value: 'OUTSOURCING_UNIT' },
+    ]);
+    expect(departmentSelect?.props('options')).toEqual([
+      { label: 'Assembly Department', value: 'dept-assembly' },
+      { label: 'Structure BU', value: 'dept-structure' },
+    ]);
+
+    typeSelect?.vm.$emit('change', 'OUTSOURCING_UNIT');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('responsibilityTypeChange')).toEqual([
+      ['OUTSOURCING_UNIT'],
+    ]);
+  });
+
   it('writes a supplier canonical ID and clears stale TEAM identity', async () => {
     const { form, wrapper } = mountFields(true);
     const select = wrapper

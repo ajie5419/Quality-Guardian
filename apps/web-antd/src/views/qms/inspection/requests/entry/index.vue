@@ -292,10 +292,9 @@ async function submitRequest() {
     !requestForm.quantity ||
     (requiresStationSelection.value && !requestForm.stationSelection) ||
     !requestForm.responsibleDepartmentId ||
-    (requestForm.responsibilityType ===
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
-      ? !requestForm.teamId
-      : !requestForm.supplierId) ||
+    (requestForm.responsibilityType !==
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+      !requestForm.supplierId) ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
   ) {
@@ -305,6 +304,7 @@ async function submitRequest() {
         requiresComponentName.value,
         isIncomingEntry.value,
         requiresStationSelection.value,
+        requestForm.responsibilityType,
       ),
     );
     return;
@@ -368,32 +368,39 @@ async function submitRequest() {
   }
 }
 
-onMounted(async () => {
-  applyRoutePrefill();
-  if (isIncomingEntry.value) {
-    try {
-      const setting = await getPublicIncomingMaterialInputSettingApi();
-      incomingMaterialFreeInputEnabled.value =
-        setting.incomingMaterialFreeInputEnabled;
-      requestForm.requestNewPart = incomingMaterialFreeInputEnabled.value;
-      if (requestForm.requestNewPart) {
-        requestForm.partId = '';
-        requestForm.partName = '';
-      } else {
-        requestForm.requestedPartName = '';
-      }
-    } catch {
-      requestForm.requestNewPart = false;
+async function loadIncomingMaterialInputSetting() {
+  try {
+    const setting = await getPublicIncomingMaterialInputSettingApi();
+    incomingMaterialFreeInputEnabled.value =
+      setting.incomingMaterialFreeInputEnabled;
+    requestForm.requestNewPart = incomingMaterialFreeInputEnabled.value;
+    if (requestForm.requestNewPart) {
+      requestForm.partId = '';
+      requestForm.partName = '';
+    } else {
+      requestForm.requestedPartName = '';
     }
+  } catch {
+    requestForm.requestNewPart = false;
   }
-  void loadWorkOrderOptions(requestForm.workOrderNumber);
+}
+
+onMounted(() => {
+  applyRoutePrefill();
+  // Responsibility choices must not wait for the optional incoming-material
+  // setting; otherwise a delayed settings request leaves the form unusable.
   void loadResponsibilityOptions();
+  void loadWorkOrderOptions(requestForm.workOrderNumber);
+  if (isIncomingEntry.value) {
+    void loadIncomingMaterialInputSetting();
+  }
 });
 
 watch(
   () => route.query,
   () => {
     applyRoutePrefill();
+    void loadResponsibilityOptions();
   },
 );
 

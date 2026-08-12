@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildInspectionRequestEntryProcessOptions,
+  buildInspectionRequestEntryRequiredMessage,
   buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
   getInspectionRequestResponsibilityUnitCopy,
@@ -75,6 +76,30 @@ describe('inspection request entry identity options', () => {
       responsibilityType: 'INTERNAL_DEPARTMENT',
       responsibleDepartmentId: 'dept-structure',
     });
+  });
+
+  it('does not describe the optional execution TEAM as a required field', () => {
+    expect(
+      buildInspectionRequestEntryRequiredMessage(
+        {
+          attachmentLabel: '自检记录',
+          attachmentRequiredMessage: '自检记录不能为空',
+          attachmentUploadName: '自检记录',
+          componentLabel: '组件名称',
+          partLabel: '一级部件名称',
+          partPlaceholder: '请选择BOM一级部件',
+          processLabel: '工序',
+          shellTitle: '扫码报检',
+          submitSuccessPrefix: '报检任务已提交',
+          teamLabel: '班组',
+          teamPlaceholder: '请选择班组',
+        },
+        false,
+        false,
+        false,
+        'INTERNAL_DEPARTMENT',
+      ),
+    ).not.toContain('班组');
   });
 
   it('rejects an execution TEAM assigned to a different department', () => {

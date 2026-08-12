@@ -263,11 +263,17 @@ export function buildInspectionRequestEntryRequiredMessage(
   requiresComponentName: boolean,
   isIncoming: boolean,
   requiresStationSelection = false,
+  responsibilityType: InspectionIssueResponsibilityType = INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
 ) {
   const componentText = requiresComponentName ? `${copy.componentLabel}、` : '';
   const incomingTypeText = isIncoming ? '进货类型、' : '';
   const stationText = requiresStationSelection ? '台数、' : '';
-  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${stationText}${copy.teamLabel}、报检人、${copy.attachmentRequiredMessage}`;
+  const responsibilityText =
+    responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+      ? '责任归属类型、责任部门、'
+      : `责任归属类型、责任部门、${getInspectionRequestResponsibilityUnitCopy(responsibilityType).label}、`;
+  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${stationText}${responsibilityText}报检人、${copy.attachmentRequiredMessage}`;
 }
 
 export function buildIncomingInspectionRequestInfo(input: {

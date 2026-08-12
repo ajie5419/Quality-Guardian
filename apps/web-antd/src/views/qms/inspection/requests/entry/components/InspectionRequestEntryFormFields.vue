@@ -352,22 +352,16 @@ function handleProcessIdentityChange(
         @change="handleStationChange"
       />
     </Form.Item>
-    <Form.Item v-if="!props.isIncomingEntry" label="责任归属类型" required>
+    <Form.Item label="责任归属类型" required>
       <Select
+        data-testid="responsibility-type-select"
         :value="form.responsibilityType"
         :options="props.responsibilityTypeOptions"
         class="w-full"
         @change="handleResponsibilityTypeChange"
       />
     </Form.Item>
-    <Form.Item v-else label="责任归属类型">
-      <Input value="供应商" class="w-full" readonly />
-    </Form.Item>
-    <Form.Item
-      v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
-      label="责任部门"
-      required
-    >
+    <Form.Item label="责任部门" required>
       <Select
         data-testid="responsible-department-select"
         :value="form.responsibleDepartmentId"
@@ -399,17 +393,6 @@ function handleProcessIdentityChange(
         allow-clear
         @change="handleInternalTeamChange"
         @search="(value) => emit('internalTeamSearch', value)"
-      />
-    </Form.Item>
-    <Form.Item v-else label="责任部门" required>
-      <Input
-        :value="
-          props.responsibilityDepartmentOptions.find(
-            (item) => item.value === form.responsibleDepartmentId,
-          )?.label || '责任部门策略加载中'
-        "
-        class="w-full"
-        readonly
       />
     </Form.Item>
     <Form.Item
