@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
@@ -159,5 +162,29 @@ describe('remediateTeamIdentitySources', () => {
     const summary = await remediateTeamIdentitySources({ mode: 'dry-run' });
 
     expect(summary.supplierSources).toEqual([]);
+  });
+
+  it('runs before the supplier identity backfill in release maintenance', () => {
+    const backendRoot = process.cwd().endsWith('/apps/backend')
+      ? process.cwd()
+      : resolve(process.cwd(), 'apps/backend');
+    const maintenance = readFileSync(
+      resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
+      'utf8',
+    );
+    const sourceIndex = maintenance.indexOf(
+      'scripts/remediate-team-identity-sources.ts --apply',
+    );
+    const confirmedIndex = maintenance.indexOf(
+      'scripts/remediate-confirmed-inspection-identity-rows.ts --apply',
+    );
+    const supplierIndex = maintenance.indexOf(
+      'scripts/backfill-quality-record-supplier-identities.ts --apply',
+    );
+
+    expect(sourceIndex).toBeGreaterThan(-1);
+    expect(confirmedIndex).toBeGreaterThan(-1);
+    expect(sourceIndex).toBeLessThan(supplierIndex);
+    expect(confirmedIndex).toBeLessThan(supplierIndex);
   });
 });
