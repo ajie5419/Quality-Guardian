@@ -27,6 +27,25 @@
 
 ---
 
+### 2026-08-12 功能：检验记录复检合格展示
+
+**执行内容：**
+
+- 检验记录列表与详情增加“复检合格”展示：`result=PASS` 且记录关联不合格项（`issueStatus !== NONE`）时显示“复检合格”，否则保持合格/不合格/让步接收等原逻辑；判定逻辑收敛到 `inspection-record-result.ts` 纯函数。
+- 小程序“我的记录”列表同步支持“复检合格”：`inspectionResult=PASS` 且存在 `linkedIssueId/linkedIssueNo` 时显示复检合格徽标（蓝色），否则保持合格/不合格/待复检；判定逻辑收敛到 `record-result.ts` 纯函数。
+
+**验证结果：**
+
+- Web 全量 Vitest：`60/60` 文件、`305/305` 用例通过（新增复检判定 `4/4`）；小程序全量 Vitest：`9/9` 文件、`39/39` 用例通过（新增复检判定 `5/5`）。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commits:** `311e3a7`（Web）、`99a9d11`（WeApp）。
+
+**遗留问题：**
+
+- 未推送、未发布；真实浏览器/小程序页面展示与生产验证尚未执行。
+
+
 ### 2026-08-12 修复：关单责任部门唯一解析、部分更新与 NC 并发
 
 **执行内容：**
