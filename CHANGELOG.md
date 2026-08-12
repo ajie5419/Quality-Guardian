@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.7](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.6...qgs-v0.24.7) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** align quality records to confirmed TEAM suppliers ([50b5ecc](https://github.com/ajie5419/Quality-Guardian/commit/50b5ecc6b06d3412d73fdba29887283aa88756d5))
+* **@qgs/backend:** align quality records to confirmed TEAM suppliers ([6322e8a](https://github.com/ajie5419/Quality-Guardian/commit/6322e8a4420c90285aa71342b7dae862c755fe42))
+
 ## [0.24.6](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.5...qgs-v0.24.6) (2026-08-12)
 
 
