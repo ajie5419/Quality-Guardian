@@ -22,7 +22,7 @@ echo "Running database migrations..."
 container run --rm \
   --env-file "$ENV_FILE" \
   "$BACKEND_IMAGE" \
-  sh -lc "/app/apps/backend/node_modules/.bin/prisma migrate deploy --schema /app/apps/backend/prisma/schema.prisma"
+  sh -lc "cd /app/apps/backend && sh scripts/run-prisma-migrations.sh"
 
 echo "Running ordered release maintenance..."
 container run --rm \

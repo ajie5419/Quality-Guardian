@@ -15,7 +15,6 @@ import {
 } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { notifyTelegramNewRequest } from '~/utils/telegram-bot';
 
@@ -31,7 +30,10 @@ import {
   parseInspectionRequestQuantity,
   serializeInspectionStationSelection,
 } from './inspection-request';
+import { resolveV2RequestResponsibility } from './inspection-request-create-responsibility.service';
+import { retryInspectionRequestCreate } from './inspection-request-create-retry.service';
 import { publishInspectionRequestCreated } from './inspection-request-events';
+import { resolveInspectionRequestIssueResponsibilities } from './inspection-request-responsibility.service';
 import {
   assertWorkOrdersExist,
   inspectionRequestWorkOrdersInclude,
@@ -73,8 +75,33 @@ export const InspectionRequestCreateService = {
       machineStationBound,
     );
 
-    const created = await retryOnRequestNoConflict(() =>
+    const created = await retryInspectionRequestCreate(() =>
       prisma.$transaction(async (tx) => {
+        const persistedResponsibility =
+          identityContract === 'V2'
+            ? await resolveV2RequestResponsibility(payload, tx)
+            : null;
+        const governedFields = persistedResponsibility
+          ? buildGovernedWriteFieldsForTable('qms_inspection_requests', {
+              componentName: payload.componentName || null,
+              partName: payload.partName,
+              processName: payload.processName,
+              team: persistedResponsibility.team,
+            })
+          : payload.governedFields;
+        const governedCanonicalIds = persistedResponsibility
+          ? await buildGovernedCanonicalWritePairForTable(
+              'qms_inspection_requests',
+              {
+                ...governedFields,
+                partId: payload.partId,
+                processId: payload.processId,
+                ...(persistedResponsibility.teamId
+                  ? { teamId: persistedResponsibility.teamId }
+                  : {}),
+              },
+            )
+          : payload.governedCanonicalIds;
         const request = await tx.qms_inspection_requests.create({
           data: {
             attachments:
@@ -87,8 +114,24 @@ export const InspectionRequestCreateService = {
               body.mutualCheckResult,
             ),
             processId: payload.processId,
-            supplierId: payload.supplierId,
-            teamId: payload.teamId,
+            supplierId:
+              persistedResponsibility?.supplierId ?? payload.supplierId,
+            supplierName:
+              persistedResponsibility?.responsibility.supplierName ??
+              (payload.supplierId ? payload.team : null),
+            teamId: persistedResponsibility?.teamId ?? payload.teamId,
+            ...(persistedResponsibility
+              ? {
+                  responsibilityType:
+                    persistedResponsibility.responsibility.responsibilityType,
+                  responsibleDepartment:
+                    persistedResponsibility.responsibility
+                      .responsibleDepartment,
+                  responsibleDepartmentId:
+                    persistedResponsibility.responsibility
+                      .responsibleDepartmentId,
+                }
+              : {}),
             processName: payload.processName,
             quantity: payload.quantity,
             stationSelection: payload.stationSelection,
@@ -101,8 +144,8 @@ export const InspectionRequestCreateService = {
             selfCheckResult: normalizeInspectionRequestCheckResult(
               body.selfCheckResult,
             ),
-            ...payload.governedFields,
-            ...payload.governedCanonicalIds,
+            ...governedFields,
+            ...governedCanonicalIds,
             partId: payload.partId,
             partName: payload.partName,
             ...(payload.requestedPartName
@@ -266,29 +309,57 @@ async function buildCreateRequestPayload(
   }
   const reporter = normalizeInspectionRequestText(body.reporter);
   const isIncoming = category === 'INCOMING';
-  const supplier = isIncoming
-    ? await SupplierIdentityService.resolveSupplierById(
-        normalizeInspectionRequestText(body.supplierId),
-      )
-    : null;
-  const teamIdentity = isIncoming
-    ? null
-    : await SupplierIdentityService.resolveTeamById(
-        normalizeInspectionRequestText(body.teamId),
-      );
-  if (isIncoming && !supplier) {
+  const requiresLegacyIdentity = identityContract === 'V1';
+  const supplier =
+    requiresLegacyIdentity && isIncoming
+      ? await SupplierIdentityService.resolveSupplierById(
+          normalizeInspectionRequestText(body.supplierId),
+        )
+      : null;
+  const teamIdentity =
+    requiresLegacyIdentity && !isIncoming
+      ? await SupplierIdentityService.resolveTeamById(
+          normalizeInspectionRequestText(body.teamId),
+        )
+      : null;
+  if (requiresLegacyIdentity && isIncoming && !supplier) {
     throw new BusinessError(
       'SUPPLIER_ID_REQUIRED',
       'supplierId is required for incoming inspection requests',
     );
   }
-  if (!isIncoming && !teamIdentity) {
+  if (requiresLegacyIdentity && !isIncoming && !teamIdentity) {
     throw new BusinessError(
       'TEAM_ID_REQUIRED',
       'teamId is required for process inspection requests',
     );
   }
   const team = supplier?.name || teamIdentity?.name || '';
+  if (requiresLegacyIdentity) {
+    const [responsibility] =
+      await resolveInspectionRequestIssueResponsibilities([
+        {
+          category,
+          processName,
+          supplierId: supplier?.id,
+          team,
+          teamId: teamIdentity?.id,
+        },
+      ]);
+    const hasExternalResponsibility =
+      responsibility?.responsibilityType !== 'INTERNAL_DEPARTMENT';
+    if (
+      !responsibility?.responsibleDepartmentId ||
+      (hasExternalResponsibility && !responsibility.supplierId) ||
+      (isIncoming && responsibility?.responsibilityType !== 'SUPPLIER')
+    ) {
+      throw new BusinessError(
+        'INSPECTION_REQUEST_RESPONSIBILITY_UNRESOLVED',
+        'The selected inspection request identity has no complete canonical responsibility',
+        409,
+      );
+    }
+  }
   const quantity = parseInspectionRequestQuantity(body.quantity);
   const normalizedStationSelection = normalizeInspectionStationSelection(
     body.stationSelection,
@@ -353,7 +424,18 @@ async function buildCreateRequestPayload(
     requestedPartName: partIdentity ? '' : requestedPartName,
     stationSelection,
     supplierId: supplier?.id || null,
+    team,
     teamId: teamIdentity?.id || null,
+    v2Responsibility: {
+      responsibilityType: normalizeInspectionRequestText(
+        body.responsibilityType,
+      ),
+      responsibleDepartmentId: normalizeInspectionRequestText(
+        body.responsibleDepartmentId,
+      ),
+      supplierId: normalizeInspectionRequestText(body.supplierId),
+      teamId: normalizeInspectionRequestText(body.teamId),
+    },
     workOrderNumber,
     workOrderNumbers,
   };
@@ -385,39 +467,4 @@ async function auditRequestCreate(
     targetType: 'inspection_request',
     userId: userinfo.id,
   });
-}
-
-/**
- * Returns true when the Prisma error is a P2002 unique-constraint violation
- * targeting the requestNo column.
- */
-function isRequestNoConflict(error: unknown): boolean {
-  if (!isPrismaUniqueConstraintError(error)) return false;
-  const message = String((error as { message?: string })?.message || '');
-  const target: unknown = (error as { meta?: { target?: unknown } })?.meta
-    ?.target;
-  const targetStr = Array.isArray(target)
-    ? target.join(',')
-    : String(target ?? '');
-  return message.includes('requestNo') || targetStr.includes('requestNo');
-}
-
-/**
- * Retries the create transaction (max 3 attempts) when two concurrent creates
- * collide on the requestNo unique index. Each retry re-enters the closure, which
- * calls generateInspectionRequestNo again and picks the new highest count.
- */
-async function retryOnRequestNoConflict<T>(
-  run: () => Promise<T>,
-  maxAttempts = 3,
-): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      if (attempt >= maxAttempts || !isRequestNoConflict(error)) {
-        throw error;
-      }
-    }
-  }
 }

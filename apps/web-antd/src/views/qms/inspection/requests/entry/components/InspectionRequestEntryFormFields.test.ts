@@ -65,6 +65,11 @@ function createForm() {
     processName: '',
     quantity: 1,
     reporter: '',
+    responsibilityType: 'INTERNAL_DEPARTMENT' as
+      | 'INTERNAL_DEPARTMENT'
+      | 'OUTSOURCING_UNIT'
+      | 'SUPPLIER',
+    responsibleDepartmentId: '',
     requestedPartName: '',
     requestNewPart: false,
     requestInfo: '',
@@ -80,6 +85,7 @@ function createForm() {
 
 function mountFields(isIncomingEntry: boolean) {
   const form = createForm();
+  if (isIncomingEntry) form.responsibilityType = 'SUPPLIER';
   const wrapper = mount(InspectionRequestEntryFormFields, {
     props: {
       attachmentFileList: [],
@@ -98,14 +104,31 @@ function mountFields(isIncomingEntry: boolean) {
       },
       form,
       isIncomingEntry,
+      internalTeamOptions: [
+        {
+          group: 'internal',
+          label: 'Assembly Team',
+          responsibleDepartmentId: 'dept-assembly',
+          value: 'team-assembly',
+        },
+      ],
       partSearchLoading: false,
       processOptions: [],
+      responsibilityDepartmentOptions: [
+        { label: 'Assembly Department', value: 'dept-assembly' },
+        { label: 'Structure BU', value: 'dept-structure' },
+      ],
+      responsibilityLoading: false,
+      responsibilityTypeOptions: [
+        { label: 'Internal department', value: 'INTERNAL_DEPARTMENT' },
+        { label: 'Supplier', value: 'SUPPLIER' },
+        { label: 'Outsourcing', value: 'OUTSOURCING_UNIT' },
+      ],
       requiresComponentName: false,
       requiresStationSelection: false,
       stationQuantity: 0,
       submitting: false,
-      teamLoading: false,
-      teamOptions: [],
+      supplierOptions: [{ label: 'Supplier A', value: 'supplier-1' }],
       uploadAction: '/upload',
       workOrderLoading: false,
       workOrderOptions: [],
@@ -115,42 +138,92 @@ function mountFields(isIncomingEntry: boolean) {
   return { form, wrapper };
 }
 
-describe('inspection request entry responsible unit identity', () => {
-  it('writes supplier ID and name snapshot for incoming inspection', async () => {
+describe('inspection request entry responsibility identity', () => {
+  it('keeps all responsibility types and canonical department selection available for incoming entry', async () => {
+    const { wrapper } = mountFields(true);
+    const typeSelect = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find(
+        (item) =>
+          item.attributes('data-testid') === 'responsibility-type-select',
+      );
+    const departmentSelect = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find(
+        (item) =>
+          item.attributes('data-testid') === 'responsible-department-select',
+      );
+
+    expect(typeSelect?.props('options')).toEqual([
+      { label: 'Internal department', value: 'INTERNAL_DEPARTMENT' },
+      { label: 'Supplier', value: 'SUPPLIER' },
+      { label: 'Outsourcing', value: 'OUTSOURCING_UNIT' },
+    ]);
+    expect(departmentSelect?.props('options')).toEqual([
+      { label: 'Assembly Department', value: 'dept-assembly' },
+      { label: 'Structure BU', value: 'dept-structure' },
+    ]);
+
+    typeSelect?.vm.$emit('change', 'OUTSOURCING_UNIT');
+    await wrapper.vm.$nextTick();
+    expect(wrapper.emitted('responsibilityTypeChange')).toEqual([
+      ['OUTSOURCING_UNIT'],
+    ]);
+  });
+
+  it('writes a supplier canonical ID and clears stale TEAM identity', async () => {
     const { form, wrapper } = mountFields(true);
     const select = wrapper
       .findAllComponents({ name: 'MockSelect' })
       .find(
-        (item) => item.attributes('data-testid') === 'responsible-unit-select',
+        (item) =>
+          item.attributes('data-testid') === 'responsible-supplier-select',
       );
 
     expect(select).toBeDefined();
-    select?.vm.$emit('change', 'supplier-1', { label: 'Supplier A' });
+    select?.vm.$emit('change', 'supplier-1');
     await wrapper.vm.$nextTick();
 
     expect(form).toMatchObject({
       supplierId: 'supplier-1',
-      team: 'Supplier A',
+      team: '',
       teamId: '',
     });
   });
 
-  it('writes TEAM ID and name snapshot for process inspection', async () => {
+  it('keeps a department without a TEAM selectable and only accepts matching execution TEAMs', async () => {
     const { form, wrapper } = mountFields(false);
-    const select = wrapper
+    const departmentSelect = wrapper
       .findAllComponents({ name: 'MockSelect' })
       .find(
-        (item) => item.attributes('data-testid') === 'responsible-unit-select',
+        (item) =>
+          item.attributes('data-testid') === 'responsible-department-select',
       );
 
-    expect(select).toBeDefined();
-    select?.vm.$emit('change', 'team-1', { label: 'Assembly Team' });
+    expect(departmentSelect).toBeDefined();
+    departmentSelect?.vm.$emit('change', 'dept-structure');
     await wrapper.vm.$nextTick();
 
     expect(form).toMatchObject({
-      supplierId: '',
-      team: 'Assembly Team',
-      teamId: 'team-1',
+      responsibleDepartmentId: 'dept-structure',
+      teamId: '',
+    });
+
+    departmentSelect?.vm.$emit('change', 'dept-assembly');
+    await wrapper.vm.$nextTick();
+    const teamSelect = wrapper
+      .findAllComponents({ name: 'MockSelect' })
+      .find(
+        (item) => item.attributes('data-testid') === 'execution-team-select',
+      );
+
+    expect(teamSelect).toBeDefined();
+    teamSelect?.vm.$emit('change', 'team-assembly');
+    await wrapper.vm.$nextTick();
+
+    expect(form).toMatchObject({
+      responsibleDepartmentId: 'dept-assembly',
+      teamId: 'team-assembly',
     });
   });
 });
@@ -185,17 +258,22 @@ describe('inspection request entry incoming type options', () => {
         },
         form,
         isIncomingEntry: true,
+        internalTeamOptions: [],
         partSearchLoading: false,
         processOptions: [
           { label: '原材料', processName: '原材料', value: 'proc-raw' },
           { label: '外购件', processName: '外购件', value: 'proc-out' },
         ],
+        responsibilityDepartmentOptions: [],
+        responsibilityLoading: false,
+        responsibilityTypeOptions: [
+          { label: 'Internal department', value: 'INTERNAL_DEPARTMENT' },
+        ],
         requiresComponentName: false,
         requiresStationSelection: false,
         stationQuantity: 0,
         submitting: false,
-        teamLoading: false,
-        teamOptions: [],
+        supplierOptions: [],
         uploadAction: '/upload',
         workOrderLoading: false,
         workOrderOptions: [],

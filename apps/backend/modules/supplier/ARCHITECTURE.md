@@ -62,7 +62,7 @@
 
 - 供应商档案主键 `suppliers.id` 是供应商域唯一身份；`nameId` 只属于名称字典命名空间。
 - 普通供应商和外部加工的画像、评分、质量问题和历史项目按 `supplierId` 读取。
-- 驻厂队伍和外部服务通过 `SupplierIdentityService.teamIdsForSupplier()` 获得 TEAM ID 集合后读取，缺失映射时不回退名称。
+- 驻厂队伍和外部服务通过 `SupplierIdentityService.teamIdsForSupplier()` 获得 TEAM ID 集合后读取，缺失映射时不回退名称；映射仅能指向 `Outsourcing + IN_HOUSE_TEAM/EXTERNAL_SERVICE` 的有效供应商，内部 BU 永不归入供应商画像或评分。
 - 名称只用于展示、关键字搜索和迁移审计，不得作为供应商画像聚合键。
 - 跨身份域映射、回填、审计与阶段准入见 `docs/master-data-identity-governance.md`。
 

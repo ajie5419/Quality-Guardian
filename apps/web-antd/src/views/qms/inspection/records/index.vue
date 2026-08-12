@@ -33,6 +33,7 @@ import InspectionForm from './components/InspectionForm.vue';
 import InspectionGrid from './components/InspectionGrid.vue';
 import { useInspectionRecords } from './composables/useInspectionRecords';
 import { INSPECTION_TABS } from './config';
+import { isReinspectionPassedRecord } from './inspection-record-result';
 
 const {
   activeKey,
@@ -179,6 +180,13 @@ function getDetailStationSelection() {
 
 function isDetailFail() {
   return getDetailString('result', '').toUpperCase() === 'FAIL';
+}
+
+function isReinspectionPassedDetail() {
+  return isReinspectionPassedRecord({
+    issueStatus: getDetailString('issueStatus', ''),
+    result: getDetailString('result', ''),
+  });
 }
 
 function getDetailType() {
@@ -374,8 +382,22 @@ watch(
             {{ getDetailNumber('unqualifiedQuantity', '0') }}
           </Descriptions.Item>
           <Descriptions.Item label="检验结论">
-            <Tag :color="isDetailFail() ? 'red' : 'green'">
-              {{ isDetailFail() ? '不合格' : '合格' }}
+            <Tag
+              :color="
+                isDetailFail()
+                  ? 'red'
+                  : isReinspectionPassedDetail()
+                    ? 'processing'
+                    : 'green'
+              "
+            >
+              {{
+                isDetailFail()
+                  ? '不合格'
+                  : isReinspectionPassedDetail()
+                    ? '复检合格'
+                    : '合格'
+              }}
             </Tag>
           </Descriptions.Item>
           <Descriptions.Item label="问题状态">

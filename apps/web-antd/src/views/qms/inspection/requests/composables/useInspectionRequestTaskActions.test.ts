@@ -49,6 +49,14 @@ beforeEach(() => {
   mockDispatchInspectionRequest.mockResolvedValue({ id: 'request-1' });
 });
 
+const internalIssueResponsibility = {
+  responsibilityType: 'INTERNAL_DEPARTMENT' as const,
+  responsibleDepartment: 'Assembly Team A',
+  responsibleDepartmentId: 'dept-assembly',
+  supplierId: null,
+  supplierName: '',
+};
+
 describe('useInspectionRequestTaskActions', () => {
   function createComposable() {
     return useInspectionRequestTaskActions({
@@ -140,10 +148,11 @@ describe('useInspectionRequestTaskActions', () => {
   it('submits linked issue photos from upload response URLs when closing as failed', async () => {
     const composable = createComposable();
 
-    composable.openClose({
+    await composable.openClose({
       id: 'request-1',
       componentName: 'Bearing',
       inspectorName: 'Inspector A',
+      issueResponsibility: internalIssueResponsibility,
       partName: 'Bearing',
       processName: 'Welding',
       quantity: 2,
@@ -153,7 +162,6 @@ describe('useInspectionRequestTaskActions', () => {
     composable.closeForm.result = 'FAIL';
     composable.linkedIssueDraft.value.defectCategoryId = 'category-1';
     composable.linkedIssueDraft.value.defectSubcategoryId = 'subcategory-1';
-    composable.linkedIssueDraft.value.ncNumber = 'NC-2026-001';
     composable.linkedIssueDraft.value.description = 'Weld pore';
     composable.linkedIssueDraft.value.division = 'Vehicle OBU';
     composable.linkedIssueDraft.value.divisionId = 'dept-vehicle';
@@ -179,11 +187,9 @@ describe('useInspectionRequestTaskActions', () => {
       expect.objectContaining({
         linkedIssue: expect.objectContaining({
           photos: ['/api/uploads/defect.jpg'],
-          ncNumber: 'NC-2026-001',
           quantity: 2,
           division: 'Vehicle OBU',
           divisionId: 'dept-vehicle',
-          responsibleDepartment: 'Assembly Team A',
           responsibleDepartmentId: 'dept-assembly',
           responsibilityType: 'INTERNAL_DEPARTMENT',
         }),
@@ -193,16 +199,29 @@ describe('useInspectionRequestTaskActions', () => {
         unqualifiedQuantity: 2,
       }),
     );
+    const requestPayload =
+      mockCloseInspectionRequest.mock.calls[0]?.[1]?.linkedIssue;
+    expect(requestPayload).not.toHaveProperty('ncNumber');
+    expect(requestPayload).not.toHaveProperty('responsibleDepartment');
+    expect(requestPayload).not.toHaveProperty('supplierName');
+    expect(requestPayload).not.toHaveProperty('teamId');
     expect(mockMessageSuccess).toHaveBeenCalledWith('报检任务检验完成');
   });
 
-  it('prefills incoming supplier as supplierName and purchasing as responsible department', () => {
+  it('prefills incoming supplier as supplierName and purchasing as responsible department', async () => {
     const composable = createComposable();
 
-    composable.openClose({
+    await composable.openClose({
       id: 'request-1',
       componentName: '',
       inspectorName: 'Inspector A',
+      issueResponsibility: {
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartment: '采购部',
+        responsibleDepartmentId: 'dept-purchase',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      },
       partName: 'Bearing',
       processName: '进货检验',
       quantity: 2,
@@ -220,14 +239,21 @@ describe('useInspectionRequestTaskActions', () => {
     });
   });
 
-  it('prefills incoming responsibility for INCOMING category with a configured process name', () => {
+  it('prefills incoming responsibility for INCOMING category with a configured process name', async () => {
     const composable = createComposable();
 
-    composable.openClose({
+    await composable.openClose({
       category: 'INCOMING',
       id: 'request-1',
       componentName: '',
       inspectorName: 'Inspector A',
+      issueResponsibility: {
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartment: '采购部',
+        responsibleDepartmentId: 'dept-purchase',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      },
       partName: 'Bearing',
       processName: '外购件',
       quantity: 2,
@@ -245,13 +271,20 @@ describe('useInspectionRequestTaskActions', () => {
     });
   });
 
-  it('prefills outsourcing unit as supplierName and production OBU as responsible department', () => {
+  it('prefills outsourcing unit as supplierName and production OBU as responsible department', async () => {
     const composable = createComposable();
 
-    composable.openClose({
+    await composable.openClose({
       id: 'request-1',
       componentName: 'Bearing',
       inspectorName: 'Inspector A',
+      issueResponsibility: {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartment: '生产 OBU',
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-outsourcing-1',
+        supplierName: 'Outsourcing Plant A',
+      },
       partName: 'Bearing',
       processName: '外协机加',
       quantity: 2,
@@ -272,13 +305,14 @@ describe('useInspectionRequestTaskActions', () => {
   it('submits the canonical TEAM supplier responsibility returned by the API', async () => {
     const composable = createComposable();
 
-    composable.openClose({
+    await composable.openClose({
       id: 'request-1',
       componentName: 'Bearing',
       inspectorName: 'Inspector A',
       issueResponsibility: {
         responsibilityType: 'OUTSOURCING_UNIT',
         responsibleDepartment: '生产 OBU',
+        responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-team-1',
         supplierName: 'Mapped Outsourcing Plant',
       },
@@ -311,22 +345,117 @@ describe('useInspectionRequestTaskActions', () => {
       expect.objectContaining({
         linkedIssue: expect.objectContaining({
           responsibilityType: 'OUTSOURCING_UNIT',
-          responsibleDepartment: '生产 OBU',
           responsibleDepartmentId: 'dept-production',
           supplierId: 'supplier-team-1',
-          supplierName: 'Mapped Outsourcing Plant',
         }),
       }),
+    );
+  });
+
+  it('refetches a normal-process external TEAM context instead of guessing internal responsibility', async () => {
+    const composable = createComposable();
+    mockGetInspectionRequest.mockResolvedValue({
+      componentName: 'Bearing',
+      id: 'request-1',
+      inspectionResult: 'PASS',
+      issueResponsibility: {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartment: 'Production snapshot renamed',
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-team-1',
+        supplierName: 'Mapped Outsourcing Plant',
+      },
+      partName: 'Bearing',
+      processName: 'Machining',
+      quantity: 2,
+      team: 'Mapped Outsourcing Plant',
+      teamId: 'team-external-1',
+      workOrderNumber: 'WO-1',
+    } as any);
+
+    await composable.openClose({
+      id: 'request-1',
+      partName: 'Bearing',
+      processName: 'Machining',
+      quantity: 2,
+      team: 'Mapped Outsourcing Plant',
+      teamId: 'team-external-1',
+      workOrderNumber: 'WO-1',
+    } as any);
+
+    expect(mockGetInspectionRequest).toHaveBeenCalledWith('request-1');
+    expect(composable.closeOpen.value).toBe(true);
+    expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartment: 'Production snapshot renamed',
+      responsibleDepartmentId: 'dept-production',
+      supplierId: 'supplier-team-1',
+    });
+  });
+
+  it('opens legacy requests with an empty responsibility context after refetch', async () => {
+    const composable = createComposable();
+    mockGetInspectionRequest.mockResolvedValue({
+      id: 'request-1',
+      responsibilityType: null,
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      supplierId: 'legacy-supplier-only',
+      issueResponsibility: {
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: '生产 OBU',
+        responsibleDepartmentId: null,
+        supplierId: null,
+        supplierName: 'Mapped Outsourcing Plant',
+      },
+    } as any);
+
+    await composable.openClose({
+      id: 'request-1',
+      processName: 'Machining',
+      team: 'Mapped Outsourcing Plant',
+      teamId: 'team-external-1',
+    } as any);
+
+    expect(mockGetInspectionRequest).toHaveBeenCalledWith('request-1');
+    expect(composable.closeOpen.value).toBe(true);
+    expect(composable.linkedIssueDraft.value).toMatchObject({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: '',
+      supplierId: '',
+    });
+  });
+
+  it('fails closed for a partially stored responsibility context', async () => {
+    const composable = createComposable();
+    mockGetInspectionRequest.mockResolvedValue({
+      id: 'request-1',
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      issueResponsibility: {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: null,
+        supplierId: 'supplier-team-1',
+      },
+    } as any);
+
+    await composable.openClose({ id: 'request-1' } as any);
+
+    expect(composable.closeOpen.value).toBe(false);
+    expect(mockMessageWarning).toHaveBeenCalledWith(
+      '报检任务责任上下文不完整，无法关闭',
     );
   });
 
   it('requires issue photos when closing as failed', async () => {
     const composable = createComposable();
 
-    composable.openClose({
+    await composable.openClose({
       id: 'request-1',
       componentName: 'Bearing',
       inspectorName: 'Inspector A',
+      issueResponsibility: internalIssueResponsibility,
       partName: 'Bearing',
       processName: 'Welding',
       quantity: 2,

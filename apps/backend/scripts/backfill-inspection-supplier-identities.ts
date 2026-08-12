@@ -18,6 +18,8 @@ interface IdentityContext {
   effectiveLinks: Map<string, EffectiveTeamLink>;
   supplierById: Map<string, { id: string; name: string }>;
   supplierByName: Map<string, { id: string; name: string }>;
+  externalTeamIds?: Set<string>;
+  internalTeamIds?: Set<string>;
   teamById: Map<string, TeamIdentity>;
   teamByName: Map<string, TeamIdentity>;
 }
@@ -84,15 +86,26 @@ export async function backfillInspectionSupplierIdentities(
     processed += rows.length;
     cursorId = rows.at(-1)?.id;
     const batchUpdates: Array<{
+      category: string;
+      clearSupplier?: boolean;
       existingSupplierId: null | string;
+      existingSupplierName: null | string;
       existingTeamId: null | string;
       id: string;
       supplier: { id: string; name: string };
+      supplierName: null | string;
       team: null | TeamIdentity;
     }> = [];
     const batchResolved: Array<{
       entityId: string;
       resolvedId: null | string;
+    }> = [];
+    const batchCleared: Array<{
+      entityId: string;
+      evidence: Record<string, null | number | string>;
+      rawId: null | string;
+      rawName: null | string;
+      reason: string;
     }> = [];
     const batchUnresolved: UnresolvedRefInput[] = [];
 
@@ -120,6 +133,12 @@ export async function backfillInspectionSupplierIdentities(
         supplierByName: row.supplierName
           ? context.supplierByName.get(row.supplierName) || null
           : null,
+        teamIsExternal: Boolean(
+          resolvedTeam && context.externalTeamIds?.has(resolvedTeam.id),
+        ),
+        teamIsInternal: Boolean(
+          resolvedTeam && context.internalTeamIds?.has(resolvedTeam.id),
+        ),
         teamById,
         teamByName,
       });
@@ -167,57 +186,91 @@ export async function backfillInspectionSupplierIdentities(
         });
         continue;
       }
+      if (resolution.action === 'clear') {
+        batchUpdates.push({
+          clearSupplier: true,
+          category: row.category,
+          existingSupplierId: row.supplierId,
+          existingSupplierName: row.supplierName,
+          existingTeamId: row.teamId,
+          id: row.id,
+          supplier: { id: '', name: '' },
+          supplierName: row.supplierName,
+          team: resolution.team,
+        });
+        continue;
+      }
       batchUpdates.push({
         existingSupplierId: row.supplierId,
+        existingSupplierName: row.supplierName,
         existingTeamId: row.teamId,
         id: row.id,
+        category: row.category,
         supplier: resolution.supplier,
+        supplierName: row.supplierName,
         team: resolution.team,
       });
     }
 
-    if (options.mode === 'apply' && batchUpdates.length > 0) {
-      const results = await prisma.$transaction(
-        batchUpdates.map((item) =>
-          prisma.inspections.updateMany({
-            where: {
-              id: item.id,
-              isDeleted: false,
-              supplierId: item.existingSupplierId,
-              teamId: item.existingTeamId,
-            },
-            data: {
-              supplierId: item.supplier.id,
-              supplierName: item.supplier.name,
-              ...(item.team
-                ? { team: item.team.name, teamId: item.team.id }
-                : {}),
-            },
-          }),
-        ),
-      );
-      const applied = results.reduce((sum, result) => sum + result.count, 0);
-      results.forEach((result, index) => {
-        const update = batchUpdates[index];
-        if (result.count > 0 && update) {
-          batchResolved.push({
-            entityId: update.id,
-            resolvedId: update.supplier.id,
-          });
-        }
+    if (options.mode === 'apply') {
+      const applied = await prisma.$transaction(async (tx) => {
+        const results = await Promise.all(
+          batchUpdates.map((item) =>
+            tx.inspections.updateMany({
+              where: {
+                id: item.id,
+                isDeleted: false,
+                supplierId: item.existingSupplierId,
+                supplierName: item.existingSupplierName,
+                teamId: item.existingTeamId,
+              },
+              data: {
+                supplierId: item.clearSupplier ? null : item.supplier.id,
+                supplierName: item.clearSupplier ? null : item.supplier.name,
+                ...(item.team
+                  ? { team: item.team.name, teamId: item.team.id }
+                  : {}),
+              },
+            }),
+          ),
+        );
+        results.forEach((result, index) => {
+          const update = batchUpdates[index];
+          if (result.count > 0 && update) {
+            if (update.clearSupplier) {
+              batchCleared.push({
+                entityId: update.id,
+                evidence: {
+                  category: update.category,
+                  teamId: update.team?.id || null,
+                },
+                rawId: update.existingSupplierId,
+                rawName: update.supplierName,
+                reason: 'internal_team_supplier_fields_cleared',
+              });
+            } else {
+              batchResolved.push({
+                entityId: update.id,
+                resolvedId: update.supplier.id,
+              });
+            }
+          }
+        });
+        await persistResolutionAudit(
+          {
+            entityType: 'inspections',
+            cleared: batchCleared,
+            resolved: batchResolved,
+            unresolved: batchUnresolved,
+          },
+          tx,
+        );
+        return results.reduce((sum, result) => sum + result.count, 0);
       });
       updated += applied;
       concurrentChanges += batchUpdates.length - applied;
     } else {
       updated += batchUpdates.length;
-    }
-
-    if (options.mode === 'apply') {
-      await persistResolutionAudit({
-        entityType: 'inspections',
-        resolved: batchResolved,
-        unresolved: batchUnresolved,
-      });
     }
     logger.info(
       {

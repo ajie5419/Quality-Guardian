@@ -3,8 +3,7 @@ import prisma from '~/utils/prisma';
 
 import {
   assertBackfillIntegrity,
-  bootstrapExactTeamLinks,
-  compareOpenAuditSnapshots,
+  loadExplicitTeamLinks,
   loadSupplierIdentityContext,
   persistResolutionAudit,
 } from './supplier-identity-backfill-runtime';
@@ -20,6 +19,7 @@ vi.mock('~/utils/prisma', () => ({
     suppliers: { findMany: vi.fn() },
     team_identity_aliases: { findMany: vi.fn() },
     team_identity_merges: { findMany: vi.fn() },
+    team_identity_sources: { findMany: vi.fn() },
     unresolved_master_data_refs: {
       findMany: vi.fn(),
       updateMany: vi.fn(),
@@ -59,55 +59,17 @@ describe('supplier identity backfill runtime', () => {
     ).not.toThrow();
   });
 
-  it('accepts previously audited conflicts during apply mode', () => {
+  it('rejects previously audited conflicts during every apply run', () => {
     expect(() =>
-      assertBackfillIntegrity(
-        [{ conflicts: 1, name: 'inspections', unresolved: 2 }],
-        { changedKeys: [], newKeys: [] },
-      ),
-    ).not.toThrow();
-  });
-
-  it('rejects new or changed open audits during apply mode', () => {
-    expect(() =>
-      assertBackfillIntegrity(
-        [{ conflicts: 1, name: 'inspections', unresolved: 2 }],
-        {
-          changedKeys: ['inspections:inspection-1:supplierId'],
-          newKeys: ['quality_records:record-1:supplierId'],
-        },
-      ),
+      assertBackfillIntegrity([
+        { conflicts: 1, name: 'inspections', unresolved: 2 },
+      ]),
     ).toThrow(
-      'Supplier identity backfill integrity check failed: open-audits.new=1, open-audits.changed=1',
+      'Supplier identity backfill integrity check failed: inspections.conflicts=1, inspections.unresolved=2',
     );
   });
 
-  it('compares open audit snapshots by key and material signature', () => {
-    const before = new Map([
-      ['inspections:inspection-1:supplierId', 'same'],
-      ['quality_records:record-1:supplierId', 'old'],
-    ]);
-    const after = new Map([
-      ['inspections:inspection-1:supplierId', 'same'],
-      ['inspections:inspection-2:teamId', 'new'],
-      ['quality_records:record-1:supplierId', 'changed'],
-    ]);
-
-    expect(compareOpenAuditSnapshots(before, after)).toEqual({
-      changedKeys: ['quality_records:record-1:supplierId'],
-      newKeys: ['inspections:inspection-2:teamId'],
-    });
-  });
-
-  it('persists exact TEAM mapping conflicts for later resolution', async () => {
-    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([
-      {
-        category: 'Outsourcing',
-        id: 'supplier-expected',
-        name: 'Resident Team',
-        outsourcingMode: 'IN_HOUSE_TEAM',
-      },
-    ] as never);
+  it('audits invalid explicit TEAM links without creating links from names', async () => {
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
       { dictKey: 'Resident Team', id: 'team-1' },
     ] as never);
@@ -115,25 +77,126 @@ describe('supplier identity backfill runtime', () => {
       {
         identityId: 'team-1',
         isDeleted: false,
+        id: 'link-1',
+        identityNameSnapshot: 'Resident Team',
         supplier: {
+          category: 'Supplier',
           id: 'supplier-linked',
           isDeleted: false,
           name: 'Other Supplier',
+          outsourcingMode: null,
         },
         supplierId: 'supplier-linked',
       },
     ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
 
-    await expect(bootstrapExactTeamLinks('apply')).resolves.toMatchObject({
+    await expect(loadExplicitTeamLinks('apply')).resolves.toMatchObject({
       conflicts: 1,
     });
     expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         create: expect.objectContaining({
-          entityId: 'team-1',
+          entityId: 'link-1',
           entityType: 'supplier_identity_links',
-          reason: 'team_supplier_identity_conflict',
+          reason: 'invalid_explicit_process_team_link',
+        }),
+      }),
+    );
+    expect(prisma.team_identity_sources.findMany).toHaveBeenCalledWith({
+      select: { sourceId: true, sourceType: true, teamId: true },
+      where: {
+        isDeleted: false,
+        teamId: { in: ['team-1'] },
+        OR: [
+          { sourceType: 'DEPARTMENT' },
+          {
+            sourceId: { in: ['supplier-linked'] },
+            sourceType: 'SUPPLIER',
+          },
+        ],
+      },
+    });
+  });
+
+  it('audits a policy-valid link without its exact SUPPLIER source', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Resident Team', id: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        isDeleted: false,
+        id: 'link-1',
+        identityNameSnapshot: 'Resident Team',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-linked',
+          isDeleted: false,
+          name: 'Resident Supplier',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-linked',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+    const result = await loadExplicitTeamLinks('apply');
+    expect(result.conflicts).toBe(1);
+    expect(result.effectiveLinks).toEqual(new Map());
+    expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          reason: 'invalid_explicit_process_team_link',
+        }),
+      }),
+    );
+  });
+
+  it('treats a TEAM with DEPARTMENT and SUPPLIER sources as an invalid link', async () => {
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([
+      { dictKey: 'Conflicted Team', id: 'team-1' },
+    ] as never);
+    vi.mocked(prisma.supplier_identity_links.findMany).mockResolvedValue([
+      {
+        identityId: 'team-1',
+        isDeleted: false,
+        id: 'link-1',
+        identityNameSnapshot: 'Conflicted Team',
+        supplier: {
+          category: 'Outsourcing',
+          id: 'supplier-linked',
+          isDeleted: false,
+          name: 'Resident Supplier',
+          outsourcingMode: 'IN_HOUSE_TEAM',
+        },
+        supplierId: 'supplier-linked',
+      },
+    ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      {
+        sourceId: 'department-1',
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-1',
+      },
+      {
+        sourceId: 'supplier-linked',
+        sourceType: 'SUPPLIER',
+        teamId: 'team-1',
+      },
+    ] as never);
+    vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
+
+    await expect(loadExplicitTeamLinks('apply')).resolves.toMatchObject({
+      conflicts: 1,
+      effectiveLinks: new Map(),
+    });
+    expect(prisma.unresolved_master_data_refs.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        create: expect.objectContaining({
+          evidence: expect.objectContaining({ teamSourceConflict: 'true' }),
         }),
       }),
     );
@@ -153,6 +216,7 @@ describe('supplier identity backfill runtime', () => {
     vi.mocked(prisma.team_identity_aliases.findMany).mockResolvedValue([
       { alias: '机加车间', teamId: 'team-bu' },
     ] as never);
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([]);
 
     const effectiveLinks = new Map([
       [
@@ -172,6 +236,42 @@ describe('supplier identity backfill runtime', () => {
     });
     expect(context.effectiveLinks.get('team-workshop')).toEqual(
       effectiveLinks.get('team-bu'),
+    );
+  });
+
+  it('classifies only DEPARTMENT-only TEAMs as internal', async () => {
+    vi.mocked(prisma.suppliers.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([] as never);
+    vi.mocked(prisma.team_identity_merges.findMany).mockResolvedValue(
+      [] as never,
+    );
+    vi.mocked(prisma.team_identity_aliases.findMany).mockResolvedValue(
+      [] as never,
+    );
+    vi.mocked(prisma.team_identity_sources.findMany).mockResolvedValue([
+      {
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-internal',
+      },
+      {
+        sourceType: 'SUPPLIER',
+        teamId: 'team-external',
+      },
+      {
+        sourceType: 'DEPARTMENT',
+        teamId: 'team-conflicted',
+      },
+      {
+        sourceType: 'SUPPLIER',
+        teamId: 'team-conflicted',
+      },
+    ] as never);
+
+    const context = await loadSupplierIdentityContext(new Map());
+
+    expect(context.internalTeamIds).toEqual(new Set(['team-internal']));
+    expect(context.externalTeamIds).toEqual(
+      new Set(['team-conflicted', 'team-external']),
     );
   });
 

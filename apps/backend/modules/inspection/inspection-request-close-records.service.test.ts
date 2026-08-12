@@ -157,4 +157,48 @@ describe('createCloseInspectionRecords', () => {
       },
     ]);
   });
+
+  it('passes a direct internal department to generated records without TEAM', async () => {
+    vi.mocked(prisma.work_orders.findMany).mockResolvedValue([
+      { projectName: 'Project 1', workOrderNumber: 'WO-001' },
+    ] as any);
+    vi.mocked(InspectionRecordCreateService.create).mockResolvedValueOnce({
+      id: 'inspection-1',
+    } as any);
+
+    await createCloseInspectionRecords({
+      body: { result: 'PASS' },
+      request: {
+        category: 'PROCESS',
+        componentName: 'Component',
+        mutualCheckResult: 'PASS',
+        partName: 'Bearing',
+        process: { name: 'Machining' },
+        processName: 'Machining',
+        reporter: 'Reporter',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Machining BU',
+        responsibleDepartmentId: 'dept-machining',
+        selfCheckResult: 'PASS',
+        supplierId: null,
+        supplierName: null,
+        team: null,
+        teamId: null,
+        workOrderNumber: 'WO-001',
+        workOrders: [],
+      } as any,
+    });
+
+    expect(InspectionRecordCreateService.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        category: 'PROCESS',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Machining BU',
+        responsibleDepartmentId: 'dept-machining',
+        supplierId: '',
+        teamId: '',
+      }),
+      undefined,
+    );
+  });
 });

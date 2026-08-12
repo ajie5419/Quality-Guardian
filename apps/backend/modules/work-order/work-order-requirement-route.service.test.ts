@@ -9,6 +9,7 @@ vi.mock('~/modules/rbac', () => ({
       .fn()
       .mockResolvedValue([
         'QMS:WorkOrder:Create',
+        'QMS:WorkOrder:Confirm',
         'QMS:WorkOrder:Delete',
         'QMS:WorkOrder:Edit',
       ]),
@@ -268,10 +269,13 @@ describe('workOrderRequirementRouteService', () => {
   });
 
   describe('updateRequirement', () => {
-    it('should update requirement with confirm flag', async () => {
+    it('allows confirmation with confirm permission but no edit permission', async () => {
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
+      vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValueOnce([
+        'QMS:WorkOrder:Confirm',
+      ]);
       (WorkOrderRequirementService.updateActiveById as any).mockResolvedValue({
         id: 'req-1',
         workOrderNumber: 'WO-001',
@@ -291,6 +295,7 @@ describe('workOrderRequirementRouteService', () => {
       );
 
       expect(result.id).toBe('req-1');
+      expect(RbacService.getUserPermissionCodes).toHaveBeenCalledWith('u1');
       expect(WorkOrderRequirementService.updateActiveById).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
@@ -304,10 +309,28 @@ describe('workOrderRequirementRouteService', () => {
       );
     });
 
-    it('should update requirement without confirm', async () => {
+    it('rejects confirmation with edit permission but no confirm permission', async () => {
+      vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValueOnce([
+        'QMS:WorkOrder:Edit',
+      ]);
+
+      await expect(
+        WorkOrderRequirementRouteService.updateRequirement(
+          mockEvent(),
+          'req-1',
+          { confirm: true },
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
+    });
+
+    it('allows ordinary edits with edit permission but no confirm permission', async () => {
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
+      vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValueOnce([
+        'QMS:WorkOrder:Edit',
+      ]);
       (WorkOrderRequirementService.updateActiveById as any).mockResolvedValue({
         id: 'req-1',
         workOrderNumber: 'WO-001',
@@ -332,6 +355,21 @@ describe('workOrderRequirementRouteService', () => {
         }),
         expect.any(Object),
       );
+    });
+
+    it('rejects ordinary edits with confirm permission but no edit permission', async () => {
+      vi.mocked(RbacService.getUserPermissionCodes).mockResolvedValueOnce([
+        'QMS:WorkOrder:Confirm',
+      ]);
+
+      await expect(
+        WorkOrderRequirementRouteService.updateRequirement(
+          mockEvent(),
+          'req-1',
+          { identityContractVersion: 2, requirementName: 'Updated' },
+          mockUserinfo(),
+        ),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN', httpStatus: 403 });
     });
 
     it('should reject name-only edits through a direct service call', async () => {

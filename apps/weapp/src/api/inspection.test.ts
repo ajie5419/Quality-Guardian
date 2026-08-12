@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { getPartOptions } from './inspection';
+import {
+  getInspectionRequestResponsibilityOptions,
+  getPartOptions,
+} from './inspection';
 
 const { requestMock } = vi.hoisted(() => ({
   requestMock: vi.fn(),
@@ -27,6 +30,23 @@ describe('inspection material option api', () => {
       data: { keyword: 'Frame' },
       method: 'GET',
       url: '/api/qms/public/inspection/requests/part-options',
+    });
+  });
+
+  it('loads request responsibility options through the authenticated endpoint', async () => {
+    requestMock.mockResolvedValue({
+      code: 0,
+      data: { departments: [], suppliers: [] },
+    });
+
+    await getInspectionRequestResponsibilityOptions({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+    });
+
+    expect(requestMock).toHaveBeenCalledWith({
+      data: { responsibilityType: 'INTERNAL_DEPARTMENT' },
+      method: 'GET',
+      url: '/api/qms/inspection/requests/responsibility-options',
     });
   });
 });

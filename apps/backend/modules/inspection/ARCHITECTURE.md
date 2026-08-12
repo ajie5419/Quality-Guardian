@@ -45,7 +45,33 @@ inspection 是 QMS 的检验域模块，覆盖检验记录、检验表模板、�
 - 后端以显式类型和 canonical ID 为权威；仅当它们与报检任务已有 `supplierId` 或 TEAM→Supplier 映射直接冲突时拒绝关闭。
 - 旧客户端未提交显式类型时，只允许使用报检工序做兼容推断；旧 `responsibleDepartment` 仅在值本身是有效 canonical 部门 ID 时兼容，供应商名称不得回退写入责任部门。
 
-历史回填只处理存在 `qms_inspection_requests.linkedIssueId` 的关联不合格项，并只接受报检 `supplierId`、TEAM→Supplier 映射或关联检验 `supplierId` 作为确定性外部身份。普通 `PROCESS + teamId` 不等于外协；证据冲突、缺失或已有其他有效责任部门时保留原值并写入 OPEN 审计。回填支持 dry-run/apply、keyset 分批、字段级 CAS 和幂等重试，并在生产 deploy 的 migration 与供应商身份回填之后自动执行。
+历史回填只处理存在 `qms_inspection_requests.linkedIssueId` 的关联不合格项，并只接受报检 `supplierId`、经有效 source 验证的 TEAM→Supplier 映射或关联检验 `supplierId` 作为确定性外部身份。普通 `PROCESS + teamId` 不等于外协；证据冲突、缺失或已有其他有效责任部门时保留原值并写入 OPEN 审计。已由 `DEPARTMENT` source 确定为内部 BU 的 PROCESS inspection、报检和关联质量记录以 supplier ID 与名称双字段 CAS 清空错误供应商事实；回填支持 dry-run/apply、keyset 分批和幂等重试，并在生产 deploy 的 migration 与供应商身份回填之后自动执行。
+
+### Unified inspection issue creation and corrupted responsibility remediation
+
+All online inspection issue entry points use the same transaction-aware creation service. A standalone issue creates its own transaction, while inspection-request close passes its outer transaction to the service. The service owns canonical responsibility validation, issue persistence, quality-loss indexing, supplier-score refresh tasks, and server-side NC number allocation. Clients do not pre-generate or submit NC numbers; the server allocates the number inside the write transaction.
+
+The canonical online responsibility payload is exactly one `responsibilityType` plus one `responsibleDepartmentId`, and `supplierId` only when the type is `SUPPLIER` or `OUTSOURCING_UNIT`. `INTERNAL_DEPARTMENT` must not carry a supplier identity. The service resolves department and supplier display snapshots from active canonical IDs. `quality_records.responsibilityType` is persisted for the explicit fact. Creation never writes `responsibleDepartments`; a canonical edit writes a single-element snapshot only to keep legacy response consistency.
+
+Inspection-request query returns `issueResponsibility` with the canonical responsible-department ID. During close, the server compares the submitted responsibility type and department ID with the request's canonical responsibility context and rejects any mismatch before writing the inspection issue.
+
+### Persisted request responsibility and legacy backfill
+
+`qms_inspection_requests` persists the nullable compatibility fields `responsibilityType`, `responsibleDepartmentId`, and `responsibleDepartment`; its existing `supplierId` is the external supplier fact. New requests must persist one complete canonical responsibility. An internal PROCESS request selects its canonical responsibility department directly; `teamId` is optional execution context and, when present, must match that department. `SUPPLIER` and `OUTSOURCING_UNIT` require a supplier ID and policy-approved department ID, with no team. A new PROCESS external request therefore uses its persisted supplier ID directly and does not require a `TEAM -> supplier_identity_links` mapping. The former internal-option resolver incorrectly required a TEAM mapping before returning a department, hiding valid departments such as structure and machining BUs; responsibility department resolution is now independent of TEAM resolution.
+
+The public and authenticated responsibility-options endpoints, Web entry form, and WeApp entry form all submit the same ID-only three-state contract. Query, inspection-record creation, and statistics consume the persisted external supplier fact rather than reconstructing it from a TEAM or a name; `INCOMING.supplierName` is only a legacy TEAM fallback, never new responsibility evidence. Generated `inspections` persist the same responsibility triad, and statistics expose a responsibility-department domain in addition to their supplier domain. The close flow locks the request's complete canonical context before it writes an issue. Legacy close may establish the canonical responsibility department directly within its transaction; any partially populated triad is rejected, because it cannot be safely mixed with legacy inference. The standalone request-responsibility resolver prevents a dependency cycle between request context resolution and inspection-record creation.
+
+The entry forms must never lock an `INCOMING` request to `SUPPLIER` or derive an external responsible department from a fixed name. Both `INCOMING` and `PROCESS` entry pages present the same three-state responsibility selector; the responsible department is a selectable canonical department for every responsibility type, and external types additionally require a canonical supplier whose category matches the responsibility type. The responsibility-options endpoint returns the full active department set for external types instead of name-filtered policy departments, so duplicate department names cannot make a valid submission impossible. `teamId` remains optional `PROCESS` execution context only: the entry forms and submission validation never require it, and the server validates it against the chosen department when present.
+
+Release maintenance backfills only incomplete legacy request responsibility facts. It first validates a complete persisted triad against active canonical master data; only rows without that triad use the existing legacy request resolver, whose TEAM-to-supplier path remains link-gated compatibility. The backfill never derives a supplier from a matching name. Missing, invalid, or conflicting evidence leaves the request unchanged and creates an OPEN `unresolved_master_data_refs` audit without overwriting an existing manual resolution. It uses ID keyset batches, field-level CAS updates, and writes successful audit resolution with the request update in one transaction. Missing legacy evidence is an auditable nullable-compatibility outcome: apply still scans every row, performs every deterministic update, and persists the OPEN audit instead of skipping the maintenance. It does not block this release wave because legacy reads remain available and closing an issue requires explicit validated canonical responsibility. Invalid evidence, conflicting evidence, lost CAS updates, or a `--max-batches`-truncated scan block release maintenance; new writes remain fail-closed. Release runs it after request category/process-option maintenance and before inspection-issue responsibility maintenance.
+
+The request and inspection responsibility migrations use bounded MySQL index names. The inspection migration adds the same nullable responsibility triad and a compact `(responsibilityType, responsibleDepartmentId)` index to `inspections`, so requests and generated records preserve the same canonical fact.
+
+### P3009 migration 恢复
+
+旧请求责任 migration 的索引名曾长达 70 字符，超过 MySQL 64 字符限制并触发 MySQL 1059 / Prisma P3009。恢复 wrapper 只能识别该精确 migration：数据库既无 `20260811000000` 所属 `qms_inspection_requests` 的四个目标字段及短索引时才调用 Prisma `resolve --rolled-back`；只有该请求表的四字段与短索引完整时才调用 `resolve --applied`；任一 partial 或 drift 状态均 fail-closed 阻断。随后才允许 `migrate deploy` 应用或确认 `20260811000001` 的 `inspections` 变更。GitHub deploy、OSS deploy 和 local container up/dev 必须复用此 wrapper。恢复前后均先只读核对 migration steps、InnoDB、字段与索引；wrapper 本身不得直接执行未经该状态机授权的数据库修复。
+
+The prior desktop TreeSelect strict-check value was stringified before persistence, which produced the literal `[object Object]` in `responsibleDepartment` or its legacy JSON array. Release maintenance remediates only rows containing that exact sentinel. It prefers a valid active `responsibleDepartmentId`; otherwise it accepts only unique canonical responsibility evidence from the linked inspection request or inspection record. PROCESS external evidence must satisfy the active TEAM + PROCESS-policy supplier + exact active SUPPLIER source + active link intersection; a TEAM with both DEPARTMENT and SUPPLIER sources is a conflict, never an external candidate. External candidates carry both supplier ID and name and persist them with the responsibility fields under the same field-level compare-and-set transaction; internal resolutions clear both supplier fields. Incomplete or conflicting supplier facts remain OPEN for external resolutions rather than being overwritten; a valid canonical internal department remains the authoritative evidence for clearing a stale supplier snapshot. The maintenance command supports dry-run/apply, ID keyset batches, field-level compare-and-set writes, and OPEN unresolved-master-data audits for missing or conflicting evidence. Both dry-run and apply fail when any unresolved, conflict, or concurrent CAS change remains. The command runs after the existing inspection issue responsibility backfill and after the migration that adds `responsibilityType`.
 
 多工单进货报检：
 
@@ -154,7 +180,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 - `inspections.supplierId` 和 `quality_records.supplierId` 统一指向 `suppliers.id`，名称字段仅保留当时快照。
 - 进货检验选择供应商时，前端提交 `supplierId + supplierName`，后端以 ID 校验并重建名称快照。
-- 过程检验保存 `teamId + team`，通过 `supplier_identity_links` 解析供应商 ID；禁止比较 TEAM 名称和供应商名称。
+- 过程检验保存 `teamId + team`，并只通过有效 `supplier_identity_links` 解析供应商 ID；调用方 `supplierId/supplierName` 不得注入 PROCESS 事实。内部 BU 没有有效 link 时两个 supplier 字段必须为空，禁止比较 TEAM 名称和供应商名称。
 - 关联不合格项必须优先继承已提交检验记录返回的 canonical `supplierId/supplierName`，不信任提交前的表单快照。
 - 评分刷新任务只携带规范 `supplierId`；过程检验先在源事务内通过 `teamId -> supplierId` 显式映射生成任务。
 - 存量回填先处理报检任务的 `teamId/supplierId`，再处理 `inspections`，最后以关联检验或唯一精确供应商名称作为确定性证据处理 `quality_records`；模糊、重名、冲突和缺少 TEAM 映射的数据写入 `unresolved_master_data_refs`。
@@ -163,7 +189,7 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 
 - 本模块的进货检验、驻厂过程检验和不合格项在线写入已切换到 ID-first：进货写入 `supplierId + supplierName`，过程写入 `teamId + team`，服务端校验 ID 并生成 canonical 名称快照。
 - 检验记录、不合格项及其质量损失变更在源事务内写入持久化指标任务；名称集合不参与派发、画像或评分。
-- 存量回填支持 dry-run/apply、分批和并发条件更新；无效旧 ID 仅在存在关联检验证据或唯一精确名称候选时修复，其他无法解析、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测。
+- 存量回填支持 dry-run/apply、分批和并发条件更新；内部 `DEPARTMENT` TEAM 的错误 PROCESS supplier 字段可被审计并清空，其他无效旧 ID 仅在存在关联检验证据或该历史字段的唯一精确名称候选时修复。无法解析、冲突或缺少 TEAM 映射的记录进入 `unresolved_master_data_refs`，不静默猜测，也不会因已存在 OPEN 审计而放行发布。
 - 本 wave 只覆盖供应商身份相关的检验链路，不代表其他主数据（部门、项目、工序等）已完成全项目 `ID_ONLY` 迁移。未纳入模块必须显式标注治理阶段并单独推进。
 
 跨模块的通用规则见 `docs/master-data-identity-governance.md`。

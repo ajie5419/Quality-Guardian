@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DeptService } from '~/modules/dept';
 import prisma from '~/utils/prisma';
 
 import { InspectionRequestStatsService } from './inspection-request-stats.service';
@@ -20,6 +21,10 @@ vi.mock('~/modules/team', () => ({
     resolveCanonicalIds: identityMocks.resolveCanonicalIds,
     resolveNamesByIds: identityMocks.resolveTeamNamesByIds,
   },
+}));
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: { findActiveByIdsOrNames: vi.fn() },
 }));
 
 vi.mock('~/utils/prisma', () => ({
@@ -105,7 +110,44 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       ]),
     );
     identityMocks.resolveCanonicalIds.mockResolvedValue(new Map());
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([]);
   }
+
+  it('aggregates PROCESS internal requests without TEAM by responsibility department', async () => {
+    setupMocks([
+      makeRequest({
+        id: 'direct-internal',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-machining',
+        team: null,
+        teamId: null,
+      }),
+    ]);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { businessUnit: null, id: 'dept-machining', name: 'Machining BU' },
+    ]);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byDepartment).toEqual([
+      {
+        count: 1,
+        department: 'Machining BU',
+        responsibleDepartmentId: 'dept-machining',
+      },
+    ]);
+    expect(result.byTeam).toEqual([]);
+    expect(result.historyByDepartment).toEqual(result.byDepartment);
+    expect(result.reinspectionRateByDepartment).toEqual([
+      expect.objectContaining({
+        responsibleDepartmentId: 'dept-machining',
+        submittedCount: 1,
+      }),
+    ]);
+  });
 
   it('excludes incoming inspection records from byTeam', async () => {
     const requests = [
@@ -426,7 +468,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ]);
   });
 
-  it('places missing team ids in one unresolved bucket without guessing by name', async () => {
+  it('uses the responsibility department domain when PROCESS requests have no TEAM', async () => {
     const requests = [
       makeRequest({ id: 'r1', team: '结构 BU2', teamId: null }),
       makeRequest({ id: 'r2', team: '结构BU2', teamId: null }),
@@ -438,8 +480,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       endDate: '2026-06-01',
     });
 
-    expect(result.byTeam).toEqual([
-      { count: 2, team: 'Unresolved team', teamId: null },
+    expect(result.byTeam).toEqual([]);
+    expect(result.byDepartment).toEqual([
+      {
+        count: 2,
+        department: 'Unresolved department',
+        responsibleDepartmentId: null,
+      },
     ]);
     expect(identityMocks.resolveTeamNamesByIds).toHaveBeenCalledWith([]);
   });

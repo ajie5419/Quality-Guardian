@@ -44,8 +44,47 @@ export interface InspectionStationSelection {
 export interface InspectionRequestIssueResponsibility {
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartment: string;
+  /** Null means the request context is incomplete or ambiguous and cannot create an issue. */
+  responsibleDepartmentId: null | string;
   supplierId: null | string;
   supplierName: string;
+}
+
+export type InspectionRequestTeamResolution =
+  | 'external'
+  | 'internal'
+  | 'unresolved';
+
+export type InspectionRequestTeamResolutionReason =
+  | 'AMBIGUOUS_DEPARTMENT_SOURCE'
+  | 'CONFLICTING_TEAM_SOURCES'
+  | 'INACTIVE_DEPARTMENT_SOURCE'
+  | 'INVALID_EXTERNAL_SUPPLIER_MAPPING'
+  | 'MISSING_RESPONSIBILITY_SOURCE';
+
+export interface InspectionRequestTeamOption {
+  group: InspectionRequestTeamResolution;
+  label: string;
+  reason?: InspectionRequestTeamResolutionReason;
+  responsibleDepartmentId?: string;
+  supplierId?: string;
+  value: string;
+}
+
+export interface InspectionRequestResponsibilityDepartmentOption {
+  label: string;
+  value: string;
+}
+
+export interface InspectionRequestResponsibilitySupplierOption {
+  label: string;
+  value: string;
+}
+
+export interface InspectionRequestResponsibilityOptions {
+  departments: InspectionRequestResponsibilityDepartmentOption[];
+  responsibilityType: InspectionIssueResponsibilityType;
+  suppliers: InspectionRequestResponsibilitySupplierOption[];
 }
 
 export interface InspectionRequest {
@@ -85,11 +124,16 @@ export interface InspectionRequest {
   requestedPartName?: null | string;
   requestInfo?: null | string;
   requestNo: string;
+  /** Server-validated responsibility fact. Legacy requests omit these fields. */
+  responsibilityType?: InspectionIssueResponsibilityType | null;
+  responsibleDepartment?: null | string;
+  responsibleDepartmentId?: null | string;
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection | null;
   status: InspectionRequestStatus;
   submittedAt: string;
   supplierId?: null | string;
+  supplierName?: null | string;
   team?: null | string;
   teamId?: null | string;
   unqualifiedQuantity?: null | number;
@@ -109,10 +153,13 @@ export interface CreateInspectionRequestParams {
   reporter: string;
   requestedPartName?: string;
   requestInfo?: string;
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
   selfCheckResult?: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection;
   supplierId?: string;
-  team: string;
+  /** Optional PROCESS internal context. External responsibility is supplier-led. */
+  team?: string;
   teamId?: string;
   workOrderNumber: string;
   workOrderNumbers?: string[];
@@ -177,7 +224,6 @@ export interface CloseInspectionRequestParams {
     division?: string;
     divisionId?: string;
     lossAmount?: number;
-    ncNumber?: string;
     partName?: string;
     photos?: string[];
     processName?: string;
@@ -185,16 +231,14 @@ export interface CloseInspectionRequestParams {
     quantity?: number;
     reportDate?: string;
     reportedBy?: string;
-    responsibilityType?: InspectionIssueResponsibilityType;
-    responsibleDepartment?: string;
-    responsibleDepartmentId?: string;
+    responsibilityType: InspectionIssueResponsibilityType;
+    responsibleDepartmentId: string;
     responsibleWelder?: string;
     rootCause?: string;
     severity?: string;
     solution?: string;
     status?: string;
     supplierId?: string;
-    supplierName?: string;
     unqualifiedQuantity?: number;
   };
   qualifiedQuantity?: number;

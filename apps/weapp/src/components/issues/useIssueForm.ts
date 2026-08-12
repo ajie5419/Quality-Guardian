@@ -30,8 +30,12 @@ import {
   mergeInspectionProcessOptions,
 } from '@/utils/issues';
 import {
-  INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS,
+  buildInspectionIssuePayload,
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  isExternalInspectionIssueResponsibility,
   mergeInspectionProcessNames,
+  normalizeInspectionIssueCanonicalId,
+  normalizeInspectionIssueResponsibilityType,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 
@@ -50,6 +54,33 @@ interface WorkOrderItem {
 interface FlatDepartment {
   id: string;
   name: string;
+}
+
+export interface IssueFormState {
+  claim: string;
+  defectCategoryId: string;
+  defectSubcategoryId: string;
+  defectSubtype: string;
+  defectType: string;
+  description: string;
+  division: string;
+  inspector: string;
+  lossAmount: number;
+  partName: string;
+  photos: string[];
+  processName: string;
+  projectName: string;
+  quantity: number;
+  reportDate: string;
+  responsibilityType: (typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE)[keyof typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE];
+  responsibleDepartmentId: string;
+  responsibleWelder: string;
+  rootCause: string;
+  severity: string;
+  solution: string;
+  status: string;
+  supplierId: string;
+  workOrderNumber: string;
 }
 
 function today() {
@@ -72,6 +103,98 @@ function flattenDepartments(nodes: DepartmentNode[]): FlatDepartment[] {
   return result;
 }
 
+export function createIssueFormState(inspector = ''): IssueFormState {
+  return {
+    claim: ISSUE_DEFAULTS.DEFAULT_CLAIM,
+    defectCategoryId: '',
+    defectSubcategoryId: '',
+    defectSubtype: '',
+    defectType: '',
+    description: '',
+    division: '',
+    inspector,
+    lossAmount: 0,
+    partName: '',
+    photos: [],
+    processName: '',
+    projectName: '',
+    quantity: ISSUE_DEFAULTS.DEFAULT_QUANTITY,
+    reportDate: today(),
+    responsibilityType:
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+    responsibleDepartmentId: '',
+    responsibleWelder: '',
+    rootCause: '',
+    severity: ISSUE_DEFAULTS.DEFAULT_SEVERITY,
+    solution: '',
+    status: ISSUE_DEFAULTS.DEFAULT_STATUS,
+    supplierId: '',
+    workOrderNumber: '',
+  };
+}
+
+export function resolveCanonicalIssueResponsibility(
+  data: Pick<
+    InspectionIssueRecord,
+    'responsibilityType' | 'responsibleDepartmentId' | 'supplierId'
+  >,
+) {
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    data.responsibilityType,
+  );
+  const responsibleDepartmentId = normalizeInspectionIssueCanonicalId(
+    data.responsibleDepartmentId,
+  );
+  const supplierId = normalizeInspectionIssueCanonicalId(data.supplierId);
+  if (!responsibilityType || !responsibleDepartmentId) return null;
+  if (isExternalInspectionIssueResponsibility(responsibilityType)) {
+    return supplierId
+      ? { responsibilityType, responsibleDepartmentId, supplierId }
+      : null;
+  }
+  return supplierId
+    ? null
+    : { responsibilityType, responsibleDepartmentId, supplierId: '' };
+}
+
+/**
+ * Editing must replay every user-editable field, but responsibility snapshots
+ * from legacy rows are display-only and never cross the online write boundary.
+ */
+export function createIssueFormStateFromRecord(
+  data: InspectionIssueRecord | undefined,
+  inspector = '',
+): IssueFormState {
+  const state = createIssueFormState(inspector);
+  if (!data) return state;
+  Object.assign(state, {
+    claim: data.claim || ISSUE_DEFAULTS.DEFAULT_CLAIM,
+    defectCategoryId: data.defectCategoryId || '',
+    defectSubcategoryId: data.defectSubcategoryId || '',
+    defectSubtype: data.defectSubtype || '',
+    defectType: data.defectType || '',
+    description: data.description || '',
+    division: data.division || '',
+    inspector: data.inspector || inspector,
+    lossAmount: Number(data.lossAmount || 0),
+    partName: data.partName || '',
+    photos: Array.isArray(data.photos) ? [...data.photos] : [],
+    processName: data.processName || '',
+    projectName: data.projectName || '',
+    quantity: Number(data.quantity || ISSUE_DEFAULTS.DEFAULT_QUANTITY),
+    reportDate: data.reportDate || data.date || today(),
+    responsibleWelder: data.responsibleWelder || '',
+    rootCause: data.rootCause || '',
+    severity: data.severity || ISSUE_DEFAULTS.DEFAULT_SEVERITY,
+    solution: data.solution || '',
+    status: String(data.status || ISSUE_DEFAULTS.DEFAULT_STATUS).toUpperCase(),
+    workOrderNumber: data.workOrderNumber || '',
+  });
+  const responsibility = resolveCanonicalIssueResponsibility(data);
+  if (responsibility) Object.assign(state, responsibility);
+  return state;
+}
+
 export function useIssueForm(
   props: IssueFormProps,
   callbacks: { success: (issue: InspectionIssueRecord | null) => void },
@@ -81,7 +204,6 @@ export function useIssueForm(
   const submitting = ref(false);
   const searching = ref(false);
   const showWorkOrderResults = ref(false);
-  const showDepartments = ref(false);
   const ready = ref(false);
   const workOrderResults = ref<WorkOrderItem[]>([]);
   const processReferenceOptions = ref<IssueOption[]>([]);
@@ -92,37 +214,10 @@ export function useIssueForm(
   const welderOptions = ref<IssueOption[]>([]);
   let searchTimer: null | ReturnType<typeof setTimeout> = null;
 
-  function createInitialState() {
-    return {
-      claim: ISSUE_DEFAULTS.DEFAULT_CLAIM,
-      defectCategoryId: '',
-      defectSubcategoryId: '',
-      defectSubtype: '',
-      defectType: '',
-      description: '',
-      division: '',
-      inspector:
-        userStore.userInfo?.realName || userStore.userInfo?.username || '',
-      lossAmount: 0,
-      ncNumber: '',
-      partName: '',
-      photos: [],
-      processName: '',
-      projectName: '',
-      quantity: ISSUE_DEFAULTS.DEFAULT_QUANTITY,
-      reportDate: today(),
-      responsibleDepartments: [],
-      responsibleWelder: '',
-      rootCause: '',
-      severity: ISSUE_DEFAULTS.DEFAULT_SEVERITY,
-      solution: '',
-      status: ISSUE_DEFAULTS.DEFAULT_STATUS,
-      supplierName: '',
-      workOrderNumber: '',
-    };
-  }
+  const inspector =
+    userStore.userInfo?.realName || userStore.userInfo?.username || '';
 
-  const form = reactive(createInitialState());
+  const form = reactive(createIssueFormState(inspector));
   const draftKey = computed(() =>
     props.mode === 'edit' && props.initialData?.id
       ? `inspectionIssueDraft:${userStore.userInfo?.id || 'anonymous'}:edit:${props.initialData.id}`
@@ -145,20 +240,14 @@ export function useIssueForm(
       value: item.id,
     })),
   );
-  const selectedDepartmentNames = computed(() =>
-    form.responsibleDepartments
-      .map((id) => departments.value.find((item) => item.id === id)?.name || id)
-      .join('、'),
+  const selectedDepartmentNames = computed(
+    () =>
+      departments.value.find((item) => item.id === form.responsibleDepartmentId)
+        ?.name || '',
   );
-  const requiresSupplier = computed(() => {
-    const names = selectedDepartmentNames.value;
-    return (
-      names.includes(INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS.PURCHASE) ||
-      names.includes(INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS.PRODUCTION) ||
-      names.includes(INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS.OUTSOURCED) ||
-      names.includes('生产')
-    );
-  });
+  const requiresSupplier = computed(() =>
+    isExternalInspectionIssueResponsibility(form.responsibilityType),
+  );
   const selectedProcessLabel = computed(
     () =>
       processOptions.value.find((item) => item.value === form.processName)
@@ -167,16 +256,14 @@ export function useIssueForm(
   const requiresWelder = computed(
     () => selectedProcessLabel.value.trim() === '焊接',
   );
-  const supplierCategory = computed<'Outsourcing' | 'Supplier'>(() => {
-    const names = selectedDepartmentNames.value;
-    return names.includes(INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS.PRODUCTION) ||
-      names.includes(INSPECTION_ISSUE_DEPT_TYPE_KEYWORDS.OUTSOURCED) ||
-      names.includes('生产')
+  const supplierCategory = computed<'Outsourcing' | 'Supplier'>(() =>
+    form.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
       ? 'Outsourcing'
-      : 'Supplier';
-  });
+      : 'Supplier',
+  );
   const supplierPickerOptions = computed(() =>
-    includeLegacyOption(supplierOptions.value, form.supplierName),
+    includeLegacyOption(supplierOptions.value, form.supplierId),
   );
   const welderPickerOptions = computed(() =>
     includeLegacyOption(welderOptions.value, form.responsibleWelder),
@@ -198,39 +285,14 @@ export function useIssueForm(
   }
 
   function applyData(data?: InspectionIssueRecord) {
-    Object.assign(form, createInitialState());
-    if (!data) return;
-    let responsibleDepartments: string[] = [];
-    if (data.responsibleDepartments?.length) {
-      responsibleDepartments = [...data.responsibleDepartments];
-    } else if (data.responsibleDepartment) {
-      responsibleDepartments = [data.responsibleDepartment];
-    }
-    Object.assign(form, {
-      ...data,
-      claim: data.claim || ISSUE_DEFAULTS.DEFAULT_CLAIM,
-      defectCategoryId: data.defectCategoryId || '',
-      defectSubcategoryId: data.defectSubcategoryId || '',
-      defectSubtype: data.defectSubtype || '',
-      defectType: data.defectType || '',
-      lossAmount: Number(data.lossAmount || 0),
-      photos: Array.isArray(data.photos) ? [...data.photos] : [],
-      processName: data.processName || '',
-      quantity: Number(data.quantity || 1),
-      reportDate: data.reportDate || today(),
-      responsibleDepartments,
-      severity: data.severity || ISSUE_DEFAULTS.DEFAULT_SEVERITY,
-      status: String(
-        data.status || ISSUE_DEFAULTS.DEFAULT_STATUS,
-      ).toUpperCase(),
-    });
+    Object.assign(form, createIssueFormStateFromRecord(data, inspector));
     resetProcessOptions(form.processName ? [form.processName] : []);
   }
 
   function restoreDraft() {
     const draft = uni.getStorageSync(draftKey.value);
     if (!draft || typeof draft !== 'object') return false;
-    Object.assign(form, draft as ReturnType<typeof createInitialState>);
+    Object.assign(form, draft as IssueFormState);
     uni.showToast({ title: '已恢复本地草稿', icon: 'none' });
     return true;
   }
@@ -302,7 +364,7 @@ export function useIssueForm(
       if (res.code === 0 && Array.isArray(res.data.items)) {
         supplierOptions.value = res.data.items.map((item) => ({
           label: item.name,
-          value: item.name,
+          value: item.id,
         }));
       }
     } catch {
@@ -413,24 +475,28 @@ export function useIssueForm(
     form.defectSubtype = subcategory?.name || '';
   }
 
-  async function onDepartmentChange(event: { detail: { value: string[] } }) {
-    const previousCategory = supplierCategory.value;
-    const selected = event.detail.value.map(String);
-    form.responsibleDepartments = selected.slice(0, 20);
-    if (selected.length > 20) {
-      uni.showToast({ title: '责任部门最多选择20个', icon: 'none' });
-    }
-    if (
-      props.mode === 'create' &&
-      previousCategory !== supplierCategory.value
-    ) {
-      form.supplierName = '';
+  function onDepartmentChange(event: { detail: { value: string } }) {
+    form.responsibleDepartmentId =
+      departments.value[Number(event.detail.value)]?.id || '';
+  }
+
+  async function onResponsibilityTypeChange(event: {
+    detail: { value: string };
+  }) {
+    const options = Object.values(INSPECTION_ISSUE_RESPONSIBILITY_TYPE);
+    const responsibilityType = normalizeInspectionIssueResponsibilityType(
+      options[Number(event.detail.value)],
+    );
+    if (!responsibilityType) return;
+    form.responsibilityType = responsibilityType;
+    if (!isExternalInspectionIssueResponsibility(responsibilityType)) {
+      form.supplierId = '';
     }
     await loadSuppliers();
   }
 
   function onSupplierChange(event: { detail: { value: string } }) {
-    form.supplierName =
+    form.supplierId =
       supplierPickerOptions.value[Number(event.detail.value)]?.value || '';
   }
 
@@ -450,9 +516,8 @@ export function useIssueForm(
   }
 
   function validateClassification() {
-    if (form.responsibleDepartments.length === 0) return '请选择责任部门';
-    if (requiresSupplier.value && !form.supplierName.trim())
-      return '请填写责任单位';
+    if (!form.responsibleDepartmentId) return '请选择责任部门';
+    if (requiresSupplier.value && !form.supplierId) return '请填写责任单位';
     if (requiresWelder.value && !form.responsibleWelder.trim())
       return '请填写责任焊工';
     if (
@@ -492,15 +557,12 @@ export function useIssueForm(
   }
 
   function buildPayload(): InspectionIssuePayload {
-    const responsibleDepartments = [...form.responsibleDepartments];
-    return {
+    return buildInspectionIssuePayload({
       ...form,
       lossAmount: Number(form.lossAmount || 0),
       photos: [...form.photos],
       quantity: Number(form.quantity),
-      responsibleDepartment: responsibleDepartments[0] || '',
-      responsibleDepartments,
-    } as InspectionIssuePayload;
+    }) as InspectionIssuePayload;
   }
 
   function validateAll() {
@@ -569,6 +631,7 @@ export function useIssueForm(
     onDefectTypeChange,
     onDepartmentChange,
     onProcessChange,
+    onResponsibilityTypeChange,
     onSeverityChange,
     onStatusChange,
     onSupplierChange,
@@ -580,7 +643,6 @@ export function useIssueForm(
     searching,
     selectedProcessLabel,
     selectedDepartmentNames,
-    showDepartments,
     showWorkOrderResults,
     submitting,
     supplierPickerOptions,

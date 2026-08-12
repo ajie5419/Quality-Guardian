@@ -45,6 +45,7 @@ import {
 import { createVxePhotoXlsxExportMethod } from '#/utils/vxe-photo-export';
 
 import { getColumns } from '../config';
+import { isReinspectionPassedRecord } from '../inspection-record-result';
 import {
   buildInspectionRecordExportRequestParams,
   buildInspectionRecordFilterParams,
@@ -528,7 +529,10 @@ defineExpose({ reload });
     </template>
 
     <template #result="{ row }">
-      <QmsStatusTag :status="row.result" type="inspection" />
+      <Tag v-if="isReinspectionPassedRecord(row)" color="processing">
+        复检合格
+      </Tag>
+      <QmsStatusTag v-else :status="row.result" type="inspection" />
     </template>
 
     <template #issueStatus="{ row }">

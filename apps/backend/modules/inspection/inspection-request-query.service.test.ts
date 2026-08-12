@@ -6,9 +6,18 @@ import { InspectionRequestQueryService } from './inspection-request-query.servic
 const { resolveSuppliersByTeamIds } = vi.hoisted(() => ({
   resolveSuppliersByTeamIds: vi.fn(),
 }));
+const { findActiveByIdsOrNames, resolveActiveDepartmentSourceIdsByTeamIds } =
+  vi.hoisted(() => ({
+    findActiveByIdsOrNames: vi.fn(),
+    resolveActiveDepartmentSourceIdsByTeamIds: vi.fn(),
+  }));
 
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: { resolveSuppliersByTeamIds },
+}));
+vi.mock('~/modules/dept', () => ({ DeptService: { findActiveByIdsOrNames } }));
+vi.mock('~/modules/team', () => ({
+  TeamIdentityService: { resolveActiveDepartmentSourceIdsByTeamIds },
 }));
 
 vi.mock('~/utils/prisma', () => ({
@@ -28,6 +37,8 @@ describe('inspection request query service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     resolveSuppliersByTeamIds.mockResolvedValue(new Map());
+    resolveActiveDepartmentSourceIdsByTeamIds.mockResolvedValue(new Map());
+    findActiveByIdsOrNames.mockResolvedValue([]);
   });
 
   it('returns canonical external responsibility for a linked TEAM', async () => {
@@ -54,6 +65,9 @@ describe('inspection request query service', () => {
     resolveSuppliersByTeamIds.mockResolvedValue(
       new Map([['team-1', { id: 'supplier-1', name: 'Canonical Supplier' }]]),
     );
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-production', name: '生产 OBU' },
+    ]);
 
     const result = await InspectionRequestQueryService.getRequestList(
       { id: 'user-1' } as any,
@@ -63,6 +77,7 @@ describe('inspection request query service', () => {
     expect(result.items[0]?.issueResponsibility).toEqual({
       responsibilityType: 'OUTSOURCING_UNIT',
       responsibleDepartment: '生产 OBU',
+      responsibleDepartmentId: 'dept-production',
       supplierId: 'supplier-1',
       supplierName: 'Canonical Supplier',
     });
@@ -88,15 +103,62 @@ describe('inspection request query service', () => {
       workOrders: [],
     } as any);
     vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-purchasing', name: '采购部' },
+    ]);
 
     const result = await InspectionRequestQueryService.getRequestDetail('IR-1');
 
     expect(result?.issueResponsibility).toEqual({
       responsibilityType: 'SUPPLIER',
       responsibleDepartment: '采购部',
+      responsibleDepartmentId: 'dept-purchasing',
       supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });
+  });
+
+  it('returns persisted direct internal responsibility without a TEAM', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      attachments: null,
+      category: 'PROCESS',
+      closeAttachments: null,
+      dispatcher: null,
+      inspection: null,
+      inspectionId: null,
+      inspector: null,
+      linkedIssueId: null,
+      process: { name: 'Machining' },
+      processName: 'Machining',
+      requestNo: 'IR-1',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Machining BU',
+      responsibleDepartmentId: 'dept-machining',
+      supplierId: null,
+      supplierName: null,
+      team: null,
+      teamId: null,
+      workOrderNumber: 'WO-001',
+      workOrders: [],
+    } as any);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-machining', name: 'Machining BU' },
+    ]);
+
+    const result = await InspectionRequestQueryService.getRequestDetail('IR-1');
+
+    expect(result?.issueResponsibility).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: 'Machining BU',
+      responsibleDepartmentId: 'dept-machining',
+      supplierId: null,
+      supplierName: '',
+    });
+    expect(resolveActiveDepartmentSourceIdsByTeamIds).toHaveBeenCalledWith(
+      [],
+      undefined,
+    );
   });
 
   it('returns supplier responsibility for INCOMING category with a configured process name', async () => {
@@ -119,12 +181,16 @@ describe('inspection request query service', () => {
       workOrders: [],
     } as any);
     vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-purchasing', name: '采购部' },
+    ]);
 
     const result = await InspectionRequestQueryService.getRequestDetail('IR-1');
 
     expect(result?.issueResponsibility).toEqual({
       responsibilityType: 'SUPPLIER',
       responsibleDepartment: '采购部',
+      responsibleDepartmentId: 'dept-purchasing',
       supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });

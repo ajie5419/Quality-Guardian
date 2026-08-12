@@ -1,18 +1,33 @@
 <script lang="ts" setup>
+import type { InspectionIssueResponsibilityType } from '@qgs/shared';
+
 import type { UploadFileWithResponse } from '../../issues/types';
 
 import type { QmsInspectionApi } from '#/api/qms/inspection';
+import type { SystemDeptApi } from '#/api/system/dept';
 
 import { computed, ref, watch } from 'vue';
 
 import { useUserStore } from '@vben/stores';
 
-import { QUALITY_CLASSIFICATION_SCOPES } from '@qgs/shared';
-import { Input, InputNumber, message, Select } from 'ant-design-vue';
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  isExternalInspectionIssueResponsibility,
+  normalizeInspectionIssueCanonicalId,
+  QUALITY_CLASSIFICATION_SCOPES,
+} from '@qgs/shared';
+import {
+  Input,
+  InputNumber,
+  message,
+  Select,
+  TreeSelect,
+} from 'ant-design-vue';
 import dayjs from 'dayjs';
 
 import { useVbenForm } from '#/adapter/form';
 import { getWelderListPage } from '#/api/qms/welder';
+import { getDeptList } from '#/api/system/dept';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import BomItemSelect from '#/views/qms/shared/components/BomItemSelect.vue';
 
@@ -32,7 +47,6 @@ import { buildTeamIdentityFields, getFormSchema } from './formData';
 import {
   deriveIssuePartName,
   deriveIssueProcessName,
-  deriveResponsibleDepartment,
   normalizeIssuePhotoUrls,
 } from './inspection-form.utils';
 
@@ -62,8 +76,15 @@ interface LinkedIssueDraft {
   supplierName: string;
   photos: UploadFileWithResponse[];
   unqualifiedQuantity: number;
-  responsibleDepartment: string;
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
   severity: string;
+}
+
+interface DepartmentTreeNode {
+  children?: DepartmentTreeNode[];
+  title: string;
+  value: string;
 }
 
 const userStore = useUserStore();
@@ -96,9 +117,11 @@ const linkedIssueDraft = ref<LinkedIssueDraft>({
   supplierName: '',
   photos: [],
   unqualifiedQuantity: 0,
-  responsibleDepartment: '',
+  responsibilityType: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+  responsibleDepartmentId: '',
   severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
 });
+const departmentTreeData = ref<DepartmentTreeNode[]>([]);
 const linkedDefectSubtypeOptions = computed(() => {
   const category = defectClassifications.value.find(
     (item) => item.id === linkedIssueDraft.value.defectCategoryId,
@@ -116,6 +139,17 @@ const defectOptions = computed(() =>
 );
 const shouldCreateLinkedIssue = computed(
   () => String(activeValues.value.result || '').toUpperCase() === 'FAIL',
+);
+const isLinkedIssueExternalResponsibility = computed(() =>
+  isExternalInspectionIssueResponsibility(
+    linkedIssueDraft.value.responsibilityType,
+  ),
+);
+const linkedIssueSupplierCategory = computed(() =>
+  linkedIssueDraft.value.responsibilityType ===
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+    ? 'Outsourcing'
+    : 'Supplier',
 );
 
 // Local reactive state for form values to ensure filtering logic is reactive
@@ -178,6 +212,60 @@ async function loadInspectionProcessOptions() {
   });
 }
 
+function toDepartmentTreeNode(
+  department: SystemDeptApi.Dept,
+): DepartmentTreeNode {
+  return {
+    children: (department.children || []).map((child) =>
+      toDepartmentTreeNode(child),
+    ),
+    title: department.name,
+    value: department.id,
+  };
+}
+
+async function loadDepartmentOptions() {
+  try {
+    const departments = await getDeptList();
+    departmentTreeData.value = departments.map((department) =>
+      toDepartmentTreeNode(department),
+    );
+  } catch (error) {
+    handleApiError(error, 'Load Inspection Issue Departments');
+  }
+}
+
+function resolveIncomingResponsibilityType() {
+  const selectedProcess = processOptions.value.find(
+    (item) => item.value === activeValues.value.incomingType,
+  );
+  return selectedProcess?.supplierSource === 'Outsourcing'
+    ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+    : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER;
+}
+
+function syncLinkedIssueResponsibilityFromContext() {
+  if (props.type !== 'incoming') return;
+  linkedIssueDraft.value.responsibilityType =
+    resolveIncomingResponsibilityType();
+  linkedIssueDraft.value.supplierId = normalizeInspectionIssueCanonicalId(
+    activeValues.value.supplierId,
+  );
+  linkedIssueDraft.value.supplierName =
+    typeof activeValues.value.supplierName === 'string'
+      ? activeValues.value.supplierName.trim()
+      : '';
+}
+
+function handleLinkedIssueSupplierChange(
+  supplierId: string | undefined,
+  option?: { item?: { name?: string } },
+) {
+  linkedIssueDraft.value.supplierId =
+    normalizeInspectionIssueCanonicalId(supplierId);
+  linkedIssueDraft.value.supplierName = String(option?.item?.name || '').trim();
+}
+
 // Watch form state changes to sync linked issue draft
 watch(
   () => activeValues.value,
@@ -202,10 +290,7 @@ watch(
     linkedIssueDraft.value.unqualifiedQuantity = normalizedUnqualified;
     linkedIssueDraft.value.qualifiedQuantity =
       totalQuantity - normalizedUnqualified;
-    if (!String(linkedIssueDraft.value.responsibleDepartment || '').trim()) {
-      linkedIssueDraft.value.responsibleDepartment =
-        deriveResponsibleDepartment(props.type, values);
-    }
+    syncLinkedIssueResponsibilityFromContext();
     if (!String(linkedIssueDraft.value.supplierName || '').trim()) {
       linkedIssueDraft.value.supplierName = String(
         values.supplierName || '',
@@ -315,6 +400,11 @@ watch(
 );
 
 watch(
+  () => activeValues.value.incomingType,
+  () => syncLinkedIssueResponsibilityFromContext(),
+);
+
+watch(
   () => props.record,
   async (val) => {
     if (val && Object.keys(val).length > 0) {
@@ -350,14 +440,17 @@ watch(
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierId: String(activeValues.value.supplierId || ''),
+      supplierId: normalizeInspectionIssueCanonicalId(
+        activeValues.value.supplierId,
+      ),
       supplierName: String(activeValues.value.supplierName || ''),
       photos: [],
       unqualifiedQuantity: 0,
-      responsibleDepartment: deriveResponsibleDepartment(
-        props.type,
-        activeValues.value,
-      ),
+      responsibilityType:
+        props.type === 'incoming'
+          ? resolveIncomingResponsibilityType()
+          : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+      responsibleDepartmentId: '',
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
     };
   },
@@ -368,6 +461,7 @@ void Promise.all([
   loadWelderOptions(),
   loadInspectionProcessOptions(),
   loadDefectClassifications(),
+  loadDepartmentOptions(),
 ]);
 
 defineExpose({
@@ -401,12 +495,11 @@ defineExpose({
             ...linkedIssueDraft.value,
             partName: deriveIssuePartName(activeValues.value),
             processName: deriveIssueProcessName(activeValues.value),
-            responsibleDepartment: deriveResponsibleDepartment(
-              props.type,
-              activeValues.value,
-            ),
-            supplierId: String(activeValues.value.supplierId || '').trim(),
-            supplierName: String(activeValues.value.supplierName || '').trim(),
+            supplierId:
+              linkedIssueDraft.value.supplierId ||
+              normalizeInspectionIssueCanonicalId(
+                activeValues.value.supplierId,
+              ),
             reportDate: String(activeValues.value.inspectionDate || '')
               .trim()
               .slice(0, 10),
@@ -458,9 +551,16 @@ defineExpose({
         message.warning('请填写解决方案');
         throw new Error('Issue solution required');
       }
-      if (!linkedIssueDraft.value.responsibleDepartment.trim()) {
-        message.warning('请填写责任部门');
-        throw new Error('Issue responsible department required');
+      if (!linkedIssueDraft.value.responsibleDepartmentId.trim()) {
+        message.warning('请选择责任部门');
+        throw new Error('Issue responsible department ID required');
+      }
+      if (
+        isLinkedIssueExternalResponsibility.value &&
+        !linkedIssueDraft.value.supplierId.trim()
+      ) {
+        message.warning('请选择责任单位');
+        throw new Error('Issue responsible supplier required');
       }
       if (
         linkedIssueDraft.value.processName.includes('焊') &&
@@ -554,11 +654,35 @@ defineExpose({
         />
       </div>
       <div>
+        <div class="mb-1 text-gray-600">责任归属类型</div>
+        <Select
+          v-model:value="linkedIssueDraft.responsibilityType"
+          :disabled="props.type === 'incoming'"
+          :options="[
+            {
+              label: '内部部门',
+              value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+            },
+            {
+              label: '供应商',
+              value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+            },
+            {
+              label: '外协单位',
+              value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+            },
+          ]"
+          class="w-full"
+        />
+      </div>
+      <div>
         <div class="mb-1 text-gray-600">责任部门</div>
-        <Input
-          v-model:value="linkedIssueDraft.responsibleDepartment"
-          :disabled="Boolean(linkedIssueDraft.responsibleDepartment)"
-          placeholder="自动沿用班组，可手动补充"
+        <TreeSelect
+          v-model:value="linkedIssueDraft.responsibleDepartmentId"
+          :tree-data="departmentTreeData"
+          :tree-default-expand-all="true"
+          class="w-full"
+          placeholder="请选择责任部门"
         />
       </div>
       <div v-if="linkedIssueDraft.processName.includes('焊')">
@@ -573,12 +697,14 @@ defineExpose({
           placeholder="请选择责任焊工"
         />
       </div>
-      <div>
+      <div v-if="isLinkedIssueExternalResponsibility">
         <div class="mb-1 text-gray-600">责任单位（供应商）</div>
-        <Input
-          v-model:value="linkedIssueDraft.supplierName"
-          :disabled="Boolean(linkedIssueDraft.supplierName)"
-          placeholder="自动沿用供应商，可手动补充"
+        <SupplierSelect
+          :value="linkedIssueDraft.supplierId || undefined"
+          :category="linkedIssueSupplierCategory"
+          :legacy-name="linkedIssueDraft.supplierName"
+          value-mode="id"
+          @change="handleLinkedIssueSupplierChange"
         />
       </div>
       <div>

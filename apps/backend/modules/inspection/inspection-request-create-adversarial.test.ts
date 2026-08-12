@@ -47,6 +47,27 @@ vi.mock('~/modules/supplier-identity', () => ({
       id: 'team-1',
       name: 'Team A',
     }),
+    resolveSuppliersByTeamIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    findActiveByIdsOrNames: vi.fn(({ names }: { names?: string[] }) =>
+      Promise.resolve(
+        names?.includes('采购部')
+          ? [{ id: 'dept-purchasing', name: '采购部' }]
+          : [{ id: 'dept-assembly', name: 'Assembly' }],
+      ),
+    ),
+  },
+}));
+
+vi.mock('~/modules/team', () => ({
+  TeamIdentityService: {
+    resolveActiveDepartmentSourceIdsByTeamIds: vi
+      .fn()
+      .mockResolvedValue(new Map([['team-1', ['dept-assembly']]])),
   },
 }));
 

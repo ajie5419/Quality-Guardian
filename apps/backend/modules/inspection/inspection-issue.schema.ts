@@ -1,4 +1,8 @@
-import { INSPECTION_ISSUE_FIELD_LIMITS } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_FIELD_LIMITS,
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  normalizeInspectionIssueResponsibilityType,
+} from '@qgs/shared';
 import { z } from 'zod';
 import { BusinessError } from '~/utils/business-error';
 
@@ -14,10 +18,6 @@ const longText = z
   .trim()
   .max(INSPECTION_ISSUE_FIELD_LIMITS.DESCRIPTION);
 const requiredLongText = longText.min(1, '必填字段不能为空');
-const optionalNcNumber = z.preprocess(
-  (value) => (String(value ?? '').trim() ? value : undefined),
-  z.string().trim().max(INSPECTION_ISSUE_FIELD_LIMITS.NC_NUMBER).optional(),
-);
 const photoSchema = z.union([
   z.string().trim().min(1),
   z
@@ -82,7 +82,6 @@ const issueFields = {
   inspectionId: shortText.optional(),
   inspector: shortText.optional(),
   lossAmount: z.coerce.number().finite().min(0).optional(),
-  ncNumber: optionalNcNumber,
   partName: requiredText,
   photos: z
     .array(photoSchema)
@@ -100,8 +99,11 @@ const issueFields = {
       '发现日期无效',
     ),
   reportedBy: shortText.optional(),
-  responsibleDepartment: shortText.optional(),
-  responsibleDepartments: z.array(requiredText).min(1).max(20).optional(),
+  responsibilityType: z.preprocess(
+    (value) => normalizeInspectionIssueResponsibilityType(value) || value,
+    z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE),
+  ),
+  responsibleDepartmentId: requiredText,
   responsibleWelder: shortText.optional(),
   rootCause: requiredLongText,
   severity: z.enum(['Critical', 'Major', 'Minor']),
@@ -109,7 +111,6 @@ const issueFields = {
   sourceType: shortText.optional(),
   status: z.enum(['CLOSED', 'IN_PROGRESS', 'OPEN']),
   supplierId: shortText.optional(),
-  supplierName: shortText.optional(),
   workOrderNumber: requiredText,
 };
 
@@ -118,11 +119,22 @@ const createSchema = z
   .strict()
   .refine(
     (value) =>
-      Boolean(value.responsibleDepartment) ||
-      Boolean(value.responsibleDepartments?.length),
+      value.responsibilityType !==
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT ||
+      !value.supplierId,
     {
-      message: '责任部门不能为空',
-      path: ['responsibleDepartment'],
+      message: '内部责任部门不能同时指定供应商 ID',
+      path: ['supplierId'],
+    },
+  )
+  .refine(
+    (value) =>
+      value.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT ||
+      Boolean(value.supplierId),
+    {
+      message: '外部责任单位缺少 canonical 供应商 ID',
+      path: ['supplierId'],
     },
   )
   .refine(

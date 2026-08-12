@@ -3,7 +3,10 @@ import type { InspectionIssueRecord } from '@/api/issues';
 
 import { onMounted } from 'vue';
 
-import { INSPECTION_ISSUE_FIELD_LIMITS } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_FIELD_LIMITS,
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+} from '@qgs/shared';
 
 import IssuePhotoField from './IssuePhotoField.vue';
 import { useIssueForm } from './useIssueForm';
@@ -32,6 +35,7 @@ const {
   onDefectTypeChange,
   onDepartmentChange,
   onProcessChange,
+  onResponsibilityTypeChange,
   onSeverityChange,
   onStatusChange,
   onSupplierChange,
@@ -43,7 +47,6 @@ const {
   searching,
   selectedProcessLabel,
   selectedDepartmentNames,
-  showDepartments,
   showWorkOrderResults,
   submitting,
   supplierPickerOptions,
@@ -77,9 +80,7 @@ onMounted(initialize);
       <view v-show="currentStep === 1" class="form-card">
         <view class="field">
           <text class="label">不合格单号</text>
-          <view class="readonly-value">{{
-            form.ncNumber || '提交后自动生成'
-          }}</view>
+          <view class="readonly-value">提交后自动生成</view>
         </view>
         <view class="field">
           <text class="label required">发现日期</text>
@@ -155,24 +156,49 @@ onMounted(initialize);
 
       <view v-show="currentStep === 2" class="form-card">
         <view class="field">
+          <text class="label required">责任归属类型</text>
+          <picker
+            :range="[
+              {
+                label: '内部部门',
+                value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+              },
+              {
+                label: '供应商',
+                value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+              },
+              {
+                label: '外协单位',
+                value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+              },
+            ]"
+            range-key="label"
+            @change="onResponsibilityTypeChange"
+          >
+            <view class="picker-value">
+              {{
+                form.responsibilityType ===
+                INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+                  ? '供应商'
+                  : form.responsibilityType ===
+                      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+                    ? '外协单位'
+                    : '内部部门'
+              }}
+            </view>
+          </picker>
+        </view>
+        <view class="field">
           <text class="label required">责任部门</text>
-          <view class="picker-value" @tap="showDepartments = !showDepartments">
-            {{ selectedDepartmentNames || '请选择责任部门' }}
-          </view>
-          <checkbox-group
-            v-if="showDepartments"
-            class="department-list"
+          <picker
+            :range="departments"
+            range-key="name"
             @change="onDepartmentChange"
           >
-            <label v-for="dept in departments" :key="dept.id" class="check-row">
-              <checkbox
-                :value="dept.id"
-                :checked="form.responsibleDepartments.includes(dept.id)"
-                color="#1890ff"
-              />
-              <text>{{ dept.name }}</text>
-            </label>
-          </checkbox-group>
+            <view class="picker-value">
+              {{ selectedDepartmentNames || '请选择责任部门' }}
+            </view>
+          </picker>
         </view>
         <view v-if="requiresSupplier" class="field">
           <text class="label required">责任单位</text>
@@ -183,11 +209,11 @@ onMounted(initialize);
           >
             <view
               class="picker-value"
-              :class="{ placeholder: !form.supplierName }"
+              :class="{ placeholder: !form.supplierId }"
             >
               {{
                 supplierPickerOptions.find(
-                  (item) => item.value === form.supplierName,
+                  (item) => item.value === form.supplierId,
                 )?.label || '请选择责任单位'
               }}
             </view>

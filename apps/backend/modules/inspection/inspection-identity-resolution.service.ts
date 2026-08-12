@@ -27,6 +27,7 @@ type InspectionTx = Pick<
   | 'supplier_identity_links'
   | 'suppliers'
   | 'team_identity_merge_participants'
+  | 'team_identity_sources'
 >;
 
 function supportedField(fieldName: string): null | SupportedField {

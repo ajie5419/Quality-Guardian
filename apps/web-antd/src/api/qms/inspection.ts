@@ -100,22 +100,18 @@ export async function getInspectionIssueChartAggregate(params: {
   );
 }
 
-export async function generateInspectionNcNumber() {
-  return requestClient.get<{ ncNumber: string }>(
-    QMS_API.INSPECTION_ISSUES_NC_NUMBER,
-  );
-}
-
 /**
  * Create Inspection Issue
  */
-export async function createInspectionIssue(data: Partial<InspectionIssue>) {
+export async function createInspectionIssue(
+  data: Partial<InspectionIssue> | Record<string, unknown>,
+) {
   return requestClient.post<InspectionIssue>(QMS_API.INSPECTION_ISSUES, data);
 }
 
 export async function updateInspectionIssue(
   id: string,
-  data: Partial<InspectionIssue>,
+  data: Partial<InspectionIssue> | Record<string, unknown>,
 ) {
   return requestClient.put<InspectionIssue>(
     `${QMS_API.INSPECTION_ISSUES}/${id}`,

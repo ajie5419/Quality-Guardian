@@ -1,5 +1,6 @@
 import type {
   InspectionIssue,
+  InspectionIssueResponsibilityType,
   QualityClassificationCategory,
   QualityClassificationScope,
 } from '@qgs/shared';
@@ -10,8 +11,6 @@ export interface InspectionIssueRecord extends InspectionIssue {
   createdBy?: null | string;
   division?: string;
   processName?: string;
-  responsibleDepartments?: string[];
-  supplierName?: string;
 }
 
 export interface InspectionIssueListParams {
@@ -37,10 +36,20 @@ export interface IssueOption {
   value: string;
 }
 
-export type InspectionIssuePayload = Partial<InspectionIssueRecord> & {
+export type InspectionIssuePayload = Omit<
+  Partial<InspectionIssueRecord>,
+  | 'ncNumber'
+  | 'responsibilityType'
+  | 'responsibleDepartment'
+  | 'responsibleDepartmentId'
+  | 'responsibleDepartments'
+  | 'supplierId'
+  | 'supplierName'
+> & {
   photos: string[];
-  responsibleDepartment: string;
-  responsibleDepartments: string[];
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
+  supplierId?: string;
 };
 
 export function getInspectionIssues(params: InspectionIssueListParams) {
@@ -97,7 +106,7 @@ export function getIssueWelders() {
 
 export function getIssueSuppliers(category: 'Outsourcing' | 'Supplier') {
   return request<{
-    items: Array<{ name: string }>;
+    items: Array<{ id: string; name: string }>;
     total: number;
   }>({
     url: '/api/qms/supplier',

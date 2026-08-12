@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { InspectionIssueCreateService } from '~/modules/inspection/inspection-issue-create.service';
 import { InspectionIssueMutationService } from '~/modules/inspection/inspection-issue-mutation.service';
 import prisma from '~/utils/prisma';
 
@@ -105,10 +106,24 @@ vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
   },
 }));
 
-vi.mock('~/modules/inspection/inspection-issue-numbering.service', () => ({
-  InspectionIssueNumberingService: {
-    generateNextNcNumber: vi.fn().mockResolvedValue('NC-26KJ-001'),
+vi.mock('~/modules/inspection/inspection-issue-create.service', () => ({
+  InspectionIssueCreateService: {
+    createInTransaction: vi.fn(async ({ tx }: { tx: typeof prisma }) => {
+      const record = await tx.quality_records.create({ data: {} as never });
+      return { ncNumber: record.nonConformanceNumber, record };
+    }),
   },
+  validateOnlineInspectionIssueResponsibilityInput: vi.fn(),
+}));
+
+vi.mock('~/modules/inspection/inspection-issue-responsibility.service', () => ({
+  resolveInspectionIssueResponsibility: vi.fn().mockResolvedValue({
+    responsibleDepartment: 'Assembly',
+    responsibleDepartmentId: 'dept-assembly',
+    responsibilityType: 'INTERNAL_DEPARTMENT',
+    supplierId: null,
+    supplierName: null,
+  }),
 }));
 
 const mockLoggerFns = vi.hoisted(() => ({
@@ -124,6 +139,12 @@ vi.mock('~/utils/logger', () => ({
 describe('inspectionIssueMutationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(
+      InspectionIssueCreateService.createInTransaction,
+    ).mockImplementation(async ({ tx }) => {
+      const record = await tx.quality_records.create({ data: {} as never });
+      return { ncNumber: record.nonConformanceNumber, record };
+    });
     (prisma.quality_records.findMany as any).mockResolvedValue([]);
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
@@ -144,18 +165,14 @@ describe('inspectionIssueMutationService', () => {
 
       expect(prisma.quality_records.create).toHaveBeenCalled();
       expect(result.ncNumber).toBe('NC-26KJ-001');
-      const { buildInspectionIssueCreateData } = await import(
-        '~/modules/inspection/inspection-issue'
-      );
-      expect(buildInspectionIssueCreateData).toHaveBeenCalledWith(
-        { ncNumber: 'NC-26KJ-001' },
-        expect.objectContaining({ createdBy: 'user-1' }),
-      );
+      expect(
+        InspectionIssueCreateService.createInTransaction,
+      ).toHaveBeenCalledWith(expect.objectContaining({ body: {} }));
     });
 
-    it('preserves an explicit NC number without generating a replacement', async () => {
-      const { InspectionIssueNumberingService } = await import(
-        '~/modules/inspection/inspection-issue-numbering.service'
+    it('delegates NC allocation to the unified create service', async () => {
+      const { InspectionIssueCreateService } = await import(
+        '~/modules/inspection/inspection-issue-create.service'
       );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       (prisma.quality_records.create as any).mockResolvedValue({
@@ -164,32 +181,30 @@ describe('inspectionIssueMutationService', () => {
         partName: 'Part',
       });
 
-      await InspectionIssueMutationService.createIssue(mockUser, {
-        ncNumber: 'NC-CUSTOM-001',
-      });
+      await InspectionIssueMutationService.createIssue(mockUser, {});
 
       expect(
-        InspectionIssueNumberingService.generateNextNcNumber,
-      ).not.toHaveBeenCalled();
+        InspectionIssueCreateService.createInTransaction,
+      ).toHaveBeenCalledWith(expect.objectContaining({ body: {} }));
     });
 
-    it('regenerates an automatic NC number after a unique conflict', async () => {
-      const { InspectionIssueNumberingService } = await import(
-        '~/modules/inspection/inspection-issue-numbering.service'
+    it('retries a serial conflict through the unified create service', async () => {
+      const { InspectionIssueCreateService } = await import(
+        '~/modules/inspection/inspection-issue-create.service'
       );
-      vi.mocked(InspectionIssueNumberingService.generateNextNcNumber)
-        .mockResolvedValueOnce('NC-26KJ-001')
-        .mockResolvedValueOnce('NC-26KJ-002');
       const conflict = Object.assign(
-        new Error('Unique constraint failed on nonConformanceNumber'),
-        { code: 'P2002', meta: { target: ['nonConformanceNumber'] } },
+        new Error('Unique constraint failed on serialNumber'),
+        { code: 'P2002', meta: { target: ['serialNumber'] } },
       );
-      (prisma.quality_records.create as any)
+      vi.mocked(InspectionIssueCreateService.createInTransaction)
         .mockRejectedValueOnce(conflict)
         .mockResolvedValueOnce({
-          id: 'ISS-2026-002',
-          nonConformanceNumber: 'NC-26KJ-002',
-          partName: 'Part',
+          ncNumber: 'NC-26KJ-002',
+          record: {
+            id: 'ISS-2026-002',
+            nonConformanceNumber: 'NC-26KJ-002',
+            partName: 'Part',
+          } as never,
         });
 
       const result = await InspectionIssueMutationService.createIssue(
@@ -198,7 +213,7 @@ describe('inspectionIssueMutationService', () => {
       );
 
       expect(
-        InspectionIssueNumberingService.generateNextNcNumber,
+        InspectionIssueCreateService.createInTransaction,
       ).toHaveBeenCalledTimes(2);
       expect(result.ncNumber).toBe('NC-26KJ-002');
     });
@@ -281,23 +296,24 @@ describe('inspectionIssueMutationService', () => {
       );
     });
 
-    it('retries on P2002 serialNumber conflict and succeeds on second attempt; serial regenerated', async () => {
-      const { getNextInspectionIssueSerialNumber } = await import(
-        '~/modules/inspection/inspection-issue'
+    it('retries on P2002 serialNumber conflict and succeeds on second attempt', async () => {
+      const { InspectionIssueCreateService } = await import(
+        '~/modules/inspection/inspection-issue-create.service'
       );
-      const serialMock = vi.mocked(getNextInspectionIssueSerialNumber);
-      serialMock.mockResolvedValueOnce(5).mockResolvedValueOnce(6);
 
       const p2002 = Object.assign(
         new Error('Unique constraint failed on the fields: (`serialNumber`)'),
         { code: 'P2002', meta: { target: ['serialNumber'] } },
       );
-      (prisma.quality_records.create as any)
+      vi.mocked(InspectionIssueCreateService.createInTransaction)
         .mockRejectedValueOnce(p2002)
         .mockResolvedValueOnce({
-          id: 'ISS-retry-1',
-          nonConformanceNumber: 'NC-26KJ-010',
-          partName: 'Part',
+          ncNumber: 'NC-26KJ-010',
+          record: {
+            id: 'ISS-retry-1',
+            nonConformanceNumber: 'NC-26KJ-010',
+            partName: 'Part',
+          } as never,
         });
 
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
@@ -306,24 +322,32 @@ describe('inspectionIssueMutationService', () => {
         {},
       );
 
-      expect(prisma.quality_records.create).toHaveBeenCalledTimes(2);
-      expect(serialMock).toHaveBeenCalledTimes(2);
+      expect(
+        InspectionIssueCreateService.createInTransaction,
+      ).toHaveBeenCalledTimes(2);
       expect(result.ncNumber).toBe('NC-26KJ-010');
     });
 
     it('does not retry createIssue on a generic (non-P2002) error', async () => {
       const networkError = new Error('DB connection lost');
-      (prisma.quality_records.create as any).mockRejectedValue(networkError);
+      const { InspectionIssueCreateService } = await import(
+        '~/modules/inspection/inspection-issue-create.service'
+      );
+      vi.mocked(
+        InspectionIssueCreateService.createInTransaction,
+      ).mockRejectedValue(networkError);
 
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       await expect(
         InspectionIssueMutationService.createIssue(mockUser, {}),
       ).rejects.toThrow('DB connection lost');
 
-      expect(prisma.quality_records.create).toHaveBeenCalledTimes(1);
+      expect(
+        InspectionIssueCreateService.createInTransaction,
+      ).toHaveBeenCalledTimes(1);
     });
 
-    it('rejects welding defects without a responsible welder by subcategory', async () => {
+    it('delegates welding validation to the unified create service', async () => {
       (
         prisma.quality_classification_subcategories.findFirst as any
       ).mockResolvedValue({
@@ -332,14 +356,14 @@ describe('inspectionIssueMutationService', () => {
       });
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
-      await expect(
-        InspectionIssueMutationService.createIssue(mockUser, {
-          defectSubcategoryId: 'sub-welding',
-          processName: '外购件',
-          responsibleWelder: '',
-        }),
-      ).rejects.toThrow('焊接缺陷必须填写责任焊工');
-      expect(prisma.quality_records.create).not.toHaveBeenCalled();
+      await InspectionIssueMutationService.createIssue(mockUser, {
+        defectSubcategoryId: 'sub-welding',
+        processName: '外购件',
+        responsibleWelder: '',
+      });
+      expect(
+        InspectionIssueCreateService.createInTransaction,
+      ).toHaveBeenCalled();
     });
 
     it('accepts welding defects when a responsible welder is provided', async () => {
@@ -404,6 +428,44 @@ describe('inspectionIssueMutationService', () => {
       expect(SystemLogService.auditLog).toHaveBeenCalled();
     });
 
+    it('persists canonical responsibility identity on update', async () => {
+      const { resolveInspectionIssueResponsibility } = await import(
+        '~/modules/inspection/inspection-issue-responsibility.service'
+      );
+      await InspectionIssueMutationService.updateIssue(
+        { id: 'user-1', username: 'admin', roles: [] } as any,
+        'rec-1',
+        {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
+        },
+        null,
+      );
+
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        expect.objectContaining({
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
+        }),
+        expect.any(Object),
+      );
+      expect(prisma.quality_records.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            responsibleDepartmentId: 'dept-assembly',
+            responsibilityType: 'INTERNAL_DEPARTMENT',
+          }),
+        }),
+      );
+      expect(prisma.quality_records.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.not.objectContaining({
+            responsibleDepartments: expect.anything(),
+          }),
+        }),
+      );
+    });
+
     it('rejects switching the defect subcategory to a welding defect without a welder', async () => {
       (
         prisma.quality_classification_subcategories.findFirst as any
@@ -430,6 +492,79 @@ describe('inspectionIssueMutationService', () => {
         ),
       ).rejects.toThrow('焊接缺陷必须填写责任焊工');
       expect(prisma.quality_records.update).not.toHaveBeenCalled();
+    });
+
+    it('merges the current triad for a partial supplierId update', async () => {
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        inspection: null,
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchase',
+        supplierId: 'supplier-old',
+        supplierName: 'Old Supplier',
+      });
+      const { resolveInspectionIssueResponsibility } = await import(
+        '~/modules/inspection/inspection-issue-responsibility.service'
+      );
+      (resolveInspectionIssueResponsibility as any).mockResolvedValue({
+        responsibleDepartment: 'Purchase',
+        responsibleDepartmentId: 'dept-purchase',
+        responsibilityType: 'SUPPLIER',
+        supplierId: 'supplier-new',
+        supplierName: 'New Supplier',
+      });
+
+      await InspectionIssueMutationService.updateIssue(
+        { id: 'user-1', username: 'admin', roles: [] } as any,
+        'rec-1',
+        { supplierId: 'supplier-new' },
+        null,
+      );
+
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        {
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchase',
+          supplierId: 'supplier-new',
+        },
+        expect.any(Object),
+      );
+      expect(prisma.quality_records.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            responsibleDepartmentId: 'dept-purchase',
+            responsibilityType: 'SUPPLIER',
+          }),
+        }),
+      );
+    });
+
+    it('merges the current external supplier for a partial type update', async () => {
+      (prisma.quality_records.findUnique as any).mockResolvedValue({
+        inspection: null,
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchase',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      });
+      const { resolveInspectionIssueResponsibility } = await import(
+        '~/modules/inspection/inspection-issue-responsibility.service'
+      );
+
+      await InspectionIssueMutationService.updateIssue(
+        { id: 'user-1', username: 'admin', roles: [] } as any,
+        'rec-1',
+        { responsibilityType: 'OUTSOURCING_UNIT' },
+        null,
+      );
+
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-purchase',
+          supplierId: 'supplier-1',
+        },
+        expect.any(Object),
+      );
     });
 
     it('rejects updates when the current record already holds a welding defect without a welder', async () => {
@@ -550,6 +685,8 @@ describe('inspectionIssueMutationService', () => {
             select: { category: true, supplierId: true, teamId: true },
           },
           processName: true,
+          responsibilityType: true,
+          responsibleDepartmentId: true,
           responsibleWelder: true,
           supplierId: true,
           supplierName: true,

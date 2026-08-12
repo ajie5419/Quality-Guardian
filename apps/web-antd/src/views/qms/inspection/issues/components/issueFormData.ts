@@ -6,7 +6,11 @@ import type { VbenFormSchema } from '#/adapter/form';
 
 import { useI18n } from '@vben/locales';
 
-import { WELDING_DEFECT_CODE, WELDING_PROCESS_KEYWORD } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  WELDING_DEFECT_CODE,
+  WELDING_PROCESS_KEYWORD,
+} from '@qgs/shared';
 
 import { mapDictionaryOptionsToInspectionProcess } from '../../records/config';
 import {
@@ -14,6 +18,7 @@ import {
   useSeverityOptions,
   useStatusOptions,
 } from '../constants';
+import { isExternalInspectionIssueResponsibility } from './issueFormPayload';
 
 export function isWeldingProcessName(value: unknown) {
   return String(value ?? '')
@@ -143,18 +148,36 @@ export function getIssueFormSchema(
       component: 'Input',
     },
     {
-      fieldName: 'responsibleDepartments',
+      fieldName: 'responsibilityType',
+      label: '责任归属类型',
+      component: 'Select',
+      rules: 'selectRequired',
+      componentProps: {
+        allowClear: false,
+        options: [
+          {
+            label: '内部部门',
+            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+          },
+          {
+            label: '供应商',
+            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+          },
+          {
+            label: '外协单位',
+            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+          },
+        ],
+      },
+    },
+    {
+      fieldName: 'responsibleDepartmentId',
       label: t('qms.inspection.issues.responsibleDepartment'),
       component: 'TreeSelect',
       rules: 'selectRequired',
       componentProps: {
         dropdownStyle: { maxHeight: '400px', overflow: 'auto' },
-        maxTagCount: 'responsive',
         treeDefaultExpandAll: true,
-        treeCheckable: true,
-        // Check parent and child departments independently so selecting a
-        // parent unit (e.g. 生产 OBU) does not cascade-select its child BUs.
-        treeCheckStrictly: true,
       },
     },
     {
@@ -186,11 +209,9 @@ export function getIssueFormSchema(
       component: 'Input',
       rules: 'required',
       dependencies: {
-        triggerFields: ['responsibleDepartments'],
+        triggerFields: ['responsibilityType'],
         show: (values: Record<string, unknown>) =>
-          Array.isArray(values.responsibleDepartments)
-            ? values.responsibleDepartments.length > 0
-            : !!values.responsibleDepartments,
+          isExternalInspectionIssueResponsibility(values.responsibilityType),
       },
     },
     {

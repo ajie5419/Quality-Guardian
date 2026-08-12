@@ -20,6 +20,10 @@ import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 import { DEFAULT_VALUES } from '../constants';
 import IssueFormFields from './IssueFormFields.vue';
+import {
+  buildInspectionIssuePayload,
+  normalizeInspectionIssueCanonicalId,
+} from './issueFormPayload';
 
 const props = defineProps<{
   deptTreeData: DeptNode[];
@@ -53,18 +57,19 @@ type IssueSubmitValues = Omit<Partial<InspectionIssue>, 'photos'> & {
   photos?: UploadPhotoItem[];
 };
 
-function normalizeResponsibleDepartments(values: {
-  responsibleDepartment?: string;
-  responsibleDepartments?: string[];
-}): string[] {
-  if (Array.isArray(values.responsibleDepartments)) {
-    return values.responsibleDepartments
-      .map((item) => String(item || '').trim())
-      .filter(Boolean);
-  }
-  return values.responsibleDepartment
-    ? [String(values.responsibleDepartment)]
+function resolveInitialResponsibleDepartmentId(
+  values: Partial<InspectionIssue>,
+): string {
+  const explicitId = normalizeInspectionIssueCanonicalId(
+    values.responsibleDepartmentId,
+  );
+  if (explicitId) return explicitId;
+  const legacyIds = Array.isArray(values.responsibleDepartments)
+    ? values.responsibleDepartments
     : [];
+  const legacyId = normalizeInspectionIssueCanonicalId(legacyIds[0]);
+  if (legacyId) return legacyId;
+  return normalizeInspectionIssueCanonicalId(values.responsibleDepartment);
 }
 
 function buildInitialData() {
@@ -79,6 +84,8 @@ function buildInitialData() {
     inspector,
     claim: DEFAULT_VALUES.DEFAULT_CLAIM,
     photos: [],
+    responsibilityType: 'INTERNAL_DEPARTMENT',
+    responsibleDepartmentId: '',
     severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
   };
 }
@@ -87,7 +94,7 @@ async function applyEditData(data: Partial<InspectionIssue>) {
   const fields = formFieldsRef.value;
   if (!fields) return;
   const { photos, ...rest } = data;
-  const responsibleDepartments = normalizeResponsibleDepartments(rest);
+  const responsibleDepartmentId = resolveInitialResponsibleDepartmentId(rest);
   let photoArray: string[] = [];
   if (Array.isArray(photos)) {
     photoArray = photos;
@@ -96,7 +103,7 @@ async function applyEditData(data: Partial<InspectionIssue>) {
   }
   await fields.setValues({
     ...rest,
-    responsibleDepartments,
+    responsibleDepartmentId,
     photos: photoArray.map((url, index) => ({
       uid: `photo-${encodeURIComponent(url)}-${index}`,
       name: `Photo ${index + 1}`,
@@ -112,7 +119,6 @@ async function resetToCreate() {
   if (!fields) return;
   await fields.resetForm();
   await fields.setValues(buildInitialData());
-  fields.resetAutoNc();
   fields.clearMatchedCases();
 }
 
@@ -152,19 +158,16 @@ async function handleOk() {
           return null;
         })
         .filter((url): url is string => !!url) || [];
-    const responsibleDepartments = normalizeResponsibleDepartments(rawData);
-    const data = {
+    const data = buildInspectionIssuePayload({
       ...rawData,
       photos,
-      responsibleDepartment: responsibleDepartments[0] || '',
-      responsibleDepartments,
       severity: rawData.severity || DEFAULT_VALUES.DEFAULT_SEVERITY,
-    };
+    });
     if (props.isEditMode && data.id) {
-      await updateInspectionIssue(data.id, data as InspectionIssue);
+      await updateInspectionIssue(data.id, data);
       message.success(t('common.saveSuccess'));
     } else {
-      await createInspectionIssue(data as InspectionIssue);
+      await createInspectionIssue(data);
       message.success(t('common.createSuccess'));
     }
     emit('update:open', false);

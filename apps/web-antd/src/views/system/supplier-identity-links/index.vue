@@ -117,6 +117,7 @@ async function loadTeamOptions(keyword = '') {
   try {
     const options = await getSupplierIdentityManagementOptionsApi({
       keyword: keyword.trim() || undefined,
+      target: 'team',
     });
     if (token !== teamSearchToken) return;
     teamOptions.value = options.teams;
@@ -136,6 +137,8 @@ async function loadSupplierOptions(keyword = '') {
   try {
     const result = await getSupplierIdentityManagementOptionsApi({
       keyword: keyword.trim() || undefined,
+      teamId: draft.teamId || undefined,
+      target: 'supplier',
     });
     if (token !== supplierSearchToken) return;
     supplierOptions.value = result.suppliers;
@@ -147,6 +150,11 @@ async function loadSupplierOptions(keyword = '') {
   } finally {
     if (token === supplierSearchToken) supplierOptionsLoading.value = false;
   }
+}
+
+function handleTeamChange() {
+  draft.supplierId = '';
+  void loadSupplierOptions();
 }
 
 async function openForm(link: Link | null = null) {
@@ -192,10 +200,14 @@ async function save() {
         editingLink.value.id,
         validation.value,
       );
-      message.success('Mapping updated.');
+      message.success(
+        'Mapping updated. Historical records require release backfill.',
+      );
     } else {
       await createSupplierIdentityLinkApi(validation.value);
-      message.success('Mapping created.');
+      message.success(
+        'Mapping created. Historical records require release backfill.',
+      );
     }
     formOpen.value = false;
     await loadLinks();
@@ -251,7 +263,7 @@ onMounted(() => {
   <Page title="Supplier Identity Mappings">
     <div class="mx-auto flex w-full max-w-6xl flex-col gap-4 p-4 md:p-6">
       <Alert
-        message="TEAM-to-supplier mappings are used to resolve external inspection ownership."
+        message="Only canonical external TEAMs and in-house-team or external-service suppliers can be linked. Historical records are repaired only by release backfill."
         show-icon
         type="info"
       />
@@ -277,7 +289,8 @@ onMounted(() => {
         <div>
           <h2 class="text-base font-semibold">Active mappings</h2>
           <p class="text-muted-foreground mt-1 text-sm">
-            Each active TEAM can be linked to one supplier.
+            Each canonical external TEAM can be linked to one
+            process-responsible supplier.
           </p>
         </div>
         <Space>
@@ -362,9 +375,10 @@ onMounted(() => {
             :filter-option="false"
             :loading="teamOptionsLoading"
             :options="teamOptions"
-            placeholder="Search and select a TEAM"
+            placeholder="Search and select an external TEAM"
             show-search
             @search="loadTeamOptions"
+            @update:value="handleTeamChange"
           />
         </Form.Item>
         <Form.Item
@@ -378,7 +392,7 @@ onMounted(() => {
             :filter-option="false"
             :loading="supplierOptionsLoading"
             :options="supplierOptions"
-            placeholder="Search and select a supplier"
+            placeholder="Search and select a process-responsible supplier"
             show-search
             @search="loadSupplierOptions"
           />

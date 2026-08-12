@@ -94,9 +94,17 @@ export const InspectionRecordUpdateService = {
           'A canonical TEAM identity is required for process inspections',
         );
       }
-      const teamIdentity = teamIdForResolution
-        ? await SupplierIdentityService.resolveTeamById(teamIdForResolution)
-        : null;
+      let teamIdentity = null;
+      if (teamIdForResolution) {
+        await SupplierIdentityService.lockTeamForMutation(
+          teamIdForResolution,
+          tx,
+        );
+        teamIdentity = await SupplierIdentityService.resolveTeamById(
+          teamIdForResolution,
+          tx,
+        );
+      }
       const governedFields = buildGovernedWriteFieldsForTable('inspections', {
         incomingType: data.incomingType,
         materialName: data.materialName,
@@ -121,11 +129,17 @@ export const InspectionRecordUpdateService = {
           ? previousInspection?.supplierId
           : governedSupplierId;
       const supplierIdentity =
-        await SupplierIdentityService.resolveSupplierForInspection({
-          category: inspectionCategory,
-          supplierId: supplierIdForResolution,
-          teamId: teamIdForResolution,
-        });
+        await SupplierIdentityService.resolveSupplierForInspection(
+          {
+            category: inspectionCategory,
+            supplierId:
+              inspectionCategory === 'PROCESS'
+                ? undefined
+                : supplierIdForResolution,
+            teamId: teamIdForResolution,
+          },
+          tx,
+        );
       if (inspectionCategory === 'INCOMING' && !supplierIdentity) {
         throw new BusinessError(
           'SUPPLIER_ID_REQUIRED',

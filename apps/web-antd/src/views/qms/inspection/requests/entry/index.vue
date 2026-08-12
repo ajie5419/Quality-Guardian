@@ -1,5 +1,6 @@
 <script lang="ts" setup>
 import type {
+  InspectionIssueResponsibilityType,
   InspectionRequestAttachment,
   InspectionRequestCheckResult,
 } from '@qgs/shared';
@@ -8,6 +9,7 @@ import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { Form, message } from 'ant-design-vue';
 
 import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
@@ -31,13 +33,16 @@ import {
   buildIncomingInspectionRequestInfo,
   buildInspectionRequestEntryProcessOptions,
   buildInspectionRequestEntryRequiredMessage,
+  buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
   getInspectionRequestEntryCopy,
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
+  inspectionRequestResponsibilityTypeOptions,
   isIncomingInspectionEntryPath,
   mapInspectionRequestEntryWorkOrderOptions,
 } from './entry-mode';
+import { useInspectionRequestEntryFormState } from './useInspectionRequestEntryFormState';
 import { useInspectionRequestIdentityOptions } from './useInspectionRequestIdentityOptions';
 import { useInspectionRequestPartOptions } from './useInspectionRequestPartOptions';
 import { useInspectionRequestStationSelection } from './useInspectionRequestStationSelection';
@@ -83,6 +88,9 @@ const requestForm = reactive({
   processName: '',
   quantity: 1,
   reporter: '',
+  responsibilityType:
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT as InspectionIssueResponsibilityType,
+  responsibleDepartmentId: '',
   requestedPartName: '',
   requestNewPart: false,
   requestInfo: '',
@@ -125,15 +133,15 @@ const processOptions = computed(() =>
 );
 
 const {
-  clearResponsibleUnitIdentity,
-  loadResponsibleUnitOptions,
-  teamLoading,
-  teamOptions,
-} = useInspectionRequestIdentityOptions({
-  isIncomingEntry,
-  processOptions,
-  requestForm,
-});
+  changeResponsibilityType,
+  clearResponsibilityIdentity,
+  internalTeamOptions,
+  loadInternalTeamOptions,
+  loadResponsibilityOptions,
+  responsibilityDepartmentOptions,
+  responsibilityLoading,
+  supplierOptions,
+} = useInspectionRequestIdentityOptions({ requestForm });
 
 const isAssemblyProcess = computed(() =>
   String(requestForm.processName || '').includes('组装'),
@@ -150,49 +158,15 @@ const entryCopy = computed(() =>
 const { requiresStationSelection, stationQuantity } =
   useInspectionRequestStationSelection({ requestForm, workOrderOptions });
 
-function applyRoutePrefill() {
-  const workOrderNumber = String(route.query.workOrderNumber || '');
-  requestForm.workOrderNumber = workOrderNumber;
-  requestForm.workOrderNumbers = workOrderNumber ? [workOrderNumber] : [];
-  requestForm.partId = String(route.query.partId || '');
-  requestForm.partName = String(route.query.partName || '');
-  requestForm.processId = String(route.query.processId || '');
-  requestForm.componentName = String(route.query.componentName || '');
-  requestForm.processName = isIncomingEntry.value
-    ? INCOMING_INSPECTION_PROCESS_NAME
-    : String(route.query.processName || '');
-  requestForm.reporter = String(route.query.reporter || '');
-  requestForm.requestedPartName = '';
-  requestForm.requestNewPart =
-    isIncomingEntry.value && incomingMaterialFreeInputEnabled.value;
-  requestForm.team = String(route.query.team || '');
-  clearResponsibleUnitIdentity();
-}
-
-function resetRequestForm() {
-  attachmentFileList.value = [];
-  requestForm.attachments = [];
-  requestForm.componentName = '';
-  requestForm.incomingType = '';
-  requestForm.partId = '';
-  requestForm.partName = '';
-  requestForm.processId = '';
-  requestForm.processName = isIncomingEntry.value
-    ? INCOMING_INSPECTION_PROCESS_NAME
-    : '';
-  requestForm.quantity = 1;
-  requestForm.reporter = '';
-  requestForm.requestedPartName = '';
-  requestForm.requestNewPart =
-    isIncomingEntry.value && incomingMaterialFreeInputEnabled.value;
-  requestForm.requestInfo = '';
-  requestForm.selfCheckResult = 'PASS';
-  requestForm.mutualCheckResult = 'PASS';
-  requestForm.stationSelection = null;
-  clearResponsibleUnitIdentity(true);
-  requestForm.workOrderNumber = '';
-  requestForm.workOrderNumbers = [];
-}
+const { applyRoutePrefill, resetRequestForm } =
+  useInspectionRequestEntryFormState({
+    attachmentFileList,
+    clearResponsibilityIdentity,
+    incomingMaterialFreeInputEnabled,
+    isIncomingEntry,
+    requestForm,
+    route,
+  });
 
 async function loadWorkOrderOptions(keyword = '') {
   workOrderLoading.value = true;
@@ -317,8 +291,10 @@ async function submitRequest() {
     (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     (requiresStationSelection.value && !requestForm.stationSelection) ||
-    !requestForm.team ||
-    (isIncomingEntry.value ? !requestForm.supplierId : !requestForm.teamId) ||
+    !requestForm.responsibleDepartmentId ||
+    (requestForm.responsibilityType !==
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+      !requestForm.supplierId) ||
     !requestForm.reporter ||
     requestForm.attachments.length === 0
   ) {
@@ -328,6 +304,7 @@ async function submitRequest() {
         requiresComponentName.value,
         isIncomingEntry.value,
         requiresStationSelection.value,
+        requestForm.responsibilityType,
       ),
     );
     return;
@@ -340,6 +317,17 @@ async function submitRequest() {
 
   submitting.value = true;
   try {
+    const responsibilityPayload =
+      buildInspectionRequestEntryResponsibilityPayload({
+        ...requestForm,
+        teamResponsibleDepartmentId: internalTeamOptions.value.find(
+          (team) => team.value === requestForm.teamId,
+        )?.responsibleDepartmentId,
+      });
+    if (!responsibilityPayload) {
+      message.warning('请选择完整的责任归属信息');
+      return;
+    }
     const created = await createPublicInspectionRequest({
       attachments: requestForm.attachments,
       category: isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
@@ -363,9 +351,7 @@ async function submitRequest() {
         : requestForm.requestInfo,
       selfCheckResult: requestForm.selfCheckResult,
       stationSelection: requestForm.stationSelection || undefined,
-      supplierId: requestForm.supplierId || undefined,
-      team: requestForm.team,
-      teamId: requestForm.teamId || undefined,
+      ...responsibilityPayload,
       workOrderNumber: requestForm.workOrderNumber,
       workOrderNumbers: isIncomingEntry.value
         ? requestForm.workOrderNumbers
@@ -382,32 +368,50 @@ async function submitRequest() {
   }
 }
 
-onMounted(async () => {
-  applyRoutePrefill();
-  if (isIncomingEntry.value) {
-    try {
-      const setting = await getPublicIncomingMaterialInputSettingApi();
-      incomingMaterialFreeInputEnabled.value =
-        setting.incomingMaterialFreeInputEnabled;
-      requestForm.requestNewPart = incomingMaterialFreeInputEnabled.value;
-      if (requestForm.requestNewPart) {
-        requestForm.partId = '';
-        requestForm.partName = '';
-      } else {
-        requestForm.requestedPartName = '';
-      }
-    } catch {
-      requestForm.requestNewPart = false;
+async function loadIncomingMaterialInputSetting() {
+  try {
+    const setting = await getPublicIncomingMaterialInputSettingApi();
+    incomingMaterialFreeInputEnabled.value =
+      setting.incomingMaterialFreeInputEnabled;
+    requestForm.requestNewPart = incomingMaterialFreeInputEnabled.value;
+    if (requestForm.requestNewPart) {
+      requestForm.partId = '';
+      requestForm.partName = '';
+    } else {
+      requestForm.requestedPartName = '';
     }
+  } catch {
+    requestForm.requestNewPart = false;
   }
+}
+
+onMounted(() => {
+  applyRoutePrefill();
+  // Responsibility choices must not wait for the optional incoming-material
+  // setting; otherwise a delayed settings request leaves the form unusable.
+  void loadResponsibilityOptions();
   void loadWorkOrderOptions(requestForm.workOrderNumber);
-  void loadResponsibleUnitOptions(requestForm.team);
+  if (isIncomingEntry.value) {
+    void loadIncomingMaterialInputSetting();
+  }
 });
 
 watch(
   () => route.query,
   () => {
     applyRoutePrefill();
+    void loadResponsibilityOptions();
+  },
+);
+
+watch(
+  () => isIncomingEntry.value,
+  () => {
+    requestForm.responsibilityType = isIncomingEntry.value
+      ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+      : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+    clearResponsibilityIdentity();
+    void loadResponsibilityOptions();
   },
 );
 
@@ -463,20 +467,27 @@ watch(
         :check-result-options="inspectionRequestEntryCheckResultOptions"
         :entry-copy="entryCopy"
         :is-incoming-entry="isIncomingEntry"
+        :internal-team-options="internalTeamOptions"
         :part-search-loading="partSearchLoading"
         :process-options="processOptions"
         :requires-component-name="requiresComponentName"
         :requires-station-selection="requiresStationSelection"
         :station-quantity="stationQuantity"
         :submitting="submitting"
-        :team-loading="teamLoading"
-        :team-options="teamOptions"
+        :responsibility-department-options="responsibilityDepartmentOptions"
+        :responsibility-loading="responsibilityLoading"
+        :responsibility-type-options="
+          inspectionRequestResponsibilityTypeOptions
+        "
+        :supplier-options="supplierOptions"
         :work-order-loading="workOrderLoading"
         :work-order-options="workOrderOptions"
         :work-order-processes-loading="workOrderProcessesLoading"
         @attachment-change="handleAttachmentUploadChange"
+        @internal-team-search="loadInternalTeamOptions"
         @part-search="searchCanonicalPartOptions"
-        @responsible-unit-search="loadResponsibleUnitOptions"
+        @responsibility-type-change="changeResponsibilityType"
+        @responsibility-options-search="loadResponsibilityOptions"
         @work-order-search="loadWorkOrderOptions"
       />
       <InspectionRequestEntrySubmitBar

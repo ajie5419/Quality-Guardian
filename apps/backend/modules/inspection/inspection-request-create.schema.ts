@@ -1,3 +1,7 @@
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  normalizeInspectionIssueResponsibilityType,
+} from '@qgs/shared';
 import { z } from 'zod';
 
 import {
@@ -32,6 +36,17 @@ export const inspectionRequestCreateBodySchema = z.object({
   processName: z.string().optional(),
   quantity: z.union([z.number(), z.string()]).optional(),
   reporter: z.string().optional(),
+  responsibilityType: z.preprocess(
+    (value) => normalizeInspectionIssueResponsibilityType(value) ?? undefined,
+    z
+      .enum([
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+      ])
+      .optional(),
+  ),
+  responsibleDepartmentId: z.string().trim().optional(),
   requestedPartName: z.string().trim().optional(),
   requestInfo: z.string().optional(),
   selfCheckResult: z.string().optional(),
@@ -55,6 +70,12 @@ export const inspectionRequestCreateV2BodySchema =
       partId: z.string().trim().min(1).optional(),
       processId: z.string().trim().min(1),
       requestedPartName: z.string().trim().min(1).max(191).optional(),
+      responsibilityType: z.enum([
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+      ]),
+      responsibleDepartmentId: z.string().trim().min(1),
     })
     .superRefine((body, context) => {
       const hasPartId = Boolean(body.partId);
@@ -80,6 +101,31 @@ export const inspectionRequestCreateV2BodySchema =
           message:
             'Incoming inspection requests require exactly one of partId or requestedPartName',
           path: ['partId'],
+        });
+      }
+      const isInternal =
+        body.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+      const isExternal = !isInternal;
+      if (isExternal && !body.supplierId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'External responsibility requires supplierId',
+          path: ['supplierId'],
+        });
+      }
+      if (isInternal && body.supplierId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'Internal responsibility cannot specify supplierId',
+          path: ['supplierId'],
+        });
+      }
+      if (isExternal && body.teamId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: 'External responsibility must not depend on teamId',
+          path: ['teamId'],
         });
       }
     });
@@ -157,11 +203,12 @@ export function validateInspectionRequestCreateV2Body(
       hasPartIdentity &&
       Boolean(normalizeInspectionRequestText(body.processId)) &&
       Boolean(normalizeInspectionRequestText(body.reporter)) &&
-      Boolean(
-        normalizeInspectionRequestText(
-          isIncoming ? body.supplierId : body.teamId,
-        ),
-      ) &&
+      Boolean(normalizeInspectionRequestText(body.responsibleDepartmentId)) &&
+      Boolean(normalizeInspectionRequestText(body.responsibilityType)) &&
+      (body.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+        ? !normalizeInspectionRequestText(body.supplierId)
+        : Boolean(normalizeInspectionRequestText(body.supplierId))) &&
       attachments.length > 0,
     workOrderNumber:
       normalizeInspectionRequestText(body.workOrderNumber) ||

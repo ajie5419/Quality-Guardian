@@ -2,7 +2,10 @@ import type {
   CloseInspectionRequestParams,
   CreateInspectionRequestParams,
   DispatchInspectionRequestParams,
+  InspectionIssueResponsibilityType,
   InspectionRequest,
+  InspectionRequestResponsibilityOptions,
+  InspectionRequestTeamOption,
   WorkOrderItem,
 } from '@qgs/shared';
 
@@ -190,13 +193,20 @@ export async function getPublicInspectionRequestPartOptions(params: {
 export async function getPublicInspectionRequestTeams(params?: {
   keyword?: string;
 }) {
-  return publicRequestClient.get<
-    Array<{
-      group: 'external' | 'internal';
-      label: string;
-      value: string;
-    }>
-  >(QMS_API.PUBLIC_INSPECTION_REQUEST_TEAMS, { params });
+  return publicRequestClient.get<InspectionRequestTeamOption[]>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_TEAMS,
+    { params },
+  );
+}
+
+export async function getPublicInspectionRequestResponsibilityOptions(params: {
+  keyword?: string;
+  responsibilityType: InspectionIssueResponsibilityType;
+}) {
+  return publicRequestClient.get<InspectionRequestResponsibilityOptions>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_RESPONSIBILITY_OPTIONS,
+    { params },
+  );
 }
 
 export async function getPublicInspectionRequestSuppliers(params?: {

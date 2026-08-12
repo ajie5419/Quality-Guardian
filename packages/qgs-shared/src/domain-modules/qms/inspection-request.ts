@@ -1,3 +1,5 @@
+import { SUPPLIER_CATEGORY } from '../../enums/qms-types';
+
 export const INSPECTION_REQUEST_STATUS = {
   CANCELLED: 'CANCELLED',
   CLOSED: 'CLOSED',
@@ -29,6 +31,24 @@ const STATION_SELECTION_MODE_SET = new Set(['ALL', 'PARTIAL']);
 
 export function normalizeInspectionRequestText(value: unknown): string {
   return String(value ?? '').trim();
+}
+
+/**
+ * V2 request responsibility is chosen explicitly. The external supplier list
+ * and server-side validation must share this type-to-category mapping.
+ */
+export function getInspectionRequestResponsibilitySupplierCategory(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
+  if (responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER) {
+    return SUPPLIER_CATEGORY.SUPPLIER;
+  }
+  if (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return SUPPLIER_CATEGORY.OUTSOURCING;
+  }
+  return null;
 }
 
 export function mergeInspectionProcessNames(
@@ -492,9 +512,13 @@ export interface InspectionRecordPayloadInput {
     quantity?: number;
     reporter: string;
     requestInfo?: null | string;
+    responsibilityType?: null | string;
+    responsibleDepartment?: null | string;
+    responsibleDepartmentId?: null | string;
     selfCheckResult: string;
     stationSelection?: null | string;
     supplierId?: null | string;
+    supplierName?: null | string;
     team?: null | string;
     teamId?: null | string;
     work_order?: null | { projectName?: null | string };
@@ -567,6 +591,15 @@ export function buildInspectionRecordPayloadCore(
           ],
     projectName:
       input.request.work_order?.projectName || input.request.workOrderNumber,
+    responsibilityType: normalizeInspectionIssueResponsibilityType(
+      input.request.responsibilityType,
+    ),
+    responsibleDepartment: normalizeInspectionRequestText(
+      input.request.responsibleDepartment,
+    ),
+    responsibleDepartmentId: normalizeInspectionRequestText(
+      input.request.responsibleDepartmentId,
+    ),
     partId: normalizeInspectionRequestText(input.request.partId),
     partName: input.request.partName,
     quantity,
@@ -600,7 +633,9 @@ export function buildInspectionRecordPayloadCore(
         requestInfo.incomingType || INCOMING_INSPECTION_PROCESS_NAME,
       materialName: input.request.partName,
       supplierId: normalizeInspectionRequestText(input.request.supplierId),
-      supplierName: normalizeInspectionRequestText(input.request.team),
+      supplierName:
+        normalizeInspectionRequestText(input.request.supplierName) ||
+        normalizeInspectionRequestText(input.request.team),
     };
   }
 
@@ -610,6 +645,8 @@ export function buildInspectionRecordPayloadCore(
     level1Component: input.request.partName,
     level2Component: componentName || undefined,
     processName: input.request.processName,
+    supplierId: normalizeInspectionRequestText(input.request.supplierId),
+    supplierName: normalizeInspectionRequestText(input.request.supplierName),
     team: normalizeInspectionRequestText(input.request.team),
     teamId: normalizeInspectionRequestText(input.request.teamId),
   };

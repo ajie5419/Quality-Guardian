@@ -73,7 +73,8 @@ const emit = defineEmits<{
 const { handleApiError } = useErrorHandler();
 const { isMobile } = useMobileViewport();
 const { t } = useI18n();
-const { canCreate, canDelete, canEdit } = useQmsPermissions('QMS:WorkOrder');
+const { canConfirm, canCreate, canDelete, canEdit } =
+  useQmsPermissions('QMS:WorkOrder');
 const { modalWidth, modalWrapClassName } = useAdaptivePopup();
 const accessStore = useAccessStore();
 
@@ -683,7 +684,7 @@ onMounted(() => {
                 <div class="flex items-center justify-center gap-1">
                   <Tooltip
                     v-if="
-                      canEdit &&
+                      canConfirm &&
                       record.executionStatus !== 'CONFIRMED' &&
                       record.executionStatus !== 'MANUAL_CONFIRMED'
                     "
@@ -700,7 +701,7 @@ onMounted(() => {
                     </Button>
                   </Tooltip>
                   <Tooltip
-                    v-else-if="canEdit"
+                    v-else-if="canConfirm"
                     :title="t('qms.workOrder.unconfirmRequirement')"
                   >
                     <Button

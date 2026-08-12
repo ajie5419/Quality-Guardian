@@ -19,6 +19,8 @@ function buildValidPayload() {
     processName: '焊接',
     quantity: '2',
     reporter: '张三',
+    responsibilityType: 'INTERNAL_DEPARTMENT',
+    responsibleDepartmentId: 'dept-1',
     selfCheckResult: 'PASS',
     stationSelection: { indexes: [1, 2], mode: 'PARTIAL' },
     team: '生产一班',
@@ -36,6 +38,19 @@ describe('inspection request create schema', () => {
       partName: undefined,
       processId: 'process-1',
       processName: undefined,
+    });
+
+    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  });
+
+  it('accepts PROCESS internal responsibility without an execution TEAM', () => {
+    const parsed = inspectionRequestCreateV2BodySchema.parse({
+      ...buildValidPayload(),
+      category: 'PROCESS',
+      partId: 'part-1',
+      processId: 'process-1',
+      team: undefined,
+      teamId: undefined,
     });
 
     expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
@@ -59,6 +74,26 @@ describe('inspection request create schema', () => {
       processId: 'incoming-process-1',
       requestedPartName: 'Unregistered bearing',
       supplierId: 'supplier-1',
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartmentId: 'dept-purchasing',
+      teamId: undefined,
+    });
+
+    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  });
+
+  it('accepts INCOMING internal responsibility without a supplier or execution TEAM', () => {
+    const parsed = inspectionRequestCreateV2BodySchema.parse({
+      ...buildValidPayload(),
+      category: 'INCOMING',
+      componentName: undefined,
+      partId: undefined,
+      processId: 'incoming-process-1',
+      requestedPartName: 'Unregistered bearing',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-quality',
+      supplierId: undefined,
+      team: undefined,
       teamId: undefined,
     });
 
@@ -74,6 +109,8 @@ describe('inspection request create schema', () => {
         processId: 'incoming-process-1',
         requestedPartName: 'Unregistered bearing',
         supplierId: 'supplier-1',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
       }),
     ).toThrow();
   });

@@ -8,6 +8,7 @@ import { Prisma } from '@prisma/client';
 import {
   formatDate,
   InspectionIssueStatusEnum,
+  normalizeInspectionIssueResponsibilityType,
   tryParsePhotos,
 } from '@qgs/shared';
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
@@ -151,6 +152,10 @@ export function mapInspectionIssueRecord(
     status: issue.status as InspectionIssueStatusEnum,
     lossAmount: Number(issue.lossAmount) || 0,
     responsibleDepartment: issue.responsibleDepartment || '',
+    responsibleDepartmentId: issue.responsibleDepartmentId || null,
+    responsibilityType: normalizeInspectionIssueResponsibilityType(
+      issue.responsibilityType,
+    ),
     responsibleDepartments,
     responsibleWelder: issue.responsibleWelder || '',
     reportedBy: issue.inspector || '',

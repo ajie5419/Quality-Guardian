@@ -276,13 +276,15 @@ export const WorkOrderRequirementRouteService = {
     body: Record<string, unknown>,
     userinfo: UserSession,
   ) {
-    await ensureWorkOrderPermission(
-      userinfo,
-      PERMISSION_CODES.QMS.WORK_ORDER.EDIT,
-    );
-    const workOrderWhere = await buildAccessibleWorkOrderWhere(event, userinfo);
     const confirm =
       typeof body.confirm === 'boolean' ? body.confirm : undefined;
+    await ensureWorkOrderPermission(
+      userinfo,
+      confirm === undefined
+        ? PERMISSION_CODES.QMS.WORK_ORDER.EDIT
+        : PERMISSION_CODES.QMS.WORK_ORDER.CONFIRM,
+    );
+    const workOrderWhere = await buildAccessibleWorkOrderWhere(event, userinfo);
     const data =
       confirm === undefined
         ? await buildRequirementUpdateData(body, userinfo.username)

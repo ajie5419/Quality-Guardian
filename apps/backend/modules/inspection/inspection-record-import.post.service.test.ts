@@ -3,7 +3,6 @@ import handler from '~/modules/inspection/inspection-record-import.post.service'
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
-import { resolveTeamIdForWrite } from '~/utils/team-resolver';
 
 vi.mock('h3', () => ({
   defineEventHandler: (fn: any) => fn,
@@ -44,10 +43,6 @@ vi.mock('~/utils/governed-write', () => ({
     .mockResolvedValue({ supplierId: 'supplier-1' }),
 }));
 
-vi.mock('~/utils/team-resolver', () => ({
-  resolveTeamIdForWrite: vi.fn().mockResolvedValue('team-1'),
-}));
-
 vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
 }));
@@ -78,7 +73,6 @@ vi.mock('~/utils/response', () => ({
 describe('inspectionRecordImportPostService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(resolveTeamIdForWrite).mockResolvedValue('team-1');
     vi.mocked(SupplierIdentityService.resolveTeamById).mockResolvedValue({
       id: 'team-1',
       name: 'Team A',
@@ -106,8 +100,8 @@ describe('inspectionRecordImportPostService', () => {
     );
 
     const items = [
-      { serialNumber: 'SN-1', inspector: 'A' },
-      { serialNumber: 'SN-2', inspector: 'B' },
+      { serialNumber: 'SN-1', inspector: 'A', teamId: 'team-1' },
+      { serialNumber: 'SN-2', inspector: 'B', teamId: 'team-1' },
     ];
     (readBody as any).mockResolvedValue({ items, category: 'PROCESS' });
     (parseNonEmptyArray as any).mockReturnValue(items);
@@ -136,8 +130,8 @@ describe('inspectionRecordImportPostService', () => {
     );
 
     const items = [
-      { serialNumber: 'SN-1', inspector: 'A' },
-      { serialNumber: 'SN-2', inspector: 'B' },
+      { serialNumber: 'SN-1', inspector: 'A', teamId: 'team-1' },
+      { serialNumber: 'SN-2', inspector: 'B', teamId: 'team-1' },
     ];
     (readBody as any).mockResolvedValue({ items, category: 'PROCESS' });
     (parseNonEmptyArray as any).mockReturnValue(items);
@@ -222,7 +216,7 @@ describe('inspectionRecordImportPostService', () => {
     );
   });
 
-  it('returns a row error when a process TEAM name is unresolved', async () => {
+  it('returns a row error when a process row omits its canonical TEAM ID', async () => {
     const { readBody } = await import('h3');
     const { parseNonEmptyArray } = await import('~/utils/request-validation');
     const { buildImportSummary } = await import(
@@ -231,8 +225,6 @@ describe('inspectionRecordImportPostService', () => {
     const items = [{ team: 'Unknown Team' }];
     (readBody as any).mockResolvedValue({ items, category: 'PROCESS' });
     (parseNonEmptyArray as any).mockReturnValue(items);
-    vi.mocked(resolveTeamIdForWrite).mockResolvedValue(null);
-    vi.mocked(SupplierIdentityService.resolveTeamById).mockResolvedValue(null);
     (buildImportSummary as any).mockReturnValue({
       successCount: 0,
       totalCount: 1,

@@ -9,7 +9,7 @@ import {
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexService } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
@@ -19,11 +19,8 @@ import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 import {
-  buildInspectionIssueCreateData,
   buildInspectionIssueUpdateData,
   buildInspectionIssueUpsertPayload,
-  createInspectionIssueId,
-  findInspectionForIssue,
   getNextInspectionIssueSerialNumber,
   hasInspectionIssueWriteAccess,
 } from './inspection-issue';
@@ -31,7 +28,11 @@ import {
   applyInspectionIssueWriteOwnership,
   InspectionIssueAccessService,
 } from './inspection-issue-access.service';
-import { InspectionIssueNumberingService } from './inspection-issue-numbering.service';
+import {
+  InspectionIssueCreateService,
+  validateOnlineInspectionIssueResponsibilityInput,
+} from './inspection-issue-create.service';
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 const logger = createModuleLogger('InspectionIssueMutation');
@@ -55,62 +56,35 @@ export const InspectionIssueMutationService = {
         'BAD_REQUEST:检验记录来源创建不合格项时必须携带 inspectionId',
       );
     }
-    const linkedInspection = await findInspectionForIssue(
-      body.inspectionId as string | undefined,
-    );
-    const newId = createInspectionIssueId();
-    const shouldGenerateNcNumber = !String(body.ncNumber || '').trim();
-
-    // Aggregate-based serial and generated NC values can race under concurrent
-    // creates, so both generated values are refreshed on a matching conflict.
-    const newRecord = await createIssueWithSerialRetry(async () => {
-      const serialNumber = await getNextInspectionIssueSerialNumber();
-      const createBody = shouldGenerateNcNumber
-        ? {
-            ...body,
-            ncNumber:
-              await InspectionIssueNumberingService.generateNextNcNumber(),
-          }
-        : body;
-      const createData = await buildInspectionIssueCreateData(createBody, {
-        createdBy: String(userinfo.id || '') || undefined,
-        id: newId,
-        inspection: linkedInspection,
-        inspectorUsername: userinfo.username,
-        serialNumber,
-      });
-      return prisma.$transaction(async (tx) => {
-        await assertWelderForWeldingDefect(createBody, tx);
-        const record = await tx.quality_records.create({ data: createData });
-        await MetricRefreshQueue.enqueueSupplierScores(
+    const newRecord = await createIssueWithSerialRetry(async () =>
+      prisma.$transaction(async (tx) =>
+        InspectionIssueCreateService.createInTransaction({
+          body,
           tx,
-          [record.supplierId],
-          'inspection-issue.created',
-        );
-        return record;
-      });
-    }, shouldGenerateNcNumber);
+          userinfo,
+        }),
+      ),
+    );
     await FileStorageService.registerReferencesFromAttachments({
       attachments: body.photos,
-      bizId: String(newRecord.id),
+      bizId: String(newRecord.record.id),
       bizType: 'inspection_issue',
       fieldName: 'photos',
     });
     await SystemLogService.auditLog('inspection', 'issueCreate', {
       userId: String(userinfo.id),
-      targetId: String(newRecord.id),
+      targetId: String(newRecord.record.id),
       detailsVariables: {
-        nonConformanceNumber: newRecord.nonConformanceNumber || '无编号',
-        partName: newRecord.partName,
+        nonConformanceNumber: newRecord.record.nonConformanceNumber || '无编号',
+        partName: newRecord.record.partName,
       },
     });
-    await QualityLossIndexService.upsertFromInternal(newRecord);
     try {
       await WelderScoreService.syncFromInspectionIssues();
     } catch (error) {
       logger.error(error, 'welder-score-sync after createIssue');
     }
-    return { ...newRecord, ncNumber: newRecord.nonConformanceNumber };
+    return { ...newRecord.record, ncNumber: newRecord.ncNumber };
   },
 
   async updateIssue(
@@ -128,6 +102,7 @@ export const InspectionIssueMutationService = {
       userContext,
     );
     const { updated, updateData } = await prisma.$transaction(async (tx) => {
+      validateOnlineInspectionIssueResponsibilityInput(body);
       const current = await tx.quality_records.findUnique({
         where: ownershipWhere,
         select: {
@@ -136,6 +111,8 @@ export const InspectionIssueMutationService = {
             select: { category: true, supplierId: true, teamId: true },
           },
           processName: true,
+          responsibilityType: true,
+          responsibleDepartmentId: true,
           responsibleWelder: true,
           supplierId: true,
           supplierName: true,
@@ -148,8 +125,24 @@ export const InspectionIssueMutationService = {
           403,
         );
       }
+      const responsibility = hasInspectionIssueResponsibilityUpdate(body)
+        ? await resolveInspectionIssueResponsibility(
+            mergeResponsibilityInput(body, current),
+            tx,
+          )
+        : null;
+      const canonicalBody = responsibility
+        ? {
+            ...body,
+            responsibleDepartment: responsibility.responsibleDepartment,
+            responsibleDepartmentId: responsibility.responsibleDepartmentId,
+            responsibilityType: responsibility.responsibilityType,
+            supplierId: responsibility.supplierId ?? '',
+            supplierName: responsibility.supplierName ?? '',
+          }
+        : body;
       const updateData = await buildInspectionIssueUpdateData(
-        body,
+        canonicalBody,
         existingNcNumber,
         current.inspection,
       );
@@ -158,16 +151,22 @@ export const InspectionIssueMutationService = {
       await assertWelderForWeldingDefect(
         {
           defectSubcategoryId:
-            body.defectSubcategoryId ?? current.defectSubcategoryId,
-          processName: body.processName ?? current.processName,
+            canonicalBody.defectSubcategoryId ?? current.defectSubcategoryId,
+          processName: canonicalBody.processName ?? current.processName,
           responsibleWelder:
-            body.responsibleWelder ?? current.responsibleWelder,
+            canonicalBody.responsibleWelder ?? current.responsibleWelder,
         },
         tx,
       );
       const updated = await tx.quality_records.update({
         where: ownershipWhere,
-        data: updateData,
+        data: responsibility
+          ? {
+              ...updateData,
+              responsibleDepartmentId: responsibility.responsibleDepartmentId,
+              responsibilityType: responsibility.responsibilityType,
+            }
+          : updateData,
       });
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
@@ -410,40 +409,47 @@ function isSerialNumberConflict(error: unknown): boolean {
   return message.includes('serialNumber') || targetStr.includes('serialNumber');
 }
 
+function hasInspectionIssueResponsibilityUpdate(body: RequestBody) {
+  return (
+    body.responsibilityType !== undefined ||
+    body.responsibleDepartmentId !== undefined ||
+    body.supplierId !== undefined
+  );
+}
+
+function mergeResponsibilityInput(
+  body: RequestBody,
+  current: {
+    responsibilityType: null | string;
+    responsibleDepartmentId: null | string;
+    supplierId: null | string;
+  },
+) {
+  return {
+    responsibilityType: String(
+      body.responsibilityType ?? current.responsibilityType ?? '',
+    ).trim(),
+    responsibleDepartmentId: String(
+      body.responsibleDepartmentId ?? current.responsibleDepartmentId ?? '',
+    ).trim(),
+    supplierId: String(body.supplierId ?? current.supplierId ?? '').trim(),
+  };
+}
+
 /**
- * Executes `run` up to 3 times for generated identifier conflicts. `run` must
- * regenerate the serial and, when applicable, the NC number on each call.
+ * Executes `run` up to 3 times for generated serial identifier conflicts.
  */
 async function createIssueWithSerialRetry<T>(
   run: () => Promise<T>,
-  retryNcNumberConflict: boolean,
   maxAttempts = 3,
 ): Promise<T> {
   for (let attempt = 1; ; attempt++) {
     try {
       return await run();
     } catch (error) {
-      if (
-        attempt >= maxAttempts ||
-        (!isSerialNumberConflict(error) &&
-          !(retryNcNumberConflict && isNcNumberConflict(error)))
-      ) {
+      if (attempt >= maxAttempts || !isSerialNumberConflict(error)) {
         throw error;
       }
     }
   }
-}
-
-function isNcNumberConflict(error: unknown): boolean {
-  if (!isPrismaUniqueConstraintError(error)) return false;
-  const message = String((error as { message?: string })?.message || '');
-  const target: unknown = (error as { meta?: { target?: unknown } })?.meta
-    ?.target;
-  const targetStr = Array.isArray(target)
-    ? target.join(',')
-    : String(target ?? '');
-  return (
-    message.includes('nonConformanceNumber') ||
-    targetStr.includes('nonConformanceNumber')
-  );
 }

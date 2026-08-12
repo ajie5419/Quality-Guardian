@@ -1,14 +1,22 @@
 import type { ReinspectionCounts } from './inspection-request-stats-identity';
 
+import { DeptService } from '~/modules/dept';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { TeamIdentityService } from '~/modules/team';
 import prisma from '~/utils/prisma';
 
 import {
+  addInspectionRequestStatsDays as addDays,
+  inspectionRequestDurationMinutes as durationMinutes,
+  formatInspectionRequestStatsDate as formatShanghaiDate,
+  resolveInspectionRequestStatsRange as resolveStatsRange,
+} from './inspection-request-stats-date';
+import {
   collectIdentityIds,
   createIdentityCountRows,
   createInspectorHistoryRows,
   createReinspectionRows,
+  incrementReinspectionCounts,
   isIncomingInspectionRequest,
   normalizeIdentityId,
   UNRESOLVED_IDENTITY_KEY,
@@ -16,83 +24,9 @@ import {
   UNRESOLVED_SUPPLIER_NAME,
   UNRESOLVED_TEAM_NAME,
 } from './inspection-request-stats-identity';
+import { buildInspectionRequestDepartmentStats } from './inspection-request-stats-responsibility';
 
 const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
-
-function getShanghaiTodayRange(now = new Date()) {
-  const shanghaiDate = new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-  }).format(now);
-  const start = new Date(`${shanghaiDate}T00:00:00+08:00`);
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  return { end, start };
-}
-
-function parseShanghaiDate(value?: null | string) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null;
-  const parsed = new Date(`${value}T00:00:00+08:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-}
-
-function addDays(date: Date, days: number) {
-  return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
-}
-
-function formatShanghaiDate(date: Date) {
-  return new Intl.DateTimeFormat('en-CA', {
-    day: '2-digit',
-    month: '2-digit',
-    timeZone: 'Asia/Shanghai',
-    year: 'numeric',
-  }).format(date);
-}
-
-function getPeriodRange(period?: null | string, now = new Date()) {
-  const today = getShanghaiTodayRange(now).start;
-  switch (period) {
-    case 'halfYear': {
-      const start = new Date(today);
-      start.setMonth(start.getMonth() - 5, 1);
-      return { end: addDays(today, 1), start };
-    }
-    case 'quarter': {
-      const start = new Date(today);
-      start.setMonth(start.getMonth() - 2, 1);
-      return { end: addDays(today, 1), start };
-    }
-    case 'year': {
-      const start = new Date(today);
-      start.setMonth(0, 1);
-      return { end: addDays(today, 1), start };
-    }
-    default: {
-      const start = new Date(today);
-      start.setDate(1);
-      return { end: addDays(today, 1), start };
-    }
-  }
-}
-
-function resolveStatsRange(query: {
-  endDate?: string;
-  period?: string;
-  startDate?: string;
-}) {
-  const customStart = parseShanghaiDate(query.startDate || '');
-  const customEnd = parseShanghaiDate(query.endDate || '');
-  if (customStart && customEnd && customEnd >= customStart)
-    return { end: addDays(customEnd, 1), start: customStart };
-  return query.period ? getPeriodRange(query.period) : getShanghaiTodayRange();
-}
-
-function durationMinutes(start: Date, end: Date) {
-  const diff = end.getTime() - start.getTime();
-  if (!Number.isFinite(diff) || diff < 0) return 0;
-  return Math.floor(diff / 60_000);
-}
 
 function hasInspectionExecutionCode(codes: string[]) {
   return codes.some((code) => INSPECTION_EXECUTION_CODES.has(code));
@@ -125,6 +59,8 @@ export const InspectionRequestStatsService = {
           status: true,
           submittedAt: true,
           supplierId: true,
+          responsibilityType: true,
+          responsibleDepartmentId: true,
           teamId: true,
         },
         where: {
@@ -186,18 +122,33 @@ export const InspectionRequestStatsService = {
         },
       }),
     ]);
-    const [supplierNamesById, teamNamesById, teamCanonicalById] =
-      await Promise.all([
-        SupplierIdentityService.resolveNamesByIds(
-          collectIdentityIds(periodRequests.map((item) => item.supplierId)),
+    const [
+      supplierNamesById,
+      teamNamesById,
+      teamCanonicalById,
+      responsibilityDepartments,
+    ] = await Promise.all([
+      SupplierIdentityService.resolveNamesByIds(
+        collectIdentityIds(periodRequests.map((item) => item.supplierId)),
+      ),
+      TeamIdentityService.resolveNamesByIds(
+        collectIdentityIds(periodRequests.map((item) => item.teamId)),
+      ),
+      TeamIdentityService.resolveCanonicalIds(
+        periodRequests.map((item) => item.teamId),
+      ),
+      DeptService.findActiveByIdsOrNames({
+        ids: collectIdentityIds(
+          periodRequests.map((item) => item.responsibleDepartmentId),
         ),
-        TeamIdentityService.resolveNamesByIds(
-          collectIdentityIds(periodRequests.map((item) => item.teamId)),
-        ),
-        TeamIdentityService.resolveCanonicalIds(
-          periodRequests.map((item) => item.teamId),
-        ),
-      ]);
+      }),
+    ]);
+    const departmentNamesById = new Map(
+      responsibilityDepartments.map((department) => [
+        department.id,
+        department.name,
+      ]),
+    );
     const now = new Date();
     const inspectorStatusMap = new Map<
       string,
@@ -300,10 +251,13 @@ export const InspectionRequestStatsService = {
         return a.status === 'BUSY' ? -1 : 1;
       });
     const teamMap = new Map<string, number>();
+    const departmentMap = new Map<string, number>();
     const supplierMap = new Map<string, number>();
     const inspectorMap = new Map<string, number>();
     const historyTeamMap = new Map<string, number>();
+    const historyDepartmentMap = new Map<string, number>();
     const teamReinspectionMap = new Map<string, ReinspectionCounts>();
+    const departmentReinspectionMap = new Map<string, ReinspectionCounts>();
     const supplierReinspectionMap = new Map<string, ReinspectionCounts>();
     const historyInspectorMap = new Map<
       string,
@@ -317,8 +271,8 @@ export const InspectionRequestStatsService = {
       string,
       { closedCount: number; date: string; submittedCount: number }
     >();
-    let todaySubmittedCount = 0;
     let todayClosedCount = 0;
+    let todaySubmittedCount = 0;
     let todaySubmittedIncomingCount = 0;
     let todaySubmittedProcessCount = 0;
     let todayClosedIncomingCount = 0;
@@ -342,41 +296,74 @@ export const InspectionRequestStatsService = {
         const daily = dailyTrendMap.get(date);
         if (daily) daily.submittedCount += 1;
         const isIncoming = isIncomingInspectionRequest(item);
+        const isExternalResponsibility =
+          item.responsibilityType === 'SUPPLIER' ||
+          item.responsibilityType === 'OUTSOURCING_UNIT';
+        const usesSupplierIdentity = isExternalResponsibility || isIncoming;
+        const isInternalProcess = !isIncoming && !isExternalResponsibility;
         if (isIncoming) {
           todaySubmittedIncomingCount += 1;
         } else {
           todaySubmittedProcessCount += 1;
         }
-        const identityId = normalizeIdentityId(
-          isIncoming
-            ? item.supplierId
-            : (teamCanonicalById.get(item.teamId) ?? item.teamId),
+        const supplierIdentityKey =
+          normalizeIdentityId(item.supplierId) || UNRESOLVED_IDENTITY_KEY;
+        const teamIdentityKey = normalizeIdentityId(
+          teamCanonicalById.get(item.teamId) ?? item.teamId,
         );
-        const identityKey = identityId || UNRESOLVED_IDENTITY_KEY;
-        const countMap = isIncoming ? supplierMap : teamMap;
-        countMap.set(identityKey, (countMap.get(identityKey) || 0) + 1);
-        if (!isIncoming) {
-          historyTeamMap.set(
-            identityKey,
-            (historyTeamMap.get(identityKey) || 0) + 1,
+        const departmentIdentityKey =
+          normalizeIdentityId(item.responsibleDepartmentId) ||
+          UNRESOLVED_IDENTITY_KEY;
+        if (usesSupplierIdentity) {
+          supplierMap.set(
+            supplierIdentityKey,
+            (supplierMap.get(supplierIdentityKey) || 0) + 1,
           );
         }
-        const reinspectionMap = isIncoming
+        if (isInternalProcess) {
+          departmentMap.set(
+            departmentIdentityKey,
+            (departmentMap.get(departmentIdentityKey) || 0) + 1,
+          );
+          historyDepartmentMap.set(
+            departmentIdentityKey,
+            (historyDepartmentMap.get(departmentIdentityKey) || 0) + 1,
+          );
+          if (teamIdentityKey) {
+            teamMap.set(
+              teamIdentityKey,
+              (teamMap.get(teamIdentityKey) || 0) + 1,
+            );
+            historyTeamMap.set(
+              teamIdentityKey,
+              (historyTeamMap.get(teamIdentityKey) || 0) + 1,
+            );
+          }
+        }
+        const reinspectionMap = usesSupplierIdentity
           ? supplierReinspectionMap
-          : teamReinspectionMap;
-        const reinspectionStat = reinspectionMap.get(identityKey) || {
-          inspectedCount: 0,
-          reinspectionCount: 0,
-          submittedCount: 0,
-        };
-        reinspectionStat.submittedCount += 1;
+          : departmentReinspectionMap;
+        const reinspectionKey = usesSupplierIdentity
+          ? supplierIdentityKey
+          : departmentIdentityKey;
         const hasReinspection =
           Boolean(item.linkedIssueId || item.linkedIssueNo) ||
           item.inspectionResult === 'FAIL';
         const hasInspectionResult = item.status === 'CLOSED' || hasReinspection;
-        if (hasInspectionResult) reinspectionStat.inspectedCount += 1;
-        if (hasReinspection) reinspectionStat.reinspectionCount += 1;
-        reinspectionMap.set(identityKey, reinspectionStat);
+        incrementReinspectionCounts(
+          reinspectionMap,
+          reinspectionKey,
+          hasInspectionResult,
+          hasReinspection,
+        );
+        if (isInternalProcess && teamIdentityKey) {
+          incrementReinspectionCounts(
+            teamReinspectionMap,
+            teamIdentityKey,
+            hasInspectionResult,
+            hasReinspection,
+          );
+        }
       }
       if (
         item.closedAt &&
@@ -440,6 +427,12 @@ export const InspectionRequestStatsService = {
       inspectorNamesById,
       UNRESOLVED_INSPECTOR_NAME,
     );
+    const departmentStats = buildInspectionRequestDepartmentStats({
+      departmentNamesById,
+      departmentReinspectionMap,
+      historyDepartmentMap,
+      submittedDepartmentMap: departmentMap,
+    });
     return {
       byInspector: inspectorRows.map(({ count, id, name }) => ({
         count,
@@ -451,6 +444,7 @@ export const InspectionRequestStatsService = {
         supplierId: id,
         team: name,
       })),
+      ...departmentStats,
       byTeam: teamRows.map(({ count, id, name }) => ({
         count,
         team: name,

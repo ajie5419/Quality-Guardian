@@ -467,6 +467,14 @@ async function main() {
       authCode: 'QMS:WorkOrder:Export',
       meta: { title: '导出' },
     },
+    {
+      id: 2305,
+      parentId: 23,
+      name: 'QMSWorkOrderConfirm',
+      type: 'button',
+      authCode: 'QMS:WorkOrder:Confirm',
+      meta: { title: '确认/撤销' },
+    },
 
     // ===================== 质量策划 =====================
     {

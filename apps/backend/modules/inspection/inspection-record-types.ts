@@ -1,4 +1,5 @@
 import type { inspection_category, inspection_result } from '@prisma/client';
+import type { InspectionIssueResponsibilityType } from '@qgs/shared';
 
 import { deriveIssueTrackingStatus, ISSUE_TRACKING_STATUS } from '@qgs/shared';
 import { BusinessError } from '~/utils/business-error';
@@ -93,6 +94,9 @@ export interface InspectionRecordInput {
   partName?: string;
   supplierId?: null | string;
   supplierName?: string;
+  responsibilityType?: InspectionIssueResponsibilityType | null;
+  responsibleDepartmentId?: null | string;
+  responsibleDepartment?: null | string;
   materialName?: string;
   incomingType?: string;
   processName?: string;

@@ -9,7 +9,7 @@ work-order 负责工单主数据、工单要求、聚合看板和进度查询。
 - 新建和编辑 V2 要求仅提交 `partId/processId`，服务端按 ID 重建 `partName/processName` 快照。
 - 部件选项来自当前工单 BOM 的 `partId`，工序选项来自 `processes.id`。字典 ID、BOM 行 ID 和名称都不能替代主数据 ID。
 - `identityContractVersion=2` 禁止客户端同时提交部件/工序名称，避免改名窗口产生 ID/名称冲突。
-- 创建和普通编辑强制 `identityContractVersion=2`；V1 name-only 写入不再被 schema 或 service 接受。确认和撤销是独立状态操作，不携带身份字段。
+- 创建和普通编辑强制 `identityContractVersion=2`；V1 name-only 写入不再被 schema 或 service 接受。确认和撤销是独立状态操作，不携带身份字段，要求独立 `QMS:WorkOrder:Confirm`；普通编辑仍要求 `QMS:WorkOrder:Edit`。
 
 Historical requirements keep their original `processName` snapshots. Ordered release maintenance bootstraps an empty process identity space once, then fills only null `processId` values with compare-and-set updates. Existing IDs and names are never overwritten; missing or ambiguous matches are written to `unresolved_master_data_refs`.
 

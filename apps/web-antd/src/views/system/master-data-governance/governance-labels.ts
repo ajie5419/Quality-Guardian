@@ -34,7 +34,7 @@ const reasonLabels: Record<string, string> = {
   DIVISION_IDENTITY_NOT_RESOLVED: '事业部身份未解析',
   INVALID_EXISTING_ID: '已有主数据 ID 无效',
   MISSING_CANONICAL_DEPARTMENT: '缺少规范部门',
-  MISSING_PROCESS_TEAM_LINK: '缺少工序与班组关联',
+  MISSING_PROCESS_TEAM_LINK: '缺少班组与供应商关联',
   NO_ACTIVE_CANONICAL_MATCH: '未找到启用的主数据',
   NO_EXACT_CANONICAL_MATCH: '未找到精确匹配的主数据',
   NO_IDENTITY_EVIDENCE: '缺少可用的身份依据',

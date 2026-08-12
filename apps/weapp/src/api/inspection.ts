@@ -1,4 +1,9 @@
-import type { CloseInspectionRequestParams } from '@qgs/shared';
+import type {
+  CloseInspectionRequestParams,
+  InspectionIssueResponsibilityType,
+  InspectionRequestResponsibilityOptions,
+  InspectionRequestTeamOption,
+} from '@qgs/shared';
 
 import { request } from './request';
 
@@ -135,6 +140,17 @@ export function getSuppliers(keyword?: string) {
   });
 }
 
+export function getInspectionRequestResponsibilityOptions(params: {
+  keyword?: string;
+  responsibilityType: InspectionIssueResponsibilityType;
+}) {
+  return request<InspectionRequestResponsibilityOptions>({
+    url: '/api/qms/inspection/requests/responsibility-options',
+    method: 'GET',
+    data: params,
+  });
+}
+
 export function getProcessDictionaryOptions() {
   return request<DictionaryOptionItem[]>({
     url: '/api/qms/public/inspection/requests/process-dictionary-options',
@@ -175,7 +191,7 @@ export function getInspectionRequestSettings() {
 
 // Get team list
 export function getTeams(keyword?: string) {
-  return request<Array<{ group: string; label: string; value: string }>>({
+  return request<InspectionRequestTeamOption[]>({
     url: '/api/qms/inspection/requests/teams',
     method: 'GET',
     data: keyword ? { keyword } : {},

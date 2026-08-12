@@ -16,6 +16,9 @@ model inspections {
   projectId              String?
   supplierName           String?
   supplierId             String?
+  responsibilityType    String?
+  responsibleDepartmentId String?
+  responsibleDepartment String?
   partName               String?
   partId                 String?
   materialName           String?
@@ -62,6 +65,7 @@ model inspections {
   @@index([processId])
   @@index([teamId])
   @@index([supplierId])
+  @@index([responsibilityType, responsibleDepartmentId], map: "inspections_responsibilityType_responsibleDepartmentId_idx")
   @@index([partId])
   @@index([projectId])
   @@index([materialNameId])
@@ -728,6 +732,7 @@ model quality_records {
   responsibleDepartment                   String
   responsibleDepartments                  String?                               @db.Text // @module inspection - JSON array
   responsibleDepartmentId                 String?
+  responsibilityType                      String?
   responsibleBU                           String?
   inspector                               String?
   analysis                                String?                               @db.Text
@@ -787,6 +792,7 @@ model quality_records {
   @@index([workOrderNumber])
   @@index([responsibleDepartment])
   @@index([responsibleDepartmentId])
+  @@index([responsibilityType])
   @@index([responsibleBU])
   @@index([supplierId])
   @@index([projectId])
@@ -1726,8 +1732,12 @@ model qms_inspection_requests {
   processId           String?
   category            inspection_category?
   supplierId          String?
+  supplierName        String?
   teamId              String?
   team                String?
+  responsibilityType  String?
+  responsibleDepartmentId String?
+  responsibleDepartment String?
   quantity            Int                                  @default(1)
   stationSelection    String?                              @db.Text
   reporter            String
@@ -1777,6 +1787,7 @@ model qms_inspection_requests {
   @@index([category])
   @@index([supplierId])
   @@index([teamId])
+  @@index([responsibilityType, responsibleDepartmentId], map: "qms_inspection_requests_resp_dept_idx")
   @@index([partId])
   @@index([componentId])
 }

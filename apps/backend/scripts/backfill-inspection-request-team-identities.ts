@@ -11,6 +11,9 @@ import prisma from '~/utils/prisma';
 import { persistResolutionAudit } from './supplier-identity-backfill-runtime';
 
 interface TeamIdentityContext {
+  effectiveLinks?: Map<string, unknown>;
+  externalTeamIds?: Set<string>;
+  internalTeamIds?: Set<string>;
   teamById: Map<string, TeamIdentity>;
   teamByName: Map<string, TeamIdentity>;
 }
@@ -40,6 +43,7 @@ export async function backfillInspectionRequestTeamIdentities(
       select: {
         id: true,
         requestNo: true,
+        supplierId: true,
         team: true,
         teamId: true,
       },
@@ -51,10 +55,19 @@ export async function backfillInspectionRequestTeamIdentities(
     cursorId = rows.at(-1)?.id;
     const batchUpdates: Array<{
       candidate: TeamIdentity;
+      clearSupplier: boolean;
+      existingSupplierId: null | string;
       existingTeamId: null | string;
       id: string;
     }> = [];
     const batchResolved: Array<{ entityId: string; resolvedId: string }> = [];
+    const batchCleared: Array<{
+      entityId: string;
+      evidence: Record<string, null | number | string>;
+      rawId: null | string;
+      rawName: null | string;
+      reason: string;
+    }> = [];
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
@@ -102,54 +115,99 @@ export async function backfillInspectionRequestTeamIdentities(
         });
         continue;
       }
-      if (row.teamId === candidate.id) {
+      if (
+        context.externalTeamIds?.has(candidate.id) &&
+        !context.effectiveLinks?.has(candidate.id)
+      ) {
+        unresolved += 1;
+        batchUnresolved.push({
+          entityId: row.id,
+          evidence: { requestNo: row.requestNo, teamId: candidate.id },
+          rawId: row.teamId,
+          rawName: row.team,
+          reason: 'MISSING_PROCESS_TEAM_LINK',
+        });
+        continue;
+      }
+      const clearSupplier = Boolean(
+        row.supplierId && context.internalTeamIds?.has(candidate.id),
+      );
+      if (row.teamId === candidate.id && !clearSupplier) {
         batchResolved.push({ entityId: row.id, resolvedId: candidate.id });
         continue;
       }
       batchUpdates.push({
         candidate,
+        clearSupplier,
         existingTeamId: row.teamId,
+        existingSupplierId: row.supplierId,
         id: row.id,
       });
     }
 
-    if (options.mode === 'apply' && batchUpdates.length > 0) {
-      const results = await prisma.$transaction(
-        batchUpdates.map((item) =>
-          prisma.qms_inspection_requests.updateMany({
-            where: {
-              id: item.id,
-              isDeleted: false,
-              teamId: item.existingTeamId,
-            },
-            data: {
-              teamId: item.candidate.id,
-            },
-          }),
-        ),
-      );
-      const applied = results.reduce((sum, result) => sum + result.count, 0);
-      results.forEach((result, index) => {
-        const update = batchUpdates[index];
-        if (result.count > 0 && update) {
-          batchResolved.push({
-            entityId: update.id,
-            resolvedId: update.candidate.id,
-          });
-        }
+    if (options.mode === 'apply') {
+      const applied = await prisma.$transaction(async (tx) => {
+        const results = await Promise.all(
+          batchUpdates.map((item) =>
+            tx.qms_inspection_requests.updateMany({
+              where: {
+                id: item.id,
+                isDeleted: false,
+                teamId: item.existingTeamId,
+                ...(item.clearSupplier
+                  ? { supplierId: item.existingSupplierId }
+                  : {}),
+              },
+              data: {
+                teamId: item.candidate.id,
+                ...(item.clearSupplier ? { supplierId: null } : {}),
+              },
+            }),
+          ),
+        );
+        results.forEach((result, index) => {
+          const update = batchUpdates[index];
+          if (result.count > 0 && update) {
+            batchResolved.push({
+              entityId: update.id,
+              resolvedId: update.candidate.id,
+            });
+            if (update.clearSupplier) {
+              batchCleared.push({
+                entityId: update.id,
+                evidence: { teamId: update.candidate.id },
+                rawId: update.existingSupplierId,
+                rawName: null,
+                reason: 'internal_team_supplier_fields_cleared',
+              });
+            }
+          }
+        });
+        await persistResolutionAudit(
+          {
+            entityType: 'qms_inspection_requests',
+            fieldName: 'teamId',
+            resolved: batchResolved,
+            unresolved: batchUnresolved,
+          },
+          tx,
+        );
+        await persistResolutionAudit(
+          {
+            cleared: batchCleared,
+            entityType: 'qms_inspection_requests',
+            fieldName: 'supplierId',
+            resolved: [],
+            unresolved: [],
+          },
+          tx,
+        );
+        return results.reduce((sum, result) => sum + result.count, 0);
       });
       updated += applied;
       concurrentChanges += batchUpdates.length - applied;
     } else {
       updated += batchUpdates.length;
-    }
-    if (options.mode === 'apply') {
-      await persistResolutionAudit({
-        entityType: 'qms_inspection_requests',
-        fieldName: 'teamId',
-        resolved: batchResolved,
-        unresolved: batchUnresolved,
-      });
     }
   }
 

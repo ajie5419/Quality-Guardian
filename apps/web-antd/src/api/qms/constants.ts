@@ -40,6 +40,8 @@ export const QMS_API = {
     '/qms/public/inspection/requests/bom-parts',
   PUBLIC_INSPECTION_REQUEST_PART_OPTIONS:
     '/qms/public/inspection/requests/part-options',
+  PUBLIC_INSPECTION_REQUEST_RESPONSIBILITY_OPTIONS:
+    '/qms/public/inspection/requests/responsibility-options',
   PUBLIC_INSPECTION_REQUEST_SUPPLIERS:
     '/qms/public/inspection/requests/suppliers',
   PUBLIC_INSPECTION_REQUEST_TEAMS: '/qms/public/inspection/requests/teams',

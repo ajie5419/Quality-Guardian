@@ -150,6 +150,31 @@ describe('qualityLossIndexService', () => {
       });
       expect(prisma.quality_loss_index.updateMany).toHaveBeenCalled();
     });
+
+    it('propagates transaction index failures so the source write rolls back', async () => {
+      const tx = {
+        quality_loss_index: {
+          upsert: vi.fn().mockRejectedValue(new Error('index unavailable')),
+        },
+      } as never;
+
+      await expect(
+        QualityLossIndexService.upsertFromInternalInTransaction(
+          {
+            createdBy: 'u-2',
+            date: new Date(),
+            id: 'qr-tx-1',
+            isDeleted: false,
+            lossAmount: 100,
+            projectName: 'P',
+            responsibleDepartment: 'QA',
+            status: 'OPEN',
+            workOrderNumber: 'WO-1',
+          },
+          tx,
+        ),
+      ).rejects.toThrow('index unavailable');
+    });
   });
 
   describe('upsertFromCommissioning', () => {

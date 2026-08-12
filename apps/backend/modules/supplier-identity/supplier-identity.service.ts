@@ -2,6 +2,7 @@ import type { inspection_category, Prisma } from '@prisma/client';
 
 import type { SupplierIdentityOptionsQuery } from './supplier-identity.schema';
 
+import { resolveSupplierInspectionPolicy } from '@qgs/shared';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
@@ -11,10 +12,14 @@ import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import { listSupplierIdentityManagementOptions } from './supplier-identity-management-options.service';
 import {
   resolveSuppliersByTeamIds as resolveSuppliersByTeamIdsFromMaster,
-  resolveSuppliersByUnlinkedTeamIds,
   resolveTeamSupplierIdentity,
   teamLinkInclude,
 } from './supplier-identity-name-resolver';
+import {
+  listSupplierIdentityTeamOptions,
+  listTeamIdsBySupplierIds,
+  listTeamIdsForSupplier,
+} from './supplier-identity-team-query.service';
 
 export interface SupplierIdentityInput {
   supplierId: string;
@@ -52,7 +57,6 @@ async function lockTeamForMutation(
     );
   }
 }
-
 async function lockTeamsForMutation(
   teamIds: string[],
   client: Prisma.TransactionClient,
@@ -61,10 +65,12 @@ async function lockTeamsForMutation(
     await lockTeamForMutation(teamId, client);
   }
 }
-
 async function validateLinkInput(
   input: SupplierIdentityInput,
-  client: Pick<Prisma.TransactionClient, 'dictionaries' | 'suppliers'>,
+  client: Pick<
+    Prisma.TransactionClient,
+    'dictionaries' | 'suppliers' | 'team_identity_sources'
+  >,
 ) {
   const supplierId = normalizeId(input.supplierId);
   const teamId = normalizeId(input.teamId);
@@ -73,7 +79,7 @@ async function validateLinkInput(
   }
   const [supplier, team] = await Promise.all([
     client.suppliers.findFirst({
-      select: { id: true, name: true },
+      select: { category: true, id: true, name: true, outsourcingMode: true },
       where: { id: supplierId, isDeleted: false },
     }),
     client.dictionaries.findFirst({
@@ -92,9 +98,61 @@ async function validateLinkInput(
   if (!team) {
     throw new BusinessError('INVALID_TEAM_ID', 'Active TEAM does not exist');
   }
+  if (resolveSupplierInspectionPolicy(supplier).identitySource !== 'team') {
+    throw new BusinessError(
+      'INVALID_PROCESS_SUPPLIER',
+      'TEAM links require an active in-house team or external service supplier',
+    );
+  }
+  const source = await client.team_identity_sources.findFirst({
+    select: { id: true },
+    where: {
+      isDeleted: false,
+      sourceId: supplier.id,
+      sourceType: 'SUPPLIER',
+      teamId: team.id,
+      team: {
+        is: {
+          teamIdentitySources: {
+            none: { isDeleted: false, sourceType: 'DEPARTMENT' },
+          },
+        },
+      },
+    },
+  });
+  if (!source) {
+    throw new BusinessError(
+      'TEAM_NOT_EXTERNAL_SUPPLIER_SOURCE',
+      'TEAM is not the canonical external team for this supplier',
+    );
+  }
   return { supplier, team };
 }
-
+async function assertNoProcessFactsForTeams(
+  teamIds: ReadonlyArray<string>,
+  client: Pick<
+    Prisma.TransactionClient,
+    'inspections' | 'qms_inspection_requests'
+  >,
+) {
+  const ids = [...new Set(teamIds.filter(Boolean))];
+  if (ids.length === 0) return;
+  const [inspectionCount, requestCount] = await Promise.all([
+    client.inspections.count({
+      where: { category: 'PROCESS', isDeleted: false, teamId: { in: ids } },
+    }),
+    client.qms_inspection_requests.count({
+      where: { category: 'PROCESS', isDeleted: false, teamId: { in: ids } },
+    }),
+  ]);
+  if (inspectionCount + requestCount > 0) {
+    throw new BusinessError(
+      'TEAM_IDENTITY_FACTS_EXIST',
+      'Historical process facts must be reconciled before changing this TEAM link',
+      409,
+    );
+  }
+}
 function teamIdentityConflict() {
   return new BusinessError(
     'TEAM_IDENTITY_CONFLICT',
@@ -102,7 +160,6 @@ function teamIdentityConflict() {
     409,
   );
 }
-
 export const SupplierIdentityService = {
   async assertTeamCanBeRetired(
     teamId: string,
@@ -146,6 +203,9 @@ export const SupplierIdentityService = {
         ) {
           throw teamIdentityConflict();
         }
+        if (existing?.isDeleted && existing.supplierId !== supplier.id) {
+          await assertNoProcessFactsForTeams([team.id], tx);
+        }
         const link = existing
           ? await tx.supplier_identity_links.update({
               where: { id: existing.id },
@@ -183,7 +243,6 @@ export const SupplierIdentityService = {
       throw error;
     }
   },
-
   lockTeamForMutation,
 
   async delete(id: string) {
@@ -200,6 +259,7 @@ export const SupplierIdentityService = {
         );
       }
       await lockTeamForMutation(existing.identityId, tx);
+      await assertNoProcessFactsForTeams([existing.identityId], tx);
       const deleted = await tx.supplier_identity_links.updateMany({
         where: {
           id,
@@ -245,11 +305,14 @@ export const SupplierIdentityService = {
     return listSupplierIdentityManagementOptions(params ?? { take: 100 });
   },
 
-  async resolveSupplierById(supplierId: null | string | undefined) {
+  async resolveSupplierById(
+    supplierId: null | string | undefined,
+    client: Pick<Prisma.TransactionClient, 'suppliers'> = prisma,
+  ) {
     const id = normalizeId(supplierId);
     if (!id) return null;
-    const supplier = await prisma.suppliers.findFirst({
-      select: { id: true, name: true },
+    const supplier = await client.suppliers.findFirst({
+      select: { category: true, id: true, name: true },
       where: { id, isDeleted: false },
     });
     if (!supplier) {
@@ -291,10 +354,13 @@ export const SupplierIdentityService = {
     return resolveSuppliersByTeamIdsFromMaster(teamIds);
   },
 
-  async resolveTeamById(teamId: null | string | undefined) {
+  async resolveTeamById(
+    teamId: null | string | undefined,
+    client: Pick<Prisma.TransactionClient, 'dictionaries'> = prisma,
+  ) {
     const id = normalizeId(teamId);
     if (!id) return null;
-    const team = await prisma.dictionaries.findFirst({
+    const team = await client.dictionaries.findFirst({
       select: { dictKey: true, id: true },
       where: {
         dictType: 'team',
@@ -310,97 +376,50 @@ export const SupplierIdentityService = {
   },
 
   async listTeamOptions(keyword = '') {
-    const normalizedKeyword = keyword.trim();
-    const teams = await prisma.dictionaries.findMany({
-      where: {
-        dictType: 'team',
-        isDeleted: false,
-        status: 1,
-        ...(normalizedKeyword
-          ? { dictKey: { contains: normalizedKeyword } }
-          : {}),
-      },
-      orderBy: [{ sort: 'asc' }, { dictKey: 'asc' }],
-      take: 100,
-      select: { dictKey: true, id: true },
-    });
-    const links = await prisma.supplier_identity_links.findMany({
-      where: {
-        identityId: { in: teams.map((team) => team.id) },
-        identityType: 'TEAM',
-        isDeleted: false,
-      },
-      select: { identityId: true },
-    });
-    const linkedTeamIds = new Set(links.map((link) => link.identityId));
-    const unlinkedSuppliers = await resolveSuppliersByUnlinkedTeamIds(
-      teams
-        .filter((team) => !linkedTeamIds.has(team.id))
-        .map((team) => team.id),
-    );
-    return teams.map((team) => ({
-      group:
-        linkedTeamIds.has(team.id) || unlinkedSuppliers.has(team.id)
-          ? ('external' as const)
-          : ('internal' as const),
-      label: team.dictKey,
-      value: team.id,
-    }));
+    return listSupplierIdentityTeamOptions(keyword);
   },
 
-  async resolveSupplierForInspection(input: {
-    category: inspection_category | string;
-    supplierId?: null | string;
-    teamId?: null | string;
-  }) {
-    const explicitSupplier = await this.resolveSupplierById(input.supplierId);
-    if (input.category !== 'PROCESS') return explicitSupplier;
-    const teamSupplier = await this.resolveSupplierByTeamId(input.teamId);
-    if (
-      explicitSupplier &&
-      teamSupplier &&
-      explicitSupplier.id !== teamSupplier.id
-    ) {
-      throw new BusinessError(
-        'SUPPLIER_IDENTITY_MISMATCH',
-        'Supplier ID does not match the linked TEAM identity',
-      );
+  async resolveSupplierForInspection(
+    input: {
+      category: inspection_category | string;
+      supplierId?: null | string;
+      teamId?: null | string;
+    },
+    client?: Prisma.TransactionClient,
+  ) {
+    if (input.category === 'PROCESS') {
+      const supplier = await this.resolveSupplierByTeamId(input.teamId, client);
+      if (supplier) return supplier;
+      const teamId = normalizeId(input.teamId);
+      if (!teamId) return null;
+      const externalSource = await (
+        client ?? prisma
+      ).team_identity_sources.findFirst({
+        select: { id: true },
+        where: {
+          isDeleted: false,
+          sourceType: 'SUPPLIER',
+          teamId,
+        },
+      });
+      if (externalSource) {
+        throw new BusinessError(
+          'MISSING_PROCESS_TEAM_LINK',
+          'External TEAM requires a valid supplier identity link',
+          409,
+        );
+      }
+      return null;
     }
-    return explicitSupplier || teamSupplier;
+    return this.resolveSupplierById(input.supplierId, client);
   },
 
   async teamIdsForSupplier(supplierId: string) {
-    const links = await prisma.supplier_identity_links.findMany({
-      select: { identityId: true },
-      where: {
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId,
-      },
-    });
-    return links.map((link) => link.identityId);
+    return listTeamIdsForSupplier(supplierId);
   },
 
   async teamIdsBySupplierIds(supplierIds: string[]) {
-    const ids = [
-      ...new Set(supplierIds.map((supplierId) => normalizeId(supplierId))),
-    ].filter(Boolean);
-    if (ids.length === 0) return new Map<string, string[]>();
-    const links = await prisma.supplier_identity_links.findMany({
-      select: { identityId: true, supplierId: true },
-      where: {
-        identityType: 'TEAM',
-        isDeleted: false,
-        supplierId: { in: ids },
-      },
-    });
-    const result = new Map<string, string[]>();
-    for (const link of links) {
-      const teamIds = result.get(link.supplierId) || [];
-      teamIds.push(link.identityId);
-      result.set(link.supplierId, teamIds);
-    }
-    return result;
+    return listTeamIdsBySupplierIds(supplierIds);
   },
 
   async update(id: string, input: SupplierIdentityInput) {
@@ -445,6 +464,12 @@ export const SupplierIdentityService = {
           },
         });
         if (conflict) throw teamIdentityConflict();
+        if (
+          current.identityId !== team.id ||
+          current.supplierId !== supplier.id
+        ) {
+          await assertNoProcessFactsForTeams([current.identityId, team.id], tx);
+        }
         const updated = await tx.supplier_identity_links.update({
           where: { id },
           data: {

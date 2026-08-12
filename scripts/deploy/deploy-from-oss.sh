@@ -201,8 +201,7 @@ run_backend() {
   docker compose -f "$compose_file" run --rm backend sh -lc "$command"
 }
 
-PRISMA_CMD="/app/apps/backend/node_modules/.bin/prisma"
-PRISMA_SCHEMA="/app/apps/backend/prisma/schema.prisma"
+MIGRATION_WRAPPER_CMD="cd /app/apps/backend && sh scripts/run-prisma-migrations.sh"
 RELEASE_MAINTENANCE_CMD="cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
 
 echo "[remote] start database dependencies"
@@ -212,7 +211,7 @@ echo "[remote] stop application writes before identity maintenance"
 docker compose -f "$compose_file" stop backend
 
 echo "[remote] run database migrations"
-run_backend "$PRISMA_CMD migrate deploy --schema '$PRISMA_SCHEMA'"
+run_backend "$MIGRATION_WRAPPER_CMD"
 
 echo "[remote] run ordered release maintenance"
 run_backend "$RELEASE_MAINTENANCE_CMD"

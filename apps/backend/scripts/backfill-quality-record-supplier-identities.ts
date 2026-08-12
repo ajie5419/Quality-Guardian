@@ -18,9 +18,7 @@ import {
 } from './quality-record-supplier-identity-backfill';
 import {
   assertBackfillIntegrity,
-  bootstrapExactTeamLinks,
-  compareOpenAuditSnapshots,
-  loadOpenAuditSnapshot,
+  loadExplicitTeamLinks,
   loadSupplierIdentityContext,
   persistResolutionAudit,
 } from './supplier-identity-backfill-runtime';
@@ -46,19 +44,13 @@ function addSample(samples: ResolutionSample[], sample: ResolutionSample) {
 async function main() {
   const options = parseBackfillOptions(process.argv.slice(2));
   logger.info(options, 'supplier identity audit/backfill started');
-  const openAuditsBefore =
-    options.mode === 'apply' ? await loadOpenAuditSnapshot() : null;
-
-  const teamBootstrap = await bootstrapExactTeamLinks(options.mode);
+  const teamBootstrap = await loadExplicitTeamLinks(options.mode);
   logger.info(
     {
-      ambiguous: teamBootstrap.ambiguous,
       conflicts: teamBootstrap.conflicts,
-      created: teamBootstrap.created,
       mode: options.mode,
-      reactivated: teamBootstrap.reactivated,
     },
-    'exact supplier to TEAM identity link bootstrap finished',
+    'explicit supplier to TEAM identity links loaded',
   );
 
   const identityContext = await loadSupplierIdentityContext(
@@ -124,9 +116,18 @@ async function main() {
     processed += rows.length;
     cursorId = rows.at(-1)?.id;
     const batchUpdates: Array<{
-      candidate: SupplierIdentity;
+      candidate: null | SupplierIdentity;
+      clearSupplier?: boolean;
       existingSupplierId: null | string;
+      existingSupplierName: null | string;
       id: string;
+    }> = [];
+    const batchCleared: Array<{
+      entityId: string;
+      evidence: Record<string, null | number | string>;
+      rawId: null | string;
+      rawName: null | string;
+      reason: string;
     }> = [];
     const batchResolved: Array<{
       entityId: string;
@@ -154,6 +155,14 @@ async function main() {
                 ? identityContext.supplierById.get(row.inspection.supplierId) ||
                   null
                 : null,
+              teamIsExternal: Boolean(
+                inspectionTeamId &&
+                  identityContext.externalTeamIds.has(inspectionTeamId),
+              ),
+              teamIsInternal: Boolean(
+                inspectionTeamId &&
+                  identityContext.internalTeamIds.has(inspectionTeamId),
+              ),
               supplierByName: row.inspection.supplierName
                 ? identityContext.supplierByName.get(
                     row.inspection.supplierName,
@@ -214,49 +223,82 @@ async function main() {
         });
         continue;
       }
+      if (resolution.action === 'clear') {
+        batchUpdates.push({
+          candidate: null,
+          clearSupplier: true,
+          existingSupplierId: row.supplierId,
+          existingSupplierName: row.supplierName,
+          id: row.id,
+        });
+        continue;
+      }
       batchUpdates.push({
         candidate: resolution.candidate,
         existingSupplierId: row.supplierId,
+        existingSupplierName: row.supplierName,
         id: row.id,
       });
     }
 
-    if (options.mode === 'apply' && batchUpdates.length > 0) {
-      const results = await prisma.$transaction(
-        batchUpdates.map((item) =>
-          prisma.quality_records.updateMany({
-            where: {
-              id: item.id,
-              isDeleted: false,
-              supplierId: item.existingSupplierId,
-            },
-            data: {
-              supplierId: item.candidate.id,
-            },
-          }),
-        ),
-      );
-      const applied = results.reduce((sum, result) => sum + result.count, 0);
-      results.forEach((result, index) => {
-        const update = batchUpdates[index];
-        if (result.count > 0 && update) {
-          batchResolved.push({
-            entityId: update.id,
-            resolvedId: update.candidate.id,
-          });
-        }
+    if (options.mode === 'apply') {
+      const applied = await prisma.$transaction(async (tx) => {
+        const results = await Promise.all(
+          batchUpdates.map((item) =>
+            tx.quality_records.updateMany({
+              where: {
+                id: item.id,
+                isDeleted: false,
+                supplierId: item.existingSupplierId,
+                supplierName: item.existingSupplierName,
+              },
+              data: {
+                supplierId: item.clearSupplier ? null : item.candidate?.id,
+                supplierName: item.clearSupplier ? null : undefined,
+              },
+            }),
+          ),
+        );
+        results.forEach((result, index) => {
+          const update = batchUpdates[index];
+          if (result.count > 0 && update) {
+            if (update.clearSupplier) {
+              const source = rows.find((row) => row.id === update.id);
+              if (source) {
+                batchCleared.push({
+                  entityId: update.id,
+                  evidence: {
+                    inspectionId: source.inspectionId,
+                    serialNumber: source.serialNumber,
+                  },
+                  rawId: source.supplierId,
+                  rawName: source.supplierName,
+                  reason: 'internal_team_supplier_fields_cleared',
+                });
+              }
+            } else if (update.candidate) {
+              batchResolved.push({
+                entityId: update.id,
+                resolvedId: update.candidate.id,
+              });
+            }
+          }
+        });
+        await persistResolutionAudit(
+          {
+            entityType: 'quality_records',
+            cleared: batchCleared,
+            resolved: batchResolved,
+            unresolved: batchUnresolved,
+          },
+          tx,
+        );
+        return results.reduce((sum, result) => sum + result.count, 0);
       });
       updated += applied;
       concurrentChanges += batchUpdates.length - applied;
     } else {
       updated += batchUpdates.length;
-    }
-    if (options.mode === 'apply') {
-      await persistResolutionAudit({
-        entityType: 'quality_records',
-        resolved: batchResolved,
-        unresolved: batchUnresolved,
-      });
     }
 
     logger.info(
@@ -287,11 +329,7 @@ async function main() {
     'supplier identity audit/backfill finished',
   );
   const integrityMetrics = [
-    {
-      ambiguous: teamBootstrap.ambiguous,
-      conflicts: teamBootstrap.conflicts,
-      name: 'team-links',
-    },
+    { conflicts: teamBootstrap.conflicts, name: 'team-links' },
     { ...inspectionRequestTeamSummary, name: 'inspection-request-teams' },
     {
       ...inspectionRequestSupplierSummary,
@@ -302,18 +340,7 @@ async function main() {
     { ...afterSalesSummary, name: 'after-sales' },
     { ...qualityRecordSummary, name: 'quality-records' },
   ];
-  const openAuditDelta = openAuditsBefore
-    ? compareOpenAuditSnapshots(openAuditsBefore, await loadOpenAuditSnapshot())
-    : undefined;
-  logger.info(
-    {
-      changedOpenAudits: openAuditDelta?.changedKeys.length || 0,
-      newOpenAudits: openAuditDelta?.newKeys.length || 0,
-      openAuditsBefore: openAuditsBefore?.size || 0,
-    },
-    'supplier identity unresolved audit delta finished',
-  );
-  assertBackfillIntegrity(integrityMetrics, openAuditDelta);
+  assertBackfillIntegrity(integrityMetrics);
 }
 
 async function run() {

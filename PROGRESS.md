@@ -2,15 +2,23 @@
 
 ## 当前状态
 
-- 最新变更: qgs v0.24.0 已发布（PR #94 合并、release PR #92 合并、tag `qgs-v0.24.0`，手动部署 `skip_maintenance=true` 成功）。发布时供应商身份回填完整性检查因 17 条新增 unresolved（PROCESS 检验缺 TEAM→供应商链接，如机加 BU、尊达）被 tag deploy 拦截，判定为生产数据缺口而非代码回归；17 条留在处置队列，待 supplier identity links UI 补齐链接后另行回填。本版本内容：SupplierSelect 跨类别回退解析、进货类型/工序按 ID 解析、supplier identity links 管理 UI、焊接缺陷责任焊工校验、责任部门 TreeSelect 独立勾选等。
+- 最新变更: qgs v0.24.0 已发布（PR #94 合并、release PR #92 合并、tag `qgs-v0.24.0`）。tag deploy 曾因 17 条 PROCESS supplier identity unresolved 被维护门禁拦截，随后错误地以 `skip_maintenance=true` 完成部署；该绕过没有证明 17 条记录均为有效外包事实，不能再按“补 link 即可解决”处理。后续修复规定：内部 BU 的 supplier 字段必须清空；只有具有确定性 SUPPLIER 来源的外部 TEAM 才能建 link；其他记录继续阻断并待证据化处置。
+- 本轮独立验收修复已完成：画像/评分 supplier→TEAM 查询、在线与回填的 PROCESS 判定、内部字段清理审计和软删关联恢复均统一为 active TEAM + active exact SUPPLIER source + active PROCESS-policy link。DEPARTMENT+SUPPLIER 双来源不再被清理为内部，而是作为无效关联/未解析外部事实阻断；回填源 CAS 与 cleared/resolved/unresolved 审计位于同一事务。实现提交：`f9e325a1`、`d57a8303`、`ebc98eba`、`38e379bf`、`4fa20802`。
 - `supplier_identity_links` 已具备系统设置管理 UI、动态菜单权限声明和管理员专用 canonical 选项 API；列表、创建、编辑、删除、客户端校验及加载/错误/空态均已接入。前端复用共享 `isSystemAdmin`，并与菜单同步识别 `super` 角色及 `*`/`["*"]` 通配权限，服务端 CRUD 继续只允许系统管理员。
 - 合格率投影重建已与 Web 请求进程隔离，管理员点击只写持久队列，由独立 worker 消费；门禁失败时前端始终允许关闭投影并立即回退 legacy，避免重建资源耗尽影响登录。
 - 维护脚本 `classify-historical-identity-unresolved` 已按用户指令移除：其尾部的全量投影重建在 1GB 本地 MySQL 容器上导致资源耗尽卡死；未分类项留在处置队列，投影基础设施保留。
-- 测试状态: 后端全仓 Vitest `267/267` 文件、`2443/2443` 用例通过；前端相关定向 Vitest `12/12` 文件、`53/53` 用例通过（含 `SupplierSelect` 9/9）；lint、typecheck、架构门禁均通过。
+- 本轮不合格项双入口统一已完成代码集成：独立新建与报检关闭收敛到同一事务创建服务，NC 编号由服务端事务内分配，责任事实使用 `responsibilityType + responsibleDepartmentId + supplierId?` 的 canonical ID 契约并限定一个主责部门。`quality_records.responsibilityType` migration、`[object Object]` 精确哨兵治理、release maintenance 接入均已实现。审查后，TEAM→supplier 修复候选与在线 resolver 统一为 active TEAM + active link + exact active `SUPPLIER` source + PROCESS-policy supplier 的四条件交集；`DEPARTMENT+SUPPLIER` 双来源为冲突。维护脚本以同一字段级 CAS 写入/清空 supplier 事实，并在 dry-run 与 apply 对 unresolved、conflict、并发 CAS 失败统一 fail-closed。小程序编辑完整恢复业务字段且只提交 canonical responsibility；在线编辑不再写 `responsibleDepartments`。实现提交：`9ddce79`、`928d666`、`fcb4044`、`46cfe31`。最终门禁已通过：后端全量 Vitest `272/272` 文件、`2500/2500` 用例，Web 定向 Vitest `57/57` 文件、`277/277` 用例，小程序定向 Vitest `6/6` 文件、`20/20` 用例；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 均通过。桌面/移动端浏览器页面验收和生产 dry-run/apply 尚未验证。
+- 现场 5320 public API 已确认目标 TEAM 仍为旧的 internal 分类，且存在同名 Outsourcing supplier；两者缺少完整 canonical `SUPPLIER` source/link 证据，必须通过主数据治理处置，不得按名称补绑。报检选项收敛为三态，其中 `MISSING` 表示“未关联内部部门或外协供应商”；创建入口 fail-closed。打开关单前，列表项缺少 context 时先拉取详情及 canonical ID。验证：后端全量 `272/272` 文件、`2504/2504` 用例，Web 全量 `57/57` 文件、`281/281` 用例，小程序全量 `6/6` 文件、`20/20` 用例，shared build，`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all` 均通过；本地过程报检浏览器已确认目标项位于待治理分组且 disabled。登录后关单页浏览器验收因无登录态尚未验证，真实运行库 source/link apply 未执行；实现提交：`f500973`。
+- 报检任务责任部门选项根因已修复：旧内部候选错误依赖 TEAM 映射，导致结构 BU、机加 BU 等有效部门不显示；责任部门现直接选择 canonical department，PROCESS `teamId` 仅为可选执行上下文且传入必须匹配。legacy 关单在事务内直接补齐部门，partial triad 仍拒绝；`inspections` 持久化同一责任三元组，统计新增责任部门 domain，独立 resolver 切断循环依赖。INCOMING `supplierName` 仅作 legacy TEAM fallback。实现提交：`40070cf`、`d84297c`、`1704d7d`、`8e33910`、`88bc724`、`5311921`。最终门禁已通过：backend 全量 `277/277` 文件、`2535/2535` 用例，Web `57/57`、`291/291`，WeApp `8/8`、`31/31`；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、shared build、Prisma migration、Prisma validate 和 diff 均 PASS。浏览器/小程序真实点击和生产 Prisma migration 尚未验证。
+- P3009 migration recovery 已完成并 fail-closed：旧请求责任 migration 的 70 字符索引名超过 MySQL 64 字符限制，触发 MySQL 1059。初次只读取证为 active failed、`applied_steps_count=0`、InnoDB，目标字段/索引均不存在；后续外部操作（非 Codex apply）将旧 row rolled back 后重新 deploy 成功，`20260811000000/00001` 均 `applied_steps_count=1`，两表字段与短索引已核对。recovery wrapper 只识别该 migration，`NONE` 执行 Prisma `resolve --rolled-back`，仅 `qms_inspection_requests` 的 00000 四字段及短索引完整时执行 `resolve --applied`，partial/drift 阻断；随后 `migrate deploy` 才应用或确认 00001 的 `inspections` 变更。GitHub/OSS/local container up/dev 统一复用。实现提交：`2051341`。验证：recovery `10/10`，root lint/type/arch/arch-all/prisma-migration/diff 均 PASS，当前 DB 只读输出 `NOT_REQUIRED`。Codex 未执行数据库 apply，生产发布/推送未做；浏览器/小程序真实点击仍未验证。
+- 报检入口责任契约已与不合格问题报告对齐并完成浏览器验收：进货/过程两个入口都可显式选择三类责任类型；责任部门对任何类型都是可选 canonical department 下拉，不再按「采购部/生产 OBU」固定名称匹配，也不再展示「责任部门策略加载中」；PROCESS 内部 `teamId` 保持「执行班组（选填）」，提交与必填提示不再要求班组；外部类型提交时服务端校验 canonical 供应商类别与责任类型一致。实现提交：`6744d71`（后端/共享契约）、`d775ffc`（Web 入口）、`ed8508f`（WeApp 入口）。验证：backend 全量 `279/279` 文件、`2551/2551` 用例，Web `58/58`、`297/297`，WeApp `8/8`、`34/34`；`pnpm lint`、`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration`、shared build 与 diff 均 PASS；本地浏览器已验证三类切换与控件状态，无控制台错误；真实提交报检与生产验证未做。
+- 代码审查三项修复已完成：关单弹窗 legacy 外部责任按政策部门名（采购部/生产 OBU）唯一匹配，零/多匹配 fail-closed，不再取全量列表第一个部门；不合格项更新支持部分责任字段，合并当前三元组后校验；NC 编号分配改为事务内 CAS 循环消除并发重复。实现提交：`80dc2f4`（后端）、`cabfdf1`（Web）。验证：backend 全量 `279/279` 文件、`2554/2554` 用例，Web `59/59`、`301/301`，WeApp `8/8`、`34/34`；lint/type/arch/arch-all/prisma-migration/diff 均 PASS。未推送、未发布；真实浏览器关单与生产验证未做。
+- 检验记录“复检合格”展示已完成：Web 记录列表/详情在 `result=PASS` 且关联不合格项（`issueStatus !== NONE`）时显示复检合格，小程序“我的记录”在 PASS 且存在 linkedIssue 时显示复检合格徽标；判定收敛为纯函数。实现提交：`311e3a7`（Web）、`99a9d11`（WeApp）。验证：Web 全量 `60/60` 文件、`305/305` 用例，WeApp `9/9`、`39/39`；lint/type/arch/arch-all/prisma-migration/diff 均 PASS。未推送、未发布；真实页面展示与生产验证未做。
+- 测试状态: 本轮后端全仓 Vitest `267/267` 文件、`2461/2461` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `pnpm run check:qms-arch:all` 均通过。前端未运行 dev/build/start。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
 - 模块 TS 文件数: 617（含测试）
-- 当前版本: `0.19.1`
+- 当前版本: `0.24.0`
 
 ## 已完成
 
@@ -43,7 +51,7 @@
 - [x] 不合格项列表增加报告日期范围搜索（列表、查询全部和导出参数一致，结束日完整包含）
 - [x] 检验记录按检验类型补齐项目、物料、组件、检验员和检验日期范围搜索
 - [x] 不合格项列表增加供应商/外协单位搜索（列表、查询全部和导出参数一致）
-- [x] 工单要求跟踪补齐带 RBAC 与数据范围校验的编辑、软删除及图标化确认/撤销操作
+- [x] 工单要求跟踪补齐带 RBAC 与数据范围校验的编辑、软删除及图标化确认/撤销操作；确认权限独立，QC 可确认
 - [x] 售后质量搜索项按业务字段补齐（项目、责任部门、经办人、缺陷、供应商和日期范围）
 - [x] 售后质量搜索增加部件名称，列表与全量导出共用查询参数
 - [x] 报检任务电脑版与移动版派单只显示启用的 `QC` 检验员，后端同步强制校验
@@ -94,9 +102,10 @@ apps/backend/
 
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）；微信开发者工具的权限、列表、详情、编辑、新增页面已验证
 - [ ] 持续补强端到端业务流程验证
+- [ ] 通过正式发布链路执行不合格项责任类型 migration 与 `[object Object]` remediation：先 dry-run 审核 OPEN unresolved 清单，再 apply 并核对无错误责任部门显示、NC 编号及质量损失索引。
 - [x] 核对事业部生产回填汇总（工单修复 142 条，不合格项修复 46 条，无冲突和并发覆盖）
 - [ ] 人工处置事业部回填遗留的 124 条工单和不合格项侧 8 个无法解析计数
-- [x] 完成 supplier identity wave 的 PR、release-please、部署、migration、回填和健康检查
+- [ ] 完成 supplier identity wave 的生产回填与健康检查：v0.24.0 的 migration 已执行，但 maintenance 被 17 条未核实的 PROCESS supplier identity 阻断后又被错误绕过；本轮修复上线后必须通过正常发布链路重新运行。
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造有限公司供应商画像的 7 月 8 日不合格项、手工工程问题、进货合格率和完整历史项目
 - [ ] 在本地管理员登录态或容器恢复后，通过主数据治理页处置 `ISS-2026-_O7D0ZBC` 的缺陷分类审计；当前保持 `OPEN`，未绕过认证或直接改库
 - [ ] 为 supervision 等尚未覆盖的存量供应商引用补齐回填、unresolved 审计和生产指标核对

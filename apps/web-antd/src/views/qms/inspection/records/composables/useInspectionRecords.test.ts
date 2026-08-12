@@ -148,6 +148,8 @@ describe('useInspectionRecords', () => {
           defectType: '焊缝缺陷',
           enabled: true,
           lossAmount: 500,
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchasing',
         },
         materialName: 'Steel',
         processName: '焊接',
@@ -171,9 +173,14 @@ describe('useInspectionRecords', () => {
         severity: 'Minor',
         sourceType: 'INSPECTION_RECORD',
         supplierId: 'supplier-1',
-        supplierName: 'Supplier A',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
       }),
     );
+    const payload = mockCreateInspectionIssue.mock.calls[0]?.[0];
+    expect(payload).not.toHaveProperty('ncNumber');
+    expect(payload).not.toHaveProperty('responsibleDepartment');
+    expect(payload).not.toHaveProperty('supplierName');
     expect(mockMessageSuccess).toHaveBeenCalledWith('已自动创建关联不合格项');
   });
 
@@ -191,6 +198,8 @@ describe('useInspectionRecords', () => {
         linkedIssue: {
           description: 'Process defect',
           enabled: true,
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-production',
           supplierId: 'stale-supplier',
           supplierName: 'Stale Supplier',
         },
@@ -207,8 +216,40 @@ describe('useInspectionRecords', () => {
       expect.objectContaining({
         inspectionId: 'rec-process-1',
         supplierId: 'supplier-team-1',
-        supplierName: 'Resident Team Supplier',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: 'dept-production',
       }),
+    );
+  });
+
+  it('drops an inspection supplier when the explicit responsibility is internal', async () => {
+    mockCreateInspectionRecord.mockResolvedValueOnce({
+      id: 'rec-internal-1',
+      supplierId: 'supplier-should-not-write',
+    });
+    const { handleSubmit, formRef } = useInspectionRecords();
+
+    formRef.value = {
+      getValues: vi.fn().mockResolvedValue({
+        linkedIssue: {
+          enabled: true,
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-quality',
+        },
+      }),
+      validate: vi.fn().mockResolvedValue(undefined),
+    };
+
+    await handleSubmit();
+
+    expect(mockCreateInspectionIssue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-quality',
+      }),
+    );
+    expect(mockCreateInspectionIssue.mock.calls[0]?.[0]).not.toHaveProperty(
+      'supplierId',
     );
   });
 

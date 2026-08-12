@@ -4,8 +4,12 @@ import { ref } from 'vue';
 import { getMyRecords } from '@/api/inspection';
 import { onShow } from '@dcloudio/uni-app';
 
+import { resolveMyInspectionRecordBadge } from './record-result';
+
 interface RecordItem {
   id: string;
+  linkedIssueId?: null | string;
+  linkedIssueNo?: null | string;
   requestNo: string;
   workOrderNumber: string;
   partName: string;
@@ -100,23 +104,11 @@ onShow(() => {
             }}</text>
             <view
               class="result-badge"
-              :class="
-                record.status === 'INSPECTING'
-                  ? 'badge-inspecting'
-                  : record.inspectionResult === 'PASS'
-                    ? 'badge-pass'
-                    : 'badge-fail'
-              "
+              :class="resolveMyInspectionRecordBadge(record).className"
             >
-              <text class="badge-text">
-                {{
-                  record.status === 'INSPECTING'
-                    ? '待复检'
-                    : record.inspectionResult === 'PASS'
-                      ? '合格'
-                      : '不合格'
-                }}
-              </text>
+              <text class="badge-text">{{
+                resolveMyInspectionRecordBadge(record).text
+              }}</text>
             </view>
           </view>
 
@@ -232,6 +224,10 @@ onShow(() => {
     background: #fff7e6;
   }
 
+  &.badge-reinspection {
+    background: #e6f4ff;
+  }
+
   .badge-text {
     font-size: 24rpx;
 
@@ -245,6 +241,10 @@ onShow(() => {
 
     .badge-inspecting & {
       color: #fa8c16;
+    }
+
+    .badge-reinspection & {
+      color: #1677ff;
     }
   }
 }

@@ -21,6 +21,7 @@ import {
 } from '~/utils/process-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
+import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';
 import {
   InspectionRecordRules,
@@ -85,17 +86,45 @@ export const InspectionRecordCreateService = {
           processName: data.processName,
         });
         const explicitTeamId = String(data.teamId || '').trim();
-        if (data.category === 'PROCESS' && !explicitTeamId) {
+        const explicitSupplierId = String(data.supplierId || '').trim();
+        const hasResponsibilityInput = [
+          data.responsibilityType,
+          data.responsibleDepartmentId,
+          data.responsibleDepartment,
+        ].some((value) => String(value || '').trim());
+        if (
+          data.category === 'PROCESS' &&
+          !explicitTeamId &&
+          !explicitSupplierId &&
+          !hasResponsibilityInput
+        ) {
           throw new BusinessError(
             'TEAM_ID_REQUIRED',
-            'A canonical TEAM identity is required for process inspections',
+            'A PROCESS inspection without TEAM requires canonical responsibility',
           );
         }
-        const teamIdentity =
-          data.category === 'PROCESS'
-            ? await SupplierIdentityService.resolveTeamById(explicitTeamId)
-            : null;
         const execute = async (tx: Prisma.TransactionClient) => {
+          const responsibility = hasResponsibilityInput
+            ? await resolveInspectionIssueResponsibility(
+                {
+                  responsibilityType: data.responsibilityType,
+                  responsibleDepartmentId: data.responsibleDepartmentId,
+                  supplierId: data.supplierId,
+                },
+                tx,
+              )
+            : null;
+          let teamIdentity = null;
+          if (data.category === 'PROCESS' && explicitTeamId) {
+            await SupplierIdentityService.lockTeamForMutation(
+              explicitTeamId,
+              tx,
+            );
+            teamIdentity = await SupplierIdentityService.resolveTeamById(
+              explicitTeamId,
+              tx,
+            );
+          }
           const governedFields = buildGovernedWriteFieldsForTable(
             'inspections',
             {
@@ -104,7 +133,7 @@ export const InspectionRecordCreateService = {
               partName: data.partName,
               processName: data.processName,
               projectName: data.projectName,
-              supplierName: data.supplierName,
+              supplierName: responsibility?.supplierName ?? data.supplierName,
               team: teamIdentity?.name ?? null,
             },
           );
@@ -112,18 +141,36 @@ export const InspectionRecordCreateService = {
             await buildGovernedCanonicalWritePairForTable('inspections', {
               ...governedFields,
               partId: data.partId,
-              supplierId: data.supplierId,
+              supplierId: responsibility?.supplierId ?? data.supplierId,
             });
           const governedSupplierId =
             typeof governedCanonicalIds.supplierId === 'string'
               ? governedCanonicalIds.supplierId
               : data.supplierId;
-          const supplierIdentity =
-            await SupplierIdentityService.resolveSupplierForInspection({
-              category: data.category,
-              supplierId: governedSupplierId,
-              teamId: teamIdentity?.id,
-            });
+          const isDirectProcessSupplier =
+            data.category === 'PROCESS' && !teamIdentity;
+          let supplierIdentity = null;
+          if (isDirectProcessSupplier && governedSupplierId) {
+            supplierIdentity =
+              await SupplierIdentityService.resolveSupplierById(
+                governedSupplierId,
+                tx,
+              );
+          }
+          if (!isDirectProcessSupplier) {
+            supplierIdentity =
+              await SupplierIdentityService.resolveSupplierForInspection(
+                {
+                  category: data.category,
+                  supplierId:
+                    data.category === 'PROCESS'
+                      ? undefined
+                      : governedSupplierId,
+                  teamId: teamIdentity?.id,
+                },
+                tx,
+              );
+          }
           if (data.category === 'INCOMING' && !supplierIdentity) {
             throw new BusinessError(
               'SUPPLIER_ID_REQUIRED',
@@ -142,6 +189,11 @@ export const InspectionRecordCreateService = {
               materialName: data.materialName,
               incomingType: data.incomingType,
               processId: resolvedProcessId,
+              responsibilityType: responsibility?.responsibilityType ?? null,
+              responsibleDepartment:
+                responsibility?.responsibleDepartment ?? null,
+              responsibleDepartmentId:
+                responsibility?.responsibleDepartmentId ?? null,
               teamId: teamIdentity?.id ?? null,
               level1Component: data.level1Component,
               level2Component: data.level2Component,

@@ -8,8 +8,16 @@ import { InspectionRequestCreateService } from '~/modules/inspection/inspection-
 import { assertWorkOrdersExist } from '~/modules/inspection/inspection-request-work-orders';
 import { PartMasterService } from '~/modules/part-master';
 import { ProcessMasterService } from '~/modules/process-master';
+import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { SystemService } from '~/modules/system';
 import prisma from '~/utils/prisma';
+
+const { resolveIssueResponsibilities } = vi.hoisted(() => ({
+  resolveIssueResponsibilities: vi.fn(),
+}));
+const { resolveV2Responsibility } = vi.hoisted(() => ({
+  resolveV2Responsibility: vi.fn(),
+}));
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -55,6 +63,14 @@ vi.mock('~/modules/supplier-identity', () => ({
   },
 }));
 
+vi.mock('./inspection-request-responsibility.service', () => ({
+  resolveInspectionRequestIssueResponsibilities: resolveIssueResponsibilities,
+}));
+
+vi.mock('./inspection-request-create-responsibility.service', () => ({
+  resolveV2RequestResponsibility: resolveV2Responsibility,
+}));
+
 vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));
@@ -66,7 +82,12 @@ vi.mock('~/modules/user', () => ({
 }));
 
 vi.mock('~/utils/governed-write', () => ({
-  buildGovernedCanonicalWritePairForTable: vi.fn().mockResolvedValue({}),
+  buildGovernedCanonicalWritePairForTable: vi.fn().mockResolvedValue({
+    partId: 'part-1',
+    partName: 'Canonical Part',
+    processId: 'process-1',
+    processName: 'Canonical Process',
+  }),
   buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
 }));
 
@@ -142,6 +163,99 @@ describe('inspectionRequestCreateService', () => {
       name: 'Canonical Part',
     });
     vi.mocked(PartMasterService.findActiveByExactName).mockResolvedValue(null);
+    resolveIssueResponsibilities.mockImplementation(
+      async ([request]: Array<{ category?: string }>) => [
+        request?.category === 'INCOMING'
+          ? {
+              responsibilityType: 'SUPPLIER',
+              responsibleDepartmentId: 'dept-purchasing',
+              supplierId: 'supplier-1',
+            }
+          : {
+              responsibilityType: 'INTERNAL_DEPARTMENT',
+              responsibleDepartmentId: 'dept-assembly',
+              supplierId: null,
+            },
+      ],
+    );
+    resolveV2Responsibility.mockImplementation(async (input) => ({
+      responsibility: {
+        responsibleDepartment: 'Assembly',
+        responsibleDepartmentId: input.v2Responsibility.responsibleDepartmentId,
+        responsibilityType: input.v2Responsibility.responsibilityType,
+        supplierId: input.v2Responsibility.supplierId || null,
+        supplierName: input.v2Responsibility.supplierId ? 'Supplier A' : null,
+      },
+      supplierId: input.v2Responsibility.supplierId || null,
+      team: '',
+      teamId: null,
+    }));
+  });
+
+  it('validates V2 responsibility inside the create transaction', async () => {
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create: vi.fn() } }),
+    );
+    resolveV2Responsibility.mockRejectedValueOnce(
+      Object.assign(new Error('invalid responsibility'), {
+        code: 'VALIDATION',
+      }),
+    );
+
+    await expect(
+      InspectionRequestCreateService.createRequest(
+        {} as any,
+        { id: 'user-1', username: 'admin' } as any,
+        {
+          category: 'PROCESS',
+          componentName: 'Component A',
+          partId: 'part-1',
+          processId: 'process-1',
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
+          workOrderNumber: 'WO-001',
+        },
+        false,
+        'V2',
+      ),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+    });
+    expect(prisma.$transaction).toHaveBeenCalled();
+  });
+
+  it('persists a V2 incoming request with direct internal responsibility', async () => {
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'INCOMING',
+        partId: 'part-1',
+        processId: 'process-1',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-quality',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          category: 'INCOMING',
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-quality',
+          supplierId: null,
+          teamId: null,
+        }),
+      }),
+    );
   });
 
   it('rejects a V2 process that is hidden for the requested category', async () => {
@@ -160,6 +274,8 @@ describe('inspectionRequestCreateService', () => {
           componentName: 'Component A',
           partId: 'part-1',
           processId: 'process-1',
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
           teamId: 'team-1',
           workOrderNumber: 'WO-001',
         },
@@ -324,6 +440,8 @@ describe('inspectionRequestCreateService', () => {
         componentName: 'Component A',
         partId: 'part-1',
         processId: 'process-1',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-assembly',
         teamId: 'team-1',
         workOrderNumber: 'WO-001',
       },
@@ -339,6 +457,78 @@ describe('inspectionRequestCreateService', () => {
           partName: 'Canonical Part',
           processId: 'process-1',
           processName: 'Canonical Process',
+        }),
+      }),
+    );
+  });
+
+  it('persists PROCESS external responsibility without a TEAM mapping', async () => {
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'PROCESS',
+        componentName: 'Component A',
+        partId: 'part-1',
+        processId: 'process-1',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-1',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(SupplierIdentityService.resolveTeamById).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-production',
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
+          teamId: null,
+        }),
+      }),
+    );
+  });
+
+  it('persists PROCESS internal responsibility without an execution TEAM', async () => {
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'PROCESS',
+        componentName: 'Component A',
+        partId: 'part-1',
+        processId: 'process-1',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-assembly',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(SupplierIdentityService.resolveTeamById).not.toHaveBeenCalled();
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
+          supplierId: null,
+          teamId: null,
         }),
       }),
     );
@@ -376,6 +566,8 @@ describe('inspectionRequestCreateService', () => {
         processId: 'process-1',
         reporter: 'Workshop',
         requestedPartName: 'Unregistered bearing',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-1',
         workOrderNumber: 'WO-001',
       },
@@ -437,6 +629,8 @@ describe('inspectionRequestCreateService', () => {
         category: 'INCOMING',
         processId: 'process-1',
         requestedPartName: ' Bearing ',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-1',
         workOrderNumber: 'WO-001',
       },
@@ -510,6 +704,8 @@ describe('inspectionRequestCreateService', () => {
           category: 'PROCESS',
           partId: 'part-1',
           processId: 'process-1',
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
           teamId: 'team-1',
           workOrderNumber: 'WO-001',
         },

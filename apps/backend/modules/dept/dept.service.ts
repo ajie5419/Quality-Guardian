@@ -41,9 +41,60 @@ interface DeptItem {
 }
 
 export const DeptService = {
+  async listActiveOptions(keyword = '') {
+    const normalizedKeyword = keyword.trim();
+    const departments = await prisma.departments.findMany({
+      where: {
+        isDeleted: false,
+        status: 1,
+        ...(normalizedKeyword ? { name: { contains: normalizedKeyword } } : {}),
+      },
+      orderBy: { name: 'asc' },
+      select: { id: true, name: true },
+      take: 100,
+    });
+    return departments.map((department) => ({
+      label: department.name,
+      value: department.id,
+    }));
+  },
+
   async findActiveById(id: string, client: DepartmentReadClient = prisma) {
     return client.departments.findFirst({
       where: { id: id.trim(), isDeleted: false, status: 1 },
+      select: { businessUnit: true, id: true, name: true },
+    });
+  },
+
+  async findActiveByIdsOrNames(
+    input: {
+      ids?: ReadonlyArray<null | string | undefined>;
+      names?: ReadonlyArray<null | string | undefined>;
+    },
+    client: DepartmentReadClient = prisma,
+  ) {
+    const ids = [
+      ...new Set(
+        (input.ids ?? []).map((id) => String(id || '').trim()).filter(Boolean),
+      ),
+    ];
+    const names = [
+      ...new Set(
+        (input.names ?? [])
+          .map((name) => String(name || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    if (ids.length === 0 && names.length === 0) return [];
+    return client.departments.findMany({
+      where: {
+        isDeleted: false,
+        status: 1,
+        OR: [
+          ...(ids.length > 0 ? [{ id: { in: ids } }] : []),
+          ...(names.length > 0 ? [{ name: { in: names } }] : []),
+        ],
+      },
       select: { businessUnit: true, id: true, name: true },
     });
   },

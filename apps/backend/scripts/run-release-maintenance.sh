@@ -10,6 +10,7 @@ cd "$BACKEND_DIR"
 # Historical fact name snapshots are frozen. Every identity backfill below may
 # create canonical IDs and audit evidence, but must never normalize a fact name.
 "$TSX_BIN" scripts/backfill-role-page-permissions.ts --apply
+"$TSX_BIN" scripts/backfill-work-order-confirm-permission.ts --apply
 "$TSX_BIN" scripts/reconcile-team-identities.ts --apply
 TEAM_IDENTITY_MAINTENANCE_MODE=1 "$TSX_BIN" scripts/merge-confirmed-team-duplicates.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-issue-divisions.ts --apply
@@ -18,7 +19,9 @@ TEAM_IDENTITY_MAINTENANCE_MODE=1 "$TSX_BIN" scripts/merge-confirmed-team-duplica
 "$TSX_BIN" scripts/bootstrap-pass-rate-identities.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-request-categories.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-request-process-options.ts --apply
+"$TSX_BIN" scripts/backfill-inspection-request-responsibilities.ts --apply
 "$TSX_BIN" scripts/backfill-inspection-issue-responsibilities.ts --apply
+"$TSX_BIN" scripts/remediate-inspection-issue-responsibilities.ts --apply
 "$TSX_BIN" scripts/backfill-quality-classifications.ts --apply
 "$TSX_BIN" scripts/historical-identity-sidecar-bootstrap.ts --apply --rebuild
 "$TSX_BIN" scripts/bootstrap-master-data-identity-baseline.ts

@@ -7,4 +7,6 @@ export {
   InspectionMaterialRequestService,
 } from './inspection-material-request.service';
 export { InspectionProcessResolutionService } from './inspection-process-resolution.service';
+export { inspectionRequestResponsibilityOptionsQuerySchema } from './inspection-request-responsibility-options.schema';
+export { InspectionRequestResponsibilityOptionsService } from './inspection-request-responsibility-options.service';
 export { InspectionService } from './inspection.service';

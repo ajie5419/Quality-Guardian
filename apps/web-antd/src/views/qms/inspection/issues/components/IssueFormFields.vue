@@ -13,12 +13,10 @@ import { useI18n } from '@vben/locales';
 import {
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   QUALITY_CLASSIFICATION_SCOPES,
-  resolveInspectionIssueResponsibilityTypeFromDepartment,
 } from '@qgs/shared';
-import { Button, message, Select, Switch, Tooltip } from 'ant-design-vue';
+import { Button, Select, Tooltip } from 'ant-design-vue';
 
 import { useVbenForm } from '#/adapter/form';
-import { generateInspectionNcNumber } from '#/api/qms/inspection';
 import { getWelderListPage } from '#/api/qms/welder';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
@@ -31,6 +29,7 @@ import {
   isWeldingDefectSubcategory,
   isWeldingProcessName,
 } from './issueFormData';
+import { isExternalInspectionIssueResponsibility } from './issueFormPayload';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
 import IssueSimilarCases from './IssueSimilarCases.vue';
 
@@ -82,8 +81,8 @@ type IssueFormValues = Partial<{
   processName: string;
   projectName: string;
   reportDate: string;
-  responsibleDepartment: string;
-  responsibleDepartments: string[];
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
   responsibleWelder: string;
   rootCause: string;
   solution: string;
@@ -170,37 +169,12 @@ const [Form, formApi] = useVbenForm({
   showDefaultActions: false,
 });
 
-function firstResponsibleDepartment(): string {
-  const departments = formValues.value.responsibleDepartments;
-  if (Array.isArray(departments) && departments.length > 0) {
-    return departments[0] || '';
-  }
-  return formValues.value.responsibleDepartment || '';
-}
-
-function findDeptTitle(
-  tree: DeptTreeLikeNode[],
-  value?: string,
-): string | undefined {
-  if (!value) return undefined;
-  for (const node of tree) {
-    if (String(node.value) === value) return node.label || node.title;
-    if (node.children) {
-      const found = findDeptTitle(node.children, value);
-      if (found) return found;
-    }
-  }
-  return undefined;
-}
-
 const resolvedResponsibilityType = computed(() => {
   if (props.responsibilityType) return props.responsibilityType;
-  const deptId = firstResponsibleDepartment();
-  if (!deptId) {
-    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
-  }
-  const name = findDeptTitle(props.deptTreeData, deptId) || '';
-  return resolveInspectionIssueResponsibilityTypeFromDepartment(name);
+  return (
+    formValues.value.responsibilityType ||
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+  );
 });
 
 const targetUnitCategory = computed(() => {
@@ -211,41 +185,9 @@ const targetUnitCategory = computed(() => {
 });
 
 const shouldShowSupplier = computed(() => {
-  return (
-    resolvedResponsibilityType.value ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
-    resolvedResponsibilityType.value ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  return isExternalInspectionIssueResponsibility(
+    resolvedResponsibilityType.value,
   );
-});
-
-const isAutoNc = ref(false);
-const isGeneratingNc = ref(false);
-
-async function autoFillNcNumber() {
-  if (props.isEditMode || isGeneratingNc.value) return;
-  try {
-    isGeneratingNc.value = true;
-    const { ncNumber } = await generateInspectionNcNumber();
-    if (!ncNumber) {
-      message.warning('NC 编号生成接口未返回编号');
-      return;
-    }
-    formApi.setFieldValue('ncNumber', ncNumber);
-  } catch (error) {
-    handleApiError(error, 'Generate NC Number');
-  } finally {
-    isGeneratingNc.value = false;
-  }
-}
-
-watch(isAutoNc, async (val) => {
-  if (props.isEditMode) return;
-  if (val) {
-    await autoFillNcNumber();
-  } else {
-    formApi.setFieldValue('ncNumber', '');
-  }
 });
 
 watch(
@@ -253,7 +195,7 @@ watch(
   (data) => {
     formApi.updateSchema([
       {
-        fieldName: 'responsibleDepartments',
+        fieldName: 'responsibleDepartmentId',
         componentProps: { treeData: data },
       },
     ]);
@@ -268,11 +210,47 @@ watch(
       {
         fieldName: 'supplierId',
         dependencies: {
-          triggerFields: ['responsibleDepartments'],
+          triggerFields: ['responsibilityType'],
           show: () => show,
         },
       },
     ]);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.responsibilityType,
+  (responsibilityType) => {
+    const isResponsibilityLocked = !!responsibilityType;
+    formApi.updateSchema([
+      {
+        fieldName: 'responsibilityType',
+        componentProps: { disabled: isResponsibilityLocked },
+      },
+      {
+        fieldName: 'responsibleDepartmentId',
+        componentProps: { disabled: isResponsibilityLocked },
+      },
+      {
+        fieldName: 'supplierId',
+        componentProps: { disabled: isResponsibilityLocked },
+      },
+    ]);
+    if (responsibilityType) {
+      formApi.setFieldValue('responsibilityType', responsibilityType);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  shouldShowSupplier,
+  (show) => {
+    if (!show) {
+      formApi.setFieldValue('supplierId', undefined);
+      formApi.setFieldValue('supplierName', '');
+    }
   },
   { immediate: true },
 );
@@ -475,10 +453,6 @@ defineExpose({
   resetForm: () => formApi.resetForm(),
   setFieldValue: (field: string, value: unknown) =>
     formApi.setFieldValue(field, value),
-  isAutoNc,
-  resetAutoNc: () => {
-    isAutoNc.value = false;
-  },
   clearMatchedCases,
 });
 </script>
@@ -487,33 +461,11 @@ defineExpose({
   <div class="issue-form-fields min-w-0">
     <Form>
       <template #ncNumber="{ modelValue }">
-        <div class="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
-          <div class="relative min-w-0 flex-1">
-            <span
-              class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
-            >
-              {{
-                modelValue ||
-                t('qms.inspection.issues.generateNumberPlaceholder')
-              }}
-            </span>
-          </div>
-          <div
-            v-if="!isEditMode"
-            class="flex flex-shrink-0 flex-wrap items-center gap-2"
-          >
-            <Button
-              :loading="isGeneratingNc"
-              size="small"
-              type="primary"
-              @click="autoFillNcNumber"
-            >
-              {{ t('qms.inspection.issues.generateNumber') }}
-            </Button>
-            <span class="text-xs text-gray-400">自动生成</span>
-            <Switch v-model:checked="isAutoNc" size="small" />
-          </div>
-        </div>
+        <span
+          class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
+        >
+          {{ modelValue || '提交后自动生成' }}
+        </span>
       </template>
 
       <template #workOrderNumber="slotProps">

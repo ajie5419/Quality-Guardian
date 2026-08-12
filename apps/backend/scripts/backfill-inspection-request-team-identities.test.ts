@@ -31,6 +31,9 @@ const options = {
 describe('inspection request TEAM identity backfill', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.$transaction).mockImplementation((callback) =>
+      callback(prisma as never),
+    );
   });
 
   it('backfills a unique canonical TEAM identity without changing the snapshot', async () => {
@@ -47,7 +50,6 @@ describe('inspection request TEAM identity backfill', () => {
     vi.mocked(prisma.qms_inspection_requests.updateMany).mockResolvedValue({
       count: 1,
     });
-    vi.mocked(prisma.$transaction).mockResolvedValue([{ count: 1 }] as never);
 
     await expect(
       backfillInspectionRequestTeamIdentities(options, {
@@ -61,6 +63,7 @@ describe('inspection request TEAM identity backfill', () => {
     });
     expect(persistResolutionAudit).toHaveBeenCalledWith(
       expect.objectContaining({ fieldName: 'teamId' }),
+      prisma,
     );
   });
 
@@ -86,13 +89,127 @@ describe('inspection request TEAM identity backfill', () => {
       }),
     ).resolves.toMatchObject({ updated: 0, unresolved: 1 });
     expect(prisma.qms_inspection_requests.updateMany).not.toHaveBeenCalled();
-    expect(persistResolutionAudit).toHaveBeenCalledWith({
-      entityType: 'qms_inspection_requests',
-      fieldName: 'teamId',
-      resolved: [],
-      unresolved: [
-        expect.objectContaining({ reason: 'team_identity_conflict' }),
-      ],
+    expect(persistResolutionAudit).toHaveBeenCalledWith(
+      {
+        entityType: 'qms_inspection_requests',
+        fieldName: 'teamId',
+        resolved: [],
+        unresolved: [
+          expect.objectContaining({ reason: 'team_identity_conflict' }),
+        ],
+      },
+      prisma,
+    );
+  });
+
+  it('clears an internal TEAM request supplier identity with a CAS update', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'request-3',
+          requestNo: 'IR-3',
+          supplierId: 'supplier-1',
+          team: 'Machine BU',
+          teamId: 'team-internal',
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+    vi.mocked(prisma.qms_inspection_requests.updateMany).mockResolvedValue({
+      count: 1,
     });
+
+    await backfillInspectionRequestTeamIdentities(options, {
+      internalTeamIds: new Set(['team-internal']),
+      teamById: new Map([
+        ['team-internal', { id: 'team-internal', name: 'Machine BU' }],
+      ]),
+      teamByName: new Map(),
+    });
+
+    expect(prisma.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
+      data: { supplierId: null, teamId: 'team-internal' },
+      where: {
+        id: 'request-3',
+        isDeleted: false,
+        supplierId: 'supplier-1',
+        teamId: 'team-internal',
+      },
+    });
+    expect(persistResolutionAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        cleared: [
+          expect.objectContaining({
+            reason: 'internal_team_supplier_fields_cleared',
+          }),
+        ],
+        fieldName: 'supplierId',
+      }),
+      prisma,
+    );
+  });
+
+  it('audits an external TEAM request without a valid explicit link', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'request-4',
+          requestNo: 'IR-4',
+          supplierId: null,
+          team: 'External Team',
+          teamId: 'team-external',
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      backfillInspectionRequestTeamIdentities(options, {
+        effectiveLinks: new Map(),
+        externalTeamIds: new Set(['team-external']),
+        teamById: new Map([
+          ['team-external', { id: 'team-external', name: 'External Team' }],
+        ]),
+        teamByName: new Map(),
+      }),
+    ).resolves.toMatchObject({ unresolved: 1, updated: 0 });
+    expect(persistResolutionAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        unresolved: [
+          expect.objectContaining({ reason: 'MISSING_PROCESS_TEAM_LINK' }),
+        ],
+      }),
+      prisma,
+    );
+  });
+
+  it('keeps the source CAS and audit write in one transaction', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'request-5',
+          requestNo: 'IR-5',
+          supplierId: null,
+          team: 'Team A',
+          teamId: null,
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+    vi.mocked(prisma.qms_inspection_requests.updateMany).mockResolvedValue({
+      count: 1,
+    });
+    vi.mocked(persistResolutionAudit).mockRejectedValue(
+      new Error('audit write failed'),
+    );
+
+    await expect(
+      backfillInspectionRequestTeamIdentities(options, {
+        teamById: new Map(),
+        teamByName: new Map([['Team A', { id: 'team-1', name: 'Team A' }]]),
+      }),
+    ).rejects.toThrow('audit write failed');
+    expect(prisma.$transaction).toHaveBeenCalledWith(expect.any(Function));
+    expect(persistResolutionAudit).toHaveBeenCalledWith(
+      expect.any(Object),
+      prisma,
+    );
   });
 });

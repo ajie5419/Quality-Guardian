@@ -169,5 +169,5 @@ Canonical bootstrap is an initialization operation, not an ongoing name resolver
 
 - 供应商评分已使用数据库持久化任务替代单进程 `EventEmitter`；源事务、租约重试、幂等重算和发布清零门禁构成完整一致性链路。
 - `unresolved_master_data_refs` 已用于回填审计，并在系统设置中提供统一治理清单。不合格项缺陷分类、售后产品分类和售后缺陷分类支持人工选择 canonical 父子分类后事务化修复；其他类型只读展示。`OPEN` 记录不得被视为已解决。
-- `supplier_identity_links` 已有系统管理员 API，但尚无前端管理界面；TEAM 映射维护仍依赖受控管理入口。
+- `supplier_identity_links` 已提供系统设置中的系统管理员管理界面和 canonical 选项 API；界面仅展示、接受可建立关联的 active TEAM 与 PROCESS-policy 外包供应商。创建关联不会伪称已修复历史事实，历史修复必须单独执行受审计 backfill。
 - 以上限制不影响本 wave 的 ID 查询契约，但必须在发布验收和后续治理计划中显式跟踪。

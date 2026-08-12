@@ -10,6 +10,7 @@ vi.mock('~/modules/supplier-identity', () => ({
       id: teamId,
       name: 'A班',
     })),
+    lockTeamForMutation: vi.fn(),
   },
 }));
 

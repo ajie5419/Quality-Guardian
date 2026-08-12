@@ -5,4 +5,3 @@ export * from './useIssueChartAggregation';
 export * from './useIssueChartPreferences';
 export * from './useIssueData';
 export * from './useIssueRemoteStatistics';
-export * from './useNcNumber';
