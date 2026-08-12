@@ -40,6 +40,7 @@ import {
 import { useStatusOptions } from '../../issues/constants';
 import { resolveDivisionIdentity } from '../composables/useInspectionRequestTaskActions';
 import { resolveTreeDepartmentIdentity } from '../inspection-request-responsibility';
+import { resolveLegacyExternalResponsibilityDepartment } from './legacyResponsibilityDepartment';
 
 interface Props {
   open: boolean;
@@ -204,10 +205,15 @@ async function loadLegacyResponsibilityOptions() {
         localLinkedIssueDraft.responsibilityType,
       )
     ) {
+      const resolved = resolveLegacyExternalResponsibilityDepartment({
+        departments: result.departments,
+        responsibilityType: localLinkedIssueDraft.responsibilityType,
+      });
       localLinkedIssueDraft.responsibleDepartmentId =
-        result.departments[0]?.value || '';
+        resolved.department?.value || '';
       localLinkedIssueDraft.responsibleDepartment =
-        result.departments[0]?.label || '';
+        resolved.department?.label || '';
+      legacyResponsibilityError.value = resolved.error;
       localLinkedIssueDraft.supplierId = '';
       localLinkedIssueDraft.supplierName = '';
       return;
@@ -621,7 +627,7 @@ async function handleBeforeUpload(file: File) {
                       (department) =>
                         department.value ===
                         localLinkedIssueDraft.responsibleDepartmentId,
-                    )?.label || '责任部门策略加载中'
+                    )?.label || '责任部门未确定'
                   "
                   readonly
                 />
