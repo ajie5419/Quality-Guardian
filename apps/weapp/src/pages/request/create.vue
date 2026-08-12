@@ -25,7 +25,12 @@ import {
   isInspectionRequestAssemblyProcess,
 } from '@qgs/shared';
 
-import { buildRequestCreateResponsibilityPayload } from './create-responsibility';
+import {
+  buildRequestCreateResponsibilityPayload,
+  isCurrentResponsibilityOptionsRequest,
+  REQUEST_CREATE_RESPONSIBILITY_LABELS,
+  REQUEST_CREATE_RESPONSIBILITY_TYPES,
+} from './create-responsibility';
 
 interface WorkOrderItem {
   workOrderNumber: string;
@@ -119,6 +124,7 @@ const workOrderResults = ref<WorkOrderItem[]>([]);
 const showWorkOrderDropdown = ref(false);
 const searchingWorkOrder = ref(false);
 let searchTimer: null | ReturnType<typeof setTimeout> = null;
+let responsibilityOptionsSequence = 0;
 const incomingPartKeyword = ref('');
 const canonicalPartList = ref<PartOptionItem[]>([]);
 const showPartDropdown = ref(false);
@@ -201,9 +207,7 @@ const selectedSupplierLabel = computed(
     supplierOptions.value.find((item) => item.value === form.supplierId)
       ?.label || '',
 );
-const responsibilityTypeLabels = computed(() =>
-  isIncoming.value ? ['供应商'] : ['内部部门', '供应商', '外协单位'],
-);
+const responsibilityTypeLabels = REQUEST_CREATE_RESPONSIBILITY_LABELS;
 const responsibilityUnitLabel = computed(() =>
   form.responsibilityType === 'OUTSOURCING_UNIT' ? '外协单位' : '供应商',
 );
@@ -240,10 +244,20 @@ function syncMaterialInputMode() {
 }
 
 async function loadResponsibilityOptions() {
+  const requestedSequence = ++responsibilityOptionsSequence;
+  const requestedResponsibilityType = form.responsibilityType;
+  const isCurrentRequest = () =>
+    isCurrentResponsibilityOptionsRequest({
+      currentResponsibilityType: form.responsibilityType,
+      currentSequence: responsibilityOptionsSequence,
+      requestedResponsibilityType,
+      requestedSequence,
+    });
   try {
     const res = await getInspectionRequestResponsibilityOptions({
-      responsibilityType: form.responsibilityType,
+      responsibilityType: requestedResponsibilityType,
     });
+    if (!isCurrentRequest()) return;
     if (res.code !== 0 || !res.data) {
       resetResponsibilityIdentity();
       departmentOptions.value = [];
@@ -253,14 +267,18 @@ async function loadResponsibilityOptions() {
     }
     departmentOptions.value = res.data.departments;
     supplierOptions.value = res.data.suppliers;
+    departmentIndex.value = departmentOptions.value.findIndex(
+      (item) => item.value === form.responsibleDepartmentId,
+    );
     if (isExternalResponsibility.value) {
-      form.responsibleDepartmentId = res.data.departments[0]?.value || '';
-      departmentIndex.value = 0;
+      internalTeamOptions.value = [];
       form.team = '';
       form.teamId = '';
+      internalTeamIndex.value = -1;
       return;
     }
     const teams = await getTeams();
+    if (!isCurrentRequest()) return;
     internalTeamOptions.value =
       teams.code === 0 && Array.isArray(teams.data)
         ? teams.data.filter(
@@ -286,6 +304,7 @@ async function loadResponsibilityOptions() {
     }
     form.supplierId = '';
   } catch {
+    if (!isCurrentRequest()) return;
     resetResponsibilityIdentity();
     departmentOptions.value = [];
     internalTeamOptions.value = [];
@@ -392,9 +411,7 @@ function onProcessChange(e: { detail: { value: string } }) {
   incomingPartKeyword.value = '';
   syncMaterialInputMode();
   form.responsibilityType =
-    form.category === 'INCOMING'
-      ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
-      : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
   resetResponsibilityIdentity();
   bomPartIndex.value = -1;
   void loadResponsibilityOptions();
@@ -458,12 +475,8 @@ function selectIncomingPart(item: PartOptionItem) {
 }
 
 function onResponsibilityTypeChange(e: { detail: { value: string } }) {
-  const values = [
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
-  ] as const;
-  const responsibilityType = values[Number(e.detail.value)];
+  const responsibilityType =
+    REQUEST_CREATE_RESPONSIBILITY_TYPES[Number(e.detail.value)];
   if (!responsibilityType) return;
   form.responsibilityType = responsibilityType;
   resetResponsibilityIdentity();
@@ -480,11 +493,12 @@ function onInternalTeamChange(e: { detail: { value: string } }) {
   errors.team = false;
 }
 
-function onInternalDepartmentChange(e: { detail: { value: string } }) {
+function onResponsibilityDepartmentChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
   departmentIndex.value = idx;
   form.responsibleDepartmentId = departmentOptions.value[idx]?.value ?? '';
   if (
+    form.responsibilityType === 'INTERNAL_DEPARTMENT' &&
     !selectedInternalTeamOptions.value.some(
       (team) => team.value === form.teamId,
     )
@@ -806,7 +820,6 @@ async function handleSubmit() {
             <text class="label">责任归属类型</text>
           </view>
           <picker
-            v-if="!isIncoming"
             class="picker"
             mode="selector"
             :range="responsibilityTypeLabels"
@@ -832,16 +845,9 @@ async function handleSubmit() {
               <text class="picker-arrow">›</text>
             </view>
           </picker>
-          <view v-else class="picker-inner">
-            <text class="picker-text">供应商</text>
-          </view>
         </view>
 
-        <view
-          v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
-          class="form-item"
-          :class="{ error: errors.team }"
-        >
+        <view class="form-item" :class="{ error: errors.team }">
           <view class="label-wrap">
             <text class="required-star">*</text>
             <text class="label">责任部门</text>
@@ -852,7 +858,7 @@ async function handleSubmit() {
             :range="departmentLabels"
             :value="departmentIndex"
             :disabled="departmentOptions.length === 0"
-            @change="onInternalDepartmentChange"
+            @change="onResponsibilityDepartmentChange"
           >
             <view class="picker-inner">
               <text
@@ -925,18 +931,6 @@ async function handleSubmit() {
             </view>
           </picker>
         </view>
-        <view v-if="isExternalResponsibility" class="form-item">
-          <view class="label-wrap">
-            <text class="label-spacer" />
-            <text class="label">责任部门</text>
-          </view>
-          <view class="picker-inner">
-            <text class="picker-text">{{
-              selectedDepartmentLabel || '责任部门策略加载中'
-            }}</text>
-          </view>
-        </view>
-
         <!-- 报检人 -->
         <view class="form-item" :class="{ error: errors.reporter }">
           <view class="label-wrap">

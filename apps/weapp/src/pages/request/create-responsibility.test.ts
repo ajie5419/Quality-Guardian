@@ -1,8 +1,45 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildRequestCreateResponsibilityPayload } from './create-responsibility';
+import {
+  buildRequestCreateResponsibilityPayload,
+  isCurrentResponsibilityOptionsRequest,
+  REQUEST_CREATE_RESPONSIBILITY_LABELS,
+  REQUEST_CREATE_RESPONSIBILITY_TYPES,
+} from './create-responsibility';
 
 describe('request create responsibility payload', () => {
+  it('keeps all three responsibility types available for both request routes', () => {
+    expect(REQUEST_CREATE_RESPONSIBILITY_TYPES).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(REQUEST_CREATE_RESPONSIBILITY_LABELS).toEqual([
+      '内部部门',
+      '供应商',
+      '外协单位',
+    ]);
+  });
+
+  it('ignores stale responsibility options after a type change', () => {
+    expect(
+      isCurrentResponsibilityOptionsRequest({
+        currentResponsibilityType: 'OUTSOURCING_UNIT',
+        currentSequence: 2,
+        requestedResponsibilityType: 'INTERNAL_DEPARTMENT',
+        requestedSequence: 1,
+      }),
+    ).toBe(false);
+    expect(
+      isCurrentResponsibilityOptionsRequest({
+        currentResponsibilityType: 'OUTSOURCING_UNIT',
+        currentSequence: 2,
+        requestedResponsibilityType: 'OUTSOURCING_UNIT',
+        requestedSequence: 2,
+      }),
+    ).toBe(true);
+  });
+
   it.each([
     [
       {
