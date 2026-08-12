@@ -27,6 +27,9 @@ vi.mock('~/utils/prisma', () => ({
       update: vi.fn(),
       updateMany: vi.fn(),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     $transaction: vi.fn(async (operations: Promise<unknown>[]) =>
       Promise.all(operations),
     ),
@@ -87,8 +90,11 @@ describe('quality-loss core services', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(prisma.$transaction).mockReset();
-    vi.mocked(prisma.$transaction).mockImplementation((operations: any) =>
-      Promise.all(operations),
+    vi.mocked(prisma.$transaction).mockImplementation((callback: any) =>
+      callback({
+        quality_losses: prisma.quality_losses,
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
     );
   });
 
@@ -335,7 +341,10 @@ describe('quality-loss core services', () => {
 
   it('updates quality loss route targets for manual and external records and handles failures', async () => {
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) =>
-      cb({ quality_losses: { update: vi.fn() } }),
+      cb({
+        quality_losses: { update: vi.fn().mockResolvedValue({ id: 'ql-1' }) },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
     );
     await expect(
       QualityLossRouteUpdateService.updateByRouteId({

@@ -5,14 +5,23 @@ import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
+vi.mock('~/utils/prisma', () => {
+  const transactionClient = {
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     quality_records: {
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: { softDeleteReferences: vi.fn() },

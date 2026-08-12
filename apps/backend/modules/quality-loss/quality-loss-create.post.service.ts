@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
-import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { resolveQualityLossDepartmentWrite } from '~/modules/quality-loss/quality-loss-department-write';
+import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
   buildQualityLossCreateDataWithCanonical,

@@ -13,6 +13,9 @@ vi.mock('~/utils/prisma', () => ({
     quality_records: {
       findUnique: vi.fn(),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     vehicle_commissioning_issues: {
       findUnique: vi.fn(),
     },
@@ -143,7 +146,12 @@ describe('quality-loss-route-update.service', () => {
     const prisma = prismaModule.default;
 
     vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
-      const tx = { quality_losses: { update: vi.fn() } };
+      const tx = {
+        quality_losses: {
+          update: vi.fn().mockResolvedValue({ id: 'manual-1' }),
+        },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      };
       await cb(tx);
       return tx;
     });
@@ -178,7 +186,10 @@ describe('quality-loss-route-update.service', () => {
       workOrderNumber: 'WO-468624',
     });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
-      callback({ quality_losses: { update } }),
+      callback({
+        quality_losses: { update },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
     );
 
     const result = await QualityLossRouteUpdateService.updateByRouteId({
@@ -224,6 +235,7 @@ describe('quality-loss-route-update.service', () => {
       callback({
         departments: { findFirst },
         quality_losses: { update },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
 
@@ -260,7 +272,10 @@ describe('quality-loss-route-update.service', () => {
     const prisma = prismaModule.default;
     const update = vi.fn().mockResolvedValue({ id: 'manual-1' });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
-      callback({ quality_losses: { update } }),
+      callback({
+        quality_losses: { update },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
     );
 
     await QualityLossRouteUpdateService.updateByRouteId({
@@ -290,6 +305,7 @@ describe('quality-loss-route-update.service', () => {
       callback({
         departments: { findFirst: vi.fn().mockResolvedValue(null) },
         quality_losses: { update },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
 
@@ -448,7 +464,12 @@ describe('quality-loss-route-update.service', () => {
         respDept: 'QA',
       });
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
-        const tx = { quality_losses: { update: vi.fn() } };
+        const tx = {
+          quality_losses: {
+            update: vi.fn().mockResolvedValue({ id: 'manual-1' }),
+          },
+          quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+        };
         await cb(tx);
         return tx;
       });

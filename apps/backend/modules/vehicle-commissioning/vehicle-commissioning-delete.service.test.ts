@@ -14,6 +14,9 @@ vi.mock('~/utils/prisma', () => ({
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     $transaction: vi.fn(),
   },
 }));
@@ -46,6 +49,7 @@ describe('vehicleCommissioningDeleteService', () => {
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback({
         vehicle_commissioning_issues: prisma.vehicle_commissioning_issues,
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
   });

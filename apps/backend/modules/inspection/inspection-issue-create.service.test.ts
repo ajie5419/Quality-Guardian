@@ -51,6 +51,9 @@ function createTx(
         lossAmount: 100,
       })),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     sequences: {
       create: vi.fn(async () => {
         currentValue = 1;
@@ -263,6 +266,9 @@ describe('inspectionIssueCreateService', () => {
             lossAmount: 100,
           }),
         ),
+      },
+      quality_loss_index_jobs: {
+        createMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       sequences: {
         create: vi.fn(),

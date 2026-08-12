@@ -1,6 +1,6 @@
 import process from 'node:process';
 
-import { QualityLossIndexWorkerService } from '~/modules/quality-loss';
+import { QualityLossIndexWorkerService } from '~/modules/quality-loss/quality-loss-index-worker.service';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
