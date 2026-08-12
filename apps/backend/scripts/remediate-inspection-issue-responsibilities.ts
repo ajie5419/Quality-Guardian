@@ -2,6 +2,7 @@ import process from 'node:process';
 
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { redis } from '~/utils/redis';
 
 import {
   assertInspectionIssueResponsibilityRemediationSucceeded,
@@ -30,7 +31,11 @@ async function run() {
       'corrupted inspection issue responsibility remediation finished',
     );
   } finally {
+    // The remediation path opens Redis transitively (SupplierIdentityService ->
+    // MetricRefreshQueue). Without disconnecting, the one-shot process never
+    // exits and the deploy maintenance 600s timeout rolls back the release.
     await prisma.$disconnect();
+    redis.disconnect();
   }
 }
 
