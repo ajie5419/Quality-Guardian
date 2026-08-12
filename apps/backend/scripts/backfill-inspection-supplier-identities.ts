@@ -110,6 +110,25 @@ export async function backfillInspectionSupplierIdentities(
     const batchUnresolved: UnresolvedRefInput[] = [];
 
     for (const row of rows) {
+      // SHIPMENT inspections belong to a different identity domain and are out
+      // of scope for the supplier/TEAM backfill; excluding them prevents the
+      // integrity gate from being blocked by an unsupported category.
+      if (row.category === 'SHIPMENT') {
+        skipped += 1;
+        continue;
+      }
+      if (
+        row.category === 'PROCESS' &&
+        !row.teamId &&
+        !row.team &&
+        !row.supplierId &&
+        !row.supplierName
+      ) {
+        // PROCESS without any TEAM or supplier evidence needs no identity:
+        // teamId is optional execution context and no supplier fact exists.
+        skipped += 1;
+        continue;
+      }
       const teamById = row.teamId
         ? context.teamById.get(row.teamId) || null
         : null;

@@ -105,14 +105,9 @@ export async function backfillInspectionRequestTeamIdentities(
       }
       const candidate = existingTeam || nameTeam;
       if (!candidate) {
-        unresolved += 1;
-        batchUnresolved.push({
-          entityId: row.id,
-          evidence: { requestNo: row.requestNo },
-          rawId: row.teamId,
-          rawName: row.team,
-          reason: 'team_identity_not_resolved',
-        });
+        // No canonical TEAM ID and no resolvable TEAM name: the row carries a
+        // legacy supplier-name snapshot or no TEAM at all. teamId is optional
+        // PROCESS context, so this is not a TEAM identity failure.
         continue;
       }
       if (

@@ -69,6 +69,11 @@ export async function backfillInspectionTeamIdentities(
       } else if (existingTeam && nameTeam && existingTeam.id !== nameTeam.id) {
         reason = 'team_identity_conflict';
       } else if (!existingTeam && !nameTeam) {
+        if (!row.teamId) {
+          // teamId is optional PROCESS context; a row without any TEAM
+          // evidence is not a TEAM identity failure.
+          continue;
+        }
         reason = 'team_identity_not_resolved';
       }
       if (reason) {

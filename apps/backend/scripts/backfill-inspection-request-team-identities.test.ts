@@ -67,6 +67,27 @@ describe('inspection request TEAM identity backfill', () => {
     );
   });
 
+  it('skips a legacy supplier-name snapshot without a resolvable TEAM', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'request-1',
+          requestNo: 'IR-1',
+          team: '秦皇岛华沧智能科技有限公司',
+          teamId: null,
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      backfillInspectionRequestTeamIdentities(options, {
+        teamById: new Map(),
+        teamByName: new Map(),
+      }),
+    ).resolves.toMatchObject({ updated: 0, unresolved: 0 });
+    expect(prisma.qms_inspection_requests.updateMany).not.toHaveBeenCalled();
+  });
+
   it('preserves a valid existing TEAM ID when the name conflicts', async () => {
     vi.mocked(prisma.qms_inspection_requests.findMany)
       .mockResolvedValueOnce([
