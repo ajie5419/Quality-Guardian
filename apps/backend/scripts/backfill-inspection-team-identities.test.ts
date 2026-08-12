@@ -66,6 +66,27 @@ describe('inspection TEAM identity backfill', () => {
     );
   });
 
+  it('skips a PROCESS record without any TEAM evidence', async () => {
+    vi.mocked(prisma.inspections.findMany)
+      .mockResolvedValueOnce([
+        {
+          id: 'inspection-1',
+          serialNumber: 'IN-1',
+          team: null,
+          teamId: null,
+        },
+      ] as never)
+      .mockResolvedValueOnce([]);
+
+    await expect(
+      backfillInspectionTeamIdentities(options, {
+        teamById: new Map(),
+        teamByName: new Map(),
+      }),
+    ).resolves.toMatchObject({ updated: 0, unresolved: 0 });
+    expect(prisma.inspections.updateMany).not.toHaveBeenCalled();
+  });
+
   it('audits a conflicting canonical ID and name without overwriting it', async () => {
     vi.mocked(prisma.inspections.findMany)
       .mockResolvedValueOnce([
