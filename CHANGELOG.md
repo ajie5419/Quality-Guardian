@@ -32,7 +32,7 @@
 **执行内容：**
 
 - 根因修复：`quality_loss_index` 不再依赖每次发版启动异步全量 backfill。after-sales、inspection issue、vehicle commissioning 和 manual quality loss 四类来源均在各自事务内持久化 enqueue 索引任务，使源事实提交与待投影工作保持一致。
-- 新增独立索引 worker：任务领取使用 5 秒 lease；失败可重试并持久化错误。历史索引任务通过支持 dry-run/apply 的 enqueue 工具创建，再由独立 drain 工具消费，保留可审计的运维路径。
+- 新增独立索引 worker：每 5 秒轮询，任务领取使用 5 分钟 lease；失败可重试并持久化错误。历史索引任务通过支持 dry-run/apply 的 enqueue 工具创建，再由独立 drain 工具消费，保留可审计的运维路径。
 - 历史 enqueue、drain、投影重建和其他 remediation 均未接入同步 release maintenance；版本化 manifest/ledger、fail-closed preflight、固定 one-off 容器、有界阶段、清理与回滚继续只负责本版本声明的启动前置任务。
 
 **验证结果：**
@@ -41,7 +41,7 @@
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、Prisma validate、migration checks、发布 shell 行为测试与 `rtk git diff --check` 均通过。
 - 生产环境未执行 Prisma migration、release maintenance、历史 enqueue dry-run/apply 或独立 drain。
 
-**commits:** `d567fb65`（持久化质量损失索引任务）、`4715c88c`（outbox 覆盖）；`4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）、`f54859d7`（preflight fail-closed）、`6cf0f3e1`（维护文档与镜像断言）、`22cc54e4`（维护链路移除 Redis）、`8f08c0de`（阻断陈旧 compose one-off）。本次文档提交见后续 commit。
+**commits:** `d567fb65`（持久化质量损失索引任务）、`4715c88c`（outbox 覆盖）；`4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）、`f54859d7`（preflight fail-closed）、`6cf0f3e1`（维护文档与镜像断言）、`22cc54e4`（维护链路移除 Redis）、`8f08c0de`（阻断陈旧 compose one-off）、`55062b80`（文档记录）。
 
 **遗留问题：**
 
