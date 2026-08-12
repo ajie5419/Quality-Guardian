@@ -806,9 +806,5 @@ export async function remediateCorruptedInspectionIssueResponsibilities(
     );
   }
 
-  logger.info(
-    summary,
-    'corrupted inspection issue responsibility remediation finished',
-  );
   return summary;
 }

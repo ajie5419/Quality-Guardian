@@ -392,4 +392,72 @@ describe('inspection request responsibility backfill', () => {
       requestResponsibilityIndex,
     );
   });
+
+  it('does not run the one-time historical identity sidecar bootstrap', () => {
+    const maintenanceScript = readFileSync(
+      resolve(backendRoot(), 'scripts/run-release-maintenance.sh'),
+      'utf8',
+    );
+
+    expect(maintenanceScript).not.toContain(
+      'scripts/historical-identity-sidecar-bootstrap.ts',
+    );
+  });
+
+  it('keeps supplier batch progress at debug while preserving one terminal summary', () => {
+    const scriptDirectory = resolve(backendRoot(), 'scripts');
+    const supplierScripts = [
+      {
+        file: 'backfill-inspection-supplier-identities.ts',
+        summary: 'inspection supplier identity audit/backfill finished',
+      },
+      {
+        file: 'backfill-after-sales-supplier-identities.ts',
+        summary: 'after-sales supplier identity audit/backfill finished',
+      },
+      {
+        file: 'backfill-quality-record-supplier-identities.ts',
+        summary: 'supplier identity audit/backfill finished',
+      },
+    ];
+
+    for (const { file, summary } of supplierScripts) {
+      const source = readFileSync(resolve(scriptDirectory, file), 'utf8');
+      expect(source).toMatch(/logger\.debug\([\s\S]*?batch finished/u);
+      expect(source).toMatch(
+        /logger\.info\([\s\S]*?(?:qualityRecordSummary|summary)/u,
+      );
+      expect(source).toContain(summary);
+    }
+  });
+
+  it('emits responsibility terminal summaries only from CLI entrypoints', () => {
+    const scriptDirectory = resolve(backendRoot(), 'scripts');
+    const summaries = [
+      {
+        entrypoint: 'backfill-inspection-request-responsibilities.ts',
+        service: 'inspection-request-responsibility-backfill.ts',
+        text: 'inspection request responsibility backfill finished',
+      },
+      {
+        entrypoint: 'backfill-inspection-issue-responsibilities.ts',
+        service: 'inspection-issue-responsibility-backfill.ts',
+        text: 'inspection issue responsibility backfill finished',
+      },
+      {
+        entrypoint: 'remediate-inspection-issue-responsibilities.ts',
+        service: 'inspection-issue-responsibility-remediation.ts',
+        text: 'corrupted inspection issue responsibility remediation finished',
+      },
+    ];
+
+    for (const { entrypoint, service, text } of summaries) {
+      expect(
+        readFileSync(resolve(scriptDirectory, entrypoint), 'utf8'),
+      ).toContain(text);
+      expect(
+        readFileSync(resolve(scriptDirectory, service), 'utf8'),
+      ).not.toContain(text);
+    }
+  });
 });

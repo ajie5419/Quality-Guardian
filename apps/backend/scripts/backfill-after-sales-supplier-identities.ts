@@ -150,7 +150,7 @@ export async function backfillAfterSalesSupplierIdentities(
         unresolved: batchUnresolved,
       });
     }
-    logger.info(
+    logger.debug(
       {
         batch: batches,
         cursorId,

@@ -291,7 +291,7 @@ export async function backfillInspectionSupplierIdentities(
     } else {
       updated += batchUpdates.length;
     }
-    logger.info(
+    logger.debug(
       {
         batch: batches,
         cursorId,
