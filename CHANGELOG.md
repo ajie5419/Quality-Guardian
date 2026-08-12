@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.8](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.7...qgs-v0.24.8) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** make TEAM identity source remediation idempotent ([fae2d36](https://github.com/ajie5419/Quality-Guardian/commit/fae2d36bbe353aa10991308ebce46b964e892596))
+* **@qgs/backend:** make TEAM identity source remediation idempotent ([03d820c](https://github.com/ajie5419/Quality-Guardian/commit/03d820c9d3a77cba3a91a0e354942e2ebf0093c4))
+
 ## [0.24.7](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.6...qgs-v0.24.7) (2026-08-12)
 
 
