@@ -10,6 +10,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     departments: { findMany: vi.fn() },
     dictionaries: { findFirst: vi.fn(), findMany: vi.fn() },
+    quality_records: { updateMany: vi.fn() },
     supplier_identity_links: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -62,6 +63,9 @@ describe('remediateTeamIdentitySources', () => {
     vi.mocked(prisma.departments.findMany).mockResolvedValue([]);
     vi.mocked(prisma.suppliers.findMany).mockResolvedValue([]);
     vi.mocked(prisma.suppliers.updateMany).mockResolvedValue({ count: 0 });
+    vi.mocked(prisma.quality_records.updateMany).mockResolvedValue({
+      count: 0,
+    });
     vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.suppliers.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.$transaction).mockImplementation((callback) =>
@@ -317,6 +321,48 @@ describe('remediateTeamIdentitySources', () => {
         supplierId: 'SUP-1769076104551-s4sh',
       },
     });
+  });
+
+  it('aligns linked quality records to the confirmed TEAM supplier', async () => {
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: '卢龙县强盛科技有限公司',
+    } as never);
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
+    vi.mocked(prisma.quality_records.updateMany).mockImplementation((async ({
+      where,
+    }: {
+      where: { inspection?: { teamId?: string } };
+    }) => ({
+      count:
+        where.inspection?.teamId === '0e9b4248568311f1881c00163e37355f' ? 1 : 0,
+    })) as never);
+
+    const summary = await remediateTeamIdentitySources({ mode: 'apply' });
+
+    expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        inspection: {
+          isDeleted: false,
+          teamId: '0e9b4248568311f1881c00163e37355f',
+        },
+        NOT: { supplierId: 'SUP-1769076104551-s4sh' },
+      },
+      data: {
+        supplierId: 'SUP-1769076104551-s4sh',
+        supplierName: '卢龙县强盛科技有限公司',
+      },
+    });
+    expect(summary.qualityRecordsAligned).toEqual([
+      {
+        supplierId: 'SUP-1769076104551-s4sh',
+        teamId: '0e9b4248568311f1881c00163e37355f',
+        teamName: '卢龙县强盛科技有限公司',
+      },
+    ]);
   });
 
   it('runs before the supplier identity backfill in release maintenance', () => {
