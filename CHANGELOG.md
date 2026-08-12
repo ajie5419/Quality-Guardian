@@ -27,6 +27,49 @@
 
 ---
 
+## [0.24.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.0...qgs-v0.24.1) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** apply confirmed legacy inspection identity corrections ([667afde](https://github.com/ajie5419/Quality-Guardian/commit/667afde6bf2e21f7fed4227d4e5cdaf8b5788edd))
+* **@qgs/backend:** apply confirmed legacy inspection identity corrections ([a90115f](https://github.com/ajie5419/Quality-Guardian/commit/a90115fe8d690dc5ef0af7d26771d7e95b99028c))
+* **@qgs/backend:** complete confirmed TEAM identity sources in maintenance ([f364e0e](https://github.com/ajie5419/Quality-Guardian/commit/f364e0e2e6798b92bd5193e14daffeaf8ee5d7b4))
+* **@qgs/backend:** complete confirmed TEAM identity sources in maintenance ([0242feb](https://github.com/ajie5419/Quality-Guardian/commit/0242febf8a261da85f30dbd265d0f7ce3db9b79e))
+* **@qgs/backend:** harden issue responsibility updates and NC allocation ([80dc2f4](https://github.com/ajie5419/Quality-Guardian/commit/80dc2f45d50fd879a2862dd035ff76d99153b9c4))
+* **@qgs/backend:** remediate issue responsibility data ([fcb4044](https://github.com/ajie5419/Quality-Guardian/commit/fcb40440c3286d58fafa2cf24056487bb43b87b7))
+* **@qgs/backend:** resolve migration recovery script path in tests ([8013512](https://github.com/ajie5419/Quality-Guardian/commit/80135121373a1383d154dce1bbc8cdb89828e8e8))
+* **@qgs/backend:** stop gating on legacy non-TEAM identity rows ([7efebe4](https://github.com/ajie5419/Quality-Guardian/commit/7efebe4aadb8cf9f271bb9dd86f92f3738e37b3b))
+* **@qgs/backend:** stop gating on legacy non-TEAM identity rows ([59ba7df](https://github.com/ajie5419/Quality-Guardian/commit/59ba7dfe09ecb349d711e6df1bb113cde1eb5c3e))
+* **@qgs/weapp:** align entry responsibility selection contract ([ed8508f](https://github.com/ajie5419/Quality-Guardian/commit/ed8508f51f53690a8664a623d956467b550e2c3a))
+* **@qgs/weapp:** show reinspection passed on my records ([99a9d11](https://github.com/ajie5419/Quality-Guardian/commit/99a9d11d52c375f9e4f2f6368ae113876b74a906))
+* **@qgs/web-antd:** align entry responsibility selection contract ([d775ffc](https://github.com/ajie5419/Quality-Guardian/commit/d775ffc384285daa09632734100dcc34de62daaa))
+* **@qgs/web-antd:** resolve legacy close responsibility department uniquely ([cabfdf1](https://github.com/ajie5419/Quality-Guardian/commit/cabfdf1b163b5766e790af35659063987612c7c0))
+* **@qgs/web-antd:** show reinspection passed on inspection records ([311e3a7](https://github.com/ajie5419/Quality-Guardian/commit/311e3a7c78c46a4c4d5c9deb189c39edcc727085))
+* atomically audit supplier identity backfill changes ([ebc98eb](https://github.com/ajie5419/Quality-Guardian/commit/ebc98ebabaf2c631b5451136c1312523345cc22f))
+* block unresolved external process teams in backfill ([d57a830](https://github.com/ajie5419/Quality-Guardian/commit/d57a8303b6da82acdcf090e7a410bc70082f1a82))
+* inspection responsibility, reinspection display and release hardening ([e617585](https://github.com/ajie5419/Quality-Guardian/commit/e61758582a879ca64b33078f5a744e098fed21bf))
+* load department sources for link conflict checks ([4fa2080](https://github.com/ajie5419/Quality-Guardian/commit/4fa20802d4c314610fe23772507c616721c2faf1))
+* **project:** align inspection issue entry forms ([928d666](https://github.com/ajie5419/Quality-Guardian/commit/928d6665ec91646f646b56a533f3a3cd9bc8485a))
+* **project:** allow direct inspection department responsibility ([88bc724](https://github.com/ajie5419/Quality-Guardian/commit/88bc724b91ff8c45cf46bc567ffb9a47068960a9))
+* **project:** block unresolved supplier identity releases ([5d82561](https://github.com/ajie5419/Quality-Guardian/commit/5d8256135af0918da406cd08ca0f44b99147b986))
+* **project:** bound supplier identity option queries ([bd5c59c](https://github.com/ajie5419/Quality-Guardian/commit/bd5c59c29c4b555468a5c975a492a0c7521b62b0))
+* **project:** clear internal process request suppliers ([a4f08a7](https://github.com/ajie5419/Quality-Guardian/commit/a4f08a737344c9ad7befecd8836e65c8a9bca1ab))
+* **project:** enforce explicit supplier team links ([f172064](https://github.com/ajie5419/Quality-Guardian/commit/f17206413a69350f2dfaf944ea2dda1d0a90cbc7))
+* **project:** persist inspection request responsibility ([40070cf](https://github.com/ajie5419/Quality-Guardian/commit/40070cf9db08ebaac01a37139616a0a67599c0f3))
+* **project:** recover failed responsibility migration safely ([2051341](https://github.com/ajie5419/Quality-Guardian/commit/2051341fe2e475fe33c2e91dbfe9bac448834d74))
+* **project:** restore inspector work order confirmation ([de561dc](https://github.com/ajie5419/Quality-Guardian/commit/de561dc6f59bc7b87594b34b7409d3351c9d1012))
+* **project:** search supplier candidates before sources ([906f788](https://github.com/ajie5419/Quality-Guardian/commit/906f7884c126396e07571a94658af4927ba7ba27))
+* **project:** select inspection responsibility departments directly ([5311921](https://github.com/ajie5419/Quality-Guardian/commit/5311921f0049eaa2a1a85b799c986c613b2c175c))
+* **project:** unify explicit request responsibility contract ([6744d71](https://github.com/ajie5419/Quality-Guardian/commit/6744d716d1ebd66d2a58ed9ab2a918cddece6ebd))
+* **project:** unify inspection issue creation contract ([9ddce79](https://github.com/ajie5419/Quality-Guardian/commit/9ddce7965f619fd7109ec00b9a1cb81eff841a84))
+* **project:** unify inspection request responsibility context ([f500973](https://github.com/ajie5419/Quality-Guardian/commit/f500973c737e309e6b38ef14f7ed35b6c063f4e3))
+* **project:** unify inspection responsibility inputs ([d84297c](https://github.com/ajie5419/Quality-Guardian/commit/d84297c151fbb79e7acbd90c48a12dd6b850d73a))
+* **project:** validate process supplier links by source ([b9a0789](https://github.com/ajie5419/Quality-Guardian/commit/b9a0789123f83b1e16a6f738847177ee67e07a9e))
+* protect historical facts when restoring supplier links ([38e379b](https://github.com/ajie5419/Quality-Guardian/commit/38e379bf40fb638c47c024a085df6fb73bb2b081))
+* reject dual-source teams across supplier identity paths ([997e699](https://github.com/ajie5419/Quality-Guardian/commit/997e699fef45fa44b24de1ee50f45cc2573b8803))
+* restrict supplier team query to valid identity intersection ([f9e325a](https://github.com/ajie5419/Quality-Guardian/commit/f9e325a1ed24ad2d488288208082f96129c526ad))
+
 ### 2026-08-12 功能：检验记录复检合格展示
 
 **执行内容：**
