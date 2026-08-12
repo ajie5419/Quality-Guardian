@@ -312,7 +312,7 @@ export const SupplierIdentityService = {
     const id = normalizeId(supplierId);
     if (!id) return null;
     const supplier = await client.suppliers.findFirst({
-      select: { id: true, name: true },
+      select: { category: true, id: true, name: true },
       where: { id, isDeleted: false },
     });
     if (!supplier) {

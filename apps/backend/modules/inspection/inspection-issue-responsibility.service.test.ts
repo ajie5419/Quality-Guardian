@@ -43,6 +43,7 @@ describe('inspection issue responsibility resolver', () => {
 
   it('resolves an external supplier from its canonical ID', async () => {
     vi.mocked(SupplierIdentityService.resolveSupplierById).mockResolvedValue({
+      category: 'Outsourcing',
       id: 'supplier-1',
       name: 'Supplier A',
     });

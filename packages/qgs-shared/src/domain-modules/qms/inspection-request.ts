@@ -1,3 +1,5 @@
+import { SUPPLIER_CATEGORY } from '../../enums/qms-types';
+
 export const INSPECTION_REQUEST_STATUS = {
   CANCELLED: 'CANCELLED',
   CLOSED: 'CLOSED',
@@ -29,6 +31,24 @@ const STATION_SELECTION_MODE_SET = new Set(['ALL', 'PARTIAL']);
 
 export function normalizeInspectionRequestText(value: unknown): string {
   return String(value ?? '').trim();
+}
+
+/**
+ * V2 request responsibility is chosen explicitly. The external supplier list
+ * and server-side validation must share this type-to-category mapping.
+ */
+export function getInspectionRequestResponsibilitySupplierCategory(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
+  if (responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER) {
+    return SUPPLIER_CATEGORY.SUPPLIER;
+  }
+  if (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return SUPPLIER_CATEGORY.OUTSOURCING;
+  }
+  return null;
 }
 
 export function mergeInspectionProcessNames(

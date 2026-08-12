@@ -107,18 +107,6 @@ export const inspectionRequestCreateV2BodySchema =
         body.responsibilityType ===
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
       const isExternal = !isInternal;
-      if (
-        body.category === 'INCOMING' &&
-        body.responsibilityType !==
-          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
-      ) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            'Incoming inspection requests require SUPPLIER responsibility',
-          path: ['responsibilityType'],
-        });
-      }
       if (isExternal && !body.supplierId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,

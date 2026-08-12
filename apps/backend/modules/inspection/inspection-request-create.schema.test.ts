@@ -82,6 +82,24 @@ describe('inspection request create schema', () => {
     expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
   });
 
+  it('accepts INCOMING internal responsibility without a supplier or execution TEAM', () => {
+    const parsed = inspectionRequestCreateV2BodySchema.parse({
+      ...buildValidPayload(),
+      category: 'INCOMING',
+      componentName: undefined,
+      partId: undefined,
+      processId: 'incoming-process-1',
+      requestedPartName: 'Unregistered bearing',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-quality',
+      supplierId: undefined,
+      team: undefined,
+      teamId: undefined,
+    });
+
+    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  });
+
   it('rejects an incoming request with both material identity forms', () => {
     expect(() =>
       inspectionRequestCreateV2BodySchema.parse({

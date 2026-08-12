@@ -1,5 +1,9 @@
 import type { Prisma } from '@prisma/client';
 
+import {
+  getInspectionRequestResponsibilitySupplierCategory,
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+} from '@qgs/shared';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 
@@ -28,18 +32,9 @@ export async function resolveV2RequestResponsibility(
     payload.v2Responsibility,
     tx,
   );
-  if (
-    payload.category === 'INCOMING' &&
-    responsibility.responsibilityType !== 'SUPPLIER'
-  ) {
-    throw new BusinessError(
-      'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
-      'Incoming inspection requests require SUPPLIER responsibility',
-      400,
-    );
-  }
   const isInternal =
-    responsibility.responsibilityType === 'INTERNAL_DEPARTMENT';
+    responsibility.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
   if (!isInternal && payload.v2Responsibility.teamId) {
     throw new BusinessError(
       'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
@@ -54,6 +49,22 @@ export async function resolveV2RequestResponsibility(
           tx,
         )
       : null;
+  const supplierCategory = getInspectionRequestResponsibilitySupplierCategory(
+    responsibility.responsibilityType,
+  );
+  if (supplierCategory) {
+    const supplier = await SupplierIdentityService.resolveSupplierById(
+      responsibility.supplierId,
+      tx,
+    );
+    if (!supplier || supplier.category !== supplierCategory) {
+      throw new BusinessError(
+        'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
+        'Supplier category does not match responsibilityType',
+        400,
+      );
+    }
+  }
   await assertInspectionRequestResponsibilityPolicy({
     client: tx,
     responsibleDepartmentId: responsibility.responsibleDepartmentId,

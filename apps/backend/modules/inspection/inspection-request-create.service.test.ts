@@ -224,36 +224,38 @@ describe('inspectionRequestCreateService', () => {
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
-  it('rejects a V2 incoming request without SUPPLIER responsibility', async () => {
+  it('persists a V2 incoming request with direct internal responsibility', async () => {
+    const create = vi.fn().mockResolvedValue(mockRequest);
     (prisma.$transaction as any).mockImplementation(async (callback: any) =>
-      callback({ qms_inspection_requests: { create: vi.fn() } }),
-    );
-    resolveV2Responsibility.mockRejectedValueOnce(
-      Object.assign(new Error('invalid request responsibility'), {
-        code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
-      }),
+      callback({ qms_inspection_requests: { create } }),
     );
 
-    await expect(
-      InspectionRequestCreateService.createRequest(
-        {} as any,
-        { id: 'user-1', username: 'admin' } as any,
-        {
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'INCOMING',
+        partId: 'part-1',
+        processId: 'process-1',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-quality',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
           category: 'INCOMING',
-          partId: 'part-1',
-          processId: 'process-1',
-          supplierId: 'supplier-1',
-          responsibilityType: 'OUTSOURCING_UNIT',
-          responsibleDepartmentId: 'dept-purchasing',
-          workOrderNumber: 'WO-001',
-        },
-        false,
-        'V2',
-      ),
-    ).rejects.toMatchObject({
-      code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
-    });
-    expect(prisma.$transaction).toHaveBeenCalled();
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-quality',
+          supplierId: null,
+          teamId: null,
+        }),
+      }),
+    );
   });
 
   it('rejects a V2 process that is hidden for the requested category', async () => {

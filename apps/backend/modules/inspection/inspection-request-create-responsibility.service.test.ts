@@ -1,3 +1,4 @@
+import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 
@@ -6,7 +7,10 @@ import { resolveV2RequestResponsibility } from './inspection-request-create-resp
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
 vi.mock('~/modules/supplier-identity', () => ({
-  SupplierIdentityService: { resolveTeamById: vi.fn() },
+  SupplierIdentityService: {
+    resolveSupplierById: vi.fn(),
+    resolveTeamById: vi.fn(),
+  },
 }));
 
 vi.mock('./inspection-issue-responsibility.service', () => ({
@@ -53,6 +57,73 @@ describe('resolveV2RequestResponsibility', () => {
       responsibilityType: 'INTERNAL_DEPARTMENT',
       responsibleDepartmentId: 'dept-machining',
       teamId: undefined,
+    });
+  });
+
+  it('allows INCOMING external responsibility when its supplier category matches', async () => {
+    vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartment: 'Production OBU',
+      responsibleDepartmentId: 'dept-production',
+      supplierId: 'supplier-outsourcing',
+      supplierName: 'Outsourcing Supplier',
+    });
+    vi.mocked(
+      SupplierIdentityService.resolveSupplierById,
+    ).mockResolvedValueOnce({
+      category: SUPPLIER_CATEGORY.OUTSOURCING,
+      id: 'supplier-outsourcing',
+      name: 'Outsourcing Supplier',
+    });
+
+    await expect(
+      resolveV2RequestResponsibility(
+        {
+          category: 'INCOMING',
+          v2Responsibility: {
+            responsibilityType: 'OUTSOURCING_UNIT',
+            responsibleDepartmentId: 'dept-production',
+            supplierId: 'supplier-outsourcing',
+          },
+        },
+        {} as any,
+      ),
+    ).resolves.toMatchObject({
+      supplierId: 'supplier-outsourcing',
+      teamId: null,
+    });
+  });
+
+  it('rejects an external supplier whose category does not match the selected type', async () => {
+    vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: 'Quality Department',
+      responsibleDepartmentId: 'dept-quality',
+      supplierId: 'supplier-outsourcing',
+      supplierName: 'Outsourcing Supplier',
+    });
+    vi.mocked(
+      SupplierIdentityService.resolveSupplierById,
+    ).mockResolvedValueOnce({
+      category: SUPPLIER_CATEGORY.OUTSOURCING,
+      id: 'supplier-outsourcing',
+      name: 'Outsourcing Supplier',
+    });
+
+    await expect(
+      resolveV2RequestResponsibility(
+        {
+          category: 'PROCESS',
+          v2Responsibility: {
+            responsibilityType: 'SUPPLIER',
+            responsibleDepartmentId: 'dept-quality',
+            supplierId: 'supplier-outsourcing',
+          },
+        },
+        {} as any,
+      ),
+    ).rejects.toMatchObject({
+      code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
     });
   });
 });

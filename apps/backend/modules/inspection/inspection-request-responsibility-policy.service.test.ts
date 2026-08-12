@@ -19,20 +19,15 @@ describe('inspection request responsibility policy', () => {
     vi.clearAllMocks();
   });
 
-  it('rejects an external type with a department outside its fixed policy', async () => {
-    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
-      { businessUnit: null, id: 'dept-production', name: '生产 OBU' },
-    ]);
-
+  it('allows any active canonical department for an external responsibility type', async () => {
     await expect(
       assertInspectionRequestResponsibilityPolicy({
         client: {} as any,
         responsibilityType: 'OUTSOURCING_UNIT',
         responsibleDepartmentId: 'dept-other',
       }),
-    ).rejects.toMatchObject({
-      code: 'INSPECTION_REQUEST_RESPONSIBILITY_POLICY_MISMATCH',
-    });
+    ).resolves.toBeUndefined();
+    expect(DeptService.findActiveByIdsOrNames).not.toHaveBeenCalled();
   });
 
   it('rejects an internal TEAM whose unique department differs from the payload', async () => {

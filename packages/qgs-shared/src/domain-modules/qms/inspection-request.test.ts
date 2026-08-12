@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildInspectionRecordPayloadCore,
   formatInspectionStationSelection,
+  getInspectionRequestResponsibilitySupplierCategory,
   INCOMING_INSPECTION_PROCESS_NAME,
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   mapInspectionRequestRecord,
@@ -208,6 +209,18 @@ describe('inspection station selection', () => {
 });
 
 describe('resolveInspectionRequestIssueResponsibility', () => {
+  it('maps external responsibility types to the supplier option category', () => {
+    expect(getInspectionRequestResponsibilitySupplierCategory('SUPPLIER')).toBe(
+      'Supplier',
+    );
+    expect(
+      getInspectionRequestResponsibilitySupplierCategory('OUTSOURCING_UNIT'),
+    ).toBe('Outsourcing');
+    expect(
+      getInspectionRequestResponsibilitySupplierCategory('INTERNAL_DEPARTMENT'),
+    ).toBeNull();
+  });
+
   it.each([
     ['采购部', INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER],
     ['生产 OBU', INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT],
