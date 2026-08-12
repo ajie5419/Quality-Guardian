@@ -403,6 +403,7 @@ describe('inspection issue responsibility remediation', () => {
         processed: 3,
         skipped: 0,
         unresolved: 3,
+        unresolvedSamples: [],
       }),
     ).toThrow('unresolved=3, conflicts=2, concurrentChanges=1');
     expect(() =>
@@ -415,6 +416,7 @@ describe('inspection issue responsibility remediation', () => {
         processed: 1,
         skipped: 0,
         unresolved: 1,
+        unresolvedSamples: [],
       }),
     ).toThrow('unresolved=1');
   });

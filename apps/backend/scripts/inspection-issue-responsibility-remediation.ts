@@ -66,6 +66,14 @@ export type InspectionIssueResponsibilityRemediationSummary = {
   processed: number;
   skipped: number;
   unresolved: number;
+  unresolvedSamples: Array<{
+    id: string;
+    reason: string;
+    responsibleDepartment: null | string;
+    responsibleDepartmentId: null | string;
+    supplierId: null | string;
+    supplierName: null | string;
+  }>;
 };
 
 /**
@@ -555,6 +563,7 @@ export async function remediateCorruptedInspectionIssueResponsibilities(
     processed: 0,
     skipped: 0,
     unresolved: 0,
+    unresolvedSamples: [],
   };
   let cursorId: string | undefined;
 
@@ -690,6 +699,16 @@ export async function remediateCorruptedInspectionIssueResponsibilities(
         summary.unresolved += 1;
         if (resolution.reason.startsWith('CONFLICTING_'))
           summary.conflicts += 1;
+        if (summary.unresolvedSamples.length < 20) {
+          summary.unresolvedSamples.push({
+            id: issue.id,
+            reason: resolution.reason,
+            responsibleDepartment: issue.responsibleDepartment,
+            responsibleDepartmentId: issue.responsibleDepartmentId,
+            supplierId: issue.supplierId,
+            supplierName: issue.supplierName,
+          });
+        }
         unresolvedAudits.push({
           entityId: issue.id,
           evidence,
