@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.4](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.3...qgs-v0.24.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** create confirmed TEAM supplier links in maintenance ([63ade2c](https://github.com/ajie5419/Quality-Guardian/commit/63ade2cb620555310e0fc644305f8049fffca609))
+* **@qgs/backend:** create confirmed TEAM supplier links in maintenance ([149e858](https://github.com/ajie5419/Quality-Guardian/commit/149e8583eb1f2fbd2d15edd6abf7d7fe67ab7ea2))
+
 ## [0.24.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.2...qgs-v0.24.3) (2026-08-12)
 
 
