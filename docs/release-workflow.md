@@ -175,10 +175,27 @@ on:
 - 构建 frontend Docker image。
 - 推送镜像到 ACR。
 - SSH 到 ECS 更新 compose 镜像 tag。
-- 执行 Prisma migration。
-- 启动 backend/frontend。
-- 执行健康检查。
-- 启动发布后维护任务。
+- 执行 Prisma migration 和本版本启动前置的 release maintenance。
+- 启动 backend/frontend 并执行健康检查。
+
+### 发布前置数据任务
+
+发布执行器的顺序是：preflight -> 拉取镜像 -> 启动 Redis -> 停止旧 backend -> Prisma migration -> release maintenance -> 启动服务 -> healthcheck。maintenance 不是发布后的后台清理；它只能包含新版本启动前必须完成的幂等数据任务。
+
+任务定义位于 `apps/backend/scripts/release-maintenance-manifest.ts`，由 `apps/backend/scripts/run-release-maintenance.ts` 读取并写入 `release_maintenance_tasks` ledger：
+
+- 只连续执行 manifest 中声明、且 ledger 尚未 `COMPLETED` 的任务；历史任务不会被每次发布重放。
+- 每项任务以 `taskKey + revision` 定位，并保存 SHA-256 checksum。完成且 checksum 一致时跳过；失败或 `RUNNING` 租约过期时在下一次发布重试。
+- 同一 `taskKey + revision` 的 checksum 漂移会阻断发布。修复必须新增 revision，不能修改已完成记录。
+- 历史 remediation、historical identity sidecar、投影重建、窗口/评分对账均为独立运维任务，禁止加入同步发布 manifest。
+
+新增 release maintenance 前，必须确认它是该版本的启动前置条件、实现幂等，并提供稳定 taskKey、递增 revision、SHA-256 checksum 和测试。否则应改为独立运维命令或持久队列 worker。
+
+### 有界执行与回滚
+
+远端发布统一由 `scripts/deploy/run-remote-release.sh` 执行。它使用固定容器名 `qms-release-migration` 与 `qms-release-maintenance`，对镜像拉取、migration、maintenance 和健康检查设置上限；失败或超时后清理固定容器、恢复备份 compose 配置并拉起旧服务。preflight 会在停止 backend 前拒绝已有的固定 one-off 容器，避免误杀其他发布。
+
+如果生产发布失败，重试前必须人工确认失败原因、检查 compose 回滚和数据库状态，并定向清理已确认属于该失败发布的旧随机名 one-off 容器。不得直接重跑发布，更不得使用宽泛 Docker prune 或跳过 maintenance。
 
 ## 常见误区
 
@@ -202,6 +219,8 @@ on:
 
 - 发布 PR CI 失败：先修代码或测试，再等 release-please 更新发布 PR；不要强合。
 - deploy 失败：查看失败 step 日志，优先确认镜像构建、ACR 登录、ECS SSH、Prisma migration、健康检查。
+- maintenance 失败、租约未过期或 checksum 漂移：保持 fail-closed。先确认 ledger 状态、任务版本与 checksum；失败/过期租约可由后续发布重新领取，漂移必须新增 revision。不要删除 ledger 记录规避门禁。
+- 发现旧随机名 migration/maintenance 容器：先人工核对来源和日志，再定向删除确认残留；固定容器残留会被 preflight 拒绝，清理后才能重试。
 - migration 失败：不要手动改生产表结构，必须通过 Prisma migration 或既有 deploy baseline 逻辑处理。
 - deploy 成功前，不要对外宣称发布完成。
 

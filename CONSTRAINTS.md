@@ -25,7 +25,9 @@
 6. **必须**使用 cuid 作为主键生成策略（禁止 Date.now()）
 7. **必须**分页接口限制 pageSize 上限（max 100）
 8. **必须**原始 SQL 使用参数化查询，防止注入
-9. **必须**在生产发布流程中把 migration 和幂等数据回填连续执行；依赖快照/物化指标的新功能不得要求人工进入生产容器补跑脚本
+9. **必须**在生产发布流程中把 migration 和本版本 manifest 声明、且 release ledger 尚未完成的启动前置幂等数据任务连续执行；依赖快照/物化指标的新功能不得要求人工进入生产容器补跑脚本
+10. **禁止**把历史 remediation、sidecar 初始化或重建、投影重建、窗口或评分对账加入同步 release maintenance；这些任务必须走独立、可审计的运维流程
+11. **必须**为 release maintenance 使用稳定的 `taskKey`、递增 `revision` 和 SHA-256 checksum；已完成 revision 的定义不得原地修改，checksum 漂移必须阻断发布
 
 ## Git Hooks 与质量门禁
 

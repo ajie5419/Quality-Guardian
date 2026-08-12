@@ -27,6 +27,30 @@
 
 ---
 
+### 2026-08-13 修复：版本化发布维护与有界发布执行
+
+**执行内容：**
+
+- 根因修复：废止“每次发布重跑永久 shell 清单”的模式。release maintenance 改为 versioned manifest + `release_maintenance_tasks` 持久化 ledger；常规发布仅执行本版本 manifest 声明且尚未完成的启动前置幂等数据任务。
+- 每项任务使用稳定 `taskKey`、递增 `revision` 与 SHA-256 checksum。完成记录跳过，失败或过期租约可重试，checksum 漂移 fail-closed；修改已完成任务必须新增 revision。
+- 明确禁止将历史 remediation、historical identity sidecar、投影重建、窗口/评分对账加入同步发布；这些工作必须独立审批和执行。
+- 远端发布器已采用固定 migration/maintenance 容器、preflight、阶段超时、失败清理和 compose 回滚。生产重试前须人工确认失败原因及数据库状态，并定向清理已确认的旧随机名残留。
+- Docker production image 增加对 release maintenance TypeScript 入口、manifest 和 runner 的存在性断言，避免 deploy 调用未随镜像发布的维护实现。
+
+**验证结果：**
+
+- 后端 release maintenance 定向 Vitest：`2/2` 文件、`9/9` 用例通过；远端发布 shell 行为测试通过（覆盖成功、migration 失败、maintenance 超时、健康检查失败、固定容器残留和 preflight 异常）。
+- `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh` 与 `rtk git diff --check` 通过。
+- 生产 Prisma migration、maintenance 执行、超时清理和回滚演练尚未执行。
+
+**commits:** `4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）；本文档与镜像断言提交见本次后续独立 commit。
+
+**遗留问题：**
+
+- 首次生产重试必须先人工检查现存随机名 one-off 容器、RDS 活动事务及 compose 回滚状态；禁止以删除 ledger、跳过 maintenance 或宽泛 Docker prune 方式绕过失败。
+
+---
+
 ### 2026-08-12 修复：发布维护全量 sidecar 重建与日志噪声
 
 **执行内容：**
