@@ -16,7 +16,7 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
-    suppliers: { findFirst: vi.fn(), findMany: vi.fn() },
+    suppliers: { findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
     $transaction: vi.fn(),
     team_identity_sources: {
       create: vi.fn(),
@@ -61,6 +61,7 @@ describe('remediateTeamIdentitySources', () => {
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([]);
     vi.mocked(prisma.departments.findMany).mockResolvedValue([]);
     vi.mocked(prisma.suppliers.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.suppliers.updateMany).mockResolvedValue({ count: 0 });
     vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.suppliers.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.$transaction).mockImplementation((callback) =>
@@ -242,6 +243,27 @@ describe('remediateTeamIdentitySources', () => {
         sourceType: 'SUPPLIER',
         teamId: '0e9b4248568311f1881c00163e37355f',
       },
+    });
+  });
+
+  it('sets the missing outsourcing mode for confirmed suppliers before linking', async () => {
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: '卢龙县强盛科技有限公司',
+    } as never);
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
+
+    await remediateTeamIdentitySources({ mode: 'apply' });
+
+    expect(prisma.suppliers.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'SUP-1769076104551-s4sh',
+        isDeleted: false,
+        outsourcingMode: null,
+      },
+      data: { outsourcingMode: 'IN_HOUSE_TEAM' },
     });
   });
 

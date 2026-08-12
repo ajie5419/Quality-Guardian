@@ -46,6 +46,21 @@ const CONFIRMED_TEAM_SUPPLIER_LINKS: Array<{
   },
 ];
 
+/**
+ * Confirmed supplier master-data corrections: these Outsourcing suppliers are
+ * in-house/on-site teams but their outsourcing mode was never set, which made
+ * them ineligible as TEAM identity sources.
+ */
+const CONFIRMED_SUPPLIER_OUTSOURCING_MODE_FIXES: Array<{
+  outsourcingMode: 'IN_HOUSE_TEAM';
+  supplierId: string;
+}> = [
+  { outsourcingMode: 'IN_HOUSE_TEAM', supplierId: 'SUP-1769076104551-s4sh' },
+  { outsourcingMode: 'IN_HOUSE_TEAM', supplierId: 'SUP-2026--XAOX2' },
+  { outsourcingMode: 'IN_HOUSE_TEAM', supplierId: 'SUP-1769076104249-hbq4' },
+  { outsourcingMode: 'IN_HOUSE_TEAM', supplierId: 'SUP-1769076104529-s2x5' },
+];
+
 type SourcePlan = {
   sourceId: string;
   sourceType: 'DEPARTMENT' | 'SUPPLIER';
@@ -262,6 +277,16 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
   }
 
   if (options.mode === 'apply') {
+    for (const fix of CONFIRMED_SUPPLIER_OUTSOURCING_MODE_FIXES) {
+      await prisma.suppliers.updateMany({
+        where: {
+          id: fix.supplierId,
+          isDeleted: false,
+          outsourcingMode: null,
+        },
+        data: { outsourcingMode: fix.outsourcingMode },
+      });
+    }
     for (const confirmed of CONFIRMED_TEAM_SUPPLIER_LINKS) {
       const team = await prisma.dictionaries.findFirst({
         where: {
