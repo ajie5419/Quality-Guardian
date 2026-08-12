@@ -301,7 +301,7 @@ async function main() {
       updated += batchUpdates.length;
     }
 
-    logger.info(
+    logger.debug(
       {
         batch: batches,
         cursorId,

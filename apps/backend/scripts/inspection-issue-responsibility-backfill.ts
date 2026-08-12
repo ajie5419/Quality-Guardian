@@ -709,6 +709,5 @@ export async function backfillInspectionIssueResponsibilities(
     );
   }
 
-  logger.info(summary, 'inspection issue responsibility backfill finished');
   return summary;
 }

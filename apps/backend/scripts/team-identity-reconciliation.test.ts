@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildLegacySourceClaims,
@@ -6,7 +6,17 @@ import {
   parseTeamIdentityReconciliationOptions,
 } from './team-identity-reconciliation';
 
+const { warn } = vi.hoisted(() => ({ warn: vi.fn() }));
+
+vi.mock('~/utils/logger', () => ({
+  createModuleLogger: vi.fn().mockReturnValue({ warn }),
+}));
+
 describe('team identity reconciliation', () => {
+  beforeEach(() => {
+    warn.mockReset();
+  });
+
   it('keeps source identities separate instead of deduplicating by name', () => {
     const candidates = collectTeamSourceCandidates(
       [
@@ -80,6 +90,30 @@ describe('team identity reconciliation', () => {
         },
       ]),
     ).toEqual(new Map());
+  });
+
+  it('silently ignores ordinary legacy remarks that are not JSON metadata', () => {
+    expect(
+      buildLegacySourceClaims([
+        { id: 'team-legacy-text', remark: 'Legacy note from an operator' },
+      ]),
+    ).toEqual(new Map());
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it('warns when a JSON-shaped legacy remark is syntactically corrupt', () => {
+    expect(
+      buildLegacySourceClaims([
+        {
+          id: 'team-corrupt-json',
+          remark: '{"managedBy":"system:team-dictionary-bootstrap",',
+        },
+      ]),
+    ).toEqual(new Map());
+    expect(warn).toHaveBeenCalledWith(
+      expect.objectContaining({ teamId: 'team-corrupt-json' }),
+      'ignored invalid legacy TEAM remark',
+    );
   });
 
   it('parses apply mode and rejects unknown options', () => {
