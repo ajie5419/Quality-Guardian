@@ -211,6 +211,7 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
     teamId: string;
     teamName: string;
   }> = [];
+  const skippedReasons: string[] = [];
   let conflicts = 0;
   let skipped = 0;
   const revived: SourcePlan[] = [];
@@ -260,37 +261,60 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
     });
   }
 
-  for (const confirmed of CONFIRMED_TEAM_SUPPLIER_LINKS) {
-    if (!teamNameById.has(confirmed.teamId)) {
-      skipped += 1;
-      continue;
+  if (options.mode === 'apply') {
+    for (const confirmed of CONFIRMED_TEAM_SUPPLIER_LINKS) {
+      const team = await prisma.dictionaries.findFirst({
+        where: {
+          dictType: 'team',
+          id: confirmed.teamId,
+          isDeleted: false,
+          status: 1,
+        },
+        select: { dictKey: true },
+      });
+      if (!team) {
+        skippedReasons.push(`${confirmed.teamName}:teamNotFound`);
+        continue;
+      }
+      const supplier = await prisma.suppliers.findFirst({
+        where: { id: confirmed.supplierId, isDeleted: false },
+        select: { category: true, outsourcingMode: true },
+      });
+      if (!supplier) {
+        skippedReasons.push(`${confirmed.teamName}:supplierNotFound`);
+        continue;
+      }
+      if (resolveSupplierInspectionPolicy(supplier).identitySource !== 'team') {
+        skippedReasons.push(
+          `${confirmed.teamName}:supplierNotProcessPolicy(category=${supplier.category},mode=${String(supplier.outsourcingMode)})`,
+        );
+        continue;
+      }
+      const teamSources = await prisma.team_identity_sources.findMany({
+        where: { teamId: confirmed.teamId, isDeleted: false },
+        select: { sourceId: true, sourceType: true },
+      });
+      if (teamSources.some((source) => source.sourceType === 'DEPARTMENT')) {
+        conflicts += 1;
+        continue;
+      }
+      plannedLinks.push(confirmed);
     }
-    const supplier = supplierById.get(confirmed.supplierId);
-    if (
-      !supplier ||
-      resolveSupplierInspectionPolicy(supplier).identitySource !== 'team'
-    ) {
-      skipped += 1;
-      continue;
+  } else {
+    // Dry-run: keep the deterministic preloaded-map checks for reporting.
+    for (const confirmed of CONFIRMED_TEAM_SUPPLIER_LINKS) {
+      if (!teamNameById.has(confirmed.teamId)) continue;
+      const supplier = supplierById.get(confirmed.supplierId);
+      if (!supplier) continue;
+      if (resolveSupplierInspectionPolicy(supplier).identitySource !== 'team') {
+        continue;
+      }
+      const teamSources = sourceByTeam.get(confirmed.teamId) || [];
+      if (teamSources.some((source) => source.sourceType === 'DEPARTMENT')) {
+        continue;
+      }
+      plannedLinks.push(confirmed);
     }
-    const teamSources = sourceByTeam.get(confirmed.teamId) || [];
-    if (teamSources.some((source) => source.sourceType === 'DEPARTMENT')) {
-      conflicts += 1;
-      continue;
-    }
-    const hasCorrectLink = links.some(
-      (link) =>
-        link.identityId === confirmed.teamId &&
-        !link.isDeleted &&
-        link.supplierId === confirmed.supplierId,
-    );
-    const hasCorrectSource = teamSources.some(
-      (source) =>
-        source.sourceType === 'SUPPLIER' &&
-        source.sourceId === confirmed.supplierId,
-    );
-    if (hasCorrectLink && hasCorrectSource) continue;
-    plannedLinks.push(confirmed);
   }
 
   if (options.mode === 'apply') {
@@ -346,6 +370,7 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
       teamName: teamNameById.get(item.teamId) || null,
     })),
     skipped,
+    skippedReasons,
     supplierSources: plannedSupplierSources.map((item) => ({
       sourceId: item.sourceId,
       teamId: item.teamId,

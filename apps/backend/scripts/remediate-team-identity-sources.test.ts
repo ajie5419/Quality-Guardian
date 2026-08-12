@@ -9,14 +9,14 @@ import { remediateTeamIdentitySources } from './remediate-team-identity-sources'
 vi.mock('~/utils/prisma', () => ({
   default: {
     departments: { findMany: vi.fn() },
-    dictionaries: { findMany: vi.fn() },
+    dictionaries: { findFirst: vi.fn(), findMany: vi.fn() },
     supplier_identity_links: {
       create: vi.fn(),
       findFirst: vi.fn(),
       findMany: vi.fn(),
       updateMany: vi.fn(),
     },
-    suppliers: { findMany: vi.fn() },
+    suppliers: { findFirst: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
     team_identity_sources: {
       create: vi.fn(),
@@ -61,6 +61,8 @@ describe('remediateTeamIdentitySources', () => {
     vi.mocked(prisma.dictionaries.findMany).mockResolvedValue([]);
     vi.mocked(prisma.departments.findMany).mockResolvedValue([]);
     vi.mocked(prisma.suppliers.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue(null);
     vi.mocked(prisma.$transaction).mockImplementation((callback) =>
       callback(prisma as never),
     );
@@ -215,6 +217,13 @@ describe('remediateTeamIdentitySources', () => {
         outsourcingMode: 'IN_HOUSE_TEAM',
       },
     ] as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: '卢龙县强盛科技有限公司',
+    } as never);
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
     vi.mocked(prisma.supplier_identity_links.findFirst).mockResolvedValue(null);
 
     await remediateTeamIdentitySources({ mode: 'apply' });
@@ -261,6 +270,13 @@ describe('remediateTeamIdentitySources', () => {
         outsourcingMode: 'IN_HOUSE_TEAM',
       },
     ] as never);
+    vi.mocked(prisma.dictionaries.findFirst).mockResolvedValue({
+      dictKey: '卢龙县强盛科技有限公司',
+    } as never);
+    vi.mocked(prisma.suppliers.findFirst).mockResolvedValue({
+      category: 'Outsourcing',
+      outsourcingMode: 'IN_HOUSE_TEAM',
+    } as never);
     vi.mocked(prisma.supplier_identity_links.updateMany).mockResolvedValue({
       count: 1,
     });
