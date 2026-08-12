@@ -74,6 +74,11 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
     [];
   let conflicts = 0;
   let skipped = 0;
+  const revived: Array<{
+    sourceId: string;
+    sourceType: string;
+    teamId: string;
+  }> = [];
 
   for (const link of links) {
     if (link.isDeleted) continue;
@@ -120,24 +125,49 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
     });
   }
 
-  if (options.mode === 'apply' && plannedSupplierSources.length > 0) {
-    await prisma.team_identity_sources.createMany({
-      data: plannedSupplierSources.map((item) => ({
-        sourceId: item.sourceId,
-        sourceType: 'SUPPLIER',
-        teamId: item.teamId,
+  if (options.mode === 'apply') {
+    const planned = [
+      ...plannedSupplierSources.map((item) => ({
+        ...item,
+        sourceType: 'SUPPLIER' as const,
       })),
-      skipDuplicates: true,
-    });
-  }
-  if (options.mode === 'apply' && plannedDepartmentSources.length > 0) {
-    await prisma.team_identity_sources.createMany({
-      data: plannedDepartmentSources.map((item) => ({
-        sourceId: item.sourceId,
-        sourceType: 'DEPARTMENT',
-        teamId: item.teamId,
+      ...plannedDepartmentSources.map((item) => ({
+        ...item,
+        sourceType: 'DEPARTMENT' as const,
       })),
-      skipDuplicates: true,
+    ];
+    await prisma.$transaction(async (tx) => {
+      for (const item of planned) {
+        // (sourceType, sourceId) is globally unique, so a soft-deleted row for
+        // the same source must be revived instead of created.
+        const revivedCount = await tx.team_identity_sources.updateMany({
+          where: {
+            isDeleted: true,
+            sourceId: item.sourceId,
+            sourceType: item.sourceType,
+          },
+          data: { isDeleted: false, teamId: item.teamId },
+        });
+        if (revivedCount.count === 1) {
+          revived.push(item);
+          continue;
+        }
+        const existing = await tx.team_identity_sources.findFirst({
+          where: { sourceId: item.sourceId, sourceType: item.sourceType },
+          select: { isDeleted: true, teamId: true },
+        });
+        if (existing && existing.teamId !== item.teamId) {
+          conflicts += 1;
+          continue;
+        }
+        await tx.team_identity_sources.create({
+          data: {
+            sourceId: item.sourceId,
+            sourceType: item.sourceType,
+            teamId: item.teamId,
+          },
+        });
+      }
     });
   }
 
@@ -149,6 +179,12 @@ export async function remediateTeamIdentitySources(options: { mode: Mode }) {
       teamName: teamNameById.get(item.teamId) || null,
     })),
     mode: options.mode,
+    revived: revived.map((item) => ({
+      sourceId: item.sourceId,
+      sourceType: item.sourceType,
+      teamId: item.teamId,
+      teamName: teamNameById.get(item.teamId) || null,
+    })),
     skipped,
     supplierSources: plannedSupplierSources.map((item) => ({
       sourceId: item.sourceId,
