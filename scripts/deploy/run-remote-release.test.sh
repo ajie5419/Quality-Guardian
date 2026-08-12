@@ -49,9 +49,17 @@ containers="${FAKE_CONTAINERS:?}"
 printf '%s\n' "$*" >> "$log"
 if [[ "$1" == container && "$2" == ls ]]; then
   if [[ "${FAKE_SCENARIO:-}" == preflight-error ]]; then exit 1; fi
-  name="$(sed -n 's/.*name=\^\/\([^$]*\)\$.*/\1/p' <<< "$*")"
-  if [[ -e "$containers/$name" ]]; then printf '%s\n' "$name"; fi
-  exit
+  filter="$(sed -n 's/.*name=\([^ ]*\).*/\1/p' <<< "$*")"
+  if [[ "$filter" == '^/qms-backend-run-' ]]; then
+    if [[ "${FAKE_SCENARIO:-}" == legacy-preflight-error ]]; then exit 1; fi
+    for path in "$containers"/qms-backend-run-*; do
+      [[ -e "$path" ]] && basename "$path"
+    done
+  else
+    name="$(sed -n 's/.*name=\^\/\([^$]*\)\$.*/\1/p' <<< "$*")"
+    if [[ -e "$containers/$name" ]]; then printf '%s\n' "$name"; fi
+  fi
+  exit 0
 fi
 if [[ "$1" == rm ]]; then
   rm -f "$containers/${@: -1}"
@@ -78,6 +86,9 @@ if [[ "$*" == *run-release-maintenance* && "${FAKE_SCENARIO:-}" == maintenance-t
   exit 124
 fi
 if [[ "$*" == *'docker container ls'* && "${FAKE_SCENARIO:-}" == preflight-timeout ]]; then
+  exit 124
+fi
+if [[ "$*" == *'name=^/qms-backend-run-'* && "${FAKE_SCENARIO:-}" == legacy-preflight-timeout ]]; then
   exit 124
 fi
 "$@"
@@ -119,6 +130,7 @@ services:
 YAML
   fi
   if [[ "$scenario" == residual ]]; then touch "$directory/containers/qms-release-maintenance"; fi
+  if [[ "$scenario" == legacy-residual ]]; then touch "$directory/containers/qms-backend-run-abcd1234"; fi
 
   set +e
   PATH="$directory/bin:$PATH" FAKE_LOG="$directory/docker.log" FAKE_CONTAINERS="$directory/containers" FAKE_SCENARIO="$scenario" \
@@ -158,9 +170,22 @@ if grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
   exit 1
 fi
 
-for scenario in preflight-error preflight-timeout; do
+run_case legacy-residual 1
+assert_contains 'pre-existing legacy backend one-off container: qms-backend-run-abcd1234' "$CASE_DIRECTORY/output.log"
+[[ -e "$CASE_DIRECTORY/containers/qms-backend-run-abcd1234" ]]
+assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
+if grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
+  echo 'legacy container preflight stopped backend' >&2
+  exit 1
+fi
+
+for scenario in preflight-error preflight-timeout legacy-preflight-error legacy-preflight-timeout; do
   run_case "$scenario" 1
-  assert_contains 'unable to inspect one-off container state' "$CASE_DIRECTORY/output.log"
+  if [[ "$scenario" == legacy-* ]]; then
+    assert_contains 'unable to inspect legacy backend one-off containers' "$CASE_DIRECTORY/output.log"
+  else
+    assert_contains 'unable to inspect one-off container state' "$CASE_DIRECTORY/output.log"
+  fi
   assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
   if [[ -f "$CASE_DIRECTORY/docker.log" ]] && grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
     echo "$scenario preflight stopped backend" >&2

@@ -137,7 +137,7 @@ finish() {
 trap finish EXIT
 
 preflight_release_containers() {
-  local container existing
+  local container existing legacy_containers legacy_container
   for container in "$MIGRATION_CONTAINER" "$MAINTENANCE_CONTAINER"; do
     if ! existing="$(run_with_timeout 30 docker container ls -a --filter "name=^/${container}$" --format '{{.Names}}')"; then
       echo "refusing release: unable to inspect one-off container state: $container" >&2
@@ -148,6 +148,20 @@ preflight_release_containers() {
       return 1
     fi
   done
+
+  # Compose used this generated prefix before release one-offs received fixed names.
+  # Docker's name filter is not the final authority because its matching semantics
+  # can include substrings; the shell expression below requires the exact prefix.
+  if ! legacy_containers="$(run_with_timeout 30 docker container ls -a --filter 'name=^/qms-backend-run-' --format '{{.Names}}')"; then
+    echo "refusing release: unable to inspect legacy backend one-off containers" >&2
+    return 1
+  fi
+  while IFS= read -r legacy_container; do
+    if [[ "$legacy_container" =~ ^qms-backend-run-[[:alnum:]][[:alnum:]_.-]*$ ]]; then
+      echo "refusing release: pre-existing legacy backend one-off container: $legacy_container" >&2
+      return 1
+    fi
+  done <<< "$legacy_containers"
 }
 
 update_compose_images() {
