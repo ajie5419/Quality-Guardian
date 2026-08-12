@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.6](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.5...qgs-v0.24.6) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** complete confirmed supplier outsourcing mode in maintenance ([5ec131c](https://github.com/ajie5419/Quality-Guardian/commit/5ec131cdc558a839e385c268945af2615bcdeff2))
+* **@qgs/backend:** complete confirmed supplier outsourcing mode in maintenance ([cda7ba6](https://github.com/ajie5419/Quality-Guardian/commit/cda7ba65fb00f920f3b9bc7875a666d8ec67ed54))
+
 ## [0.24.5](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.4...qgs-v0.24.5) (2026-08-12)
 
 
