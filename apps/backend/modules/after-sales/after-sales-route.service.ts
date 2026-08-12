@@ -7,7 +7,7 @@ import {
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { parseRequiredWorkOrderNumber } from '~/modules/work-order/work-order-query';
 import { isBusinessError } from '~/utils/business-error';
@@ -24,7 +24,7 @@ export const AfterSalesRouteService = {
     const result = await prisma.$transaction(async (tx) => {
       const existing = await tx.after_sales.findMany({
         where: { id: { in: ids } },
-        select: { supplierBrandId: true },
+        select: { id: true, supplierBrandId: true },
       });
       const result = await tx.after_sales.updateMany({
         where: { id: { in: ids } },
@@ -33,6 +33,11 @@ export const AfterSalesRouteService = {
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
         existing.map((item) => item.supplierBrandId),
+        'after-sales.batch-deleted',
+      );
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        existing.map((item) => ({ source: 'EXTERNAL', sourcePk: item.id })),
         'after-sales.batch-deleted',
       );
       return result;
@@ -45,7 +50,6 @@ export const AfterSalesRouteService = {
         }),
       ),
     );
-    await QualityLossIndexService.softDeleteSourceMany('External', ids);
     return result.count;
   },
 
@@ -67,6 +71,11 @@ export const AfterSalesRouteService = {
         [created.supplierBrandId],
         'after-sales.created',
       );
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'EXTERNAL', sourcePk: created.id }],
+        'after-sales.created',
+      );
       return created;
     });
     await FileStorageService.registerReferencesFromAttachments({
@@ -80,7 +89,6 @@ export const AfterSalesRouteService = {
       targetId: String(created.id),
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
-    await QualityLossIndexService.upsertFromAfterSales(created);
     return created;
   },
 
@@ -117,16 +125,19 @@ export const AfterSalesRouteService = {
           identityMode: 'legacy-import',
           serialNumber,
         });
-        const created = await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx) => {
           const created = await tx.after_sales.create({ data: createData });
           await MetricRefreshQueue.enqueueSupplierScores(
             tx,
             [created.supplierBrandId],
             'after-sales.imported',
           );
-          return created;
+          await QualityLossIndexQueue.enqueue(
+            tx,
+            [{ source: 'EXTERNAL', sourcePk: created.id }],
+            'after-sales.imported',
+          );
         });
-        await QualityLossIndexService.upsertFromAfterSales(created);
         successCount++;
       } catch (error) {
         const message = toImportErrorMessage(error);

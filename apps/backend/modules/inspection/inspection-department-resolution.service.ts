@@ -1,4 +1,5 @@
 import { DeptService } from '~/modules/dept';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { MasterDataResolutionAuditService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
@@ -99,6 +100,14 @@ export const InspectionDepartmentResolutionService = {
               responsibleDepartments: JSON.stringify([department.name]),
             },
           });
+          await QualityLossIndexQueue.enqueue(
+            tx,
+            eligibleAudits.map((item) => ({
+              source: 'INTERNAL',
+              sourcePk: item.entityId,
+            })),
+            'inspection-issue.department-resolved',
+          );
           if (updated.count !== eligibleAudits.length) {
             throw new BusinessError(
               'MASTER_DATA_REFERENCE_CHANGED',

@@ -1,7 +1,7 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { resolveQualityLossDepartmentWrite } from '~/modules/quality-loss/quality-loss-department-write';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
   buildQualityLossCreateDataWithCanonical,
@@ -52,9 +52,15 @@ export default defineEventHandler(async (event) => {
         tx,
         body.responsibleDepartmentId,
       );
-      return tx.quality_losses.create({
+      const newItem = await tx.quality_losses.create({
         data: { ...createData, ...departmentWrite },
       });
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'MANUAL', sourcePk: newItem.id }],
+        'quality-loss.created',
+      );
+      return newItem;
     });
 
     await SystemLogService.auditLog('quality-loss', 'create', {
@@ -65,8 +71,6 @@ export default defineEventHandler(async (event) => {
         type: newItem.type,
       },
     });
-    await QualityLossIndexService.upsertFromManual(newItem);
-
     return useResponseSuccess(buildQualityLossCreateResponse(newItem));
   } catch (error) {
     if (isBusinessError(error)) return businessErrorResponse(event, error);

@@ -5,6 +5,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
 
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
 
@@ -184,6 +185,13 @@ export const InspectionRequestCloseService = {
             data: { status: 'CLOSED' },
             where: { ...linkedIssueWhere, status: { not: 'CLOSED' } },
           });
+          if (linkedIssueUpdate.count > 0 && issueRecord?.id) {
+            await QualityLossIndexQueue.enqueue(
+              tx,
+              [{ source: 'INTERNAL', sourcePk: issueRecord.id }],
+              'inspection-request.closed-linked-issue',
+            );
+          }
           closedLinkedIssueCount = linkedIssueUpdate.count;
           linkedIssueStatus = 'CLOSED';
         }

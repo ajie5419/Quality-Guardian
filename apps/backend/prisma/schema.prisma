@@ -8,56 +8,56 @@ datasource db {
 }
 
 model inspections {
-  id                     String                               @id @default(cuid())
-  serialNumber           String?                              @unique
-  category               inspection_category
-  workOrderNumber        String
-  projectName            String?
-  projectId              String?
-  supplierName           String?
-  supplierId             String?
-  responsibilityType    String?
+  id                      String                               @id @default(cuid())
+  serialNumber            String?                              @unique
+  category                inspection_category
+  workOrderNumber         String
+  projectName             String?
+  projectId               String?
+  supplierName            String?
+  supplierId              String?
+  responsibilityType      String?
   responsibleDepartmentId String?
-  responsibleDepartment String?
-  partName               String?
-  partId                 String?
-  materialName           String?
-  materialNameId         String?
-  incomingType           String?
-  incomingTypeId         String?
-  processName            String?
-  processId              String?
-  teamId                 String?
-  level1Component        String?
-  level2Component        String?
-  team                   String?
-  documents              String?                              @db.LongText
-  hasDocuments           Boolean                              @default(true)
-  selfCheckDocuments     String?                              @db.LongText
-  hasSelfCheckDocuments  Boolean                              @default(false)
-  packingListArchived    String?
-  quantity               Int                                  @default(1)
-  stationSelection       String?                              @db.Text
-  qualifiedQuantity      Int?
-  unqualifiedQuantity    Int?
-  inspector              String
-  templateId             String?
-  templateName           String?
-  inspectionDate         DateTime
-  reportDate             DateTime?
-  result                 inspection_result                    @default(PASS)
-  remarks                String?                              @db.Text
-  isDeleted              Boolean                              @default(false)
-  createdAt              DateTime                             @default(now())
-  updatedAt              DateTime                             @updatedAt
-  items                  inspection_items[]
-  archiveTask            inspection_archive_tasks?
-  inspectionRequest      qms_inspection_requests?
-  inspectionRequestLinks qms_inspection_request_inspections[]
-  process                processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
-  qualityRecords         quality_records[]
-  supplier               suppliers?                           @relation("inspections_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  work_order             work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  responsibleDepartment   String?
+  partName                String?
+  partId                  String?
+  materialName            String?
+  materialNameId          String?
+  incomingType            String?
+  incomingTypeId          String?
+  processName             String?
+  processId               String?
+  teamId                  String?
+  level1Component         String?
+  level2Component         String?
+  team                    String?
+  documents               String?                              @db.LongText
+  hasDocuments            Boolean                              @default(true)
+  selfCheckDocuments      String?                              @db.LongText
+  hasSelfCheckDocuments   Boolean                              @default(false)
+  packingListArchived     String?
+  quantity                Int                                  @default(1)
+  stationSelection        String?                              @db.Text
+  qualifiedQuantity       Int?
+  unqualifiedQuantity     Int?
+  inspector               String
+  templateId              String?
+  templateName            String?
+  inspectionDate          DateTime
+  reportDate              DateTime?
+  result                  inspection_result                    @default(PASS)
+  remarks                 String?                              @db.Text
+  isDeleted               Boolean                              @default(false)
+  createdAt               DateTime                             @default(now())
+  updatedAt               DateTime                             @updatedAt
+  items                   inspection_items[]
+  archiveTask             inspection_archive_tasks?
+  inspectionRequest       qms_inspection_requests?
+  inspectionRequestLinks  qms_inspection_request_inspections[]
+  process                 processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
+  qualityRecords          quality_records[]
+  supplier                suppliers?                           @relation("inspections_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  work_order              work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
 
   @@index([workOrderNumber])
   @@index([category])
@@ -1324,11 +1324,11 @@ model identity_resolution_projection {
 // A completed generation is built in isolation and only becomes visible through
 // the singleton pointer after every row has been written successfully.
 model identity_projection_generations {
-  id                      String                               @id @default(cuid())
-  status                  identity_projection_generation_status @default(BUILDING)
+  id                      String                                   @id @default(cuid())
+  status                  identity_projection_generation_status    @default(BUILDING)
   sourceResolutionVersion Int
-  failureReason           String?                              @db.Text
-  createdAt               DateTime                             @default(now())
+  failureReason           String?                                  @db.Text
+  createdAt               DateTime                                 @default(now())
   activatedAt             DateTime?
   retiredAt               DateTime?
   projections             identity_resolution_projection[]
@@ -1342,32 +1342,32 @@ model identity_projection_generations {
 // The single control row provides both the active generation and a CAS version
 // so a rebuild cannot publish a stale snapshot over an intervening decision.
 model identity_projection_generation_pointer {
-  key               String                              @id
+  key                String                           @id
   activeGenerationId String?
-  resolutionVersion Int                                 @default(0)
-  switchedAt        DateTime                            @default(now())
-  activeGeneration  identity_projection_generations?    @relation("identity_projection_active_generation", fields: [activeGenerationId], references: [id], onDelete: SetNull)
+  resolutionVersion  Int                              @default(0)
+  switchedAt         DateTime                         @default(now())
+  activeGeneration   identity_projection_generations? @relation("identity_projection_active_generation", fields: [activeGenerationId], references: [id], onDelete: SetNull)
 }
 
 // @module master-data-identity
 // A run fixes one fact-set cutoff before WP2 compares legacy and projection results.
 model identity_reconciliation_runs {
-  id                 String                              @id @default(cuid())
-  consumerKey        String
-  factEntityType     String
+  id                     String                              @id @default(cuid())
+  consumerKey            String
+  factEntityType         String
   projectionGenerationId String?
-  baselineChecksum   String
-  cutoffKind         identity_reconciliation_cutoff_kind
-  createdAtCutoff    DateTime?
-  idCutoff           String?
-  snapshotDescriptor Json?
-  status             identity_reconciliation_run_status  @default(PENDING)
-  startedAt          DateTime?
-  completedAt        DateTime?
-  failureReason      String?                             @db.Text
-  createdAt          DateTime                            @default(now())
-  updatedAt          DateTime                            @updatedAt
-  metrics            identity_reconciliation_metrics[]
+  baselineChecksum       String
+  cutoffKind             identity_reconciliation_cutoff_kind
+  createdAtCutoff        DateTime?
+  idCutoff               String?
+  snapshotDescriptor     Json?
+  status                 identity_reconciliation_run_status  @default(PENDING)
+  startedAt              DateTime?
+  completedAt            DateTime?
+  failureReason          String?                             @db.Text
+  createdAt              DateTime                            @default(now())
+  updatedAt              DateTime                            @updatedAt
+  metrics                identity_reconciliation_metrics[]
 
   @@index([consumerKey, status, createdAt], map: "identity_reconciliation_consumer_idx")
   @@index([factEntityType, cutoffKind, status], map: "identity_reconciliation_fact_idx")
@@ -1379,17 +1379,17 @@ model identity_reconciliation_runs {
 // separate from supplier score jobs because publication has different CAS and
 // recovery semantics.
 model pass_rate_projection_refresh_jobs {
-  id          String                              @id @default(cuid())
-  status      pass_rate_projection_refresh_status @default(PENDING)
-  reason      String?
+  id            String                              @id @default(cuid())
+  status        pass_rate_projection_refresh_status @default(PENDING)
+  reason        String?
   requestedById String?
-  attempts    Int                                 @default(0)
-  leaseUntil  DateTime?
-  lastError   String?                             @db.Text
-  completedAt DateTime?
-  isDeleted   Boolean                             @default(false)
-  createdAt   DateTime                            @default(now())
-  updatedAt   DateTime                            @updatedAt
+  attempts      Int                                 @default(0)
+  leaseUntil    DateTime?
+  lastError     String?                             @db.Text
+  completedAt   DateTime?
+  isDeleted     Boolean                             @default(false)
+  createdAt     DateTime                            @default(now())
+  updatedAt     DateTime                            @updatedAt
 
   @@index([status, leaseUntil, isDeleted], map: "pass_rate_projection_refresh_status_idx")
 }
@@ -1415,24 +1415,24 @@ model identity_reconciliation_metrics {
 // It deliberately stores only the facts needed by this consumer, so reports
 // never join the generic identity projection during normal reads.
 model pass_rate_process_identity_projection {
-  id                 String                               @id @default(cuid())
-  generationId       String
-  inspectionId       String
-  createdAtSnapshot  DateTime
+  id                  String                               @id @default(cuid())
+  generationId        String
+  inspectionId        String
+  createdAtSnapshot   DateTime
   // This watermark is copied from the source fact. It lets the feature-read
   // guard reject a generation after an inspection is edited or soft-deleted.
-  updatedAtSnapshot  DateTime?
-  inspectionDate     DateTime
-  category           String                               @db.VarChar(32)
-  incomingType       String?
-  effectiveProcessId String?
-  state              historical_identity_resolution_state
-  resolutionId       String?
-  quantity           Int
-  qualifiedQuantity  Int?
+  updatedAtSnapshot   DateTime?
+  inspectionDate      DateTime
+  category            String                               @db.VarChar(32)
+  incomingType        String?
+  effectiveProcessId  String?
+  state               historical_identity_resolution_state
+  resolutionId        String?
+  quantity            Int
+  qualifiedQuantity   Int?
   unqualifiedQuantity Int?
-  result             inspection_result
-  generation         identity_projection_generations     @relation(fields: [generationId], references: [id], onDelete: Cascade)
+  result              inspection_result
+  generation          identity_projection_generations      @relation(fields: [generationId], references: [id], onDelete: Cascade)
 
   @@unique([generationId, inspectionId], map: "pass_rate_process_projection_generation_inspection_key")
   @@index([generationId, createdAtSnapshot, inspectionDate], map: "pass_rate_process_projection_snapshot_idx")
@@ -1743,61 +1743,61 @@ model qms_task_dispatches {
 }
 
 model qms_inspection_requests {
-  id                  String                               @id @default(cuid())
-  requestNo           String                               @unique
-  workOrderNumber     String
-  partName            String
-  partId              String?
-  componentName       String?
-  componentId         String?
-  processName         String
-  processId           String?
-  category            inspection_category?
-  supplierId          String?
-  supplierName        String?
-  teamId              String?
-  team                String?
-  responsibilityType  String?
+  id                      String                               @id @default(cuid())
+  requestNo               String                               @unique
+  workOrderNumber         String
+  partName                String
+  partId                  String?
+  componentName           String?
+  componentId             String?
+  processName             String
+  processId               String?
+  category                inspection_category?
+  supplierId              String?
+  supplierName            String?
+  teamId                  String?
+  team                    String?
+  responsibilityType      String?
   responsibleDepartmentId String?
-  responsibleDepartment String?
-  quantity            Int                                  @default(1)
-  stationSelection    String?                              @db.Text
-  reporter            String
-  selfCheckResult     String                               @default("PASS")
-  mutualCheckResult   String                               @default("PASS")
-  requestInfo         String?                              @db.Text
-  attachments         String?                              @db.LongText
-  status              inspection_request_status            @default(SUBMITTED)
-  priority            Int                                  @default(3)
-  dispatcherId        String?
-  inspectorId         String?
-  dispatchTaskId      String?
-  inspectionId        String?                              @unique
-  inspectionResult    inspection_result                    @default(PASS)
-  qualifiedQuantity   Int?
-  unqualifiedQuantity Int?
-  linkedIssueId       String?
-  linkedIssueNo       String?
-  linkedIssueStatus   String?
-  dispatchRemark      String?                              @db.Text
-  closeRemark         String?                              @db.Text
-  closeAttachments    String?                              @db.LongText
-  submittedAt         DateTime                             @default(now())
-  dispatchedAt        DateTime?
-  closedAt            DateTime?
-  isDeleted           Boolean                              @default(false)
-  createdAt           DateTime                             @default(now())
-  updatedAt           DateTime                             @updatedAt
-  process             processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
-  supplier            suppliers?                           @relation("inspection_requests_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  work_order          work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
-  dispatcher          users?                               @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
-  inspector           users?                               @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
-  dispatch_task       qms_task_dispatches?                 @relation(fields: [dispatchTaskId], references: [id], onDelete: SetNull)
-  inspection          inspections?                         @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
-  workOrders          qms_inspection_request_work_orders[]
-  inspectionLinks     qms_inspection_request_inspections[]
-  materialRequest     qms_inspection_material_requests?
+  responsibleDepartment   String?
+  quantity                Int                                  @default(1)
+  stationSelection        String?                              @db.Text
+  reporter                String
+  selfCheckResult         String                               @default("PASS")
+  mutualCheckResult       String                               @default("PASS")
+  requestInfo             String?                              @db.Text
+  attachments             String?                              @db.LongText
+  status                  inspection_request_status            @default(SUBMITTED)
+  priority                Int                                  @default(3)
+  dispatcherId            String?
+  inspectorId             String?
+  dispatchTaskId          String?
+  inspectionId            String?                              @unique
+  inspectionResult        inspection_result                    @default(PASS)
+  qualifiedQuantity       Int?
+  unqualifiedQuantity     Int?
+  linkedIssueId           String?
+  linkedIssueNo           String?
+  linkedIssueStatus       String?
+  dispatchRemark          String?                              @db.Text
+  closeRemark             String?                              @db.Text
+  closeAttachments        String?                              @db.LongText
+  submittedAt             DateTime                             @default(now())
+  dispatchedAt            DateTime?
+  closedAt                DateTime?
+  isDeleted               Boolean                              @default(false)
+  createdAt               DateTime                             @default(now())
+  updatedAt               DateTime                             @updatedAt
+  process                 processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
+  supplier                suppliers?                           @relation("inspection_requests_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  work_order              work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
+  dispatcher              users?                               @relation("qms_inspection_requests_dispatcherIdTousers", fields: [dispatcherId], references: [id])
+  inspector               users?                               @relation("qms_inspection_requests_inspectorIdTousers", fields: [inspectorId], references: [id])
+  dispatch_task           qms_task_dispatches?                 @relation(fields: [dispatchTaskId], references: [id], onDelete: SetNull)
+  inspection              inspections?                         @relation(fields: [inspectionId], references: [id], onDelete: SetNull)
+  workOrders              qms_inspection_request_work_orders[]
+  inspectionLinks         qms_inspection_request_inspections[]
+  materialRequest         qms_inspection_material_requests?
 
   @@index([workOrderNumber])
   @@index([status])
@@ -1937,6 +1937,29 @@ model quality_loss_index {
   @@index([partId])
   @@index([supplierBrandId])
   @@index([isDeleted, occurDate])
+}
+
+// @module quality-loss
+// Durable outbox for rebuilding one materialized quality-loss index row after
+// a source write commits. Source facts remain authoritative.
+model quality_loss_index_jobs {
+  id          String                        @id @default(cuid())
+  source      quality_loss_index_source
+  sourcePk    String
+  reason      String?
+  status      quality_loss_index_job_status @default(PENDING)
+  attempts    Int                           @default(0)
+  availableAt DateTime                      @default(now())
+  leaseOwner  String?
+  leaseUntil  DateTime?
+  lastError   String?                       @db.Text
+  completedAt DateTime?
+  createdAt   DateTime                      @default(now())
+  updatedAt   DateTime                      @updatedAt
+
+  @@index([status, availableAt])
+  @@index([status, leaseUntil])
+  @@index([source, sourcePk, status])
 }
 
 model knowledge_categories {
@@ -2101,6 +2124,20 @@ enum metric_refresh_type {
 }
 
 enum metric_refresh_status {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum quality_loss_index_source {
+  MANUAL
+  INTERNAL
+  EXTERNAL
+  COMMISSIONING
+}
+
+enum quality_loss_index_job_status {
   PENDING
   PROCESSING
   COMPLETED

@@ -19,6 +19,11 @@ type QualityLossIndexClient = Pick<
   'quality_loss_index'
 >;
 
+interface IndexWriteOptions {
+  client?: QualityLossIndexClient;
+  suppressErrors?: boolean;
+}
+
 interface AfterSalesInput {
   actualClaim?: null | number | Prisma.Decimal;
   claimStatus: null | string;
@@ -184,35 +189,44 @@ async function upsertInternal(
 }
 
 export const QualityLossIndexService = {
-  async upsertFromAfterSales(row: AfterSalesInput | null | undefined) {
+  async upsertFromAfterSales(
+    row: AfterSalesInput | null | undefined,
+    options: IndexWriteOptions = {},
+  ) {
     if (!row) return;
+    const client = options.client ?? prisma;
+    const suppressErrors = options.suppressErrors ?? true;
     const amount = num(row.materialCost) + num(row.laborTravelCost);
     const include = !row.isDeleted && (row.isClaim || amount > 0);
     if (!include) {
-      await softDelete(SOURCE.EXTERNAL, row.id);
+      await softDelete(SOURCE.EXTERNAL, row.id, client, suppressErrors);
       return;
     }
-    await upsertIndexRow({
-      id: `EXT-${row.id}`,
-      source: SOURCE.EXTERNAL,
-      sourcePk: row.id,
-      occurDate: row.occurDate,
-      amount,
-      actualClaim: num(row.actualClaim),
-      status: row.claimStatus || 'OPEN',
-      projectId: row.projectId ?? null,
-      projectName: row.projectName,
-      workOrderNumber: row.workOrderNumber,
-      respDept: row.respDept,
-      respDeptId: row.respDeptId ?? null,
-      partId: row.partId ?? null,
-      partName: row.partName || row.productSubtype || row.productType || null,
-      description: row.issueDescription || null,
-      supplierBrandId: row.supplierBrandId ?? null,
-      createdBy: row.createdBy,
-      isDeleted: false,
-      indexedAt: new Date(),
-    });
+    await upsertIndexRow(
+      {
+        id: `EXT-${row.id}`,
+        source: SOURCE.EXTERNAL,
+        sourcePk: row.id,
+        occurDate: row.occurDate,
+        amount,
+        actualClaim: num(row.actualClaim),
+        status: row.claimStatus || 'OPEN',
+        projectId: row.projectId ?? null,
+        projectName: row.projectName,
+        workOrderNumber: row.workOrderNumber,
+        respDept: row.respDept,
+        respDeptId: row.respDeptId ?? null,
+        partId: row.partId ?? null,
+        partName: row.partName || row.productSubtype || row.productType || null,
+        description: row.issueDescription || null,
+        supplierBrandId: row.supplierBrandId ?? null,
+        createdBy: row.createdBy,
+        isDeleted: false,
+        indexedAt: new Date(),
+      },
+      client,
+      suppressErrors,
+    );
   },
 
   async upsertFromInternal(row: InternalInput | null | undefined) {
@@ -226,66 +240,84 @@ export const QualityLossIndexService = {
     await upsertInternal(row, client, false);
   },
 
-  async upsertFromCommissioning(row: CommissioningInput | null | undefined) {
+  async upsertFromCommissioning(
+    row: CommissioningInput | null | undefined,
+    options: IndexWriteOptions = {},
+  ) {
     if (!row) return;
+    const client = options.client ?? prisma;
+    const suppressErrors = options.suppressErrors ?? true;
     const amount = num(row.lossAmount);
     const include = !row.isDeleted && (row.isClaim || amount > 0);
     if (!include) {
-      await softDelete(SOURCE.COMMISSIONING, row.id);
+      await softDelete(SOURCE.COMMISSIONING, row.id, client, suppressErrors);
       return;
     }
-    await upsertIndexRow({
-      id: `DA-${row.id}`,
-      source: SOURCE.COMMISSIONING,
-      sourcePk: row.id,
-      occurDate: row.date,
-      amount,
-      actualClaim: num(row.recoveredAmount),
-      status: row.claimStatus || 'OPEN',
-      projectId: row.projectId ?? null,
-      projectName: row.projectName,
-      workOrderNumber: row.workOrderNumber,
-      respDept: row.responsibleDepartment,
-      respDeptId: row.responsibleDepartmentId ?? null,
-      partId: row.partId ?? null,
-      partName: row.partName || null,
-      description: row.claimNotes || row.description || null,
-      supplierBrandId: null,
-      createdBy: row.createdBy,
-      isDeleted: false,
-      indexedAt: new Date(),
-    });
+    await upsertIndexRow(
+      {
+        id: `DA-${row.id}`,
+        source: SOURCE.COMMISSIONING,
+        sourcePk: row.id,
+        occurDate: row.date,
+        amount,
+        actualClaim: num(row.recoveredAmount),
+        status: row.claimStatus || 'OPEN',
+        projectId: row.projectId ?? null,
+        projectName: row.projectName,
+        workOrderNumber: row.workOrderNumber,
+        respDept: row.responsibleDepartment,
+        respDeptId: row.responsibleDepartmentId ?? null,
+        partId: row.partId ?? null,
+        partName: row.partName || null,
+        description: row.claimNotes || row.description || null,
+        supplierBrandId: null,
+        createdBy: row.createdBy,
+        isDeleted: false,
+        indexedAt: new Date(),
+      },
+      client,
+      suppressErrors,
+    );
   },
 
-  async upsertFromManual(row: ManualInput | null | undefined) {
+  async upsertFromManual(
+    row: ManualInput | null | undefined,
+    options: IndexWriteOptions = {},
+  ) {
     if (!row) return;
+    const client = options.client ?? prisma;
+    const suppressErrors = options.suppressErrors ?? true;
     const amount = num(row.amount);
     if (row.isDeleted || amount <= 0) {
-      await softDelete(SOURCE.MANUAL, row.id);
+      await softDelete(SOURCE.MANUAL, row.id, client, suppressErrors);
       return;
     }
-    await upsertIndexRow({
-      id: `QL-${row.id}`,
-      source: SOURCE.MANUAL,
-      sourcePk: row.id,
-      occurDate: row.occurDate,
-      amount,
-      actualClaim: num(row.actualClaim),
-      status: row.status || 'Pending',
-      lossType: row.type,
-      projectId: row.projectId ?? null,
-      projectName: row.projectName,
-      workOrderNumber: row.workOrderNumber,
-      respDept: row.respDept,
-      respDeptId: row.respDeptId ?? null,
-      partId: row.partId ?? null,
-      partName: row.partName,
-      description: row.description || null,
-      supplierBrandId: null,
-      createdBy: row.createdBy,
-      isDeleted: false,
-      indexedAt: new Date(),
-    });
+    await upsertIndexRow(
+      {
+        id: `QL-${row.id}`,
+        source: SOURCE.MANUAL,
+        sourcePk: row.id,
+        occurDate: row.occurDate,
+        amount,
+        actualClaim: num(row.actualClaim),
+        status: row.status || 'Pending',
+        lossType: row.type,
+        projectId: row.projectId ?? null,
+        projectName: row.projectName,
+        workOrderNumber: row.workOrderNumber,
+        respDept: row.respDept,
+        respDeptId: row.respDeptId ?? null,
+        partId: row.partId ?? null,
+        partName: row.partName,
+        description: row.description || null,
+        supplierBrandId: null,
+        createdBy: row.createdBy,
+        isDeleted: false,
+        indexedAt: new Date(),
+      },
+      client,
+      suppressErrors,
+    );
   },
 
   async softDeleteSource(source: Source, sourcePk: string) {
@@ -305,6 +337,35 @@ export const QualityLossIndexService = {
         'failed to soft-delete quality_loss_index rows',
       );
     }
+  },
+
+  async rebuildOne(source: Source, sourcePk: string) {
+    if (source === SOURCE.EXTERNAL) {
+      const row = await prisma.after_sales.findUnique({
+        where: { id: sourcePk },
+      });
+      if (!row) return softDelete(source, sourcePk, prisma, false);
+      return this.upsertFromAfterSales(row, { suppressErrors: false });
+    }
+    if (source === SOURCE.INTERNAL) {
+      const row = await prisma.quality_records.findUnique({
+        where: { id: sourcePk },
+      });
+      if (!row) return softDelete(source, sourcePk, prisma, false);
+      return upsertInternal(row, prisma, false);
+    }
+    if (source === SOURCE.COMMISSIONING) {
+      const row = await prisma.vehicle_commissioning_issues.findUnique({
+        where: { id: sourcePk },
+      });
+      if (!row) return softDelete(source, sourcePk, prisma, false);
+      return this.upsertFromCommissioning(row, { suppressErrors: false });
+    }
+    const row = await prisma.quality_losses.findUnique({
+      where: { id: sourcePk },
+    });
+    if (!row) return softDelete(source, sourcePk, prisma, false);
+    return this.upsertFromManual(row, { suppressErrors: false });
   },
 
   async backfillAfterSales(options: { batchSize?: number } = {}) {

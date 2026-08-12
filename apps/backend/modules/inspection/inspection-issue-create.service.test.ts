@@ -29,9 +29,7 @@ vi.mock('~/modules/metric-refresh', () => ({
   MetricRefreshQueue: { enqueueSupplierScores: mocks.enqueueScores },
 }));
 vi.mock('~/modules/quality-loss', () => ({
-  QualityLossIndexService: {
-    upsertFromInternalInTransaction: mocks.upsertLoss,
-  },
+  QualityLossIndexQueue: { enqueue: mocks.upsertLoss },
 }));
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: { resolveSupplierById: mocks.resolveSupplier },
@@ -122,7 +120,11 @@ describe('inspectionIssueCreateService', () => {
       }),
       expect.objectContaining({ serialNumber: 9 }),
     );
-    expect(mocks.upsertLoss).toHaveBeenCalledWith(result.record, tx);
+    expect(mocks.upsertLoss).toHaveBeenCalledWith(
+      tx,
+      [{ source: 'INTERNAL', sourcePk: result.record.id }],
+      'inspection-issue.created',
+    );
     expect(mocks.enqueueScores).toHaveBeenCalledWith(
       tx,
       [null],

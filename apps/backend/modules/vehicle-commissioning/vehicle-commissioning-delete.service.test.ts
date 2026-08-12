@@ -1,11 +1,12 @@
 import { VEHICLE_COMMISSIONING_PERMISSION_CODES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileStorageService } from '~/modules/file-storage';
-import { QualityLossIndexService } from '~/modules/quality-loss';
 import { RbacService } from '~/modules/rbac';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { VehicleCommissioningDeleteService } from '~/modules/vehicle-commissioning/vehicle-commissioning-delete.service';
 import prisma from '~/utils/prisma';
+
+const mocks = vi.hoisted(() => ({ enqueue: vi.fn() }));
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -13,6 +14,7 @@ vi.mock('~/utils/prisma', () => ({
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -23,9 +25,7 @@ vi.mock('~/modules/file-storage', () => ({
 }));
 
 vi.mock('~/modules/quality-loss', () => ({
-  QualityLossIndexService: {
-    softDeleteSource: vi.fn(),
-  },
+  QualityLossIndexQueue: { enqueue: mocks.enqueue },
 }));
 
 vi.mock('~/modules/rbac', () => ({
@@ -43,6 +43,11 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
 describe('vehicleCommissioningDeleteService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        vehicle_commissioning_issues: prisma.vehicle_commissioning_issues,
+      }),
+    );
   });
 
   const user = {
@@ -89,9 +94,12 @@ describe('vehicleCommissioningDeleteService', () => {
       bizId: 'issue-1',
       bizType: 'vehicle_commissioning_issue',
     });
-    expect(QualityLossIndexService.softDeleteSource).toHaveBeenCalledWith(
-      'Commissioning',
-      'issue-1',
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vehicle_commissioning_issues: prisma.vehicle_commissioning_issues,
+      }),
+      [{ source: 'COMMISSIONING', sourcePk: 'issue-1' }],
+      'vehicle-commissioning.deleted',
     );
     expect(SystemLogService.auditLog).toHaveBeenCalledWith(
       'vehicle-commissioning',
