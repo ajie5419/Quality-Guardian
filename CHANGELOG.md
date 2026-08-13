@@ -31,21 +31,21 @@
 
 **执行内容：**
 
-- 根因修复：远端发布器不再在 Prisma migration 前停止 backend。migration 与 release maintenance 使用新镜像 one-off 容器执行时，旧 backend 保持在线；仅在两项前置阶段完成后停止旧 backend 并启动新服务。
-- 回滚保留 compose 配置恢复、有界超时和固定 one-off 容器清理。migration、maintenance 失败或超时时，不会停止或重启仍在运行的旧 backend；仅已进入镜像切换后的失败路径才拉起旧 backend。
-- shell 行为测试锁定成功路径的 migration -> maintenance -> stop backend -> start services 顺序，并覆盖 migration failure、maintenance failure 与 maintenance timeout 均没有 backend stop/up 操作。
+- 根因修复：远端发布器不再在 Prisma migration 前停止 backend，也不再存在显式 `docker compose stop backend` 阶段。migration 与 release maintenance 使用新镜像 one-off 容器执行时，旧 backend 保持在线；仅在两项前置阶段完成后由 Compose 启动命令按新镜像重建服务。
+- 回滚保留 compose 配置恢复、有界超时和固定 one-off 容器清理。migration、maintenance 失败或超时时，不会对未切换的旧 backend 执行启动操作；切换命令前即记录 `backend_switch_started`，因此切换命令超时、失败或健康检查失败时，均会以旧 compose 配置再次启动 backend。
+- shell 行为测试锁定成功路径的 migration -> maintenance -> start services 顺序且无显式 backend stop；覆盖 migration failure、maintenance failure 与 maintenance timeout 均没有 backend stop/up，并覆盖 start-services failure 和健康检查失败均恢复旧 backend。
 
 **验证结果：**
 
-- `bash scripts/deploy/run-remote-release.test.sh` 通过，覆盖成功切换顺序、migration failure、maintenance failure、maintenance timeout、健康检查失败与 one-off preflight。
+- `bash scripts/deploy/run-remote-release.test.sh` 通过，覆盖成功切换顺序、migration failure、maintenance failure、maintenance timeout、start-services failure、健康检查失败与 one-off preflight。
 - `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/run-remote-release.test.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
 - 生产发布未执行。
 
-**commit:** 本次独立提交。
+**commits:** `bbf17ff3`（前置阶段保持旧 backend 在线）；本次移除显式 backend stop 的修正使用独立提交。
 
 **遗留问题：**
 
-- 生产环境仍须通过正式发布流程验证新旧镜像切换与健康检查失败回滚；migration 或 maintenance 失败时不得手动重启旧 backend。
+- 生产环境仍须通过正式发布流程验证新旧镜像切换与健康检查失败回滚。单实例 Compose 重建会短暂中断连接，不得宣称零停机发布；migration 或 maintenance 失败时不得手动重启旧 backend。
 
 ---
 

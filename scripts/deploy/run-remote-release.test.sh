@@ -44,6 +44,18 @@ assert_before() {
   }
 }
 
+assert_occurrences() {
+  local needle="$1"
+  local expected="$2"
+  local file="$3"
+  local actual
+  actual="$(grep -Fc -- "$needle" "$file" || true)"
+  [[ "$actual" == "$expected" ]] || {
+    echo "expected $expected occurrences of '$needle' in $file, got $actual" >&2
+    exit 1
+  }
+}
+
 assert_outer_timeout_budget() {
   assert_contains 'command_timeout: 60m' "$WORKFLOW"
   assert_contains '120m' "$OSS_ENTRYPOINT"
@@ -95,6 +107,14 @@ if [[ "$1" == compose ]]; then
     touch "$containers/$name"
     if [[ "$arguments" == *run-prisma-migrations* && "${FAKE_SCENARIO:-}" == migration-failure ]]; then exit 1; fi
     if [[ "$arguments" == *run-release-maintenance* && "${FAKE_SCENARIO:-}" == maintenance-failure ]]; then exit 1; fi
+  fi
+  if [[ "$arguments" == *'up -d redis backend frontend'* && "${FAKE_SCENARIO:-}" == start-services-failure ]]; then
+    attempts_file="$containers/start-services-attempts"
+    attempts=0
+    [[ -f "$attempts_file" ]] && attempts="$(cat "$attempts_file")"
+    attempts=$((attempts + 1))
+    printf '%s\n' "$attempts" > "$attempts_file"
+    [[ "$attempts" == 1 ]] && exit 1
   fi
 fi
 SCRIPT
@@ -171,8 +191,8 @@ assert_contains 'image: backend:new' "$CASE_DIRECTORY/docker-compose.yml"
 [[ ! -e "$CASE_DIRECTORY/containers/qms-release-migration" ]]
 [[ ! -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
 assert_before 'run --name qms-release-migration' 'run --name qms-release-maintenance' "$CASE_DIRECTORY/docker.log"
-assert_before 'run --name qms-release-maintenance' 'stop backend' "$CASE_DIRECTORY/docker.log"
-assert_before 'stop backend' 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
+assert_before 'run --name qms-release-maintenance' 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
 
 run_case migration-failure 1
 assert_contains 'stage=prisma-migrate state=failed' "$CASE_DIRECTORY/output.log"
@@ -193,26 +213,28 @@ assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
 assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
 assert_not_contains 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
 
+run_case start-services-failure 1
+assert_contains 'stage=start-services state=failed' "$CASE_DIRECTORY/output.log"
+assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
+assert_occurrences 'up -d redis backend frontend' 2 "$CASE_DIRECTORY/docker.log"
+
 run_case health-failure 1
 assert_contains 'stage=healthcheck state=failed' "$CASE_DIRECTORY/output.log"
 assert_contains 'image: old-frontend' "$CASE_DIRECTORY/docker-compose.yml"
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
+assert_occurrences 'up -d redis backend frontend' 2 "$CASE_DIRECTORY/docker.log"
 
 run_case residual 1
 assert_contains 'pre-existing one-off container: qms-release-maintenance' "$CASE_DIRECTORY/output.log"
 [[ -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
-if grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
-  echo 'residual container preflight stopped backend' >&2
-  exit 1
-fi
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
 
 run_case legacy-residual 1
 assert_contains 'pre-existing legacy backend one-off container: qms-backend-run-abcd1234' "$CASE_DIRECTORY/output.log"
 [[ -e "$CASE_DIRECTORY/containers/qms-backend-run-abcd1234" ]]
 assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
-if grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
-  echo 'legacy container preflight stopped backend' >&2
-  exit 1
-fi
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
 
 for scenario in preflight-error preflight-timeout legacy-preflight-error legacy-preflight-timeout; do
   run_case "$scenario" 1
@@ -222,10 +244,7 @@ for scenario in preflight-error preflight-timeout legacy-preflight-error legacy-
     assert_contains 'unable to inspect one-off container state' "$CASE_DIRECTORY/output.log"
   fi
   assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
-  if [[ -f "$CASE_DIRECTORY/docker.log" ]] && grep -Fq 'stop backend' "$CASE_DIRECTORY/docker.log"; then
-    echo "$scenario preflight stopped backend" >&2
-    exit 1
-  fi
+  [[ ! -f "$CASE_DIRECTORY/docker.log" ]] || assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
 done
 
 # A timeout must leave no release container behind, so the next invocation can proceed.

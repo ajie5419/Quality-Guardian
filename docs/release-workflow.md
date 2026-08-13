@@ -176,11 +176,11 @@ on:
 - 推送镜像到 ACR。
 - SSH 到 ECS 更新 compose 镜像 tag。
 - 在旧 backend 保持在线时执行 Prisma migration 和本版本启动前置的 release maintenance。
-- 仅在上述前置阶段成功后停止旧 backend，切换新 backend/frontend 并执行健康检查。
+- 仅在上述前置阶段成功后通过一次 Compose 启动命令切换新 backend/frontend 并执行健康检查。
 
 ### 发布前置数据任务
 
-发布执行器的顺序是：preflight -> 拉取镜像 -> 启动 Redis -> Prisma migration -> release maintenance -> 停止旧 backend -> 启动新服务 -> healthcheck。migration 与 maintenance 运行期间旧 backend 保持在线；maintenance 成功后才短暂停止旧 backend 以切换新镜像。maintenance 不是发布后的后台清理；它只能包含新版本启动前必须完成的幂等数据任务。
+发布执行器的顺序是：preflight -> 拉取镜像 -> 启动 Redis -> Prisma migration -> release maintenance -> 启动新服务 -> healthcheck。migration 与 maintenance 运行期间旧 backend 保持在线；maintenance 成功后，执行器不再显式停止 backend，而是由一次 Compose 启动命令按新镜像重建 backend/frontend。单实例 Compose 重建仍会产生短暂连接中断，不属于零停机发布。maintenance 不是发布后的后台清理；它只能包含新版本启动前必须完成的幂等数据任务。
 
 任务定义位于 `apps/backend/scripts/release-maintenance-manifest.ts`，由 `apps/backend/scripts/run-release-maintenance.ts` 读取并写入 `release_maintenance_tasks` ledger：
 
@@ -193,7 +193,7 @@ on:
 
 ### 有界执行与回滚
 
-远端发布统一由 `scripts/deploy/run-remote-release.sh` 执行。它使用固定容器名 `qms-release-migration` 与 `qms-release-maintenance`，对镜像拉取、migration、maintenance 和健康检查设置上限；失败或超时后清理固定容器并恢复备份 compose 配置。若 migration 或 maintenance 失败，旧 backend 从未停止，不会被回滚流程重启；只有已进入新镜像切换后的失败路径才拉起旧 backend。preflight 会在停止 backend 前拒绝已有的固定 one-off 容器，避免误杀其他发布。
+远端发布统一由 `scripts/deploy/run-remote-release.sh` 执行。它使用固定容器名 `qms-release-migration` 与 `qms-release-maintenance`，对镜像拉取、migration、maintenance 和健康检查设置上限；失败或超时后清理固定容器并恢复备份 compose 配置。若 migration 或 maintenance 失败，旧 backend 没有被 Compose 切换，回滚不会对 backend 执行启动操作；一旦 Compose 切换已开始，即使启动命令超时或失败，也会以旧 compose 配置再次启动 backend。preflight 会在切换前拒绝已有的固定 one-off 容器，避免误杀其他发布。
 
 如果生产发布失败，重试前必须人工确认失败原因、检查 compose 回滚和数据库状态，并定向清理已确认属于该失败发布的旧随机名 one-off 容器。不得直接重跑发布，更不得使用宽泛 Docker prune 或跳过 maintenance。
 
