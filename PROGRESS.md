@@ -2,6 +2,7 @@
 
 ## 当前状态
 
+- 报检详情身份展示已按持久化类别分离：`INCOMING` 使用详情 API 已透传的 `supplierName` 显示“供应商”，缺失快照显示 `-`；`PROCESS` 保持“班组”与 `team`。前端不再把供应商名称写入或回退到班组字段。
 - 报检入口责任部门默认值已在 Web 与 WeApp 统一：`OUTSOURCING_UNIT` 仅在完整选项中唯一精确匹配 canonical `生产 OBU` 时预选该部门，`SUPPLIER` 对 `采购部` 同理。共享纯函数保留同一责任类型的手动选择；空字段在选项未加载、零匹配或重名时保持未选并由提交校验 fail-closed，不硬编码部门 ID。
 - 最新变更: qgs v0.24.0 已发布（PR #94 合并、release PR #92 合并、tag `qgs-v0.24.0`）。tag deploy 曾因 17 条 PROCESS supplier identity unresolved 被维护门禁拦截，随后错误地以 `skip_maintenance=true` 完成部署；该绕过没有证明 17 条记录均为有效外包事实，不能再按“补 link 即可解决”处理。后续修复规定：内部 BU 的 supplier 字段必须清空；只有具有确定性 SUPPLIER 来源的外部 TEAM 才能建 link；其他记录继续阻断并待证据化处置。
 - 本轮独立验收修复已完成：画像/评分 supplier→TEAM 查询、在线与回填的 PROCESS 判定、内部字段清理审计和软删关联恢复均统一为 active TEAM + active exact SUPPLIER source + active PROCESS-policy link。DEPARTMENT+SUPPLIER 双来源不再被清理为内部，而是作为无效关联/未解析外部事实阻断；回填源 CAS 与 cleared/resolved/unresolved 审计位于同一事务。实现提交：`f9e325a1`、`d57a8303`、`ebc98eba`、`38e379bf`、`4fa20802`。

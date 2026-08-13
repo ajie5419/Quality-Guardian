@@ -118,6 +118,8 @@ Every new inspection request persists an explicit category:
 - `INCOMING` uses `supplierId` as its statistics identity.
 - `PROCESS` uses `teamId` as its statistics identity.
 
+详情卡片也按同一类别边界展示身份：`INCOMING` 显示“供应商”和响应中的 `supplierName` 快照，缺失快照显示 `-`；`PROCESS`（及无类别的旧记录）显示“班组”和 `team`。展示层不得将供应商名称写入、回退或推断为 `team`。
+
 `processName` is a mutable display snapshot and must not decide the online statistics domain. Release maintenance backfills legacy null categories after supplier and TEAM reconciliation. For the compatibility-only null-category path, `teamId` takes precedence because a process TEAM may also have a linked `supplierId`; a supplier ID is treated as incoming only when no TEAM ID exists. The historical incoming process name is used only by the one-time backfill when both IDs are absent.
 
 Request statistics aggregate by `teamId`, `supplierId`, and `inspectorId`. Canonical names are batch-resolved after aggregation and never participate in a map key, join, or category branch. Therefore:

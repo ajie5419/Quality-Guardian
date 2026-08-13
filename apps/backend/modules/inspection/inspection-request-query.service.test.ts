@@ -97,6 +97,7 @@ describe('inspection request query service', () => {
       processName: '进货检验',
       requestNo: 'IR-1',
       supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
       team: 'Supplier A',
       teamId: null,
       workOrderNumber: 'WO-001',
@@ -113,6 +114,10 @@ describe('inspection request query service', () => {
       responsibilityType: 'SUPPLIER',
       responsibleDepartment: '采购部',
       responsibleDepartmentId: 'dept-purchasing',
+      supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
+    });
+    expect(result).toMatchObject({
       supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });
