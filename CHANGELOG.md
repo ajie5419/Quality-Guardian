@@ -27,6 +27,14 @@
 
 ---
 
+## [0.24.13](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.12...qgs-v0.24.13) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** keep sidecar rebuild out of release maintenance ([d55d1bd](https://github.com/ajie5419/Quality-Guardian/commit/d55d1bd3acb6f74951746e74c59078cdba9b4560))
+* **@qgs/backend:** keep sidecar rebuild out of release maintenance ([ee42531](https://github.com/ajie5419/Quality-Guardian/commit/ee425315865fac8f344ad9cd03fe3ef592c02696))
+
 ### 2026-08-13 修复：发布前置阶段保持旧 backend 在线
 
 **执行内容：**
