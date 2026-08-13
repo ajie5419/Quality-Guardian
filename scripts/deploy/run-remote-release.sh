@@ -70,6 +70,7 @@ backup_created=0
 release_succeeded=0
 migration_started=0
 maintenance_started=0
+backend_stopped=0
 
 stage_start() {
   echo "[release] stage=$1 state=start"
@@ -118,7 +119,11 @@ rollback() {
 
   echo "[release] restoring previous compose configuration"
   cp "$backup_file" "$COMPOSE_FILE" || true
-  run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d redis backend frontend || true
+  if [[ "$backend_stopped" -eq 1 ]]; then
+    run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d redis backend frontend || true
+  else
+    run_with_timeout 180 docker compose -f "$COMPOSE_FILE" up -d redis frontend || true
+  fi
 }
 
 finish() {
@@ -257,9 +262,10 @@ mv "$tmp_compose" "$COMPOSE_FILE"
 
 run_stage "pull-images" 300 docker compose -f "$COMPOSE_FILE" pull backend frontend
 run_stage "start-redis" 120 docker compose -f "$COMPOSE_FILE" up -d redis
-run_stage "stop-backend" 120 docker compose -f "$COMPOSE_FILE" stop backend
 deploy_prisma_migrations
 run_one_off "release-maintenance" "$MAINTENANCE_TIMEOUT_SECONDS" "$MAINTENANCE_CONTAINER" "cd /app/apps/backend && sh scripts/run-release-maintenance.sh"
+run_stage "stop-backend" 120 docker compose -f "$COMPOSE_FILE" stop backend
+backend_stopped=1
 run_stage "start-services" 180 docker compose -f "$COMPOSE_FILE" up -d redis backend frontend
 healthcheck
 

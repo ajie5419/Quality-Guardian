@@ -22,6 +22,28 @@ assert_contains() {
   grep -Fq -- "$needle" "$file" || { echo "missing '$needle' in $file" >&2; exit 1; }
 }
 
+assert_not_contains() {
+  local needle="$1"
+  local file="$2"
+  if grep -Fq -- "$needle" "$file"; then
+    echo "unexpected '$needle' in $file" >&2
+    exit 1
+  fi
+}
+
+assert_before() {
+  local earlier="$1"
+  local later="$2"
+  local file="$3"
+  local earlier_line later_line
+  earlier_line="$(grep -Fn -- "$earlier" "$file" | head -n 1 | cut -d: -f1)"
+  later_line="$(grep -Fn -- "$later" "$file" | head -n 1 | cut -d: -f1)"
+  [[ -n "$earlier_line" && -n "$later_line" && "$earlier_line" -lt "$later_line" ]] || {
+    echo "expected '$earlier' before '$later' in $file" >&2
+    exit 1
+  }
+}
+
 assert_outer_timeout_budget() {
   assert_contains 'command_timeout: 60m' "$WORKFLOW"
   assert_contains '120m' "$OSS_ENTRYPOINT"
@@ -148,15 +170,28 @@ assert_contains 'stage=release-maintenance state=complete' "$CASE_DIRECTORY/outp
 assert_contains 'image: backend:new' "$CASE_DIRECTORY/docker-compose.yml"
 [[ ! -e "$CASE_DIRECTORY/containers/qms-release-migration" ]]
 [[ ! -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
+assert_before 'run --name qms-release-migration' 'run --name qms-release-maintenance' "$CASE_DIRECTORY/docker.log"
+assert_before 'run --name qms-release-maintenance' 'stop backend' "$CASE_DIRECTORY/docker.log"
+assert_before 'stop backend' 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
 
 run_case migration-failure 1
 assert_contains 'stage=prisma-migrate state=failed' "$CASE_DIRECTORY/output.log"
 assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
-assert_contains 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
+assert_not_contains 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
+
+run_case maintenance-failure 1
+assert_contains 'stage=release-maintenance state=failed' "$CASE_DIRECTORY/output.log"
+assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
+assert_not_contains 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
 
 run_case maintenance-timeout 1
 assert_contains 'stage=release-maintenance state=failed' "$CASE_DIRECTORY/output.log"
 [[ ! -e "$CASE_DIRECTORY/containers/qms-release-maintenance" ]]
+assert_contains 'image: old-backend' "$CASE_DIRECTORY/docker-compose.yml"
+assert_not_contains 'stop backend' "$CASE_DIRECTORY/docker.log"
+assert_not_contains 'up -d redis backend frontend' "$CASE_DIRECTORY/docker.log"
 
 run_case health-failure 1
 assert_contains 'stage=healthcheck state=failed' "$CASE_DIRECTORY/output.log"

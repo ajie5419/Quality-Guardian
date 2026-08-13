@@ -27,6 +27,28 @@
 
 ---
 
+### 2026-08-13 修复：发布前置阶段保持旧 backend 在线
+
+**执行内容：**
+
+- 根因修复：远端发布器不再在 Prisma migration 前停止 backend。migration 与 release maintenance 使用新镜像 one-off 容器执行时，旧 backend 保持在线；仅在两项前置阶段完成后停止旧 backend 并启动新服务。
+- 回滚保留 compose 配置恢复、有界超时和固定 one-off 容器清理。migration、maintenance 失败或超时时，不会停止或重启仍在运行的旧 backend；仅已进入镜像切换后的失败路径才拉起旧 backend。
+- shell 行为测试锁定成功路径的 migration -> maintenance -> stop backend -> start services 顺序，并覆盖 migration failure、maintenance failure 与 maintenance timeout 均没有 backend stop/up 操作。
+
+**验证结果：**
+
+- `bash scripts/deploy/run-remote-release.test.sh` 通过，覆盖成功切换顺序、migration failure、maintenance failure、maintenance timeout、健康检查失败与 one-off preflight。
+- `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/run-remote-release.test.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+- 生产发布未执行。
+
+**commit:** 本次独立提交。
+
+**遗留问题：**
+
+- 生产环境仍须通过正式发布流程验证新旧镜像切换与健康检查失败回滚；migration 或 maintenance 失败时不得手动重启旧 backend。
+
+---
+
 ### 2026-08-13 修复：质量损失索引持久化队列与发布可靠性闭环
 
 **执行内容：**
