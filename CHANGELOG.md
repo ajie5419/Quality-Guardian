@@ -27,6 +27,25 @@
 
 ---
 
+## [0.25.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.13...qgs-v0.25.0) (2026-08-13)
+
+
+### Features
+
+* **@qgs/backend:** version release maintenance tasks ([8da5c1a](https://github.com/ajie5419/Quality-Guardian/commit/8da5c1a1b8d5eea53f0bb802b233ef682e1c6c73))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** persist quality loss index jobs ([d567fb6](https://github.com/ajie5419/Quality-Guardian/commit/d567fb657b19a5047d7545911a45d1f13df71bde))
+* **@qgs/backend:** remove redis from release maintenance ([22cc54e](https://github.com/ajie5419/Quality-Guardian/commit/22cc54e408b3cf5efe833c0da03392dfda6f8c6e))
+* **deploy:** block stale compose one-offs ([8f08c0d](https://github.com/ajie5419/Quality-Guardian/commit/8f08c0de5838110a2d487e955eac2d3aa65508ad))
+* **deploy:** bound release execution and rollback ([4fce2d1](https://github.com/ajie5419/Quality-Guardian/commit/4fce2d153d325961aa701614adf7a73fc53c55c0))
+* **deploy:** fail closed on release preflight ([f54859d](https://github.com/ajie5419/Quality-Guardian/commit/f54859d7074ba8121aacf86ada82dc8e662a17fc))
+* **deploy:** keep backend online during release preflight ([bbf17ff](https://github.com/ajie5419/Quality-Guardian/commit/bbf17ff37f8fcf3d52d3a00f5dc4579a6df39bb1))
+* **deploy:** make release maintenance versioned and bounded ([a0e2c2b](https://github.com/ajie5419/Quality-Guardian/commit/a0e2c2be5bdd7ea3634be7a974df8730e7ccab8c))
+* **deploy:** restore backend after failed compose switch ([acc6be4](https://github.com/ajie5419/Quality-Guardian/commit/acc6be43ff5cca335117570b63f3c35c12687618))
+
 ### 2026-08-13 修复：release maintenance manifest 测试工作目录依赖
 
 **执行内容：**
