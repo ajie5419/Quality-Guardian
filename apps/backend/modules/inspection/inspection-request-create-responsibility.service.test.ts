@@ -1,10 +1,18 @@
-import { SUPPLIER_CATEGORY } from '@qgs/shared';
+import {
+  getInspectionRequestResponsibilitySupplierCategory,
+  OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+  SUPPLIER_CATEGORY,
+} from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { resolveV2RequestResponsibility } from './inspection-request-create-responsibility.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
+
+const { resolveProcessOutsourcingResponsibleDepartmentId } = vi.hoisted(() => ({
+  resolveProcessOutsourcingResponsibleDepartmentId: vi.fn(),
+}));
 
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: {
@@ -21,6 +29,10 @@ vi.mock('./inspection-request-responsibility-policy.service', () => ({
   assertInspectionRequestResponsibilityPolicy: vi.fn(),
 }));
 
+vi.mock('./inspection-request-responsibility-default.service', () => ({
+  resolveProcessOutsourcingResponsibleDepartmentId,
+}));
+
 describe('resolveV2RequestResponsibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -31,6 +43,9 @@ describe('resolveV2RequestResponsibility', () => {
       supplierId: null,
       supplierName: null,
     });
+    resolveProcessOutsourcingResponsibleDepartmentId.mockResolvedValue(
+      'dept-production',
+    );
   });
 
   it('accepts direct internal responsibility without an execution TEAM', async () => {
@@ -63,7 +78,7 @@ describe('resolveV2RequestResponsibility', () => {
   it('allows INCOMING external responsibility when its supplier category matches', async () => {
     vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
       responsibilityType: 'OUTSOURCING_UNIT',
-      responsibleDepartment: 'Production OBU',
+      responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
       responsibleDepartmentId: 'dept-production',
       supplierId: 'supplier-outsourcing',
       supplierName: 'Outsourcing Supplier',
@@ -125,5 +140,55 @@ describe('resolveV2RequestResponsibility', () => {
     ).rejects.toMatchObject({
       code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
     });
+  });
+
+  it('server-resolves the hidden PROCESS outsourcing department before creating R', async () => {
+    expect(
+      getInspectionRequestResponsibilitySupplierCategory('OUTSOURCING_UNIT'),
+    ).toBe(SUPPLIER_CATEGORY.OUTSOURCING);
+    vi.mocked(resolveInspectionIssueResponsibility)
+      .mockReset()
+      .mockResolvedValue({
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-outsourcing',
+        supplierName: 'Outsourcing Unit A',
+      });
+    vi.mocked(SupplierIdentityService.resolveSupplierById)
+      .mockReset()
+      .mockResolvedValue({
+        category: SUPPLIER_CATEGORY.OUTSOURCING,
+        id: 'supplier-outsourcing',
+        name: 'Outsourcing Unit A',
+      });
+    await expect(
+      SupplierIdentityService.resolveSupplierById(
+        'supplier-outsourcing',
+        {} as any,
+      ),
+    ).resolves.toMatchObject({ category: SUPPLIER_CATEGORY.OUTSOURCING });
+
+    await expect(
+      resolveV2RequestResponsibility(
+        {
+          category: 'PROCESS',
+          v2Responsibility: {
+            responsibilityType: 'OUTSOURCING_UNIT',
+            supplierId: 'supplier-outsourcing',
+          },
+        },
+        {} as any,
+      ),
+    ).resolves.toMatchObject({
+      supplierId: 'supplier-outsourcing',
+      team: '',
+      teamId: null,
+    });
+    expect(resolveProcessOutsourcingResponsibleDepartmentId).toHaveBeenCalled();
+    expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+      expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
+      expect.any(Object),
+    );
   });
 });

@@ -76,16 +76,19 @@ function createForm() {
     selfCheckResult: 'PASS' as const,
     stationSelection: null,
     supplierId: 'supplier-old',
-    team: 'Legacy Unit',
-    teamId: 'team-old',
     workOrderNumber: '',
     workOrderNumbers: [],
   };
 }
 
-function mountFields(isIncomingEntry: boolean) {
+function mountFields(
+  isIncomingEntry: boolean,
+  responsibilityType?: 'INTERNAL_DEPARTMENT' | 'OUTSOURCING_UNIT' | 'SUPPLIER',
+) {
   const form = createForm();
-  if (isIncomingEntry) form.responsibilityType = 'SUPPLIER';
+  form.responsibilityType =
+    responsibilityType ||
+    (isIncomingEntry ? 'SUPPLIER' : 'INTERNAL_DEPARTMENT');
   const wrapper = mount(InspectionRequestEntryFormFields, {
     props: {
       attachmentFileList: [],
@@ -99,19 +102,9 @@ function mountFields(isIncomingEntry: boolean) {
         partLabel: 'Part',
         partPlaceholder: 'Select part',
         processLabel: 'Process',
-        teamLabel: 'Responsible unit',
-        teamPlaceholder: 'Select unit',
       },
       form,
       isIncomingEntry,
-      internalTeamOptions: [
-        {
-          group: 'internal',
-          label: 'Assembly Team',
-          responsibleDepartmentId: 'dept-assembly',
-          value: 'team-assembly',
-        },
-      ],
       partSearchLoading: false,
       processOptions: [],
       responsibilityDepartmentOptions: [
@@ -171,7 +164,7 @@ describe('inspection request entry responsibility identity', () => {
     ]);
   });
 
-  it('writes a supplier canonical ID and clears stale TEAM identity', async () => {
+  it('writes a supplier canonical ID without a TEAM field', async () => {
     const { form, wrapper } = mountFields(true);
     const select = wrapper
       .findAllComponents({ name: 'MockSelect' })
@@ -186,12 +179,10 @@ describe('inspection request entry responsibility identity', () => {
 
     expect(form).toMatchObject({
       supplierId: 'supplier-1',
-      team: '',
-      teamId: '',
     });
   });
 
-  it('keeps a department without a TEAM selectable and only accepts matching execution TEAMs', async () => {
+  it('keeps a department selectable without an execution TEAM control', async () => {
     const { form, wrapper } = mountFields(false);
     const departmentSelect = wrapper
       .findAllComponents({ name: 'MockSelect' })
@@ -206,25 +197,35 @@ describe('inspection request entry responsibility identity', () => {
 
     expect(form).toMatchObject({
       responsibleDepartmentId: 'dept-structure',
-      teamId: '',
     });
+    expect(
+      wrapper
+        .findAllComponents({ name: 'MockSelect' })
+        .some(
+          (item) => item.attributes('data-testid') === 'execution-team-select',
+        ),
+    ).toBe(false);
+  });
 
-    departmentSelect?.vm.$emit('change', 'dept-assembly');
-    await wrapper.vm.$nextTick();
-    const teamSelect = wrapper
-      .findAllComponents({ name: 'MockSelect' })
-      .find(
-        (item) => item.attributes('data-testid') === 'execution-team-select',
-      );
+  it('hides the client responsibility department for PROCESS outsourcing', () => {
+    const { wrapper } = mountFields(false, 'OUTSOURCING_UNIT');
 
-    expect(teamSelect).toBeDefined();
-    teamSelect?.vm.$emit('change', 'team-assembly');
-    await wrapper.vm.$nextTick();
-
-    expect(form).toMatchObject({
-      responsibleDepartmentId: 'dept-assembly',
-      teamId: 'team-assembly',
-    });
+    expect(
+      wrapper
+        .findAllComponents({ name: 'MockSelect' })
+        .some(
+          (item) =>
+            item.attributes('data-testid') === 'responsible-department-select',
+        ),
+    ).toBe(false);
+    expect(
+      wrapper
+        .findAllComponents({ name: 'MockSelect' })
+        .some(
+          (item) =>
+            item.attributes('data-testid') === 'responsible-supplier-select',
+        ),
+    ).toBe(true);
   });
 });
 
@@ -253,12 +254,9 @@ describe('inspection request entry incoming type options', () => {
           partLabel: 'Part',
           partPlaceholder: 'Select part',
           processLabel: 'Process',
-          teamLabel: 'Responsible unit',
-          teamPlaceholder: 'Select unit',
         },
         form,
         isIncomingEntry: true,
-        internalTeamOptions: [],
         partSearchLoading: false,
         processOptions: [
           { label: '原材料', processName: '原材料', value: 'proc-raw' },

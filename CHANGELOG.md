@@ -27,6 +27,32 @@
 
 ---
 
+### 2026-08-13 修复：过程报检内部责任部门作为班组展示
+
+**执行内容：**
+
+- 统一 `PROCESS + INTERNAL_DEPARTMENT` 的业务班组语义：Web 和 WeApp 报检入口移除执行班组控件及提交字段，V2 服务端拒绝客户端携带的 `team/teamId`。
+- PROCESS 外协报检仅选择外协单位：Web/WeApp 隐藏且不提交责任部门，服务端复用 shared 既有外协责任部门策略唯一解析活跃 canonical 部门；缺失或重名配置 fail-closed。PROCESS 责任类型去除 SUPPLIER，INCOMING 保持原有供应商语义。
+- 请求、检验记录、导出与班组筛选统一把 `PROCESS + OUTSOURCING_UNIT` 显示和匹配为 canonical `supplierName`，不依赖或写入 `team/teamId`；关单继续以同一 R 原子投影 inspection 与 NC。
+- 报检任务 API 与检验记录 API 现共享同一 PROCESS 内部班组展示规则：创建后、关闭前的任务列表/详情已将 `responsibleDepartment` 返回为 `team`；Web 表格、顶部详情抽屉、待派单提醒及 WeApp 列表、派单详情、关单页均直接展示该 API 字段，无需各自补偿。
+- 关单事务提取报检任务完整责任 R，并逐条复制至新建多工单检验记录、空事实的显式关联检验记录和 FAIL 不合格项；partial/conflict 记录与 PASS legacy 无 R 均 fail-closed，不把部门 ID 写入 `teamId`。
+- 列表、详情、导出和班组筛选使用责任部门作为内部过程检验的班组展示；历史记录自身缺失时批量读取关联报检任务，只有唯一内部责任部门才兼容展示，冲突保持空，外协和真实 TEAM 记录不变。
+- 追加关单 R 投影、existing 冲突、PASS/FAIL 与详情/列表/导出/筛选历史兼容回归，并更新 inspection 架构与进度文档。
+
+**验证结果：**
+
+- 后端定向 Vitest：`10/10` 文件、`106/106` 用例通过，覆盖新建多工单、PASS/FAIL、显式关联记录、NC 责任投影、历史详情/列表/导出、筛选和冲突关联。
+- 本次报检前展示回归：后端 `3/3` 文件、`15/15` 用例及 Web 顶部详情抽屉 `1/1` 文件、`3/3` 用例通过，覆盖 `Structure BU1` 的 API 列表/详情映射和卡片展示。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** 未提交（按本次任务要求）。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start，未推送或发布。
+
+---
+
 ### 2026-08-13 修复：报检详情身份字段按类别展示
 
 **执行内容：**

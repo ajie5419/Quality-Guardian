@@ -31,8 +31,6 @@ type RequestForm = {
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection: null | { indexes: number[]; mode: 'ALL' | 'PARTIAL' };
   supplierId: string;
-  team: string;
-  teamId: string;
   workOrderNumber: string;
   workOrderNumbers: string[];
 };

@@ -2,7 +2,6 @@
 import type {
   InspectionRequestResponsibilityDepartmentOption,
   InspectionRequestResponsibilitySupplierOption,
-  InspectionRequestTeamOption,
 } from '@qgs/shared';
 
 import { computed, reactive, ref } from 'vue';
@@ -13,7 +12,6 @@ import {
   getInspectionRequestSettings,
   getPartOptions,
   getProcesses,
-  getTeams,
   searchWorkOrders,
   submitInspectionRequest,
 } from '@/api/inspection';
@@ -27,9 +25,9 @@ import {
 
 import {
   buildRequestCreateResponsibilityPayload,
+  getRequestCreateResponsibilityLabels,
+  getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
-  REQUEST_CREATE_RESPONSIBILITY_LABELS,
-  REQUEST_CREATE_RESPONSIBILITY_TYPES,
   resolveRequestCreateResponsibilityDepartmentDefault,
 } from './create-responsibility';
 
@@ -71,8 +69,6 @@ interface FormState {
   partId: string;
   partName: string;
   quantity: null | number;
-  team: string;
-  teamId: string;
   reporter: string;
   responsibilityType: 'INTERNAL_DEPARTMENT' | 'OUTSOURCING_UNIT' | 'SUPPLIER';
   responsibleDepartmentId: string;
@@ -96,8 +92,6 @@ const form = reactive<FormState>({
   partId: '',
   partName: '',
   quantity: null,
-  team: '',
-  teamId: '',
   reporter: '',
   responsibilityType: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
   responsibleDepartmentId: '',
@@ -115,7 +109,7 @@ const errors = reactive({
   processName: false,
   componentName: false,
   reporter: false,
-  team: false,
+  responsibility: false,
   attachments: false,
 });
 
@@ -141,7 +135,6 @@ const bomPartList = ref<BomPartItem[]>([]);
 const departmentOptions = ref<
   InspectionRequestResponsibilityDepartmentOption[]
 >([]);
-const internalTeamOptions = ref<InspectionRequestTeamOption[]>([]);
 const supplierOptions = ref<InspectionRequestResponsibilitySupplierOption[]>(
   [],
 );
@@ -150,7 +143,6 @@ const supplierOptions = ref<InspectionRequestResponsibilitySupplierOption[]>(
 const processIndex = ref(-1);
 const bomPartIndex = ref(-1);
 const departmentIndex = ref(-1);
-const internalTeamIndex = ref(-1);
 const supplierIndex = ref(-1);
 const selfCheckIndex = ref(-1);
 const mutualCheckIndex = ref(-1);
@@ -175,18 +167,6 @@ const incomingPartOptions = computed(() => {
 const processLabels = computed(() =>
   processList.value.map((item) => item.processName),
 );
-const internalTeamLabels = computed(() =>
-  internalTeamOptions.value
-    .filter(
-      (item) => item.responsibleDepartmentId === form.responsibleDepartmentId,
-    )
-    .map((item) => item.label),
-);
-const selectedInternalTeamOptions = computed(() =>
-  internalTeamOptions.value.filter(
-    (item) => item.responsibleDepartmentId === form.responsibleDepartmentId,
-  ),
-);
 const departmentLabels = computed(() =>
   departmentOptions.value.map((item) => item.label),
 );
@@ -208,7 +188,20 @@ const selectedSupplierLabel = computed(
     supplierOptions.value.find((item) => item.value === form.supplierId)
       ?.label || '',
 );
-const responsibilityTypeLabels = REQUEST_CREATE_RESPONSIBILITY_LABELS;
+const responsibilityTypes = computed(() =>
+  getRequestCreateResponsibilityTypes(form.category),
+);
+const responsibilityTypeLabels = computed(() =>
+  getRequestCreateResponsibilityLabels(form.category),
+);
+const responsibilityTypeIndex = computed(() =>
+  Math.max(0, responsibilityTypes.value.indexOf(form.responsibilityType)),
+);
+const isProcessOutsourcing = computed(
+  () =>
+    form.category === 'PROCESS' &&
+    form.responsibilityType === 'OUTSOURCING_UNIT',
+);
 const responsibilityUnitLabel = computed(() =>
   form.responsibilityType === 'OUTSOURCING_UNIT' ? '外协单位' : '供应商',
 );
@@ -261,58 +254,25 @@ async function loadResponsibilityOptions() {
     if (!isCurrentRequest()) return;
     if (res.code !== 0 || !res.data) {
       departmentOptions.value = [];
-      internalTeamOptions.value = [];
       supplierOptions.value = [];
       return;
     }
     departmentOptions.value = res.data.departments;
     supplierOptions.value = res.data.suppliers;
-    form.responsibleDepartmentId =
-      resolveRequestCreateResponsibilityDepartmentDefault({
-        currentResponsibleDepartmentId: form.responsibleDepartmentId,
-        departments: departmentOptions.value,
-        responsibilityType: requestedResponsibilityType,
-      });
+    form.responsibleDepartmentId = isProcessOutsourcing.value
+      ? ''
+      : resolveRequestCreateResponsibilityDepartmentDefault({
+          currentResponsibleDepartmentId: form.responsibleDepartmentId,
+          departments: departmentOptions.value,
+          responsibilityType: requestedResponsibilityType,
+        });
     departmentIndex.value = departmentOptions.value.findIndex(
       (item) => item.value === form.responsibleDepartmentId,
     );
-    if (isExternalResponsibility.value) {
-      internalTeamOptions.value = [];
-      form.team = '';
-      form.teamId = '';
-      internalTeamIndex.value = -1;
-      return;
-    }
-    const teams = await getTeams();
-    if (!isCurrentRequest()) return;
-    internalTeamOptions.value =
-      teams.code === 0 && Array.isArray(teams.data)
-        ? teams.data.filter(
-            (item) =>
-              item.group === 'internal' &&
-              Boolean(item.responsibleDepartmentId),
-          )
-        : [];
-    departmentIndex.value = departmentOptions.value.findIndex(
-      (item) => item.value === form.responsibleDepartmentId,
-    );
-    internalTeamIndex.value = selectedInternalTeamOptions.value.findIndex(
-      (item) => item.value === form.teamId,
-    );
-    if (
-      form.teamId &&
-      !selectedInternalTeamOptions.value.some(
-        (item) => item.value === form.teamId,
-      )
-    ) {
-      form.teamId = '';
-      form.team = '';
-    }
-    form.supplierId = '';
+    if (!isExternalResponsibility.value) form.supplierId = '';
   } catch {
     if (!isCurrentRequest()) return;
     departmentOptions.value = [];
-    internalTeamOptions.value = [];
     supplierOptions.value = [];
   }
 }
@@ -320,10 +280,7 @@ async function loadResponsibilityOptions() {
 function resetResponsibilityIdentity() {
   form.responsibleDepartmentId = '';
   form.supplierId = '';
-  form.team = '';
-  form.teamId = '';
   departmentIndex.value = -1;
-  internalTeamIndex.value = -1;
   supplierIndex.value = -1;
 }
 
@@ -480,47 +437,26 @@ function selectIncomingPart(item: PartOptionItem) {
 }
 
 function onResponsibilityTypeChange(e: { detail: { value: string } }) {
-  const responsibilityType =
-    REQUEST_CREATE_RESPONSIBILITY_TYPES[Number(e.detail.value)];
+  const responsibilityType = responsibilityTypes.value[Number(e.detail.value)];
   if (!responsibilityType) return;
   form.responsibilityType = responsibilityType;
   resetResponsibilityIdentity();
   void loadResponsibilityOptions();
 }
 
-function onInternalTeamChange(e: { detail: { value: string } }) {
-  const idx = Number(e.detail.value);
-  internalTeamIndex.value = idx;
-  const team = selectedInternalTeamOptions.value[idx];
-  form.teamId = team?.value ?? '';
-  form.team = team?.label ?? '';
-  form.supplierId = '';
-  errors.team = false;
-}
-
 function onResponsibilityDepartmentChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
   departmentIndex.value = idx;
   form.responsibleDepartmentId = departmentOptions.value[idx]?.value ?? '';
-  if (
-    form.responsibilityType === 'INTERNAL_DEPARTMENT' &&
-    !selectedInternalTeamOptions.value.some(
-      (team) => team.value === form.teamId,
-    )
-  ) {
-    form.team = '';
-    form.teamId = '';
-    internalTeamIndex.value = -1;
-  }
   form.supplierId = '';
-  errors.team = false;
+  errors.responsibility = false;
 }
 
 function onSupplierChange(e: { detail: { value: string } }) {
   const idx = Number(e.detail.value);
   supplierIndex.value = idx;
   form.supplierId = supplierOptions.value[idx]?.value ?? '';
-  errors.team = false;
+  errors.responsibility = false;
 }
 
 function onSelfCheckChange(e: { detail: { value: string } }) {
@@ -590,8 +526,8 @@ function validate(): boolean {
       : !form.partId) ||
     (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
-  errors.team =
-    !form.responsibleDepartmentId ||
+  errors.responsibility =
+    (!isProcessOutsourcing.value && !form.responsibleDepartmentId) ||
     (isExternalResponsibility.value ? !form.supplierId : false);
   errors.attachments = form.attachments.length === 0;
   return (
@@ -599,7 +535,7 @@ function validate(): boolean {
     !errors.processName &&
     !errors.componentName &&
     !errors.reporter &&
-    !errors.team &&
+    !errors.responsibility &&
     !errors.attachments
   );
 }
@@ -626,9 +562,7 @@ async function handleSubmit() {
     }
     const responsibilityPayload = buildRequestCreateResponsibilityPayload({
       ...form,
-      teamResponsibleDepartmentId: internalTeamOptions.value.find(
-        (team) => team.value === form.teamId,
-      )?.responsibleDepartmentId,
+      category: form.category || undefined,
     });
     if (!responsibilityPayload) {
       throw new Error('请填写完整的责任归属信息');
@@ -819,7 +753,7 @@ async function handleSubmit() {
         </view>
 
         <!-- Responsibility identity is explicit; display names never cross the write boundary. -->
-        <view class="form-item" :class="{ error: errors.team }">
+        <view class="form-item" :class="{ error: errors.responsibility }">
           <view class="label-wrap">
             <text class="required-star">*</text>
             <text class="label">责任归属类型</text>
@@ -828,31 +762,23 @@ async function handleSubmit() {
             class="picker"
             mode="selector"
             :range="responsibilityTypeLabels"
-            :value="
-              form.responsibilityType === 'SUPPLIER'
-                ? 1
-                : form.responsibilityType === 'OUTSOURCING_UNIT'
-                  ? 2
-                  : 0
-            "
+            :value="responsibilityTypeIndex"
             @change="onResponsibilityTypeChange"
           >
             <view class="picker-inner">
               <text class="picker-text">{{
-                responsibilityTypeLabels[
-                  form.responsibilityType === 'SUPPLIER'
-                    ? 1
-                    : form.responsibilityType === 'OUTSOURCING_UNIT'
-                      ? 2
-                      : 0
-                ]
+                responsibilityTypeLabels[responsibilityTypeIndex]
               }}</text>
               <text class="picker-arrow">›</text>
             </view>
           </picker>
         </view>
 
-        <view class="form-item" :class="{ error: errors.team }">
+        <view
+          v-if="!isProcessOutsourcing"
+          class="form-item"
+          :class="{ error: errors.responsibility }"
+        >
           <view class="label-wrap">
             <text class="required-star">*</text>
             <text class="label">责任部门</text>
@@ -878,41 +804,10 @@ async function handleSubmit() {
         </view>
 
         <view
-          v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
+          v-if="form.responsibilityType !== 'INTERNAL_DEPARTMENT'"
           class="form-item"
+          :class="{ error: errors.responsibility }"
         >
-          <view class="label-wrap">
-            <text class="label-spacer" />
-            <text class="label">执行班组（选填）</text>
-          </view>
-          <picker
-            class="picker"
-            mode="selector"
-            :range="internalTeamLabels"
-            :value="internalTeamIndex"
-            :disabled="
-              !form.responsibleDepartmentId ||
-              selectedInternalTeamOptions.length === 0
-            "
-            @change="onInternalTeamChange"
-          >
-            <view class="picker-inner">
-              <text
-                class="picker-text"
-                :class="{ 'picker-placeholder': !form.teamId }"
-              >
-                {{
-                  selectedInternalTeamOptions.find(
-                    (item) => item.value === form.teamId,
-                  )?.label || '请选择执行班组（选填）'
-                }}
-              </text>
-              <text class="picker-arrow">›</text>
-            </view>
-          </picker>
-        </view>
-
-        <view v-else class="form-item" :class="{ error: errors.team }">
           <view class="label-wrap">
             <text class="required-star">*</text>
             <text class="label">{{ responsibilityUnitLabel }}</text>

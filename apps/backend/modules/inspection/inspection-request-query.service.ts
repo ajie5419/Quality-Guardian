@@ -57,9 +57,7 @@ async function buildRequestListWhere(
       ? { workOrderNumber: query.workOrderNumber }
       : {}),
     ...(query.processName ? { processName: query.processName } : {}),
-    ...(query.team
-      ? await buildTeamContainsWhere({ keyword: query.team })
-      : {}),
+    ...(query.team ? await buildRequestTeamDisplayWhere(query.team) : {}),
     ...(query.keyword
       ? {
           OR: [
@@ -71,10 +69,28 @@ async function buildRequestListWhere(
             { processName: { contains: query.keyword } },
             { process: { is: { name: { contains: query.keyword } } } },
             { reporter: { contains: query.keyword } },
-            await buildTeamContainsWhere({ keyword: query.keyword }),
+            await buildRequestTeamDisplayWhere(query.keyword),
           ],
         }
       : {}),
+  };
+}
+
+async function buildRequestTeamDisplayWhere(keyword: string) {
+  return {
+    OR: [
+      await buildTeamContainsWhere({ keyword }),
+      {
+        category: 'PROCESS',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: { contains: keyword },
+      },
+      {
+        category: 'PROCESS',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        supplierName: { contains: keyword },
+      },
+    ],
   };
 }
 

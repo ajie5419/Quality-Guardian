@@ -2,7 +2,8 @@
 
 ## 当前状态
 
-- 报检详情身份展示已按持久化类别分离：`INCOMING` 使用详情 API 已透传的 `supplierName` 显示“供应商”，缺失快照显示 `-`；`PROCESS` 保持“班组”与 `team`。前端不再把供应商名称写入或回退到班组字段。
+- PROCESS 内部报检的业务“班组”已收敛为 canonical `responsibleDepartment`：Web/WeApp 入口不再展示或提交执行 TEAM，V2 后端拒绝 `team/teamId`。PROCESS 仅允许内部部门或外协单位；外协入口隐藏责任部门，创建事务从 shared 既有外协责任部门策略唯一解析活跃 canonical 部门，缺失/重名 fail-closed。请求 API 和检验记录 API 共用同一后端展示规则：PROCESS 内部显示责任部门，PROCESS 外协显示 canonical `supplierName`，外部/历史行仍返回真实 TEAM；绝不伪造 TEAM ID。关单事务以报检任务完整 R（责任类型、部门 ID/名称、供应商 ID/名称）为唯一事实，逐条投影新建多工单记录、空事实的显式关联记录和 FAIL 不合格项；partial/conflict fail-closed，PASS legacy 无 R 阻断。历史 inspection 自身缺失时仅在关联报检任务唯一同部门时兼容展示，冲突保持空。未运行 dev/build/start，未提交或发布。
+- 报检详情身份展示已按持久化类别分离：`INCOMING` 使用详情 API 已透传的 `supplierName` 显示“供应商”，缺失快照显示 `-`；`PROCESS + INTERNAL_DEPARTMENT` 显示责任部门这一业务班组，其他 PROCESS 记录保持真实 `team`。前端不再把供应商名称写入或回退到班组字段。
 - 报检入口责任部门默认值已在 Web 与 WeApp 统一：`OUTSOURCING_UNIT` 仅在完整选项中唯一精确匹配 canonical `生产 OBU` 时预选该部门，`SUPPLIER` 对 `采购部` 同理。共享纯函数保留同一责任类型的手动选择；空字段在选项未加载、零匹配或重名时保持未选并由提交校验 fail-closed，不硬编码部门 ID。
 - 最新变更: qgs v0.24.0 已发布（PR #94 合并、release PR #92 合并、tag `qgs-v0.24.0`）。tag deploy 曾因 17 条 PROCESS supplier identity unresolved 被维护门禁拦截，随后错误地以 `skip_maintenance=true` 完成部署；该绕过没有证明 17 条记录均为有效外包事实，不能再按“补 link 即可解决”处理。后续修复规定：内部 BU 的 supplier 字段必须清空；只有具有确定性 SUPPLIER 来源的外部 TEAM 才能建 link；其他记录继续阻断并待证据化处置。
 - 本轮独立验收修复已完成：画像/评分 supplier→TEAM 查询、在线与回填的 PROCESS 判定、内部字段清理审计和软删关联恢复均统一为 active TEAM + active exact SUPPLIER source + active PROCESS-policy link。DEPARTMENT+SUPPLIER 双来源不再被清理为内部，而是作为无效关联/未解析外部事实阻断；回填源 CAS 与 cleared/resolved/unresolved 审计位于同一事务。实现提交：`f9e325a1`、`d57a8303`、`ebc98eba`、`38e379bf`、`4fa20802`。

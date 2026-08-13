@@ -10,11 +10,13 @@ import { buildResourceUrl } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
 
 interface TaskInfo {
+  category?: 'INCOMING' | 'PROCESS';
   requestNo: string;
   workOrderNumber: string;
   partName: string;
   processName: string;
   reporter: string;
+  team?: null | string;
   attachments: Array<{ name: string; url: string }>;
 }
 
@@ -49,11 +51,16 @@ async function loadData(id: string) {
       const d = detailRes.data as Record<string, unknown>;
       const rawAttachments = Array.isArray(d.attachments) ? d.attachments : [];
       task.value = {
+        category:
+          d.category === 'INCOMING' || d.category === 'PROCESS'
+            ? d.category
+            : undefined,
         requestNo: String(d.requestNo ?? ''),
         workOrderNumber: String(d.workOrderNumber ?? ''),
         partName: String(d.partName ?? ''),
         processName: String(d.processName ?? ''),
         reporter: String(d.reporter ?? ''),
+        team: (d.team as null | string) || null,
         attachments: rawAttachments.map((a: unknown) => {
           if (typeof a === 'string')
             return { name: a.split('/').pop() ?? '附件', url: a };
@@ -173,6 +180,10 @@ onLoad((options) => {
         <view class="info-row">
           <text class="info-label">工序</text>
           <text class="info-value">{{ task.processName }}</text>
+        </view>
+        <view v-if="task.category === 'PROCESS'" class="info-row">
+          <text class="info-label">班组</text>
+          <text class="info-value">{{ task.team || '-' }}</text>
         </view>
         <view class="info-row">
           <text class="info-label">报检人</text>

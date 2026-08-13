@@ -23,7 +23,10 @@ import {
 } from './inspection-request-close-effects.service';
 import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
 import { createCloseInspectionRecords } from './inspection-request-close-records.service';
-import { resolveLegacyCloseRequestResponsibility } from './inspection-request-close-responsibility.service';
+import {
+  buildCloseInspectionResponsibilityWrite,
+  resolveLegacyCloseRequestResponsibility,
+} from './inspection-request-close-responsibility.service';
 import {
   failCloseRequest,
   parseCloseRequestNumber,
@@ -127,13 +130,11 @@ export const InspectionRequestCloseService = {
 
         let inspectionId = explicitInspectionId;
         const responsibilityResolution =
-          result === 'FAIL' && linkedIssue
-            ? await resolveLegacyCloseRequestResponsibility({
-                linkedIssue,
-                request,
-                tx,
-              })
-            : { request, resolvedLegacy: false };
+          await resolveLegacyCloseRequestResponsibility({
+            linkedIssue: result === 'FAIL' ? linkedIssue : undefined,
+            request,
+            tx,
+          });
         const requestWithResponsibility = responsibilityResolution.request;
         let inspectionLinks: CloseInspectionRecordLink[] = explicitInspectionId
           ? [
@@ -153,6 +154,50 @@ export const InspectionRequestCloseService = {
             tx,
           });
           inspectionId = inspectionLinks[0]?.inspectionId || '';
+        }
+
+        if (explicitInspectionId && inspectionId) {
+          const existingInspection = await tx.inspections.findFirst({
+            select: {
+              id: true,
+              responsibilityType: true,
+              responsibleDepartment: true,
+              responsibleDepartmentId: true,
+              supplierId: true,
+              supplierName: true,
+            },
+            where: {
+              id: inspectionId,
+              isDeleted: false,
+              workOrderNumber: request.workOrderNumber,
+            },
+          });
+          if (!existingInspection) {
+            failCloseRequest(
+              'BAD_REQUEST',
+              '关联的检验记录不存在，或工单号与报检任务不一致',
+            );
+          }
+          await tx.inspections.update({
+            data: {
+              ...buildCloseInspectionResponsibilityWrite({
+                inspection: existingInspection,
+                request: requestWithResponsibility,
+              }),
+              inspector:
+                normalizeInspectionRequestText(body.inspector) ||
+                request.reporter,
+              quantity: totalQuantity,
+              stationSelection: request.stationSelection,
+              qualifiedQuantity,
+              remarks:
+                normalizeInspectionRequestText(body.closeRemark) ||
+                request.requestInfo,
+              result: result === 'FAIL' ? 'FAIL' : 'PASS',
+              unqualifiedQuantity,
+            },
+            where: { id: inspectionId },
+          });
         }
 
         let issueRecord = null;
@@ -186,24 +231,6 @@ export const InspectionRequestCloseService = {
           });
           closedLinkedIssueCount = linkedIssueUpdate.count;
           linkedIssueStatus = 'CLOSED';
-        }
-        if (explicitInspectionId && inspectionId) {
-          await tx.inspections.update({
-            data: {
-              inspector:
-                normalizeInspectionRequestText(body.inspector) ||
-                request.reporter,
-              quantity: totalQuantity,
-              stationSelection: request.stationSelection,
-              qualifiedQuantity,
-              remarks:
-                normalizeInspectionRequestText(body.closeRemark) ||
-                request.requestInfo,
-              result: result === 'FAIL' ? 'FAIL' : 'PASS',
-              unqualifiedQuantity,
-            },
-            where: { id: inspectionId },
-          });
         }
         await tx.qms_inspection_request_inspections.createMany({
           data: inspectionLinks.map((item) => ({

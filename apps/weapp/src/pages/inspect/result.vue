@@ -36,6 +36,7 @@ interface TaskDetail {
   responsibleDepartment?: null | string;
   responsibleDepartmentId?: null | string;
   requestNo: string;
+  team?: null | string;
   workOrderNumber: string;
   partName: string;
   processName: string;
@@ -176,6 +177,7 @@ async function fetchDetail() {
             ? d.category
             : undefined,
         requestNo: (d.requestNo as string) || '',
+        team: (d.team as null | string) || null,
         workOrderNumber: (d.workOrderNumber as string) || '',
         partName: ((d.partName ?? d.componentName) as string) || '',
         processName: (d.processName as string) || '',
@@ -533,6 +535,10 @@ onLoad((options) => {
       <view class="detail-row">
         <text class="detail-label">工序</text>
         <text class="detail-value">{{ task.processName }}</text>
+      </view>
+      <view v-if="task.category === 'PROCESS'" class="detail-row">
+        <text class="detail-label">班组</text>
+        <text class="detail-value">{{ task.team || '-' }}</text>
       </view>
     </view>
 

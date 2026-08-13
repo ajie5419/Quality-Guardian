@@ -7,6 +7,7 @@ import { canDispatchByRoles } from '@/utils/roles';
 import { onPullDownRefresh, onShow } from '@dcloudio/uni-app';
 
 interface TaskItem {
+  category?: 'INCOMING' | 'PROCESS';
   id: string;
   requestNo: string;
   workOrderNumber: string;
@@ -15,6 +16,7 @@ interface TaskItem {
   reporter: string;
   priority: number;
   submittedAt: string;
+  team?: null | string;
   createdAt: string;
 }
 
@@ -138,6 +140,10 @@ onPullDownRefresh(() => {
             <view class="info-row">
               <text class="info-label">工序</text>
               <text class="info-value">{{ task.processName }}</text>
+            </view>
+            <view v-if="task.category === 'PROCESS'" class="info-row">
+              <text class="info-label">班组</text>
+              <text class="info-value">{{ task.team || '-' }}</text>
             </view>
           </view>
           <view class="card-footer">

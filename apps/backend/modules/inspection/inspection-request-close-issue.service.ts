@@ -13,6 +13,7 @@ import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { findInspectionForIssue } from './inspection-issue';
 import { InspectionIssueCreateService } from './inspection-issue-create.service';
 import { normalizeInspectionRequestText } from './inspection-request';
+import { requireCanonicalCloseResponsibility } from './inspection-request-close-responsibility.service';
 import {
   failCloseRequest,
   parseCloseRequestNumber,
@@ -85,13 +86,18 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     tx: options.tx,
     userinfo: options.userinfo,
   });
+  const responsibility = requireCanonicalCloseResponsibility(options.request);
+  const record = await options.tx.quality_records.update({
+    data: responsibility,
+    where: { id: created.record.id },
+  });
 
   return {
     auditVariables: {
       issue: issueBody.partName,
       nonConformanceNumber: created.ncNumber,
     },
-    record: created.record,
+    record,
   };
 }
 

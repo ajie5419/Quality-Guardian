@@ -100,6 +100,9 @@ const mockRequest = {
   processName: 'Welding',
   quantity: 10,
   reporter: 'Reporter A',
+  responsibilityType: 'INTERNAL_DEPARTMENT',
+  responsibleDepartment: 'Welding BU',
+  responsibleDepartmentId: 'dept-welding',
   requestInfo: null,
   requestNo: 'REQ-001',
   status: 'PENDING',
@@ -224,5 +227,65 @@ describe('inspectionRequestCloseService', () => {
       code: 'BAD_REQUEST',
       message: '报检任务已检验完成',
     });
+  });
+
+  it('projects request responsibility to an explicit inspection with no fact', async () => {
+    const inspectionUpdate = vi.fn().mockResolvedValue({});
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+      mockRequest,
+    );
+    (prisma.inspections.findFirst as any).mockResolvedValue({
+      id: 'i-existing',
+    });
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: {
+          findFirst: vi.fn().mockResolvedValue({
+            id: 'i-existing',
+            responsibilityType: null,
+            responsibleDepartment: null,
+            responsibleDepartmentId: null,
+            supplierId: null,
+            supplierName: null,
+          }),
+          findMany: vi.fn().mockResolvedValue([]),
+          update: inspectionUpdate,
+        },
+        qms_inspection_request_inspections: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_inspection_requests: {
+          update: vi.fn().mockResolvedValue({
+            ...mockRequest,
+            status: 'CLOSED',
+          }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_task_dispatches: { updateMany: vi.fn() },
+      }),
+    );
+
+    await InspectionRequestCloseService.closeRequest(
+      {} as any,
+      'req-1',
+      {
+        attachments: [{ name: 'f.pdf', url: 'http://example.com/f.pdf' }],
+        inspectionId: 'i-existing',
+        result: 'PASS',
+      },
+      mockUserInfo,
+    );
+
+    expect(inspectionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartment: 'Welding BU',
+          responsibleDepartmentId: 'dept-welding',
+          supplierId: null,
+          supplierName: null,
+        }),
+      }),
+    );
   });
 });

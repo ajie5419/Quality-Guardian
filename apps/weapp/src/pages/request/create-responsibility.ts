@@ -18,6 +18,36 @@ export const REQUEST_CREATE_RESPONSIBILITY_LABELS = [
   '外协单位',
 ] as const;
 
+export function getRequestCreateResponsibilityTypes(
+  category: '' | 'INCOMING' | 'PROCESS',
+) {
+  return category === 'PROCESS'
+    ? REQUEST_CREATE_RESPONSIBILITY_TYPES.filter(
+        (type) => type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+      )
+    : REQUEST_CREATE_RESPONSIBILITY_TYPES;
+}
+
+export function getRequestCreateResponsibilityLabels(
+  category: '' | 'INCOMING' | 'PROCESS',
+) {
+  return getRequestCreateResponsibilityTypes(category).map((type) =>
+    getRequestCreateResponsibilityLabel(type),
+  );
+}
+
+function getRequestCreateResponsibilityLabel(
+  type: RequestCreateResponsibilityType,
+) {
+  if (type === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT) {
+    return '内部部门';
+  }
+  if (type === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT) {
+    return '外协单位';
+  }
+  return '供应商';
+}
+
 export function isCurrentResponsibilityOptionsRequest(input: {
   currentResponsibilityType: string;
   currentSequence: number;
@@ -39,32 +69,30 @@ export function resolveRequestCreateResponsibilityDepartmentDefault(input: {
 }
 
 export function buildRequestCreateResponsibilityPayload(input: {
+  category?: 'INCOMING' | 'PROCESS';
   responsibilityType: RequestCreateResponsibilityType;
   responsibleDepartmentId: string;
   supplierId: string;
-  teamId: string;
-  teamResponsibleDepartmentId?: string;
 }) {
+  if (
+    input.category === 'PROCESS' &&
+    input.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    const supplierId = input.supplierId.trim();
+    return supplierId
+      ? { responsibilityType: input.responsibilityType, supplierId }
+      : null;
+  }
   const responsibleDepartmentId = input.responsibleDepartmentId.trim();
   if (!responsibleDepartmentId) return null;
   if (
     input.responsibilityType ===
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   ) {
-    const teamId = input.teamId.trim();
-    if (!teamId) {
-      return {
-        responsibilityType: input.responsibilityType,
-        responsibleDepartmentId,
-      };
-    }
-    if (input.teamResponsibleDepartmentId?.trim() !== responsibleDepartmentId) {
-      return null;
-    }
     return {
       responsibilityType: input.responsibilityType,
       responsibleDepartmentId,
-      teamId,
     };
   }
   const supplierId = input.supplierId.trim();

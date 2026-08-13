@@ -4,17 +4,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { useInspectionRequestIdentityOptions } from './useInspectionRequestIdentityOptions';
 
-const {
-  getPublicInspectionRequestResponsibilityOptions,
-  getPublicInspectionRequestTeams,
-} = vi.hoisted(() => ({
+const { getPublicInspectionRequestResponsibilityOptions } = vi.hoisted(() => ({
   getPublicInspectionRequestResponsibilityOptions: vi.fn(),
-  getPublicInspectionRequestTeams: vi.fn(),
 }));
 
 vi.mock('#/api/qms/inspection-request', () => ({
   getPublicInspectionRequestResponsibilityOptions,
-  getPublicInspectionRequestTeams,
 }));
 
 vi.mock('#/hooks/useErrorHandler', () => ({
@@ -24,7 +19,6 @@ vi.mock('#/hooks/useErrorHandler', () => ({
 afterEach(() => {
   vi.clearAllMocks();
 });
-
 function createForm() {
   return reactive({
     responsibilityType: 'INTERNAL_DEPARTMENT' as
@@ -33,8 +27,6 @@ function createForm() {
       | 'SUPPLIER',
     responsibleDepartmentId: '',
     supplierId: '',
-    team: '',
-    teamId: '',
   });
 }
 
@@ -47,7 +39,6 @@ describe('inspection request responsibility options', () => {
       responsibilityType: 'INTERNAL_DEPARTMENT',
       suppliers: [],
     });
-    getPublicInspectionRequestTeams.mockResolvedValue([]);
     const composable = useInspectionRequestIdentityOptions({ requestForm });
 
     await composable.loadResponsibilityOptions();
@@ -64,7 +55,7 @@ describe('inspection request responsibility options', () => {
     expect(requestForm.supplierId).toBe('');
   });
 
-  it('defaults an outsourcing responsibility to the unique production OBU department', async () => {
+  it('does not retain a hidden client department for PROCESS outsourcing', async () => {
     const requestForm = createForm();
     getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
       departments: [{ label: '生产 OBU', value: 'dept-production' }],
@@ -77,10 +68,8 @@ describe('inspection request responsibility options', () => {
 
     expect(requestForm).toMatchObject({
       responsibilityType: 'OUTSOURCING_UNIT',
-      responsibleDepartmentId: 'dept-production',
+      responsibleDepartmentId: '',
       supplierId: '',
-      team: '',
-      teamId: '',
     });
     expect(composable.supplierOptions.value).toEqual([
       { label: 'Outsource A', value: 'supplier-a' },
@@ -159,8 +148,6 @@ describe('inspection request responsibility options', () => {
       expect(requestForm).toMatchObject({
         responsibleDepartmentId: '',
         supplierId,
-        team: '',
-        teamId: '',
       });
       expect(composable.responsibilityDepartmentOptions.value).toEqual([
         { label: 'Current department', value: departmentId },
@@ -203,7 +190,6 @@ describe('inspection request responsibility options', () => {
       responsibilityType: 'INTERNAL_DEPARTMENT',
       suppliers: [],
     });
-    getPublicInspectionRequestTeams.mockResolvedValue([]);
     const composable = useInspectionRequestIdentityOptions({ requestForm });
 
     await composable.loadResponsibilityOptions();
@@ -211,12 +197,10 @@ describe('inspection request responsibility options', () => {
     expect(requestForm).toMatchObject({
       responsibleDepartmentId: '',
       supplierId: '',
-      team: '',
-      teamId: '',
     });
   });
 
-  it('keeps the selected department and execution team while searching other departments', async () => {
+  it('keeps the selected department while searching other departments', async () => {
     const requestForm = createForm();
     getPublicInspectionRequestResponsibilityOptions
       .mockResolvedValueOnce({
@@ -229,65 +213,19 @@ describe('inspection request responsibility options', () => {
         responsibilityType: 'INTERNAL_DEPARTMENT',
         suppliers: [],
       });
-    getPublicInspectionRequestTeams.mockResolvedValue([
-      {
-        group: 'internal',
-        label: 'Structure Team',
-        responsibleDepartmentId: 'dept-structure',
-        value: 'team-structure',
-      },
-    ]);
     const composable = useInspectionRequestIdentityOptions({ requestForm });
 
     await composable.loadResponsibilityOptions();
     requestForm.responsibleDepartmentId = 'dept-structure';
-    requestForm.teamId = 'team-structure';
-    requestForm.team = 'Structure Team';
-    getPublicInspectionRequestTeams.mockClear();
 
     await composable.loadResponsibilityOptions('machining');
 
-    expect(getPublicInspectionRequestTeams).not.toHaveBeenCalled();
     expect(requestForm).toMatchObject({
       responsibleDepartmentId: 'dept-structure',
-      team: 'Structure Team',
-      teamId: 'team-structure',
     });
     expect(composable.responsibilityDepartmentOptions.value).toEqual([
       { label: 'Structure BU', value: 'dept-structure' },
       { label: 'Machining BU', value: 'dept-machining' },
-    ]);
-  });
-
-  it('searches execution TEAMs without reloading or clearing the selected department', async () => {
-    const requestForm = createForm();
-    requestForm.responsibleDepartmentId = 'dept-structure';
-    getPublicInspectionRequestTeams.mockResolvedValue([
-      {
-        group: 'internal',
-        label: 'Structure Team',
-        responsibleDepartmentId: 'dept-structure',
-        value: 'team-structure',
-      },
-    ]);
-    const composable = useInspectionRequestIdentityOptions({ requestForm });
-
-    await composable.loadInternalTeamOptions('structure team');
-
-    expect(
-      getPublicInspectionRequestResponsibilityOptions,
-    ).not.toHaveBeenCalled();
-    expect(getPublicInspectionRequestTeams).toHaveBeenCalledWith({
-      keyword: 'structure team',
-    });
-    expect(requestForm.responsibleDepartmentId).toBe('dept-structure');
-    expect(composable.internalTeamOptions.value).toEqual([
-      {
-        group: 'internal',
-        label: 'Structure Team',
-        responsibleDepartmentId: 'dept-structure',
-        value: 'team-structure',
-      },
     ]);
   });
 });

@@ -75,7 +75,7 @@ export const inspectionRequestCreateV2BodySchema =
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
       ]),
-      responsibleDepartmentId: z.string().trim().min(1),
+      responsibleDepartmentId: z.string().trim().min(1).optional(),
     })
     .superRefine((body, context) => {
       const hasPartId = Boolean(body.partId);
@@ -107,6 +107,30 @@ export const inspectionRequestCreateV2BodySchema =
         body.responsibilityType ===
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
       const isExternal = !isInternal;
+      const isProcessOutsourcing =
+        body.category === 'PROCESS' &&
+        body.responsibilityType ===
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+      if (
+        body.category === 'PROCESS' &&
+        body.responsibilityType ===
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'PROCESS inspection requests cannot use supplier responsibility',
+          path: ['responsibilityType'],
+        });
+      }
+      if (isProcessOutsourcing && body.responsibleDepartmentId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'PROCESS outsourcing responsibility department is server-resolved',
+          path: ['responsibleDepartmentId'],
+        });
+      }
       if (isExternal && !body.supplierId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -121,10 +145,10 @@ export const inspectionRequestCreateV2BodySchema =
           path: ['supplierId'],
         });
       }
-      if (isExternal && body.teamId) {
+      if (body.team || body.teamId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'External responsibility must not depend on teamId',
+          message: 'Inspection request teamId is no longer supported',
           path: ['teamId'],
         });
       }
@@ -203,7 +227,13 @@ export function validateInspectionRequestCreateV2Body(
       hasPartIdentity &&
       Boolean(normalizeInspectionRequestText(body.processId)) &&
       Boolean(normalizeInspectionRequestText(body.reporter)) &&
-      Boolean(normalizeInspectionRequestText(body.responsibleDepartmentId)) &&
+      (body.category === 'PROCESS' &&
+      body.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+        ? !normalizeInspectionRequestText(body.responsibleDepartmentId)
+        : Boolean(
+            normalizeInspectionRequestText(body.responsibleDepartmentId),
+          )) &&
       Boolean(normalizeInspectionRequestText(body.responsibilityType)) &&
       (body.responsibilityType ===
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT

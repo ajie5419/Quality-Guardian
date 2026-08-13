@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildRequestCreateResponsibilityPayload,
+  getRequestCreateResponsibilityLabels,
+  getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
   REQUEST_CREATE_RESPONSIBILITY_LABELS,
   REQUEST_CREATE_RESPONSIBILITY_TYPES,
@@ -9,6 +11,22 @@ import {
 } from './create-responsibility';
 
 describe('request create responsibility payload', () => {
+  it('removes supplier responsibility from PROCESS while preserving INCOMING choices', () => {
+    expect(getRequestCreateResponsibilityTypes('PROCESS')).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getRequestCreateResponsibilityLabels('PROCESS')).toEqual([
+      '内部部门',
+      '外协单位',
+    ]);
+    expect(getRequestCreateResponsibilityTypes('INCOMING')).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+  });
+
   it.each([
     [
       'OUTSOURCING_UNIT' as const,
@@ -81,13 +99,10 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'INTERNAL_DEPARTMENT' as const,
         responsibleDepartmentId: 'dept-assembly',
         supplierId: 'supplier-stale',
-        teamId: 'team-assembly',
-        teamResponsibleDepartmentId: 'dept-assembly',
       },
       {
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-assembly',
-        teamId: 'team-assembly',
       },
     ],
     [
@@ -95,7 +110,6 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'SUPPLIER' as const,
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
-        teamId: 'team-stale',
       },
       {
         responsibilityType: 'SUPPLIER',
@@ -108,7 +122,6 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'OUTSOURCING_UNIT' as const,
         responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-b',
-        teamId: 'team-stale',
       },
       {
         responsibilityType: 'OUTSOURCING_UNIT',
@@ -129,31 +142,34 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'SUPPLIER',
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: '',
-        teamId: '',
       }),
     ).toBeNull();
   });
 
-  it('allows a department without a TEAM and rejects a mismatched selected TEAM', () => {
+  it('uses an internal department without a TEAM identity', () => {
     expect(
       buildRequestCreateResponsibilityPayload({
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-machining',
         supplierId: '',
-        teamId: '',
       }),
     ).toEqual({
       responsibilityType: 'INTERNAL_DEPARTMENT',
       responsibleDepartmentId: 'dept-machining',
     });
+  });
+
+  it('submits PROCESS outsourcing without a hidden department ID', () => {
     expect(
       buildRequestCreateResponsibilityPayload({
-        responsibilityType: 'INTERNAL_DEPARTMENT',
-        responsibleDepartmentId: 'dept-machining',
-        supplierId: '',
-        teamId: 'team-structure',
-        teamResponsibleDepartmentId: 'dept-structure',
+        category: 'PROCESS',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: '',
+        supplierId: 'supplier-outsourcing',
       }),
-    ).toBeNull();
+    ).toEqual({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      supplierId: 'supplier-outsourcing',
+    });
   });
 });

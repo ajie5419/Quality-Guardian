@@ -1,3 +1,4 @@
+import { OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   isIncomingInspectionRequestProcess,
@@ -252,6 +253,54 @@ describe('inspectionRequestCreateService', () => {
           responsibilityType: 'INTERNAL_DEPARTMENT',
           responsibleDepartmentId: 'dept-quality',
           supplierId: null,
+          teamId: null,
+        }),
+      }),
+    );
+  });
+
+  it('persists the server-resolved PROCESS outsourcing R without a TEAM', async () => {
+    const create = vi.fn().mockResolvedValue(mockRequest);
+    (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+      callback({ qms_inspection_requests: { create } }),
+    );
+    resolveV2Responsibility.mockResolvedValueOnce({
+      responsibility: {
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+        responsibleDepartmentId: 'dept-production',
+        supplierId: 'supplier-outsourcing',
+        supplierName: 'Outsourcing Unit A',
+      },
+      supplierId: 'supplier-outsourcing',
+      team: '',
+      teamId: null,
+    });
+
+    await InspectionRequestCreateService.createRequest(
+      {} as any,
+      { id: 'user-1', username: 'admin' } as any,
+      {
+        category: 'PROCESS',
+        componentName: 'Component A',
+        partId: 'part-1',
+        processId: 'process-1',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        supplierId: 'supplier-outsourcing',
+        workOrderNumber: 'WO-001',
+      },
+      false,
+      'V2',
+    );
+
+    expect(create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+          responsibleDepartmentId: 'dept-production',
+          supplierId: 'supplier-outsourcing',
+          supplierName: 'Outsourcing Unit A',
           teamId: null,
         }),
       }),

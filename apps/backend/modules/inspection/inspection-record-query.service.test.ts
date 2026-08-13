@@ -13,6 +13,9 @@ vi.mock('~/utils/prisma', () => ({
     inspection_form_templates: {
       findUnique: vi.fn(),
     },
+    qms_inspection_requests: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
   },
 }));
 
@@ -76,6 +79,7 @@ const baseInspection = {
 describe('inspectionRecordQueryService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (prisma.qms_inspection_requests.findMany as any).mockResolvedValue([]);
   });
 
   describe('findById', () => {
@@ -129,6 +133,26 @@ describe('inspectionRecordQueryService', () => {
       });
       expect(result?.drawingNo).toBe('DWG-1');
       expect(result?.formNo).toBe('FORM-1');
+    });
+
+    it('uses one linked internal request department for a legacy record', async () => {
+      (prisma.inspections.findFirst as any).mockResolvedValue({
+        ...baseInspection,
+        process: { name: 'Machining' },
+        reportDate: null,
+        team: null,
+      });
+      (prisma.qms_inspection_requests.findMany as any).mockResolvedValue([
+        {
+          inspectionId: 'insp-1',
+          inspectionLinks: [],
+          responsibleDepartment: 'Machining BU',
+        },
+      ]);
+
+      const result = await InspectionRecordQueryService.findById('insp-1');
+
+      expect(result?.team).toBe('Machining BU');
     });
   });
 
@@ -185,6 +209,61 @@ describe('inspectionRecordQueryService', () => {
           take: expect.anything(),
         }),
       );
+    });
+
+    it('uses the same linked responsibility fallback for export rows', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          archiveTask: null,
+          process: { name: 'Machining' },
+          qualityRecords: [],
+          team: null,
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+      (prisma.qms_inspection_requests.findMany as any).mockResolvedValue([
+        {
+          inspectionId: null,
+          inspectionLinks: [{ inspectionId: 'insp-1' }],
+          responsibleDepartment: 'Machining BU',
+        },
+      ]);
+
+      const result = await InspectionRecordQueryService.findAll({
+        forExport: true,
+      });
+
+      expect(result.items[0]?.team).toBe('Machining BU');
+    });
+
+    it('fails closed for a legacy record linked to different internal departments', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          archiveTask: null,
+          process: { name: 'Machining' },
+          qualityRecords: [],
+          team: 'Legacy team',
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+      (prisma.qms_inspection_requests.findMany as any).mockResolvedValue([
+        {
+          inspectionId: 'insp-1',
+          inspectionLinks: [],
+          responsibleDepartment: 'Machining BU',
+        },
+        {
+          inspectionId: null,
+          inspectionLinks: [{ inspectionId: 'insp-1' }],
+          responsibleDepartment: 'Structure BU',
+        },
+      ]);
+
+      const result = await InspectionRecordQueryService.findAll({});
+
+      expect(result.items[0]?.team).toBeNull();
     });
 
     it('should fallback when archiveTask include causes schema mismatch', async () => {
@@ -291,7 +370,41 @@ describe('inspectionRecordQueryService', () => {
             processName: { contains: 'Welding' },
             projectName: { contains: 'Project A' },
             supplierName: { contains: 'Supplier A' },
-            team: { contains: 'Team A' },
+            AND: [
+              {
+                OR: [
+                  { team: { contains: 'Team A' } },
+                  {
+                    category: 'PROCESS',
+                    responsibilityType: 'INTERNAL_DEPARTMENT',
+                    responsibleDepartment: { contains: 'Team A' },
+                  },
+                  {
+                    category: 'PROCESS',
+                    responsibilityType: 'OUTSOURCING_UNIT',
+                    supplierName: { contains: 'Team A' },
+                  },
+                  {
+                    AND: [
+                      { category: 'PROCESS' },
+                      {
+                        OR: [
+                          { responsibilityType: null },
+                          { responsibilityType: 'INTERNAL_DEPARTMENT' },
+                        ],
+                      },
+                      {
+                        OR: [
+                          { responsibleDepartment: null },
+                          { responsibleDepartment: '' },
+                        ],
+                      },
+                      { id: { in: [] } },
+                    ],
+                  },
+                ],
+              },
+            ],
             workOrderNumber: 'WO-001',
           }),
         }),

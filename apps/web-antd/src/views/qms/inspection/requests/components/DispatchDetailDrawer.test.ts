@@ -119,12 +119,13 @@ describe('dispatch detail drawer request identity', () => {
     );
   });
 
-  it('keeps the process execution team display', () => {
+  it('shows the API-mapped internal responsibility department as the process team', () => {
     const wrapper = mountDrawer(
       createRequest({
         category: 'PROCESS',
-        supplierName: 'Supplier A',
-        team: 'Assembly Team A',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Structure BU1',
+        team: 'Structure BU1',
       }),
     );
 
@@ -132,7 +133,7 @@ describe('dispatch detail drawer request identity', () => {
       '班组',
     );
     expect(wrapper.get('[data-testid="request-identity-value"]').text()).toBe(
-      'Assembly Team A',
+      'Structure BU1',
     );
   });
 });

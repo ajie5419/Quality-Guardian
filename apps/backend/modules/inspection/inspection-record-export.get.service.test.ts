@@ -107,6 +107,27 @@ describe('inspectionRecordExportGetService', () => {
     );
   });
 
+  it('exports the team label already resolved by the shared list query', async () => {
+    const { InspectionService } = await import(
+      '~/modules/inspection/inspection.service'
+    );
+    (InspectionService.findAll as any).mockResolvedValue({
+      items: [{ id: 'legacy-inspection', team: 'Machining BU' }],
+      total: 1,
+    });
+
+    const result: any = await handler({
+      query: { team: 'Machining BU' },
+    } as any);
+
+    expect(result.data.items).toEqual([
+      { id: 'legacy-inspection', team: 'Machining BU' },
+    ]);
+    expect(InspectionService.findAll).toHaveBeenCalledWith(
+      expect.objectContaining({ forExport: true, team: 'Machining BU' }),
+    );
+  });
+
   it('should handle zero total without error', async () => {
     const { InspectionService } = await import(
       '~/modules/inspection/inspection.service'

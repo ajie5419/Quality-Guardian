@@ -2,7 +2,10 @@ import type { Prisma } from '@prisma/client';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { resolveLegacyCloseRequestResponsibility } from './inspection-request-close-responsibility.service';
+import {
+  buildCloseInspectionResponsibilityWrite,
+  resolveLegacyCloseRequestResponsibility,
+} from './inspection-request-close-responsibility.service';
 
 const mocks = vi.hoisted(() => ({
   assertPolicy: vi.fn(),
@@ -82,6 +85,13 @@ describe('legacy inspection request close responsibility', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
+  it('blocks a PASS close when a legacy request has no responsibility fact', async () => {
+    await expect(
+      resolveLegacyCloseRequestResponsibility({ request: baseRequest, tx }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
   it('rejects a concurrent responsibility write', async () => {
     updateMany.mockResolvedValueOnce({ count: 0 });
     await expect(
@@ -136,5 +146,48 @@ describe('legacy inspection request close responsibility', () => {
         where: expect.objectContaining({ isDeleted: false }),
       }),
     );
+  });
+
+  it('projects request snapshots to an inspection with no responsibility fact', () => {
+    expect(
+      buildCloseInspectionResponsibilityWrite({
+        inspection: { supplierId: null },
+        request: {
+          ...baseRequest,
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartment: '装配部',
+          responsibleDepartmentId: 'dept-assembly',
+          supplierId: null,
+          supplierName: null,
+        },
+      }),
+    ).toEqual({
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: '装配部',
+      responsibleDepartmentId: 'dept-assembly',
+      supplierId: null,
+      supplierName: null,
+    });
+  });
+
+  it('rejects a partial or conflicting existing inspection identity', () => {
+    const request = {
+      ...baseRequest,
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartment: '装配部',
+      responsibleDepartmentId: 'dept-assembly',
+      supplierId: null,
+      supplierName: null,
+    };
+    expect(() =>
+      buildCloseInspectionResponsibilityWrite({
+        inspection: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-other',
+          supplierId: null,
+        },
+        request,
+      }),
+    ).toThrow('关联检验记录责任事实与报检任务不一致');
   });
 });

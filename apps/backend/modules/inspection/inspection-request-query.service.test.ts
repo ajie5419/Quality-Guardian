@@ -160,10 +160,53 @@ describe('inspection request query service', () => {
       supplierId: null,
       supplierName: '',
     });
+    expect(result?.team).toBe('Machining BU');
     expect(resolveActiveDepartmentSourceIdsByTeamIds).toHaveBeenCalledWith(
       [],
       undefined,
     );
+  });
+
+  it('maps the internal responsibility department to the list team before close', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([
+      {
+        attachments: null,
+        category: 'PROCESS',
+        closeAttachments: null,
+        dispatcher: null,
+        inspection: null,
+        inspectionId: null,
+        inspector: null,
+        linkedIssueId: null,
+        process: { name: 'Structure' },
+        processName: 'Structure',
+        requestNo: 'IR-structure',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Structure BU1',
+        responsibleDepartmentId: 'dept-structure',
+        supplierId: null,
+        supplierName: null,
+        team: null,
+        teamId: null,
+        workOrderNumber: 'WO-001',
+        workOrders: [],
+      },
+    ] as any);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(1);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-structure', name: 'Structure BU1' },
+    ]);
+
+    const result = await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1' } as any,
+      {},
+    );
+
+    expect(result.items[0]).toMatchObject({
+      responsibleDepartment: 'Structure BU1',
+      team: 'Structure BU1',
+    });
   });
 
   it('returns supplier responsibility for INCOMING category with a configured process name', async () => {
