@@ -34,6 +34,18 @@ model xxx {
 4. 禁止手动改 migration 文件内容（会破坏 checksum）
 5. 禁止在 migration 中写业务数据操作（用单独脚本）
 
+## 发布前置数据任务
+
+Prisma migration 只负责数据库结构。仅当一个幂等数据任务是**当前版本启动前的必要条件**时，才能作为 release maintenance 纳入同步发布路径。
+
+- 任务必须在 `apps/backend/scripts/release-maintenance-manifest.ts` 中显式登记，不能再向 shell 脚本追加永久任务清单。
+- 每项任务使用稳定的 `taskKey`、递增的 `revision` 和任务定义的 SHA-256 `checksum`。修改已发布任务必须新增 revision，禁止原地修改完成 revision 的定义或 checksum。
+- `release_maintenance_tasks` 是持久化 ledger，按 `(taskKey, revision)` 唯一。checksum 相同且状态为 `COMPLETED` 时跳过；`FAILED` 和租约过期的 `RUNNING` 任务可以在后续发布中重新领取；未过期的 `RUNNING` 任务阻断并发发布。
+- ledger 中同一 revision 的 checksum 与 manifest 不一致属于定义漂移，必须 fail-closed 阻断发布，先新增正确 revision 后再发布。
+- 历史 remediation、sidecar 初始化或重建、投影重建、窗口/评分对账不得加入 manifest。它们必须以独立命令、审批、dry-run、执行记录和结果核对完成，不能阻塞常规切流。
+
+空 manifest 是合法基线：它表示该版本没有新的启动前置数据任务，绝不意味着需要重放历史回填波次。
+
 ## 质量分类主数据
 
 三套二级分类树由 `quality-classification` 模块统一管理：

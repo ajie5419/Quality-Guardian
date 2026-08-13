@@ -385,7 +385,7 @@ describe('remediateTeamIdentitySources', () => {
     ]);
   });
 
-  it('runs before the supplier identity backfill in release maintenance', () => {
+  it('does not run remediation in release maintenance', () => {
     const backendRoot = process.cwd().endsWith('/apps/backend')
       ? process.cwd()
       : resolve(process.cwd(), 'apps/backend');
@@ -393,19 +393,11 @@ describe('remediateTeamIdentitySources', () => {
       resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
-    const sourceIndex = maintenance.indexOf(
-      'scripts/remediate-team-identity-sources.ts --apply',
+    expect(maintenance).not.toContain(
+      'scripts/remediate-team-identity-sources.ts',
     );
-    const confirmedIndex = maintenance.indexOf(
-      'scripts/remediate-confirmed-inspection-identity-rows.ts --apply',
+    expect(maintenance).not.toContain(
+      'scripts/remediate-confirmed-inspection-identity-rows.ts',
     );
-    const supplierIndex = maintenance.indexOf(
-      'scripts/backfill-quality-record-supplier-identities.ts --apply',
-    );
-
-    expect(sourceIndex).toBeGreaterThan(-1);
-    expect(confirmedIndex).toBeGreaterThan(-1);
-    expect(sourceIndex).toBeLessThan(supplierIndex);
-    expect(confirmedIndex).toBeLessThan(supplierIndex);
   });
 });

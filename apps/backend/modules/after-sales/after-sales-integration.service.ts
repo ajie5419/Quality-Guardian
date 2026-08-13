@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import prisma from '~/utils/prisma';
 
 function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
@@ -62,7 +62,7 @@ export const AfterSalesIntegrationService = {
   },
 
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
-    const updated = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const current = await tx.after_sales.findUnique({
         where: { id: params.id },
         select: { supplierBrandId: true },
@@ -79,9 +79,12 @@ export const AfterSalesIntegrationService = {
         [current?.supplierBrandId, updated.supplierBrandId],
         'after-sales.quality-loss-updated',
       );
-      return updated;
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'EXTERNAL', sourcePk: updated.id }],
+        'after-sales.quality-loss-updated',
+      );
     });
-    await QualityLossIndexService.upsertFromAfterSales(updated);
   },
 
   async getQualityLossTrendRows(params: {

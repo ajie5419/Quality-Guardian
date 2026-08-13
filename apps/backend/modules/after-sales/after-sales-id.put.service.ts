@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { buildGovernedAfterSalesUpdateData } from '~/modules/after-sales/after-sales-payload';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
     const supplierChanged =
       updateData.supplierBrand !== undefined ||
       updateData.supplierBrandId !== undefined;
-    const updated = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const current =
         costsChanged || supplierChanged
           ? await tx.after_sales.findUnique({
@@ -58,9 +58,12 @@ export default defineEventHandler(async (event) => {
         [current?.supplierBrandId, updated.supplierBrandId],
         'after-sales.updated',
       );
-      return updated;
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'EXTERNAL', sourcePk: updated.id }],
+        'after-sales.updated',
+      );
     });
-    await QualityLossIndexService.upsertFromAfterSales(updated);
     if (bodyRecord.photos !== undefined) {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: bodyRecord.photos,

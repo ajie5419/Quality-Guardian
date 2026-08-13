@@ -62,6 +62,9 @@ vi.mock('~/utils/prisma', () => ({
     quality_losses: {
       create: vi.fn(),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
   },
 }));
 
@@ -137,6 +140,7 @@ describe('quality-loss route handlers', () => {
           }),
         },
         quality_losses: prisma.quality_losses,
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
   });

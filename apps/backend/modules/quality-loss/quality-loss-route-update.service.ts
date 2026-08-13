@@ -6,7 +6,7 @@ import { resolveQualityLossTargetLocator } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
   normalizeQualityLossSource,
@@ -272,14 +272,14 @@ export const QualityLossRouteUpdateService = {
           const manualContext = hasManualContext
             ? await resolveManualQualityLossContext(params.body)
             : null;
-          const updated = await prisma.$transaction(async (tx) => {
+          await prisma.$transaction(async (tx) => {
             const departmentWrite = parsedBody.respDeptId
               ? await resolveQualityLossDepartmentWrite(
                   tx,
                   parsedBody.respDeptId,
                 )
               : {};
-            return tx.quality_losses.update({
+            const updated = await tx.quality_losses.update({
               where: target.where,
               data: {
                 ...(parsedBody.occurDate
@@ -301,8 +301,12 @@ export const QualityLossRouteUpdateService = {
                 updatedAt: new Date(),
               },
             });
+            await QualityLossIndexQueue.enqueue(
+              tx,
+              [{ source: 'MANUAL', sourcePk: updated.id }],
+              'quality-loss.updated',
+            );
           });
-          await QualityLossIndexService.upsertFromManual(updated);
         }
       }
     } catch (error) {

@@ -75,6 +75,12 @@ vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
 }));
 
+const mocks = vi.hoisted(() => ({ enqueue: vi.fn() }));
+
+vi.mock('~/modules/quality-loss/quality-loss-index-queue.service', () => ({
+  QualityLossIndexQueue: { enqueue: mocks.enqueue },
+}));
+
 describe('quality-loss-create.post.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -104,11 +110,12 @@ describe('quality-loss-create.post.service', () => {
       id: 'dept-qa',
       name: 'Current Quality',
     });
+    const tx = {
+      departments: { findFirst },
+      quality_losses: { create },
+    };
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
-      callback({
-        departments: { findFirst },
-        quality_losses: { create },
-      }),
+      callback(tx),
     );
 
     const result = await handler({} as any);
@@ -145,6 +152,11 @@ describe('quality-loss-create.post.service', () => {
       },
       'QL-2026-001',
       { createdBy: 'user-1' },
+    );
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      tx,
+      [{ source: 'MANUAL', sourcePk: 'new-id' }],
+      'quality-loss.created',
     );
   });
 

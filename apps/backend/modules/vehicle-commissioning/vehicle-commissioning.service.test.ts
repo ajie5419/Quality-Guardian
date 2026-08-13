@@ -3,7 +3,6 @@ import { Buffer } from 'node:buffer';
 import { VEHICLE_COMMISSIONING_PERMISSION_CODES } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import {
@@ -15,6 +14,8 @@ import {
 } from '~/modules/vehicle-commissioning/vehicle-commissioning-issue-format';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import prisma from '~/utils/prisma';
+
+const mocks = vi.hoisted(() => ({ enqueue: vi.fn() }));
 
 vi.mock('nanoid', () => ({
   nanoid: () => 'issueid1',
@@ -31,6 +32,10 @@ vi.mock('~/utils/prisma', () => ({
       updateMany: vi.fn(),
       update: vi.fn(),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    $transaction: vi.fn(),
     $queryRaw: vi.fn(),
   },
 }));
@@ -48,11 +53,8 @@ vi.mock('~/modules/file-storage/file-storage.service', () => ({
   },
 }));
 
-vi.mock('~/modules/quality-loss/quality-loss-index.service', () => ({
-  QualityLossIndexService: {
-    softDeleteSource: vi.fn(),
-    upsertFromCommissioning: vi.fn(),
-  },
+vi.mock('~/modules/quality-loss', () => ({
+  QualityLossIndexQueue: { enqueue: mocks.enqueue },
 }));
 
 vi.mock('~/modules/rbac/rbac.service', () => ({
@@ -112,6 +114,12 @@ const createdRow = {
 describe('vehicleCommissioningService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        vehicle_commissioning_issues: prisma.vehicle_commissioning_issues,
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
+    );
   });
 
   it('finds issue id by primary id', async () => {
@@ -129,6 +137,10 @@ describe('vehicleCommissioningService', () => {
   });
 
   it('updates quality loss fields with only provided values', async () => {
+    vi.mocked(prisma.vehicle_commissioning_issues.update).mockResolvedValue({
+      id: 'issue-1',
+    } as never);
+
     await VehicleCommissioningService.updateQualityLossFields({
       actualClaim: 20,
       id: 'issue-1',
@@ -141,6 +153,13 @@ describe('vehicleCommissioningService', () => {
         updatedAt: expect.any(Date),
       }),
     });
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vehicle_commissioning_issues: prisma.vehicle_commissioning_issues,
+      }),
+      [{ source: 'COMMISSIONING', sourcePk: 'issue-1' }],
+      'vehicle-commissioning.quality-loss-updated',
+    );
   });
 
   it('queries loss aggregation records and counts with work order filter', async () => {
@@ -434,9 +453,12 @@ describe('vehicleCommissioningService', () => {
       bizId: 'issue-1',
       bizType: 'vehicle_commissioning_issue',
     });
-    expect(QualityLossIndexService.softDeleteSource).toHaveBeenCalledWith(
-      'Commissioning',
-      'issue-1',
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({
+        vehicle_commissioning_issues: prisma.vehicle_commissioning_issues,
+      }),
+      [{ source: 'COMMISSIONING', sourcePk: 'issue-1' }],
+      'vehicle-commissioning.deleted',
     );
     expect(SystemLogService.auditLog).toHaveBeenCalledWith(
       'vehicle-commissioning',

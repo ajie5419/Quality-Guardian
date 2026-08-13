@@ -13,27 +13,70 @@ import { AfterSalesIntegrationService } from './after-sales-integration.service'
  */
 export const AfterSalesAPI = {
   // Identity lookups
-  findIdBySerialNumber: AfterSalesIntegrationService.findIdBySerialNumber,
-  findEarliestVehicleFailureDate:
-    AfterSalesIntegrationService.findEarliestVehicleFailureDate,
+  findIdBySerialNumber: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.findIdBySerialNumber
+    >
+  ) => AfterSalesIntegrationService.findIdBySerialNumber(...args),
+  findEarliestVehicleFailureDate: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.findEarliestVehicleFailureDate
+    >
+  ) => AfterSalesIntegrationService.findEarliestVehicleFailureDate(...args),
 
   // Bulk read for aggregations and trend
-  getLossRecordsForAggregation:
-    AfterSalesIntegrationService.getLossRecordsForAggregation,
-  countLossRecordsForAggregation:
-    AfterSalesIntegrationService.countLossRecordsForAggregation,
-  getQualityLossDrillDownRecords:
-    AfterSalesIntegrationService.getQualityLossDrillDownRecords,
-  getQualityLossTrendRows: AfterSalesIntegrationService.getQualityLossTrendRows,
-  getSupplierScoringData: AfterSalesIntegrationService.getSupplierScoringData,
-  getWeeklyReportIssues: AfterSalesIntegrationService.getWeeklyReportIssues,
-  getVehicleFailureRecords:
-    AfterSalesIntegrationService.getVehicleFailureRecords,
+  getLossRecordsForAggregation: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getLossRecordsForAggregation
+    >
+  ) => AfterSalesIntegrationService.getLossRecordsForAggregation(...args),
+  countLossRecordsForAggregation: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.countLossRecordsForAggregation
+    >
+  ) => AfterSalesIntegrationService.countLossRecordsForAggregation(...args),
+  getQualityLossDrillDownRecords: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getQualityLossDrillDownRecords
+    >
+  ) => AfterSalesIntegrationService.getQualityLossDrillDownRecords(...args),
+  getQualityLossTrendRows: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getQualityLossTrendRows
+    >
+  ) => AfterSalesIntegrationService.getQualityLossTrendRows(...args),
+  getSupplierScoringData: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getSupplierScoringData
+    >
+  ) => AfterSalesIntegrationService.getSupplierScoringData(...args),
+  getWeeklyReportIssues: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getWeeklyReportIssues
+    >
+  ) => AfterSalesIntegrationService.getWeeklyReportIssues(...args),
+  getVehicleFailureRecords: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getVehicleFailureRecords
+    >
+  ) => AfterSalesIntegrationService.getVehicleFailureRecords(...args),
 
   // Period metrics for KPI assembly
-  getReportPeriodMetrics: AfterSalesIntegrationService.getReportPeriodMetrics,
-  getStatsForDashboard: AfterSalesIntegrationService.getStatsForDashboard,
+  getReportPeriodMetrics: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getReportPeriodMetrics
+    >
+  ) => AfterSalesIntegrationService.getReportPeriodMetrics(...args),
+  getStatsForDashboard: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.getStatsForDashboard
+    >
+  ) => AfterSalesIntegrationService.getStatsForDashboard(...args),
 
   // Update path that quality-loss PUT route reaches into
-  updateQualityLossFields: AfterSalesIntegrationService.updateQualityLossFields,
+  updateQualityLossFields: (
+    ...args: Parameters<
+      typeof AfterSalesIntegrationService.updateQualityLossFields
+    >
+  ) => AfterSalesIntegrationService.updateQualityLossFields(...args),
 };

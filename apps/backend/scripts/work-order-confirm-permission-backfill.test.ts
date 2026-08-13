@@ -234,19 +234,16 @@ describe('work order confirm permission backfill', () => {
     ).toThrow('unknown argument: --unexpected');
   });
 
-  it('runs the QC grant immediately after page permission backfill', () => {
+  it('does not keep the historical QC grant in every release', () => {
     const maintenance = readFileSync(
       resolve(getBackendRoot(), 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
-    const pageBackfillIndex = maintenance.indexOf(
+    expect(maintenance).not.toContain(
       'scripts/backfill-role-page-permissions.ts',
     );
-    const confirmBackfillIndex = maintenance.indexOf(
+    expect(maintenance).not.toContain(
       'scripts/backfill-work-order-confirm-permission.ts',
     );
-
-    expect(pageBackfillIndex).toBeGreaterThan(-1);
-    expect(confirmBackfillIndex).toBeGreaterThan(pageBackfillIndex);
   });
 });

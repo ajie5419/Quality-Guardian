@@ -2,6 +2,7 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 
 import { Prisma } from '@prisma/client';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
 import { QUALITY_LOSS_SOURCE } from '~/modules/quality-loss/quality-loss-status';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { BusinessError } from '~/utils/business-error';
@@ -84,17 +85,20 @@ export const QualityLossRecordMaintenanceService = {
     }
 
     await assertDeleteAccess([target], context);
-    // Keep the source row and its materialized projection consistent.
-    const [result] = await prisma.$transaction([
-      prisma.quality_losses.updateMany({
+    const result = await prisma.$transaction(async (tx) => {
+      const result = await tx.quality_losses.updateMany({
         where: { id: target.id, isDeleted: false },
         data: { isDeleted: true },
-      }),
-      prisma.quality_loss_index.updateMany({
-        where: { source: QUALITY_LOSS_SOURCE.MANUAL, sourcePk: target.id },
-        data: { isDeleted: true, indexedAt: new Date() },
-      }),
-    ]);
+      });
+      if (result.count > 0) {
+        await QualityLossIndexQueue.enqueue(
+          tx,
+          [{ source: 'MANUAL', sourcePk: target.id }],
+          'quality-loss.deleted',
+        );
+      }
+      return result;
+    });
     if (result.count === 0) {
       throw new BusinessError('NOT_FOUND', '质量损失记录不存在', 404);
     }
@@ -128,19 +132,20 @@ export const QualityLossRecordMaintenanceService = {
     await assertDeleteAccess(targets, context);
 
     const targetIds = targets.map((target) => target.id);
-    const [result] = await prisma.$transaction([
-      prisma.quality_losses.updateMany({
+    const result = await prisma.$transaction(async (tx) => {
+      const result = await tx.quality_losses.updateMany({
         where: { id: { in: targetIds }, isDeleted: false },
         data: { isDeleted: true },
-      }),
-      prisma.quality_loss_index.updateMany({
-        where: {
-          source: QUALITY_LOSS_SOURCE.MANUAL,
-          sourcePk: { in: targetIds },
-        },
-        data: { isDeleted: true, indexedAt: new Date() },
-      }),
-    ]);
+      });
+      if (result.count > 0) {
+        await QualityLossIndexQueue.enqueue(
+          tx,
+          targetIds.map((sourcePk) => ({ source: 'MANUAL', sourcePk })),
+          'quality-loss.batch-deleted',
+        );
+      }
+      return result;
+    });
 
     await SystemLogService.auditLog('quality-loss', 'batchDelete', {
       userId: context.userId,

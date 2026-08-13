@@ -27,6 +27,29 @@
 
 ---
 
+### 2026-08-13 修复：release maintenance manifest 测试工作目录依赖
+
+**执行内容：**
+
+- 根因修复：`release-maintenance-manifest.test.ts` 曾以 `process.cwd()` 解析同目录的 runner。CI 从仓库根执行 `pnpm run test:unit` 时会错误指向根目录 `scripts/`，导致读取失败。
+- 测试改为从 `import.meta.url` 推导自身所在的 `apps/backend/scripts` 目录后解析 `run-release-maintenance.ts`，不再依赖调用工作目录。
+
+**验证结果：**
+
+- 根目录 `pnpm exec vitest run apps/backend/scripts/release-maintenance-manifest.test.ts` 与 `apps/backend` 目录 `pnpm exec vitest run scripts/release-maintenance-manifest.test.ts` 均通过（各 `1/1` 文件、`4/4` 用例）。
+- supplier identity 定向 Vitest 通过：`3/3` 文件、`50/50` 用例。
+- 后端全量 Vitest 通过：`285/285` 文件、`2596/2596` 用例。
+- 根目录全量 unit tests 通过：`393/393` 文件、`3268/3268` 用例。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** 本次独立提交。
+
+**遗留问题：**
+
+- 无；生产环境未受影响。
+
+---
+
 ## [0.24.13](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.12...qgs-v0.24.13) (2026-08-12)
 
 
@@ -34,6 +57,74 @@
 
 * **@qgs/backend:** keep sidecar rebuild out of release maintenance ([d55d1bd](https://github.com/ajie5419/Quality-Guardian/commit/d55d1bd3acb6f74951746e74c59078cdba9b4560))
 * **@qgs/backend:** keep sidecar rebuild out of release maintenance ([ee42531](https://github.com/ajie5419/Quality-Guardian/commit/ee425315865fac8f344ad9cd03fe3ef592c02696))
+
+### 2026-08-13 修复：发布前置阶段保持旧 backend 在线
+
+**执行内容：**
+
+- 根因修复：远端发布器不再在 Prisma migration 前停止 backend，也不再存在显式 `docker compose stop backend` 阶段。migration 与 release maintenance 使用新镜像 one-off 容器执行时，旧 backend 保持在线；仅在两项前置阶段完成后由 Compose 启动命令按新镜像重建服务。
+- 回滚保留 compose 配置恢复、有界超时和固定 one-off 容器清理。migration、maintenance 失败或超时时，不会对未切换的旧 backend 执行启动操作；切换命令前即记录 `backend_switch_started`，因此切换命令超时、失败或健康检查失败时，均会以旧 compose 配置再次启动 backend。
+- shell 行为测试锁定成功路径的 migration -> maintenance -> start services 顺序且无显式 backend stop；覆盖 migration failure、maintenance failure 与 maintenance timeout 均没有 backend stop/up，并覆盖 start-services failure 和健康检查失败均恢复旧 backend。
+
+**验证结果：**
+
+- `bash scripts/deploy/run-remote-release.test.sh` 通过，覆盖成功切换顺序、migration failure、maintenance failure、maintenance timeout、start-services failure、健康检查失败与 one-off preflight。
+- `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/run-remote-release.test.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+- 生产发布未执行。
+
+**commits:** `bbf17ff3`（前置阶段保持旧 backend 在线）；本次移除显式 backend stop 的修正使用独立提交。
+
+**遗留问题：**
+
+- 生产环境仍须通过正式发布流程验证新旧镜像切换与健康检查失败回滚。单实例 Compose 重建会短暂中断连接，不得宣称零停机发布；migration 或 maintenance 失败时不得手动重启旧 backend。
+
+---
+
+### 2026-08-13 修复：质量损失索引持久化队列与发布可靠性闭环
+
+**执行内容：**
+
+- 根因修复：`quality_loss_index` 不再依赖每次发版启动异步全量 backfill。after-sales、inspection issue、vehicle commissioning 和 manual quality loss 四类来源均在各自事务内持久化 enqueue 索引任务，使源事实提交与待投影工作保持一致。
+- 新增独立索引 worker：每 5 秒轮询，任务领取使用 5 分钟 lease；失败可重试并持久化错误。历史索引任务通过支持 dry-run/apply 的 enqueue 工具创建，再由独立 drain 工具消费，保留可审计的运维路径。
+- 历史 enqueue、drain、投影重建和其他 remediation 均未接入同步 release maintenance；版本化 manifest/ledger、fail-closed preflight、固定 one-off 容器、有界阶段、清理与回滚继续只负责本版本声明的启动前置任务。
+
+**验证结果：**
+
+- 后端全量 Vitest：`285/285` 文件、`2596/2596` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、Prisma validate、migration checks、发布 shell 行为测试与 `rtk git diff --check` 均通过。
+- 生产环境未执行 Prisma migration、release maintenance、历史 enqueue dry-run/apply 或独立 drain。
+
+**commits:** `d567fb65`（持久化质量损失索引任务）、`4715c88c`（outbox 覆盖）；`4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）、`f54859d7`（preflight fail-closed）、`6cf0f3e1`（维护文档与镜像断言）、`22cc54e4`（维护链路移除 Redis）、`8f08c0de`（阻断陈旧 compose one-off）、`55062b80`（文档记录）。
+
+**遗留问题：**
+
+- 生产发布前仍须通过正式发布流程执行并核对 migration 与 release maintenance；历史索引修复须先运行 enqueue dry-run 审核，再在独立运维窗口 apply 和 drain，禁止重新接入同步发布。
+
+---
+
+### 2026-08-13 修复：版本化发布维护与有界发布执行
+
+**执行内容：**
+
+- 根因修复：废止“每次发布重跑永久 shell 清单”的模式。release maintenance 改为 versioned manifest + `release_maintenance_tasks` 持久化 ledger；常规发布仅执行本版本 manifest 声明且尚未完成的启动前置幂等数据任务。
+- 每项任务使用稳定 `taskKey`、递增 `revision` 与 SHA-256 checksum。完成记录跳过，失败或过期租约可重试，checksum 漂移 fail-closed；修改已完成任务必须新增 revision。
+- 明确禁止将历史 remediation、historical identity sidecar、投影重建、窗口/评分对账加入同步发布；这些工作必须独立审批和执行。
+- 远端发布器已采用固定 migration/maintenance 容器、preflight、阶段超时、失败清理和 compose 回滚。生产重试前须人工确认失败原因及数据库状态，并定向清理已确认的旧随机名残留。
+- Docker production image 增加对 release maintenance TypeScript 入口、manifest 和 runner 的存在性断言，避免 deploy 调用未随镜像发布的维护实现。
+
+**验证结果：**
+
+- 后端 release maintenance 定向 Vitest：`2/2` 文件、`9/9` 用例通过；远端发布 shell 行为测试通过（覆盖成功、migration 失败、maintenance 超时、健康检查失败、固定容器残留和 preflight 异常）。
+- `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh` 与 `rtk git diff --check` 通过。
+- 生产 Prisma migration、maintenance 执行、超时清理和回滚演练尚未执行。
+
+**commits:** `4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）；本文档与镜像断言提交见本次后续独立 commit。
+
+**遗留问题：**
+
+- 首次生产重试必须先人工检查现存随机名 one-off 容器、RDS 活动事务及 compose 回滚状态；禁止以删除 ledger、跳过 maintenance 或宽泛 Docker prune 方式绕过失败。
+
+---
 
 ### 2026-08-12 修复：发布维护全量 sidecar 重建与日志噪声
 

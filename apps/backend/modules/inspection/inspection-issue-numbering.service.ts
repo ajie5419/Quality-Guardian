@@ -1,4 +1,5 @@
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
 import { BusinessError } from '~/utils/business-error';
@@ -48,15 +49,23 @@ export const InspectionIssueNumberingService = {
     userId: string,
     roles?: unknown,
   ): Promise<void> {
-    const result = await prisma.quality_records.updateMany({
-      where: applyInspectionIssueWriteOwnership(
-        { id, isDeleted: false },
-        { roles, userId },
-      ),
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const result = await tx.quality_records.updateMany({
+        where: applyInspectionIssueWriteOwnership(
+          { id, isDeleted: false },
+          { roles, userId },
+        ),
+        data: {
+          isDeleted: true,
+          updatedAt: new Date(),
+        },
+      });
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'INTERNAL', sourcePk: id }],
+        'inspection-issue.deleted',
+      );
+      return result;
     });
     if (result.count === 0) {
       throw new BusinessError('NOT_FOUND', '记录不存在', 404);

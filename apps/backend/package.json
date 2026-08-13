@@ -34,7 +34,10 @@
     "maintenance:work-order-confirm-permission": "tsx scripts/backfill-work-order-confirm-permission.ts",
     "maintenance:supplier-score-snapshots": "tsx scripts/reconcile-supplier-score-snapshots.ts",
     "maintenance:supplier-identities": "tsx scripts/backfill-quality-record-supplier-identities.ts",
-    "maintenance:backfill-thumbnails": "tsx scripts/backfill-missing-thumbnails.ts"
+    "maintenance:quality-loss-index:enqueue": "tsx scripts/enqueue-quality-loss-index.ts",
+    "maintenance:quality-loss-index:drain": "tsx scripts/drain-quality-loss-index.ts",
+    "maintenance:backfill-thumbnails": "tsx scripts/backfill-missing-thumbnails.ts",
+    "maintenance:release": "tsx scripts/run-release-maintenance.ts"
   },
   "dependencies": {
     "@fastify/busboy": "^3.2.0",

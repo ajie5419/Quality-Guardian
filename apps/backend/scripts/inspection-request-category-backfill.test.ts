@@ -140,48 +140,30 @@ describe('inspection request category backfill', () => {
     });
   });
 
-  it('runs identity bootstrap before process category classification', () => {
+  it('does not keep historical category bootstrap in every release', () => {
     const backendRoot = getBackendRoot();
     const maintenanceScript = readFileSync(
       resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
       'utf8',
     );
-    const identityBackfillIndex = maintenanceScript.indexOf(
+    expect(maintenanceScript).not.toContain(
       'scripts/backfill-identity-relations.ts',
     );
-    const categoryBackfillIndex = maintenanceScript.indexOf(
+    expect(maintenanceScript).not.toContain(
       'scripts/backfill-inspection-request-categories.ts',
     );
-
-    expect(identityBackfillIndex).toBeGreaterThan(-1);
-    expect(categoryBackfillIndex).toBeGreaterThan(identityBackfillIndex);
   });
 
-  it('runs quality loss index rebuild detached after the healthcheck', () => {
+  it('keeps the quality loss index rebuild out of release maintenance', () => {
     const backendRoot = getBackendRoot();
-    const repositoryRoot = resolve(backendRoot, '../..');
     const maintenanceScript = readFileSync(
       resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
       'utf8',
-    );
-    const deployWorkflow = readFileSync(
-      resolve(repositoryRoot, '.github/workflows/deploy.yml'),
-      'utf8',
-    );
-    const healthcheckIndex = deployWorkflow.indexOf('if [ "$ok" -ne 1 ]');
-    const qualityLossContainerIndex = deployWorkflow.indexOf(
-      'docker rm -f "$QUALITY_LOSS_BACKFILL_CONTAINER"',
-    );
-    const detachedRunIndex = deployWorkflow.indexOf(
-      'run --rm -d --name "$QUALITY_LOSS_BACKFILL_CONTAINER"',
     );
 
     expect(maintenanceScript).not.toContain(
       'scripts/backfill-quality-loss-index.ts',
     );
-    expect(healthcheckIndex).toBeGreaterThan(-1);
-    expect(qualityLossContainerIndex).toBeGreaterThan(healthcheckIndex);
-    expect(detachedRunIndex).toBeGreaterThan(qualityLossContainerIndex);
   });
 
   it('is idempotent after an applied row no longer matches the null category query', async () => {

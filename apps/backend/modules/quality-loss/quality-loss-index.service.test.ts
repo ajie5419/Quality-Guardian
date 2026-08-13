@@ -8,6 +8,10 @@ vi.mock('~/utils/prisma', () => ({
       updateMany: vi.fn(),
       upsert: vi.fn(),
     },
+    after_sales: { findUnique: vi.fn() },
+    quality_losses: { findUnique: vi.fn() },
+    quality_records: { findUnique: vi.fn() },
+    vehicle_commissioning_issues: { findUnique: vi.fn() },
   },
 }));
 
@@ -110,6 +114,36 @@ describe('qualityLossIndexService', () => {
 
       expect(prisma.quality_loss_index.upsert).not.toHaveBeenCalled();
       expect(prisma.quality_loss_index.updateMany).toHaveBeenCalled();
+    });
+  });
+
+  describe('rebuildOne', () => {
+    it('is idempotent when the same source key is retried', async () => {
+      vi.mocked(prisma.after_sales.findUnique).mockResolvedValue({
+        claimStatus: 'OPEN',
+        createdBy: 'u-1',
+        id: 'as-retry',
+        isClaim: true,
+        isDeleted: false,
+        laborTravelCost: 0,
+        materialCost: 20,
+        occurDate: new Date('2026-08-13T00:00:00.000Z'),
+        projectName: 'P',
+        respDept: 'QA',
+        workOrderNumber: 'WO-1',
+      } as never);
+
+      await QualityLossIndexService.rebuildOne('External', 'as-retry');
+      await QualityLossIndexService.rebuildOne('External', 'as-retry');
+
+      expect(prisma.quality_loss_index.upsert).toHaveBeenCalledTimes(2);
+      expect(prisma.quality_loss_index.upsert).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          where: {
+            source_sourcePk: { source: 'External', sourcePk: 'as-retry' },
+          },
+        }),
+      );
     });
   });
 

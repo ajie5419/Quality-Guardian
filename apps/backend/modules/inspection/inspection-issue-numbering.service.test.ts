@@ -2,14 +2,23 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueNumberingService } from '~/modules/inspection/inspection-issue-numbering.service';
 import prisma from '~/utils/prisma';
 
-vi.mock('~/utils/prisma', () => ({
-  default: {
+vi.mock('~/utils/prisma', () => {
+  const transactionClient = {
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     quality_records: {
       findFirst: vi.fn(),
       updateMany: vi.fn(),
     },
-  },
-}));
+  };
+  return {
+    default: {
+      ...transactionClient,
+      $transaction: vi.fn((callback) => callback(transactionClient)),
+    },
+  };
+});
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
   FileStorageService: {
