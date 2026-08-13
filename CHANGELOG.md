@@ -6613,3 +6613,16 @@
 - P3009 recovery 定向测试 `10/10` 通过；root `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。当前数据库只读检测输出 `NOT_REQUIRED`。Codex 未执行任何数据库 apply；生产发布和推送均未执行。
 
 **commits:** `40070cf`（后端/共享契约）、`d84297c`（Web/WeApp 入口）、`1704d7d`（历史治理与发布维护）、`8e33910`（测试夹具修正）、`88bc724`（后端/共享契约修正）、`5311921`（Web/WeApp 选项修正）、`2051341`（P3009 migration recovery）。
+### 2026-08-13 PROCESS 外协报检责任部门 canonical ID 修复
+
+**执行内容：**
+
+- 根因：外协报检的隐藏责任部门每次仅按共享显示名称查询；本地存在两个 active 同名部门时，正确的 fail-closed 保护阻断了 public V2 创建，但名称并不是稳定身份。
+- 新增系统设置 `INSPECTION_REQUEST_PROCESS_OUTSOURCING_RESPONSIBLE_DEPARTMENT_ID`。已有设置时，运行时只按 active canonical ID 解析；部门改名后以当前名称快照写入请求、检验记录与不合格项责任事实，ID 不变。
+- 设置缺失时只允许用现有共享旧名称进行一次原子引导：唯一候选用 `create` 固化，唯一键并发竞争后回读赢家配置；零个或多个候选、无效或停用配置均 fail-closed。没有按名称排序、ID 格式或 `first` 选择。
+- release maintenance 在请求责任回填前显式运行相同的幂等引导，歧义不会被跳过或绕过。
+
+**验证结果：**
+
+- 后端定向 Vitest：`6/6` 文件、`48/48` 用例通过，覆盖配置 ID 改名后解析、首次唯一 bootstrap、零/多候选拒绝、停用 ID 拒绝、并发 create 竞争回读及 release-maintenance 接线。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`rtk git diff --check`：通过。

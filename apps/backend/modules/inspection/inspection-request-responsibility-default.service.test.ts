@@ -1,58 +1,41 @@
-import { OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DeptService } from '~/modules/dept';
+import { ProcessOutsourcingResponsibleDepartmentSettingService } from '~/modules/system';
 
 import { resolveProcessOutsourcingResponsibleDepartmentId } from './inspection-request-responsibility-default.service';
 
-vi.mock('~/modules/dept', () => ({
-  DeptService: { findActiveByIdsOrNames: vi.fn() },
+vi.mock('~/modules/system', () => ({
+  ProcessOutsourcingResponsibleDepartmentSettingService: {
+    resolveConfiguredDepartment: vi.fn(),
+  },
 }));
 
 describe('process outsourcing responsibility department default', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('uses the one active canonical policy department', async () => {
-    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
-      {
-        businessUnit: '',
-        id: 'dept-production',
-        name: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
-      },
-    ]);
+  it('delegates canonical ID resolution to the system setting boundary', async () => {
+    vi.mocked(
+      ProcessOutsourcingResponsibleDepartmentSettingService.resolveConfiguredDepartment,
+    ).mockResolvedValue({
+      businessUnit: '',
+      id: 'dept-production',
+      name: 'Renamed production department',
+    });
 
     await expect(
       resolveProcessOutsourcingResponsibleDepartmentId({} as any),
     ).resolves.toBe('dept-production');
   });
 
-  it.each([
-    { departments: [] },
-    {
-      departments: [
-        {
-          businessUnit: '',
-          id: 'a',
-          name: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
-        },
-        {
-          businessUnit: '',
-          id: 'b',
-          name: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
-        },
-      ],
-    },
-  ])(
-    'fails closed when the canonical policy department is unavailable or ambiguous',
-    async ({ departments }) => {
-      vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue(
-        departments,
-      );
+  it('preserves the transaction boundary for bootstrap and configuration reads', async () => {
+    const tx = {} as any;
+    vi.mocked(
+      ProcessOutsourcingResponsibleDepartmentSettingService.resolveConfiguredDepartment,
+    ).mockResolvedValue({ id: 'dept-production', name: 'Production' });
 
-      await expect(
-        resolveProcessOutsourcingResponsibleDepartmentId({} as any),
-      ).rejects.toMatchObject({
-        code: 'INSPECTION_REQUEST_OUTSOURCING_DEPARTMENT_UNRESOLVED',
-      });
-    },
-  );
+    await resolveProcessOutsourcingResponsibleDepartmentId(tx);
+
+    expect(
+      ProcessOutsourcingResponsibleDepartmentSettingService.resolveConfiguredDepartment,
+    ).toHaveBeenCalledWith(tx);
+  });
 });

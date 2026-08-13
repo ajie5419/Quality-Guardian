@@ -74,6 +74,7 @@
 - [x] 报检 Web/小程序与工单要求 V2 ID-required 写契约
 - [x] Historical process identity bootstrap and work-order requirement `processId` backfill, including empty-only seeding and ordered release maintenance
 - [x] 全局工序主数据与报检显示配置解耦（过程报检/进货检验独立开关、稳定 ID、全局复用、无名称或工单要求兜底）
+- [x] PROCESS 外协报检隐藏责任部门的 canonical ID 设置（首次唯一旧名称原子引导、改名稳定、并发与歧义 fail-closed、发布维护门禁）
 - [x] 受控名称 `Map` 键架构门禁 `B-ID9`
 - [x] 质量二级分类开放配置（不合格项缺陷、售后产品、售后缺陷），含 Web/小程序接入、canonical ID 统计、发布初始化和历史回填
 - [x] 质量分类 migration 的 MySQL 长索引名修复、自动化门禁与本地容器数据库恢复
