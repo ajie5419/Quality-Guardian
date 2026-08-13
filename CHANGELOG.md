@@ -27,6 +27,29 @@
 
 ---
 
+### 2026-08-13 修复：release maintenance manifest 测试工作目录依赖
+
+**执行内容：**
+
+- 根因修复：`release-maintenance-manifest.test.ts` 曾以 `process.cwd()` 解析同目录的 runner。CI 从仓库根执行 `pnpm run test:unit` 时会错误指向根目录 `scripts/`，导致读取失败。
+- 测试改为从 `import.meta.url` 推导自身所在的 `apps/backend/scripts` 目录后解析 `run-release-maintenance.ts`，不再依赖调用工作目录。
+
+**验证结果：**
+
+- 根目录 `pnpm exec vitest run apps/backend/scripts/release-maintenance-manifest.test.ts` 与 `apps/backend` 目录 `pnpm exec vitest run scripts/release-maintenance-manifest.test.ts` 均通过（各 `1/1` 文件、`4/4` 用例）。
+- supplier identity 定向 Vitest 通过：`3/3` 文件、`50/50` 用例。
+- 后端全量 Vitest 通过：`285/285` 文件、`2596/2596` 用例。
+- 根目录全量 unit tests 通过：`393/393` 文件、`3268/3268` 用例。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** 本次独立提交。
+
+**遗留问题：**
+
+- 无；生产环境未受影响。
+
+---
+
 ## [0.24.13](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.12...qgs-v0.24.13) (2026-08-12)
 
 

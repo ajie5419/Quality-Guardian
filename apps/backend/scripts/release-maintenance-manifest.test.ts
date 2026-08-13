@@ -1,8 +1,8 @@
 import type { ReleaseMaintenanceTaskDefinition } from './release-maintenance-manifest';
 
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import process from 'node:process';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
@@ -11,6 +11,8 @@ import {
   releaseMaintenanceManifest,
   retiredHistoricalReleaseMaintenanceTaskKeys,
 } from './release-maintenance-manifest';
+
+const scriptsDirectory = dirname(fileURLToPath(import.meta.url));
 
 function task(taskKey: string): ReleaseMaintenanceTaskDefinition {
   return {
@@ -25,7 +27,7 @@ function task(taskKey: string): ReleaseMaintenanceTaskDefinition {
 describe('release maintenance manifest', () => {
   it('keeps the ledger runner independent from Redis', () => {
     const entrypoint = readFileSync(
-      resolve(process.cwd(), 'scripts/run-release-maintenance.ts'),
+      resolve(scriptsDirectory, 'run-release-maintenance.ts'),
       'utf8',
     );
 
