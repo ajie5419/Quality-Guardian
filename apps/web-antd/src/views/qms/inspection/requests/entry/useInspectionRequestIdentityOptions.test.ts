@@ -64,10 +64,10 @@ describe('inspection request responsibility options', () => {
     expect(requestForm.supplierId).toBe('');
   });
 
-  it('loads outsourcing canonical department and supplier choices without preselecting either', async () => {
+  it('defaults an outsourcing responsibility to the unique production OBU department', async () => {
     const requestForm = createForm();
     getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
-      departments: [{ label: 'Production OBU', value: 'dept-production' }],
+      departments: [{ label: '生产 OBU', value: 'dept-production' }],
       responsibilityType: 'OUTSOURCING_UNIT',
       suppliers: [{ label: 'Outsource A', value: 'supplier-a' }],
     });
@@ -77,7 +77,7 @@ describe('inspection request responsibility options', () => {
 
     expect(requestForm).toMatchObject({
       responsibilityType: 'OUTSOURCING_UNIT',
-      responsibleDepartmentId: '',
+      responsibleDepartmentId: 'dept-production',
       supplierId: '',
       team: '',
       teamId: '',
@@ -85,6 +85,56 @@ describe('inspection request responsibility options', () => {
     expect(composable.supplierOptions.value).toEqual([
       { label: 'Outsource A', value: 'supplier-a' },
     ]);
+  });
+
+  it('defaults a supplier responsibility to the unique purchasing department', async () => {
+    const requestForm = createForm();
+    getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+      departments: [{ label: '采购部', value: 'dept-purchasing' }],
+      responsibilityType: 'SUPPLIER',
+      suppliers: [{ label: 'Supplier A', value: 'supplier-a' }],
+    });
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.changeResponsibilityType('SUPPLIER');
+
+    expect(requestForm.responsibleDepartmentId).toBe('dept-purchasing');
+  });
+
+  it('leaves the department unselected when production OBU is ambiguous', async () => {
+    const requestForm = createForm();
+    getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
+      departments: [
+        { label: '生产 OBU', value: 'dept-production-a' },
+        { label: '生产 OBU', value: 'dept-production-b' },
+      ],
+      responsibilityType: 'OUTSOURCING_UNIT',
+      suppliers: [{ label: 'Outsource A', value: 'supplier-a' }],
+    });
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.changeResponsibilityType('OUTSOURCING_UNIT');
+
+    expect(requestForm.responsibleDepartmentId).toBe('');
+  });
+
+  it('keeps a same-type manual department when options cannot load', async () => {
+    const requestForm = createForm();
+    requestForm.responsibilityType = 'SUPPLIER';
+    requestForm.responsibleDepartmentId = 'dept-manual';
+    requestForm.supplierId = 'supplier-manual';
+    getPublicInspectionRequestResponsibilityOptions.mockRejectedValue(
+      new Error('Network unavailable'),
+    );
+    const composable = useInspectionRequestIdentityOptions({ requestForm });
+
+    await composable.loadResponsibilityOptions();
+
+    expect(requestForm).toMatchObject({
+      responsibleDepartmentId: 'dept-manual',
+      supplierId: 'supplier-manual',
+    });
+    expect(composable.responsibilityDepartmentOptions.value).toEqual([]);
   });
 
   it.each([

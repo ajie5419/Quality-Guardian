@@ -30,6 +30,7 @@ import {
   isCurrentResponsibilityOptionsRequest,
   REQUEST_CREATE_RESPONSIBILITY_LABELS,
   REQUEST_CREATE_RESPONSIBILITY_TYPES,
+  resolveRequestCreateResponsibilityDepartmentDefault,
 } from './create-responsibility';
 
 interface WorkOrderItem {
@@ -259,7 +260,6 @@ async function loadResponsibilityOptions() {
     });
     if (!isCurrentRequest()) return;
     if (res.code !== 0 || !res.data) {
-      resetResponsibilityIdentity();
       departmentOptions.value = [];
       internalTeamOptions.value = [];
       supplierOptions.value = [];
@@ -267,6 +267,12 @@ async function loadResponsibilityOptions() {
     }
     departmentOptions.value = res.data.departments;
     supplierOptions.value = res.data.suppliers;
+    form.responsibleDepartmentId =
+      resolveRequestCreateResponsibilityDepartmentDefault({
+        currentResponsibleDepartmentId: form.responsibleDepartmentId,
+        departments: departmentOptions.value,
+        responsibilityType: requestedResponsibilityType,
+      });
     departmentIndex.value = departmentOptions.value.findIndex(
       (item) => item.value === form.responsibleDepartmentId,
     );
@@ -305,7 +311,6 @@ async function loadResponsibilityOptions() {
     form.supplierId = '';
   } catch {
     if (!isCurrentRequest()) return;
-    resetResponsibilityIdentity();
     departmentOptions.value = [];
     internalTeamOptions.value = [];
     supplierOptions.value = [];

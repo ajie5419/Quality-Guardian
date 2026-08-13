@@ -12,6 +12,7 @@ import {
   normalizeInspectionStationSelection,
   resolveInspectionIssueResponsibilityTypeFromDepartment,
   resolveInspectionRequestIssueResponsibility,
+  resolveInspectionRequestResponsibilityDepartmentDefault,
 } from './inspection-request';
 
 describe('mapInspectionRequestRecord', () => {
@@ -209,6 +210,63 @@ describe('inspection station selection', () => {
 });
 
 describe('resolveInspectionRequestIssueResponsibility', () => {
+  it.each([
+    [
+      'OUTSOURCING_UNIT',
+      [{ label: '生产 OBU', value: 'dept-production' }],
+      'dept-production',
+    ],
+    [
+      'SUPPLIER',
+      [{ label: '采购部', value: 'dept-purchasing' }],
+      'dept-purchasing',
+    ],
+  ] as const)(
+    'defaults %s to its uniquely matching canonical department',
+    (responsibilityType, departments, expected) => {
+      expect(
+        resolveInspectionRequestResponsibilityDepartmentDefault({
+          departments,
+          responsibilityType,
+        }),
+      ).toBe(expected);
+    },
+  );
+
+  it.each([
+    {
+      departments: [
+        { label: '生产 OBU', value: 'dept-production-a' },
+        { label: '生产 OBU', value: 'dept-production-b' },
+      ],
+      responsibilityType: 'OUTSOURCING_UNIT' as const,
+    },
+    {
+      departments: [],
+      responsibilityType: 'SUPPLIER' as const,
+    },
+  ])(
+    'fails closed when the default department is not uniquely available',
+    ({ departments, responsibilityType }) => {
+      expect(
+        resolveInspectionRequestResponsibilityDepartmentDefault({
+          departments,
+          responsibilityType,
+        }),
+      ).toBe('');
+    },
+  );
+
+  it('keeps a department selected manually for the same responsibility type', () => {
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentDefault({
+        currentResponsibleDepartmentId: 'dept-manual',
+        departments: [{ label: '采购部', value: 'dept-purchasing' }],
+        responsibilityType: 'SUPPLIER',
+      }),
+    ).toBe('dept-manual');
+  });
+
   it('maps external responsibility types to the supplier option category', () => {
     expect(getInspectionRequestResponsibilitySupplierCategory('SUPPLIER')).toBe(
       'Supplier',

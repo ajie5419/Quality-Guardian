@@ -1,6 +1,10 @@
-import type { InspectionIssueResponsibilityType } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  resolveInspectionRequestResponsibilityDepartmentDefault,
+} from '@qgs/shared';
 
-import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
+type RequestCreateResponsibilityType =
+  (typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE)[keyof typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE];
 
 export const REQUEST_CREATE_RESPONSIBILITY_TYPES = [
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
@@ -26,8 +30,16 @@ export function isCurrentResponsibilityOptionsRequest(input: {
   );
 }
 
+export function resolveRequestCreateResponsibilityDepartmentDefault(input: {
+  currentResponsibleDepartmentId: string;
+  departments: Array<{ label: string; value: string }>;
+  responsibilityType: RequestCreateResponsibilityType;
+}) {
+  return resolveInspectionRequestResponsibilityDepartmentDefault(input);
+}
+
 export function buildRequestCreateResponsibilityPayload(input: {
-  responsibilityType: InspectionIssueResponsibilityType;
+  responsibilityType: RequestCreateResponsibilityType;
   responsibleDepartmentId: string;
   supplierId: string;
   teamId: string;

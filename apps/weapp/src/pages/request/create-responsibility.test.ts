@@ -5,9 +5,44 @@ import {
   isCurrentResponsibilityOptionsRequest,
   REQUEST_CREATE_RESPONSIBILITY_LABELS,
   REQUEST_CREATE_RESPONSIBILITY_TYPES,
+  resolveRequestCreateResponsibilityDepartmentDefault,
 } from './create-responsibility';
 
 describe('request create responsibility payload', () => {
+  it.each([
+    [
+      'OUTSOURCING_UNIT' as const,
+      [{ label: '生产 OBU', value: 'dept-production' }],
+      'dept-production',
+    ],
+    [
+      'SUPPLIER' as const,
+      [{ label: '采购部', value: 'dept-purchasing' }],
+      'dept-purchasing',
+    ],
+  ])(
+    'uses the shared canonical default for %s',
+    (responsibilityType, departments, expected) => {
+      expect(
+        resolveRequestCreateResponsibilityDepartmentDefault({
+          currentResponsibleDepartmentId: '',
+          departments,
+          responsibilityType,
+        }),
+      ).toBe(expected);
+    },
+  );
+
+  it('does not replace a manually selected department', () => {
+    expect(
+      resolveRequestCreateResponsibilityDepartmentDefault({
+        currentResponsibleDepartmentId: 'dept-manual',
+        departments: [{ label: '采购部', value: 'dept-purchasing' }],
+        responsibilityType: 'SUPPLIER',
+      }),
+    ).toBe('dept-manual');
+  });
+
   it('keeps all three responsibility types available for both request routes', () => {
     expect(REQUEST_CREATE_RESPONSIBILITY_TYPES).toEqual([
       'INTERNAL_DEPARTMENT',

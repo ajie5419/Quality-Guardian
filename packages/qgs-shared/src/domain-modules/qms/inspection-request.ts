@@ -51,6 +51,50 @@ export function getInspectionRequestResponsibilitySupplierCategory(
   return null;
 }
 
+export type InspectionRequestResponsibilityDepartmentCandidate = {
+  label: string;
+  value: string;
+};
+
+/**
+ * Resolves the policy department only from one exact canonical display-name
+ * match. Ambiguous or unavailable option lists intentionally leave the form
+ * unselected so the server remains the final authority for responsibility.
+ */
+export function resolveInspectionRequestResponsibilityDepartmentDefault(input: {
+  currentResponsibleDepartmentId?: unknown;
+  departments: ReadonlyArray<InspectionRequestResponsibilityDepartmentCandidate>;
+  responsibilityType: InspectionIssueResponsibilityType;
+}) {
+  const currentResponsibleDepartmentId = normalizeInspectionRequestText(
+    input.currentResponsibleDepartmentId,
+  );
+  if (currentResponsibleDepartmentId) return currentResponsibleDepartmentId;
+
+  let targetDepartmentName = '';
+  if (
+    input.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    targetDepartmentName = OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT;
+  } else if (
+    input.responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+  ) {
+    targetDepartmentName = INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT;
+  }
+  if (!targetDepartmentName) return '';
+
+  const matches = input.departments.filter(
+    (department) =>
+      normalizeInspectionRequestText(department.label) ===
+        targetDepartmentName &&
+      Boolean(normalizeInspectionRequestText(department.value)),
+  );
+  return matches.length === 1
+    ? normalizeInspectionRequestText(matches[0]?.value)
+    : '';
+}
+
 export function mergeInspectionProcessNames(
   ...groups: ReadonlyArray<ReadonlyArray<unknown>>
 ): string[] {

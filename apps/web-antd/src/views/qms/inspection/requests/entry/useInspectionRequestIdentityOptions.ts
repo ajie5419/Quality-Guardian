@@ -7,7 +7,10 @@ import type {
 
 import { ref } from 'vue';
 
-import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  resolveInspectionRequestResponsibilityDepartmentDefault,
+} from '@qgs/shared';
 
 import {
   getPublicInspectionRequestResponsibilityOptions,
@@ -108,6 +111,15 @@ export function useInspectionRequestIdentityOptions(options: {
       requestForm.teamId = '';
     }
 
+    if (!preserveSelection) {
+      requestForm.responsibleDepartmentId =
+        resolveInspectionRequestResponsibilityDepartmentDefault({
+          currentResponsibleDepartmentId: requestForm.responsibleDepartmentId,
+          departments: options.departments,
+          responsibilityType: options.responsibilityType,
+        });
+    }
+
     if (isExternal) {
       requestForm.team = '';
       requestForm.teamId = '';
@@ -167,7 +179,6 @@ export function useInspectionRequestIdentityOptions(options: {
         responsibilityDepartmentOptions.value = [];
         internalTeamOptions.value = [];
         supplierOptions.value = [];
-        clearResponsibilityIdentity();
       }
     } finally {
       responsibilityLoading.value = false;
