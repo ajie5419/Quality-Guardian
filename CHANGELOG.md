@@ -27,6 +27,33 @@
 
 ---
 
+### 2026-08-14 修复：不合格编号改为可选的系统正式标识
+
+**执行内容：**
+
+- 不合格项编号改为可选且不可手填：独立新建、报检任务 FAIL 关闭、普通检验记录 FAIL 三个入口均明确提交 `generateNcNumber`；关闭时 `nonConformanceNumber` 持久化为 `NULL`，开启时仅由后端事务内编号服务分配。
+- 普通检验记录与关联不合格项收敛为同一 Prisma 事务；后端从已落库检验记录继承 inspection、供应商和工单的 canonical 事实，校验失败会同时回滚，前端不再在保存记录后发送第二次创建请求。
+- 新增一次性补号接口、权限 `QMS:Inspection:Issues:AssignNcNumber`、审计和 Web/WeApp 受权限控制的操作入口；只有未编号项可补号，已编号项不可修改、清空、删除后复用或重复生成。
+- 报检关闭强制校验 `QMS:Inspection:Requests:Close`，非系统管理员只可关闭派发给自己的任务；并发或重复 FAIL 在事务锁后读取当前 `linkedIssueId`，复用原不合格项而不覆盖关联、不再创建或重号。
+- 补齐手工编号拒绝、空编号 `null` 类型契约、导入生成策略、编号器新年度首号与并发保护；关单和普通记录的提交后附件、审计、评分副作用改为 best-effort，避免已提交事务被误报为失败。
+- 修复售后核心与对抗测试 fixture，使 DeptService 新增的 `departments.findMany` 读取使用完整 Prisma mock；未改生产代码。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2595/2595` 用例通过。
+- Web happy-dom Vitest：`61/61` 文件、`312/312` 用例通过。
+- WeApp Vitest：`10/10` 文件、`46/46` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、Prisma migration 检查、shared build 与 `rtk git diff --check` 均通过。
+
+**commit:** `9cc90993`、`bb88eda3`、`2000d63c`、`2f79dfe4`
+
+**遗留问题：**
+
+- 未读取凭据，未运行真实 MySQL 并发集成验证。
+- 未运行前端 dev/build/start，未完成真实页面验收或生产发布。
+
+---
+
 ### 2026-08-14 修复：部门改名后的责任部门在线展示
 
 **执行内容：**
