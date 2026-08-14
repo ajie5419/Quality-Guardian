@@ -15,6 +15,7 @@ vi.mock('~/utils/prisma', () => {
   };
   const transactionClient = {
     after_sales: afterSales,
+    departments: { findMany: vi.fn().mockResolvedValue([]) },
     metric_refresh_jobs: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
