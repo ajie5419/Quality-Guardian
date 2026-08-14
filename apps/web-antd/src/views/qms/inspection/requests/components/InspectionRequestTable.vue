@@ -169,7 +169,7 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
             {{ props.inspectionQuantityText(record) }}
           </div>
           <div v-if="props.hasLinkedIssue(record)" class="text-xs text-red-500">
-            {{ record.linkedIssueNo || '已生成不合格项' }}
+            {{ record.linkedIssueNo || 'Linked unnumbered inspection issue' }}
           </div>
         </div>
       </template>
@@ -336,7 +336,7 @@ function handleActionMenuClick(record: InspectionRequest, key: unknown) {
           {{ props.inspectionResultLabel(record) }}
         </Tag>
         <Tag v-if="props.hasLinkedIssue(record)" color="red">
-          {{ record.linkedIssueNo || '已生成不合格项' }}
+          {{ record.linkedIssueNo || 'Linked unnumbered inspection issue' }}
         </Tag>
       </div>
 

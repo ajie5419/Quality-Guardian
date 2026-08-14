@@ -218,7 +218,9 @@ onShow(async () => {
         >
           <view class="card-heading">
             <view class="heading-main">
-              <text class="nc-number">{{ issue.ncNumber || '-' }}</text>
+              <text class="nc-number">{{
+                issue.ncNumber || 'Unnumbered'
+              }}</text>
               <text class="part-name">{{ issue.partName || '-' }}</text>
             </view>
             <view class="status-tag" :class="statusClass(String(issue.status))">

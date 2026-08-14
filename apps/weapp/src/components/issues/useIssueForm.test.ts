@@ -1,11 +1,16 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createIssueFormState,
   createIssueFormStateFromRecord,
   resolveCanonicalIssueResponsibility,
 } from './useIssueForm';
 
 describe('mobile issue form edit state', () => {
+  it('defaults new issue drafts to unnumbered', () => {
+    expect(createIssueFormState().generateNcNumber).toBe(false);
+  });
+
   it('replays every editable field from an existing issue and keeps canonical external responsibility', () => {
     const state = createIssueFormStateFromRecord(
       {

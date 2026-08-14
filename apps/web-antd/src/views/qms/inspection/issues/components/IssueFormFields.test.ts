@@ -6,12 +6,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import IssueFormFields from './IssueFormFields.vue';
 
-const { mockGetWelderListPage, mockHandleApiError, mockSetFieldValue } =
-  vi.hoisted(() => ({
-    mockGetWelderListPage: vi.fn(),
-    mockHandleApiError: vi.fn(),
-    mockSetFieldValue: vi.fn(),
-  }));
+const {
+  mockGetWelderListPage,
+  mockHandleApiError,
+  mockSetFieldValue,
+  mockSetFormState,
+} = vi.hoisted(() => ({
+  mockGetWelderListPage: vi.fn(),
+  mockHandleApiError: vi.fn(),
+  mockSetFieldValue: vi.fn(),
+  mockSetFormState: vi.fn(),
+}));
 
 vi.mock('@vben/locales', () => ({
   $t: (key: string) => key,
@@ -19,13 +24,18 @@ vi.mock('@vben/locales', () => ({
 }));
 
 vi.mock('#/adapter/form', () => ({
-  useVbenForm: () => [
+  useVbenForm: (config: {
+    schema: Array<{ fieldName: string; label?: string }>;
+  }) => [
     defineComponent({
       name: 'MockVbenForm',
       setup(_, { slots }) {
         return () =>
           h('div', [
-            slots.ncNumber?.({ modelValue: '' }),
+            ...config.schema.map((field) => h('span', field.label || '')),
+            ...(config.schema.some((field) => field.fieldName === 'ncNumber')
+              ? [slots.ncNumber?.({ modelValue: '' })]
+              : []),
             slots.supplierId?.({ value: undefined }),
             slots['description-label']?.(),
           ]);
@@ -35,6 +45,7 @@ vi.mock('#/adapter/form', () => ({
       getValues: vi.fn(),
       resetForm: vi.fn(),
       setFieldValue: mockSetFieldValue,
+      setState: mockSetFormState,
       setValues: vi.fn(),
       updateSchema: vi.fn(),
       validate: vi.fn(),
@@ -150,11 +161,19 @@ describe('issue form fields responsibility contract', () => {
     });
   }
 
-  it('shows that NC numbers are generated after submit without a client control', () => {
+  it('shows the automatic NC number generation switch only while creating', () => {
     const wrapper = mountComponent(false);
 
-    expect(wrapper.text()).toContain('提交后自动生成');
-    expect(wrapper.text()).not.toContain('生成编号');
+    expect(wrapper.text()).toContain('Generate NC Number');
+    expect(wrapper.text()).not.toContain('qms.inspection.issues.ncNumber');
+  });
+
+  it('shows a read-only NC number field without the generation switch while editing', () => {
+    const wrapper = mountComponent(true);
+
+    expect(wrapper.text()).toContain('qms.inspection.issues.ncNumber');
+    expect(wrapper.text()).toContain('Unnumbered');
+    expect(wrapper.text()).not.toContain('Generate NC Number');
   });
 
   it('writes the supplier id and name snapshot together', async () => {

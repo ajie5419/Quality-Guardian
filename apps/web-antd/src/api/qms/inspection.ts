@@ -123,6 +123,12 @@ export async function deleteInspectionIssue(id: string) {
   return requestClient.delete(`${QMS_API.INSPECTION_ISSUES}/${id}`);
 }
 
+export async function assignInspectionIssueNcNumber(id: string) {
+  return requestClient.post<InspectionIssue>(
+    `${QMS_API.INSPECTION_ISSUES}/${id}/assign-nc-number`,
+  );
+}
+
 /**
  * Batch delete inspection issues
  */

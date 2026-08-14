@@ -44,6 +44,7 @@ type LinkedIssueDraftState = {
   description: string;
   division: string;
   divisionId: string;
+  generateNcNumber: boolean;
   lossAmount: number;
   ncNumber: string;
   partName: string;
@@ -158,6 +159,7 @@ export function useInspectionRequestTaskActions(
     description: '',
     division: '',
     divisionId: '',
+    generateNcNumber: false,
     lossAmount: 0,
     ncNumber: '',
     partName: '',
@@ -484,6 +486,7 @@ export function useInspectionRequestTaskActions(
       description: '',
       division: '',
       divisionId: '',
+      generateNcNumber: false,
       lossAmount: 0,
       ncNumber: '',
       partName: request.componentName || request.partName || '',

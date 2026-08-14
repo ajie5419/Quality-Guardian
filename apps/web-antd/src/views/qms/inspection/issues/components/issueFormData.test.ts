@@ -97,4 +97,22 @@ describe('issue form welding conditions', () => {
       schema.some((field) => field.fieldName === 'responsibleDepartments'),
     ).toBe(false);
   });
+
+  it('only exposes automatic number generation while creating an issue', () => {
+    const createSchema = getIssueFormSchema();
+    const editSchema = getIssueFormSchema(undefined, [], true);
+
+    expect(
+      createSchema.some((field) => field.fieldName === 'generateNcNumber'),
+    ).toBe(true);
+    expect(createSchema.some((field) => field.fieldName === 'ncNumber')).toBe(
+      false,
+    );
+    expect(editSchema.some((field) => field.fieldName === 'ncNumber')).toBe(
+      true,
+    );
+    expect(
+      editSchema.some((field) => field.fieldName === 'generateNcNumber'),
+    ).toBe(false);
+  });
 });

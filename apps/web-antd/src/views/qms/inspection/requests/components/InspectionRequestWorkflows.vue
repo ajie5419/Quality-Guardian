@@ -39,6 +39,7 @@ type LinkedIssueDraft = {
   description: string;
   division: string;
   divisionId: string;
+  generateNcNumber: boolean;
   lossAmount: number;
   ncNumber: string;
   partName: string;

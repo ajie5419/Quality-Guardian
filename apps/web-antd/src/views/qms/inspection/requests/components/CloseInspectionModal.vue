@@ -61,6 +61,7 @@ interface Props {
     description: string;
     division: string;
     divisionId: string;
+    generateNcNumber: boolean;
     lossAmount: number;
     ncNumber: string;
     partName: string;
@@ -457,6 +458,7 @@ async function collectIssueFromForm() {
       values.defectSubcategoryId,
     ),
     lossAmount: Number(values.lossAmount) || 0,
+    generateNcNumber: Boolean(values.generateNcNumber),
     claim: normalizeInspectionIssueText(values.claim),
     description: normalizeInspectionIssueText(values.description),
     rootCause: normalizeInspectionIssueText(values.rootCause),

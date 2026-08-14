@@ -499,6 +499,12 @@ async function handleGenerateInsight() {
       v-model:open="detailVisible"
       :dept-data="deptRawData"
       :record="detailRecord"
+      @assigned="
+        () => {
+          gridApi.reload();
+          refreshStatistics();
+        }
+      "
     />
 
     <IssueEditModal

@@ -21,6 +21,7 @@ import {
   InputNumber,
   message,
   Select,
+  Switch,
   TreeSelect,
 } from 'ant-design-vue';
 import dayjs from 'dayjs';
@@ -62,6 +63,7 @@ interface LinkedIssueDraft {
   defectSubtype: string;
   defectType: string;
   description: string;
+  generateNcNumber: boolean;
   lossAmount: number;
   partName: string;
   processName: string;
@@ -103,6 +105,7 @@ const linkedIssueDraft = ref<LinkedIssueDraft>({
   defectSubtype: '',
   defectType: '',
   description: '',
+  generateNcNumber: false,
   lossAmount: 0,
   partName: '',
   processName: '',
@@ -138,7 +141,9 @@ const defectOptions = computed(() =>
   })),
 );
 const shouldCreateLinkedIssue = computed(
-  () => String(activeValues.value.result || '').toUpperCase() === 'FAIL',
+  () =>
+    !props.record?.id &&
+    String(activeValues.value.result || '').toUpperCase() === 'FAIL',
 );
 const isLinkedIssueExternalResponsibility = computed(() =>
   isExternalInspectionIssueResponsibility(
@@ -430,6 +435,7 @@ watch(
       defectSubtype: '',
       defectType: '',
       description: '',
+      generateNcNumber: false,
       lossAmount: 0,
       partName: deriveIssuePartName(activeValues.value),
       processName: deriveIssueProcessName(activeValues.value),
@@ -506,6 +512,7 @@ defineExpose({
             reportedBy: String(activeValues.value.inspector || '').trim(),
             photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
             enabled: true,
+            generateNcNumber: linkedIssueDraft.value.generateNcNumber,
             quantity: unqualifiedQuantity,
           }
         : {
@@ -635,6 +642,14 @@ defineExpose({
   >
     <div class="mb-3 font-medium text-orange-700">
       当前判定为“不合格”，请补充不合格项信息（保存时自动建立关联）
+    </div>
+    <div class="mb-3 flex items-center gap-2 text-sm text-gray-700">
+      <Switch v-model:checked="linkedIssueDraft.generateNcNumber" />
+      <span>{{
+        linkedIssueDraft.generateNcNumber
+          ? 'Generate NC Number automatically on submission'
+          : 'Unnumbered'
+      }}</span>
     </div>
     <div class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div>

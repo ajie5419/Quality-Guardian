@@ -265,7 +265,10 @@ function requestIdentity(request: InspectionRequest) {
               <div class="mb-1 text-xs text-gray-500">关联不合格项</div>
               <div class="flex flex-wrap items-center gap-2">
                 <Tag :color="props.inspectionResultColor(props.request)">
-                  {{ props.request.linkedIssueNo || '已生成不合格项' }}
+                  {{
+                    props.request.linkedIssueNo ||
+                    'Linked unnumbered inspection issue'
+                  }}
                 </Tag>
                 <Tag
                   :color="

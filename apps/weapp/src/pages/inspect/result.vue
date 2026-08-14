@@ -99,6 +99,7 @@ const description = ref('');
 const rootCause = ref('');
 const solution = ref('');
 const lossAmount = ref(0);
+const generateNcNumber = ref(false);
 
 // ─── Derived ─────────────────────────────────────────────────────────────────
 
@@ -485,6 +486,7 @@ async function submitResult() {
       quantity: unqualified,
       lossAmount: lossAmount.value,
       photos: attachments.value.map((item) => item.url),
+      generateNcNumber: generateNcNumber.value,
     };
   }
 
@@ -682,6 +684,17 @@ onLoad((options) => {
 
       <!-- ── STEP 2 - 不合格品信息 ─────────────────────────────────────── -->
       <view v-show="currentStep === 2">
+        <view class="card">
+          <view class="field-label">Generate NC Number</view>
+          <view class="switch-row">
+            <switch v-model="generateNcNumber" color="#1890ff" />
+            <text class="switch-label">{{
+              generateNcNumber
+                ? 'Generate automatically on submission'
+                : 'Unnumbered'
+            }}</text>
+          </view>
+        </view>
         <!-- 缺陷分类 -->
         <view class="card">
           <view class="field-label required">缺陷分类</view>

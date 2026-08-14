@@ -64,6 +64,7 @@ export interface IssueFormState {
   defectType: string;
   description: string;
   division: string;
+  generateNcNumber: boolean;
   inspector: string;
   lossAmount: number;
   partName: string;
@@ -112,6 +113,7 @@ export function createIssueFormState(inspector = ''): IssueFormState {
     defectType: '',
     description: '',
     division: '',
+    generateNcNumber: false,
     inspector,
     lossAmount: 0,
     partName: '',
@@ -374,7 +376,7 @@ export function useIssueForm(
 
   async function initialize() {
     applyData(props.initialData);
-    restoreDraft();
+    if (props.mode === 'create') restoreDraft();
     try {
       await loadReferenceData();
     } finally {

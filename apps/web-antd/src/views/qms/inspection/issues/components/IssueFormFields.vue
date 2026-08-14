@@ -75,6 +75,7 @@ type IssueFormValues = Partial<{
   defectSubcategoryId: string;
   description: string;
   division: string;
+  generateNcNumber: boolean;
   inspector: string;
   ncNumber: string;
   partName: string;
@@ -165,6 +166,8 @@ const [Form, formApi] = useVbenForm({
   schema: getIssueFormSchemaWithStatusOptions(
     props.statusOptions,
     props.processOptions,
+    [],
+    props.isEditMode,
   ),
   showDefaultActions: false,
 });
@@ -283,6 +286,21 @@ watch(
         },
       },
     ]);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.isEditMode,
+  () => {
+    formApi.setState({
+      schema: getIssueFormSchemaWithStatusOptions(
+        props.statusOptions,
+        props.processOptions,
+        [],
+        props.isEditMode,
+      ),
+    });
   },
   { immediate: true },
 );
@@ -464,7 +482,7 @@ defineExpose({
         <span
           class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
         >
-          {{ modelValue || '提交后自动生成' }}
+          {{ modelValue || 'Unnumbered' }}
         </span>
       </template>
 

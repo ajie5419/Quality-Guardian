@@ -45,6 +45,7 @@ export function isWeldingDefectSubcategory(
 export function getIssueFormSchema(
   processOptionsOverride?: Array<{ label: string; value: string }>,
   classificationOptions: QualityClassificationCategory[] = [],
+  isEditMode = false,
 ): VbenFormSchema[] {
   const { t } = useI18n();
   const { statusOptions: fallbackStatusOptions } = useStatusOptions();
@@ -67,16 +68,26 @@ export function getIssueFormSchema(
       hideLabel: true,
       formItemClass: 'hidden',
     },
-    {
-      fieldName: 'ncNumber',
-      label: t('qms.inspection.issues.ncNumber'),
-      component: 'Input',
-      componentProps: {
-        placeholder: t('qms.inspection.issues.generateNumberPlaceholder'),
-        readonly: true,
-        disabled: true,
-      },
-    },
+    ...(isEditMode
+      ? [
+          {
+            fieldName: 'ncNumber',
+            label: t('qms.inspection.issues.ncNumber'),
+            component: 'Input' as const,
+            componentProps: { readonly: true, disabled: true },
+          },
+        ]
+      : [
+          {
+            fieldName: 'generateNcNumber',
+            label: 'Generate NC Number',
+            component: 'Switch' as const,
+            componentProps: {
+              checkedChildren: 'Generate automatically',
+              unCheckedChildren: 'Unnumbered',
+            },
+          },
+        ]),
     {
       fieldName: 'reportDate',
       label: t('qms.inspection.issues.reportDate'),
@@ -333,8 +344,13 @@ export function getIssueFormSchemaWithStatusOptions(
   options?: StatusOption[],
   processOptions?: Array<{ label: string; value: string }>,
   classificationOptions: QualityClassificationCategory[] = [],
+  isEditMode = false,
 ): VbenFormSchema[] {
-  const schema = getIssueFormSchema(processOptions, classificationOptions);
+  const schema = getIssueFormSchema(
+    processOptions,
+    classificationOptions,
+    isEditMode,
+  );
   const target = schema.find((item) => item.fieldName === 'status');
   if (target) {
     target.componentProps = {

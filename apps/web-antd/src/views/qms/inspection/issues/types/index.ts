@@ -43,7 +43,7 @@ export interface InspectionIssue {
   createdBy?: null | string;
   id: string;
   inspectionId?: string;
-  ncNumber: string;
+  ncNumber: null | string;
   reportDate: string;
   workOrderNumber: string;
   projectName: string;
