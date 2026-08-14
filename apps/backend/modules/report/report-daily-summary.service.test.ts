@@ -22,9 +22,9 @@ vi.mock('~/modules/vehicle-commissioning/daily-report-storage.service', () => ({
   },
 }));
 
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNamesByIds: vi.fn().mockResolvedValue(new Map()),
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -188,12 +188,10 @@ describe('reportDailySummaryService', () => {
 
   it('uses canonical department and work-order project names', async () => {
     const { InspectionService } = await import('~/modules/inspection');
-    const { MasterDataGovernanceKernel } = await import(
-      '~/utils/canonical-master-data'
+    const { DeptService } = await import('~/modules/dept');
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+      new Map([['dept-1', 'Renamed Department']]),
     );
-    vi.mocked(
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
-    ).mockResolvedValue(new Map([['dept-1', 'Renamed Department']]));
     (InspectionService.getDailyReportIssues as any).mockResolvedValue([
       {
         createdAt: new Date('2026-06-15T10:00:00.000Z'),

@@ -25,6 +25,12 @@
 - 通用列表仍允许名称关键字搜索，这是搜索能力，不得作为供应商画像、评分或跨表关联回退。
 - 售后产品分类和缺陷分类的 unresolved 记录可在系统治理页面人工处置；服务端校验启用的父子分类，并在同一事务内更新售后快照和审计状态。其他 unresolved 类型仍只读展示。售后源数据与评分刷新任务在同一事务提交，失败任务由持久化 Worker 重试。
 
+## 责任部门在线读取契约
+
+- `after_sales.respDeptId` 是责任部门的 canonical identity，`respDept` 与 `responsibleDepartments` 仅保存写入快照；部门改名不触发业务表批量更新。
+- 列表、详情、导出、统计、动态图表和周报读取都通过 `DeptService.resolveActiveNamesByIds` 批量解析 active ID 的当前名称，避免 N+1，也不得从 after-sales 模块直接访问 departments 表。存在有效 ID 时响应中的主责任部门与 legacy 多值数组主项都展示当前名称；无 ID 的历史行才保留快照，非空失效/软删 ID 保持 unresolved，不能按名称猜测。
+- 责任部门名称筛选先由 `DeptService.findActiveByNameContains` 解析 active IDs，再和 legacy 快照条件共同进入数据库 `where`；不得先分页或加载后再按当前名称过滤。
+
 ## 质量分类契约
 
 - `productCategoryId`、`productSubcategoryId` 引用 `AFTER_SALES_PRODUCT` 分类域；`productType`、`productSubtype` 仅保存历史名称快照。

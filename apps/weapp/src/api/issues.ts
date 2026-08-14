@@ -46,6 +46,7 @@ export type InspectionIssuePayload = Omit<
   | 'supplierId'
   | 'supplierName'
 > & {
+  generateNcNumber?: boolean;
   photos: string[];
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartmentId: string;
@@ -90,6 +91,13 @@ export function deleteInspectionIssue(id: string) {
   return request<null>({
     url: `/api/qms/inspection/issues/${id}`,
     method: 'DELETE',
+  });
+}
+
+export function assignInspectionIssueNcNumber(id: string) {
+  return request<InspectionIssueRecord>({
+    url: `/api/qms/inspection/issues/${id}/assign-nc-number`,
+    method: 'POST',
   });
 }
 

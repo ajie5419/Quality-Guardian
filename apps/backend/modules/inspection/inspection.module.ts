@@ -129,27 +129,33 @@ export const inspectionModule: ModuleDeclaration = {
           title: '删除',
         },
         {
+          authCode: INSPECTION_ISSUE_PERMISSION_CODES.ASSIGN_NC_NUMBER,
+          name: 'QMSInspectionIssuesAssignNcNumber',
+          order: 5,
+          title: '生成不合格编号',
+        },
+        {
           authCode: 'QMS:Inspection:Issues:Settle',
           name: 'QMSInspectionIssuesSettle',
-          order: 5,
+          order: 6,
           title: '案例沉淀',
         },
         {
           authCode: 'QMS:Inspection:Issues:ChartAdd',
           name: 'QMSInspectionIssuesChartAdd',
-          order: 6,
+          order: 7,
           title: '新增图表',
         },
         {
           authCode: 'QMS:Inspection:Issues:ChartEdit',
           name: 'QMSInspectionIssuesChartEdit',
-          order: 7,
+          order: 8,
           title: '编辑图表',
         },
         {
           authCode: 'QMS:Inspection:Issues:ChartDelete',
           name: 'QMSInspectionIssuesChartDelete',
-          order: 8,
+          order: 9,
           title: '删除图表',
         },
       ],
@@ -205,6 +211,12 @@ export const inspectionModule: ModuleDeclaration = {
       action: 'UPDATE',
       targetType: 'inspection_issue',
       detailsTemplate: '修改检验问题: {{partName}} ({{nonConformanceNumber}})',
+    },
+    issueAssignNcNumber: {
+      action: 'UPDATE',
+      targetType: 'inspection_issue',
+      detailsTemplate:
+        '生成不合格编号: {{partName}} ({{nonConformanceNumber}})',
     },
     issueCloseLinked: {
       action: 'UPDATE',

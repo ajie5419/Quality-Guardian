@@ -32,6 +32,7 @@ import {
   InspectionIssueCreateService,
   validateOnlineInspectionIssueResponsibilityInput,
 } from './inspection-issue-create.service';
+import { reserveInspectionIssueNcNumber } from './inspection-issue-nc-number.service';
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
@@ -65,20 +66,34 @@ export const InspectionIssueMutationService = {
         }),
       ),
     );
-    await FileStorageService.registerReferencesFromAttachments({
-      attachments: body.photos,
-      bizId: String(newRecord.record.id),
-      bizType: 'inspection_issue',
-      fieldName: 'photos',
-    });
-    await SystemLogService.auditLog('inspection', 'issueCreate', {
-      userId: String(userinfo.id),
-      targetId: String(newRecord.record.id),
-      detailsVariables: {
-        nonConformanceNumber: newRecord.record.nonConformanceNumber || '无编号',
-        partName: newRecord.record.partName,
-      },
-    });
+    try {
+      await FileStorageService.registerReferencesFromAttachments({
+        attachments: body.photos,
+        bizId: String(newRecord.record.id),
+        bizType: 'inspection_issue',
+        fieldName: 'photos',
+      });
+    } catch (error) {
+      logger.error(
+        error,
+        'inspection-issue attachment references after create',
+      );
+    }
+    // The write has committed, so audit failure must not make callers retry an
+    // irreversible NC assignment.
+    try {
+      await SystemLogService.auditLog('inspection', 'issueCreate', {
+        userId: String(userinfo.id),
+        targetId: String(newRecord.record.id),
+        detailsVariables: {
+          nonConformanceNumber:
+            newRecord.record.nonConformanceNumber || '无编号',
+          partName: newRecord.record.partName,
+        },
+      });
+    } catch (error) {
+      logger.error(error, 'inspection-issue audit after create');
+    }
     try {
       await WelderScoreService.syncFromInspectionIssues();
     } catch (error) {
@@ -143,7 +158,7 @@ export const InspectionIssueMutationService = {
         : body;
       const updateData = await buildInspectionIssueUpdateData(
         canonicalBody,
-        existingNcNumber,
+        undefined,
         current.inspection,
       );
       // The update payload is partial, so validate the merged final state
@@ -289,6 +304,7 @@ export const InspectionIssueMutationService = {
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
     items: Array<Record<string, unknown>>,
+    generateNcNumber = false,
   ) {
     await InspectionIssueAccessService.ensurePermission(
       userinfo,
@@ -300,56 +316,24 @@ export const InspectionIssueMutationService = {
     const createdBy = String(userinfo.id || userinfo.userId || '') || undefined;
     for (const [index, item] of items.entries()) {
       try {
+        rejectSubmittedImportNcNumber(item);
         const payload = await buildInspectionIssueUpsertPayload(
           item,
           serialSeed,
-          { createdBy },
+          { createdBy, nonConformanceNumber: null },
         );
-        if (!payload) {
-          rowErrors.push(
-            buildImportRowError({
-              field: 'workOrderNumber',
-              item,
-              keyField: 'ncNumber',
-              reason: '缺少有效的工单号',
-              row: index + 1,
-              suggestion: '请填写可关联的工单号',
-            }),
-          );
-          continue;
-        }
         serialSeed++;
         try {
-          const ncNumber = String(payload.where.nonConformanceNumber || '');
           await prisma.$transaction(async (tx) => {
-            const existingRecord = await tx.quality_records.findUnique({
-              where: { nonConformanceNumber: ncNumber },
-              select: { createdBy: true, isDeleted: true, supplierId: true },
+            const nonConformanceNumber = generateNcNumber
+              ? await reserveInspectionIssueNcNumber(tx)
+              : null;
+            const saved = await tx.quality_records.create({
+              data: { ...payload, nonConformanceNumber },
             });
-            if (
-              existingRecord &&
-              (existingRecord.createdBy !== createdBy ||
-                existingRecord.isDeleted)
-            ) {
-              throw new BusinessError(
-                'FORBIDDEN',
-                '该不合格编号不属于当前用户，禁止通过导入覆盖',
-                403,
-              );
-            }
-            const saved = existingRecord
-              ? await tx.quality_records.update({
-                  where: {
-                    createdBy,
-                    isDeleted: false,
-                    nonConformanceNumber: ncNumber,
-                  },
-                  data: payload.update,
-                })
-              : await tx.quality_records.create({ data: payload.create });
             await MetricRefreshQueue.enqueueSupplierScores(
               tx,
-              [existingRecord?.supplierId, saved.supplierId],
+              [saved.supplierId],
               'inspection-issue.imported',
             );
             await QualityLossIndexQueue.enqueue(
@@ -426,6 +410,19 @@ function hasInspectionIssueResponsibilityUpdate(body: RequestBody) {
     body.responsibleDepartmentId !== undefined ||
     body.supplierId !== undefined
   );
+}
+
+function rejectSubmittedImportNcNumber(item: Record<string, unknown>) {
+  for (const key of ['ncNumber', 'nonConformanceNumber'] as const) {
+    const value = item[key];
+    if (value !== undefined && value !== null && String(value).trim()) {
+      throw new BusinessError(
+        'VALIDATION',
+        '导入不支持手工填写不合格编号',
+        400,
+      );
+    }
+  }
 }
 
 function mergeResponsibilityInput(

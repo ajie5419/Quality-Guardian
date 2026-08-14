@@ -4,7 +4,6 @@ import type {
   InspectionRequestCheckResult,
   InspectionRequestResponsibilityDepartmentOption,
   InspectionRequestResponsibilitySupplierOption,
-  InspectionRequestTeamOption,
 } from '@qgs/shared';
 import type {
   SelectProps,
@@ -14,6 +13,7 @@ import type {
 
 import { computed } from 'vue';
 
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { Form, Input, InputNumber, Select } from 'ant-design-vue';
 
 import { getInspectionRequestResponsibilityUnitCopy } from '../entry-mode';
@@ -25,8 +25,6 @@ type EntryCopy = {
   partLabel: string;
   partPlaceholder: string;
   processLabel: string;
-  teamLabel: string;
-  teamPlaceholder: string;
 };
 
 type StationSelection = {
@@ -40,7 +38,6 @@ const props = defineProps<{
   bomPartsLoading: boolean;
   checkResultOptions: Array<{ label: string; value: string }>;
   entryCopy: EntryCopy;
-  internalTeamOptions: InspectionRequestTeamOption[];
   isIncomingEntry: boolean;
   partSearchLoading: boolean;
   processOptions: Array<{
@@ -73,7 +70,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   attachmentChange: [info: UploadChangeParam<UploadFile>];
-  internalTeamSearch: [keyword: string];
   partSearch: [keyword: string];
   responsibilityOptionsSearch: [keyword: string];
   responsibilityTypeChange: [value: InspectionIssueResponsibilityType];
@@ -98,8 +94,6 @@ const form = defineModel<{
   selfCheckResult: InspectionRequestCheckResult;
   stationSelection: null | StationSelection;
   supplierId: string;
-  team: string;
-  teamId: string;
   workOrderNumber: string;
   workOrderNumbers: string[];
 }>('form', { required: true });
@@ -120,13 +114,13 @@ const incomingTypeOptions = computed(() =>
 const responsibilityUnitCopy = computed(() =>
   getInspectionRequestResponsibilityUnitCopy(form.value.responsibilityType),
 );
-const selectedInternalTeamOptions = computed(() =>
-  props.internalTeamOptions.filter(
-    (team) =>
-      team.responsibleDepartmentId === form.value.responsibleDepartmentId,
-  ),
+const isExternalResponsibility = computed(
+  () =>
+    form.value.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
+    form.value.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
 );
-
 function handleWorkOrderChange(value: SelectProps['value']) {
   if (props.isIncomingEntry) {
     const values = Array.isArray(value) ? value.map(String) : [];
@@ -170,34 +164,14 @@ function handleResponsibilityTypeChange(value: SelectProps['value']) {
   emit('responsibilityTypeChange', value);
 }
 
-function handleInternalTeamChange(value: SelectProps['value']) {
-  const teamId = typeof value === 'string' ? value : '';
-  const team = selectedInternalTeamOptions.value.find(
-    (item) => item.value === teamId,
-  );
-  form.value.teamId = teamId;
-  form.value.team = team?.label || '';
-  form.value.supplierId = '';
-}
-
 function handleInternalDepartmentChange(value: SelectProps['value']) {
   const responsibleDepartmentId = typeof value === 'string' ? value : '';
   form.value.responsibleDepartmentId = responsibleDepartmentId;
-  if (
-    !selectedInternalTeamOptions.value.some(
-      (team) => team.value === form.value.teamId,
-    )
-  ) {
-    form.value.team = '';
-    form.value.teamId = '';
-  }
   form.value.supplierId = '';
 }
 
 function handleSupplierChange(value: SelectProps['value']) {
   form.value.supplierId = typeof value === 'string' ? value : '';
-  form.value.team = '';
-  form.value.teamId = '';
 }
 
 function handlePartIdentityChange(
@@ -361,7 +335,7 @@ function handleProcessIdentityChange(
         @change="handleResponsibilityTypeChange"
       />
     </Form.Item>
-    <Form.Item label="责任部门" required>
+    <Form.Item v-if="!isExternalResponsibility" label="责任部门" required>
       <Select
         data-testid="responsible-department-select"
         :value="form.responsibleDepartmentId"
@@ -374,25 +348,6 @@ function handleProcessIdentityChange(
         allow-clear
         @change="handleInternalDepartmentChange"
         @search="(value) => emit('responsibilityOptionsSearch', value)"
-      />
-    </Form.Item>
-    <Form.Item
-      v-if="form.responsibilityType === 'INTERNAL_DEPARTMENT'"
-      label="执行班组（选填）"
-    >
-      <Select
-        data-testid="execution-team-select"
-        :value="form.teamId"
-        :disabled="!form.responsibleDepartmentId"
-        :filter-option="false"
-        :loading="props.responsibilityLoading"
-        :options="selectedInternalTeamOptions"
-        class="w-full"
-        placeholder="请选择执行班组（选填）"
-        show-search
-        allow-clear
-        @change="handleInternalTeamChange"
-        @search="(value) => emit('internalTeamSearch', value)"
       />
     </Form.Item>
     <Form.Item

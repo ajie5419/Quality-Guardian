@@ -36,9 +36,9 @@ import {
   buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
   getInspectionRequestEntryCopy,
+  getInspectionRequestResponsibilityTypeOptions,
   INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
-  inspectionRequestResponsibilityTypeOptions,
   isIncomingInspectionEntryPath,
   mapInspectionRequestEntryWorkOrderOptions,
 } from './entry-mode';
@@ -100,8 +100,6 @@ const requestForm = reactive({
     mode: 'ALL' | 'PARTIAL';
   },
   supplierId: '',
-  team: '',
-  teamId: '',
   workOrderNumber: '',
   workOrderNumbers: [] as string[],
 });
@@ -135,13 +133,17 @@ const processOptions = computed(() =>
 const {
   changeResponsibilityType,
   clearResponsibilityIdentity,
-  internalTeamOptions,
-  loadInternalTeamOptions,
   loadResponsibilityOptions,
   responsibilityDepartmentOptions,
   responsibilityLoading,
   supplierOptions,
-} = useInspectionRequestIdentityOptions({ requestForm });
+} = useInspectionRequestIdentityOptions({
+  requestForm,
+});
+
+const responsibilityTypeOptions = computed(() =>
+  getInspectionRequestResponsibilityTypeOptions(isIncomingEntry.value),
+);
 
 const isAssemblyProcess = computed(() =>
   String(requestForm.processName || '').includes('组装'),
@@ -291,7 +293,9 @@ async function submitRequest() {
     (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     (requiresStationSelection.value && !requestForm.stationSelection) ||
-    !requestForm.responsibleDepartmentId ||
+    (requestForm.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+      !requestForm.responsibleDepartmentId) ||
     (requestForm.responsibilityType !==
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
       !requestForm.supplierId) ||
@@ -320,9 +324,6 @@ async function submitRequest() {
     const responsibilityPayload =
       buildInspectionRequestEntryResponsibilityPayload({
         ...requestForm,
-        teamResponsibleDepartmentId: internalTeamOptions.value.find(
-          (team) => team.value === requestForm.teamId,
-        )?.responsibleDepartmentId,
       });
     if (!responsibilityPayload) {
       message.warning('请选择完整的责任归属信息');
@@ -387,8 +388,6 @@ async function loadIncomingMaterialInputSetting() {
 
 onMounted(() => {
   applyRoutePrefill();
-  // Responsibility choices must not wait for the optional incoming-material
-  // setting; otherwise a delayed settings request leaves the form unusable.
   void loadResponsibilityOptions();
   void loadWorkOrderOptions(requestForm.workOrderNumber);
   if (isIncomingEntry.value) {
@@ -467,7 +466,6 @@ watch(
         :check-result-options="inspectionRequestEntryCheckResultOptions"
         :entry-copy="entryCopy"
         :is-incoming-entry="isIncomingEntry"
-        :internal-team-options="internalTeamOptions"
         :part-search-loading="partSearchLoading"
         :process-options="processOptions"
         :requires-component-name="requiresComponentName"
@@ -476,15 +474,12 @@ watch(
         :submitting="submitting"
         :responsibility-department-options="responsibilityDepartmentOptions"
         :responsibility-loading="responsibilityLoading"
-        :responsibility-type-options="
-          inspectionRequestResponsibilityTypeOptions
-        "
+        :responsibility-type-options="responsibilityTypeOptions"
         :supplier-options="supplierOptions"
         :work-order-loading="workOrderLoading"
         :work-order-options="workOrderOptions"
         :work-order-processes-loading="workOrderProcessesLoading"
         @attachment-change="handleAttachmentUploadChange"
-        @internal-team-search="loadInternalTeamOptions"
         @part-search="searchCanonicalPartOptions"
         @responsibility-type-change="changeResponsibilityType"
         @responsibility-options-search="loadResponsibilityOptions"

@@ -18,7 +18,7 @@ export interface InspectionIssue {
   inspector: string; // 检验员 (New standard)
   isClaim: boolean; // 是否索赔
   lossAmount: number; // 损失金额
-  ncNumber: string; // 不合格编号
+  ncNumber: null | string; // 不合格编号; null means no formal NC number was assigned
   partName: string; // 部件名称
   photos: string[]; // 问题照片
   photoThumbUrl?: string; // 缩略图地址（列表展示）

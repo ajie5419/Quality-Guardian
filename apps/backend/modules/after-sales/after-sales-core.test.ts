@@ -27,6 +27,12 @@ vi.mock('~/utils/prisma', () => {
   return {
     default: {
       after_sales: afterSales,
+      departments: {
+        findMany: vi.fn().mockResolvedValue([
+          { id: 'dept-1', name: 'Quality' },
+          { id: 'dept-2', name: 'Service' },
+        ]),
+      },
       $queryRaw: vi.fn(),
       $transaction: vi.fn((callback) => callback({ after_sales: afterSales })),
     },

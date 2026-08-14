@@ -2,12 +2,30 @@ import { describe, expect, it } from 'vitest';
 
 import {
   buildRequestCreateResponsibilityPayload,
+  getRequestCreateResponsibilityLabels,
+  getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
+  isRequestCreateExternalResponsibility,
   REQUEST_CREATE_RESPONSIBILITY_LABELS,
   REQUEST_CREATE_RESPONSIBILITY_TYPES,
 } from './create-responsibility';
 
 describe('request create responsibility payload', () => {
+  it('uses category-specific responsibility choices', () => {
+    expect(getRequestCreateResponsibilityTypes('PROCESS')).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getRequestCreateResponsibilityLabels('PROCESS')).toEqual([
+      '内部部门',
+      '外协单位',
+    ]);
+    expect(getRequestCreateResponsibilityTypes('INCOMING')).toEqual([
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+  });
+
   it('keeps all three responsibility types available for both request routes', () => {
     expect(REQUEST_CREATE_RESPONSIBILITY_TYPES).toEqual([
       'INTERNAL_DEPARTMENT',
@@ -46,13 +64,10 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'INTERNAL_DEPARTMENT' as const,
         responsibleDepartmentId: 'dept-assembly',
         supplierId: 'supplier-stale',
-        teamId: 'team-assembly',
-        teamResponsibleDepartmentId: 'dept-assembly',
       },
       {
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-assembly',
-        teamId: 'team-assembly',
       },
     ],
     [
@@ -60,25 +75,10 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'SUPPLIER' as const,
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
-        teamId: 'team-stale',
       },
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
-      },
-    ],
-    [
-      {
-        responsibilityType: 'OUTSOURCING_UNIT' as const,
-        responsibleDepartmentId: 'dept-production',
-        supplierId: 'supplier-b',
-        teamId: 'team-stale',
-      },
-      {
-        responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
-        supplierId: 'supplier-b',
       },
     ],
   ])(
@@ -94,30 +94,48 @@ describe('request create responsibility payload', () => {
         responsibilityType: 'SUPPLIER',
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: '',
-        teamId: '',
       }),
     ).toBeNull();
   });
 
-  it('allows a department without a TEAM and rejects a mismatched selected TEAM', () => {
+  it('uses an internal department without a TEAM identity', () => {
     expect(
       buildRequestCreateResponsibilityPayload({
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-machining',
         supplierId: '',
-        teamId: '',
       }),
     ).toEqual({
       responsibilityType: 'INTERNAL_DEPARTMENT',
       responsibleDepartmentId: 'dept-machining',
     });
+  });
+
+  it.each(['SUPPLIER', 'OUTSOURCING_UNIT'] as const)(
+    'submits %s without a hidden department ID',
+    (responsibilityType) => {
+      expect(
+        buildRequestCreateResponsibilityPayload({
+          responsibilityType,
+          responsibleDepartmentId: 'dept-stale',
+          supplierId: 'supplier-outsourcing',
+        }),
+      ).toEqual({
+        responsibilityType,
+        supplierId: 'supplier-outsourcing',
+      });
+      expect(isRequestCreateExternalResponsibility(responsibilityType)).toBe(
+        true,
+      );
+    },
+  );
+
+  it('fails closed when outsourcing has no supplier', () => {
     expect(
       buildRequestCreateResponsibilityPayload({
-        responsibilityType: 'INTERNAL_DEPARTMENT',
-        responsibleDepartmentId: 'dept-machining',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: '',
         supplierId: '',
-        teamId: 'team-structure',
-        teamResponsibleDepartmentId: 'dept-structure',
       }),
     ).toBeNull();
   });

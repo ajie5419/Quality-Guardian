@@ -4,6 +4,7 @@ import {
   getIssueFormSchema,
   isWeldingDefectSubcategory,
   isWeldingProcessName,
+  RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
 } from './issueFormData';
 
 vi.mock('@vben/locales', () => ({
@@ -96,5 +97,39 @@ describe('issue form welding conditions', () => {
     expect(
       schema.some((field) => field.fieldName === 'responsibleDepartments'),
     ).toBe(false);
+    expect(department?.componentProps).toMatchObject(
+      RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+    );
+    expect(department?.componentProps).toMatchObject({
+      labelInValue: false,
+      treeNodeLabelProp: 'title',
+    });
+  });
+
+  it('only exposes automatic number generation while creating an issue', () => {
+    const createSchema = getIssueFormSchema();
+    const editSchema = getIssueFormSchema(undefined, [], true);
+
+    expect(
+      createSchema.some((field) => field.fieldName === 'generateNcNumber'),
+    ).toBe(true);
+    expect(createSchema.some((field) => field.fieldName === 'ncNumber')).toBe(
+      false,
+    );
+    expect(editSchema.some((field) => field.fieldName === 'ncNumber')).toBe(
+      true,
+    );
+    expect(
+      editSchema.some((field) => field.fieldName === 'generateNcNumber'),
+    ).toBe(false);
+
+    const generateNcNumber = createSchema.find(
+      (field) => field.fieldName === 'generateNcNumber',
+    );
+    expect(generateNcNumber?.componentProps).toMatchObject({
+      class: '!w-auto',
+      style: { width: 'auto' },
+    });
+    expect(generateNcNumber?.label).toBe('生成不合格编号');
   });
 });

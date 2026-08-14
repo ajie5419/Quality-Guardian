@@ -3,12 +3,21 @@ import type { InspectionIssue } from '../types';
 
 import type { SystemDeptApi } from '#/api/system/dept';
 
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 import { useI18n } from '@vben/locales';
 
-import { Descriptions, Drawer, Image, Tag } from 'ant-design-vue';
+import {
+  Button,
+  Descriptions,
+  Drawer,
+  Image,
+  message,
+  Modal,
+  Tag,
+} from 'ant-design-vue';
 
+import { assignInspectionIssueNcNumber } from '#/api/qms/inspection';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
 import { findNameById } from '#/types';
 import {
@@ -28,18 +37,51 @@ const props = defineProps<{
   deptData: SystemDeptApi.Dept[];
   record?: InspectionIssue;
 }>();
+const emit = defineEmits<{ assigned: [] }>();
 
 const open = defineModel<boolean>('open', { default: false });
 
 const { t } = useI18n();
 const { isMobile } = useMobileViewport();
 
-const title = computed(() => `不合格项详情 - ${props.record?.ncNumber || ''}`);
+const assigningNcNumber = ref(false);
+const assignedNcNumber = ref<null | string>(null);
+const displayNcNumber = computed(
+  () => assignedNcNumber.value || props.record?.ncNumber || 'Unnumbered',
+);
+const title = computed(() => `Inspection Issue - ${displayNcNumber.value}`);
 const drawerWidth = computed(() =>
   isMobile.value ? '100vw' : 'min(100vw, 960px)',
 );
 
 const photos = computed(() => parsePhotos(props.record?.photos));
+
+watch(
+  () => props.record?.id,
+  () => {
+    assignedNcNumber.value = null;
+  },
+);
+
+function assignNcNumber() {
+  const issue = props.record;
+  if (!issue || issue.ncNumber || assigningNcNumber.value) return;
+  Modal.confirm({
+    title: 'Generate NC Number',
+    content: 'This action cannot be undone.',
+    async onOk() {
+      assigningNcNumber.value = true;
+      try {
+        const result = await assignInspectionIssueNcNumber(issue.id);
+        assignedNcNumber.value = result.ncNumber || null;
+        message.success('NC number generated');
+        emit('assigned');
+      } finally {
+        assigningNcNumber.value = false;
+      }
+    },
+  });
+}
 
 type DetailPhoto = {
   previewUrl: string;
@@ -99,7 +141,17 @@ function formatDisplayDate(value: string | undefined) {
       size="small"
     >
       <Descriptions.Item :label="t('qms.inspection.issues.ncNumber')">
-        {{ record.ncNumber || '-' }}
+        {{ displayNcNumber }}
+        <Button
+          v-if="!record.ncNumber"
+          v-access:code="'QMS:Inspection:Issues:AssignNcNumber'"
+          :loading="assigningNcNumber"
+          class="ml-2"
+          size="small"
+          @click="assignNcNumber"
+        >
+          Generate NC Number
+        </Button>
       </Descriptions.Item>
       <Descriptions.Item :label="t('qms.inspection.issues.statusLabel')">
         <Tag :color="getStatusColor(record.status)">

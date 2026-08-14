@@ -3,13 +3,13 @@ import {
   mapInspectionArchiveStatusLabel,
   parseDailySummaryContent,
 } from '@qgs/shared';
+import { DeptService } from '~/modules/dept';
 import { InspectionService } from '~/modules/inspection';
 import {
   resolveInspectionFormProcess,
   resolveInspectionFormProcessCandidates,
 } from '~/modules/inspection/inspection-form';
 import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
@@ -66,17 +66,9 @@ export const ReportDailySummaryService = {
       start: startDate,
       username: queryUser,
     });
-    const departmentNames =
-      await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        canonicalIds: issues.map((item) => item.responsibleDepartmentId),
-        configKey: 'responsibleDepartment',
-        idLikeNameById: issues
-          .map((item) => ({
-            id: item.responsibleDepartmentId || '',
-            rawName: item.responsibleDepartment ?? null,
-          }))
-          .filter((pair) => pair.id !== ''),
-      });
+    const departmentNames = await DeptService.resolveActiveNamesByIds(
+      issues.map((item) => item.responsibleDepartmentId),
+    );
     interface ProcessItem {
       partNames: Set<string>;
       process: string;

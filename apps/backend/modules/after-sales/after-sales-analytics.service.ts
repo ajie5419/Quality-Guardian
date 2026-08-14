@@ -12,6 +12,7 @@ import {
   QMS_STATUS_OPEN_SET,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+import { DeptService } from '~/modules/dept';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
@@ -352,17 +353,9 @@ export const AfterSalesAnalyticsService = {
           canonicalIds: supplierStats.map((item) => item.supplierBrandId),
           configKey: 'supplierBrand',
         }),
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-          canonicalIds: deptStats.map((item) => item.respDeptId),
-          configKey: 'responsibleDepartment',
-          canonicalIdById,
-          idLikeNameById: deptStats
-            .map((item) => ({
-              id: item.respDeptId || '',
-              rawName: item.respDept ?? null,
-            }))
-            .filter((pair) => pair.id !== ''),
-        }),
+        DeptService.resolveActiveNamesByIds(
+          deptStats.map((item) => item.respDeptId),
+        ),
       ]);
 
       const trendResults = isYearMode

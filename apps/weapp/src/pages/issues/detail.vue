@@ -3,7 +3,11 @@ import type { InspectionIssueRecord } from '@/api/issues';
 
 import { computed, ref } from 'vue';
 
-import { deleteInspectionIssue, getInspectionIssue } from '@/api/issues';
+import {
+  assignInspectionIssueNcNumber,
+  deleteInspectionIssue,
+  getInspectionIssue,
+} from '@/api/issues';
 import { buildResourceUrl } from '@/api/request';
 import { useUserStore } from '@/stores/user';
 import {
@@ -17,6 +21,8 @@ import {
 } from '@/utils/issues';
 import { onLoad, onShow } from '@dcloudio/uni-app';
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
+
+import { mergeAssignedNcNumber } from './issue-nc-number';
 
 const userStore = useUserStore();
 const issueId = ref('');
@@ -39,6 +45,16 @@ const canDelete = computed(() =>
       canManageInspectionIssue(issue.value, userStore.userInfo),
   ),
 );
+const canAssignNcNumber = computed(() =>
+  Boolean(
+    issue.value &&
+      !issue.value.ncNumber &&
+      userStore.hasPermission(
+        INSPECTION_ISSUE_PERMISSION_CODES.ASSIGN_NC_NUMBER,
+      ),
+  ),
+);
+const assigningNcNumber = ref(false);
 
 async function loadIssue() {
   if (!issueId.value || loading.value) return;
@@ -106,6 +122,42 @@ async function performDelete() {
   }
 }
 
+function assignNcNumber() {
+  if (!issue.value || assigningNcNumber.value || !canAssignNcNumber.value) {
+    return;
+  }
+  uni.showModal({
+    title: 'Generate NC Number',
+    content: 'This action cannot be undone.',
+    success: (result) => {
+      if (result.confirm) void performAssignNcNumber();
+    },
+  });
+}
+
+async function performAssignNcNumber() {
+  if (!issue.value || assigningNcNumber.value) return;
+  assigningNcNumber.value = true;
+  uni.showLoading({ title: 'Generating...' });
+  try {
+    const result = await assignInspectionIssueNcNumber(issue.value.id);
+    if (result.code !== 0 || !result.data) {
+      uni.showToast({
+        title: result.message || 'Generation failed',
+        icon: 'none',
+      });
+      return;
+    }
+    issue.value = mergeAssignedNcNumber(issue.value, result.data);
+    uni.showToast({ title: 'NC number generated', icon: 'success' });
+  } catch {
+    uni.showToast({ title: 'Network error', icon: 'none' });
+  } finally {
+    uni.hideLoading();
+    assigningNcNumber.value = false;
+  }
+}
+
 onLoad(async (options) => {
   if (!userStore.checkAuth()) return;
   await userStore.loadPermissionCodes();
@@ -138,7 +190,7 @@ onShow(() => {
       <scroll-view scroll-y class="detail-scroll">
         <view class="summary-card">
           <view>
-            <text class="nc-number">{{ issue.ncNumber || '-' }}</text>
+            <text class="nc-number">{{ issue.ncNumber || 'Unnumbered' }}</text>
             <text class="part-name">{{ issue.partName || '-' }}</text>
           </view>
           <view class="status-tag">{{
@@ -238,7 +290,18 @@ onShow(() => {
         </view>
       </scroll-view>
 
-      <view v-if="canEdit || canDelete" class="bottom-actions">
+      <view
+        v-if="canEdit || canDelete || canAssignNcNumber"
+        class="bottom-actions"
+      >
+        <button
+          v-if="canAssignNcNumber"
+          class="edit-button"
+          :disabled="assigningNcNumber"
+          @tap="assignNcNumber"
+        >
+          Generate NC Number
+        </button>
         <button v-if="canEdit" class="edit-button" @tap="editIssue">
           编辑
         </button>

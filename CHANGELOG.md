@@ -27,6 +27,253 @@
 
 ---
 
+### 2026-08-14 合并：报检责任、可选 NC 编号与发布维护
+
+**执行内容：**
+
+- 整合报检责任、可选不合格编号与原子关单变更，同时保留质量损失索引持久化队列和 versioned release-maintenance manifest/ledger。
+- 关闭已有或新建关联不合格项后，在同一事务内入队质量损失索引任务；删除两份依赖旧 `generateNextNcNumber` 的编号器测试。
+- 将历史外协责任 bootstrap 的发布维护断言迁移到 TypeScript manifest/ledger，并保留其位于报检责任回填前的历史顺序，不重新启用已退役任务。
+- 拆分关单关联不合格项查询，使 `inspection-request-close.service.ts` 保持在 500 行架构限制内。
+
+**验证结果：**
+
+- 根目录全量 Vitest：`406/406` 文件、`3379/3379` 用例通过。
+- 后端全量 Vitest：`292/292` 文件、`2656/2656` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** 本次 merge commit。
+
+**遗留问题：**
+
+- 未启动前端 dev/build/start；未执行生产 migration、release maintenance 或部署。
+
+---
+
+### 2026-08-14 修复：进货报检供应商展示与责任契约
+
+**执行内容：**
+
+- 修复进货报检任务列表的供应商名称缺失：后端将已持久化的 canonical `supplierName` 投影到列表兼容 `team` 字段，与过程外协展示一致，不回写 `team` 或伪造 `teamId`。
+- Web、H5 和小程序的进货报检入口及关单表单仅保留供应商和外协单位；两者都隐藏责任部门，请求仅提交 `responsibilityType + supplierId`。
+- 后端创建与关单事务复用同一 canonical 部门解析服务：供应商责任通过独立系统设置解析“采购部”，外协责任解析“生产 OBU”。客户端伪造部门、配置缺失/失效/歧义、既有责任冲突继续 fail-closed。
+- 历史进货任务关闭时，顶层责任和 FAIL `linkedIssue` 都可省略部门 ID；服务端在同一事务内注入并投影最终 canonical 部门，避免再触发“报检任务责任事实不完整”。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2631/2631` 用例通过。
+- Web happy-dom Vitest：`65/65` 文件、`342/342` 用例通过。
+- WeApp Vitest：`10/10` 文件、`49/49` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** `b9b48555` `fix(@qgs/backend): canonicalize incoming responsibility`、`bec0103a` `fix(@qgs/web-antd): align incoming responsibility entry`、`a84b291f` `fix(@qgs/weapp): align incoming responsibility entry`。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start；真实登录页面、真实 MySQL 并发和生产数据关单未执行。
+
+---
+
+### 2026-08-14 修复：进货与过程外协历史报检统一关单
+
+**执行内容：**
+
+- 根因是外协责任契约分裂：入口只对过程检验隐藏部门，关单 schema 又要求所有责任类型提交部门；桌面端还把“已有外协单位但缺持久部门”的历史任务误判为完整并锁定，最终后端只能报“报检任务责任事实缺失”。
+- `INCOMING` 与 `PROCESS` 的报检入口、桌面关单、H5 和小程序统一为外协只选择 `supplierId`，不显示、不提交 `responsibleDepartmentId`。完整历史事实仍锁定；缺持久部门的历史外协任务进入显式裁决流程。
+- 后端在创建和关单事务中复用同一系统设置解析 canonical “生产 OBU”部门；FAIL 的 `linkedIssue` 在一致性校验和创建 NC 前注入同一部门。客户端显式提交外协部门、设置缺失/失效/歧义以及持久事实冲突继续 fail-closed。
+- 回归测试同时覆盖进货与过程、PASS 与 FAIL、完整与 partial 历史事实，以及顶层责任和 FAIL `linkedIssue` 均不携带外协部门字段。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2621/2621` 用例通过。
+- Web happy-dom Vitest：`65/65` 文件、`340/340` 用例通过。
+- WeApp Vitest：`10/10` 文件、`52/52` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** `e32d466` `fix(@qgs/backend): unify outsourcing responsibility resolution`、`04141cc` `fix(@qgs/web-antd): align incoming outsourcing close flow`、`f2f0e7f` `fix(@qgs/weapp): unify incoming outsourcing responsibility`。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start；真实登录页面与生产数据关单未执行。
+
+---
+
+### 2026-08-14 修复：历史报检任务关闭责任裁决
+
+**执行内容：**
+
+- 关闭 payload 新增独立顶层 canonical `responsibility`，由 `responsibilityType + responsibleDepartmentId + supplierId?` 组成；完整报检任务的既有责任事实不可被该字段覆盖，冲突输入直接拒绝。
+- 历史 partial 或 missing responsibility 在关闭事务的状态锁后重新读取类别、TEAM 与责任字段；通过 active 主数据、类别/TEAM policy 和字段级 CAS 补齐，PASS 与 FAIL 共用同一最终事实。`PROCESS + SUPPLIER`、供应商类别错误、失效 ID、partial conflict 和 CAS 失败继续 fail-closed。
+- FAIL 的 `linkedIssue` 必须与最终关闭责任精确一致；重复或并发 FAIL 复用已有 NC 前也验证其持久化三元组，避免两个事实源漂移。旧 FAIL 客户端仅在未提交顶层字段时才临时以 `linkedIssue` 为 fallback，PASS 不推断缺失责任。
+- 桌面关单弹窗、H5 检验结果页和小程序关闭页都补齐历史责任选择；H5 PASS 强制关闭附件，FAIL 走完整不合格项表单并提交同一顶层责任事实。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2610/2610` 用例通过。
+- Web happy-dom Vitest：`148/148` 文件、`328/328` 用例通过。
+- WeApp Vitest：`10/10` 文件、`48/48` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all` 与 `rtk git diff --check HEAD~5..HEAD` 均通过。
+
+**commit:** `2dd47b0c` `fix(@qgs/backend): repair historical inspection close responsibility`、`97b32657` `fix(@qgs/web-antd): adjudicate historical inspection close responsibility`、`804b0d08` `fix(@qgs/weapp): complete historical inspection close flows`、`ac08e6ff` `test(@qgs/backend): align issue supplier fixture`。全量验收发现旧测试 fixture 未返回生产 `SupplierIdentityService` 既有的 supplier category，已按两类外部责任的 canonical category 对齐。
+
+**遗留问题：**
+
+- 未运行真实 MySQL 并发集成验证；事务回滚与行锁边界由同一 Prisma transaction client 的定向测试覆盖。
+- 未运行前端 dev/build/start、真实浏览器或小程序点击验收。
+
+---
+
+### 2026-08-14 修复：不合格项编辑责任部门回显
+
+**执行内容：**
+
+- 修复 `IssueFormFields` 中编辑态完整 schema 重建覆盖异步部门树的问题：统一 schema 构造现在始终注入当前 `deptTreeData`，因此 TreeSelect 能用 `title` 显示名称、用 primitive `value` 保持 canonical 部门 ID。
+- 同时将责任归属类型、责任部门和供应商的锁定态纳入完整 schema 构造，避免编辑态重建后解除受控字段禁用状态。
+- 补齐回归测试：真实 TreeSelect 在异步树到达后将 `dept-1770026473133` 回显为部门名称；编辑态重建后最终 schema 仍保留树数据和锁定态；编辑弹窗优先回填显式 canonical 部门 ID，不采用旧名称或数组猜测。
+
+**验证结果：**
+
+- Web 定向 Vitest：`5/5` 文件、`18/18` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `b15fec9` `fix(@qgs/web-antd): preserve department labels on schema rebuild`。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start，未进行真实浏览器页面验收。
+
+---
+
+### 2026-08-14 修复：关单不合格表单与历史责任事实兼容
+
+**执行内容：**
+
+- 不合格编号开关改为中文展示；责任部门树节点补齐 `title/value`，回填展示名称、提交保持 canonical 部门 ID。
+- `PROCESS` 报检任务 FAIL 关单表单移除 `SUPPLIER` 责任类型，保留内部部门和外协单位；`INCOMING` 保留三类，后端同步拒绝 `PROCESS + SUPPLIER`。
+- 历史已派单任务的部分责任 identity 可由 FAIL 表单的显式、主数据验证 canonical IDs 在同一事务内补齐；旧名称快照刷新，类型、部门 ID 或供应商 ID 冲突继续拒绝，PASS 不猜测缺失 identity。
+- 关闭责任解析结果携带必填 `supplierCategory`，类别校验复用该解析事实，不再重复查询供应商。
+
+**验证结果：**
+
+- Web 定向 Vitest：`4/4` 文件、`26/26` 用例通过。
+- 后端定向 Vitest：`6/6` 文件、`76/76` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `abf51d0` `fix(@qgs/web-antd): align issue responsibility forms`、`47c7540` `fix(@qgs/backend): complete legacy close responsibility`。
+
+**遗留问题：**
+
+- 未启动本地服务，因此未在 `localhost:5173` 完成真实页面验收。
+
+---
+
+### 2026-08-14 修复：不合格项表单责任部门回显与编号开关布局
+
+**执行内容：**
+
+- 不合格项表单的责任部门 `TreeSelect` 显式采用 `label/value/children` 映射；异步部门选项到达、编辑回填和预填均显示 canonical ID 对应的部门名称，提交值仍保持部门 ID。
+- “Generate NC Number” 开关移除会拉宽控件的状态文字，并抵消表单统一 `w-full`，恢复为紧凑的原生开关；编辑态继续不显示该开关。
+
+**验证结果：**
+
+- Web happy-dom Vitest：`61/61` 文件、`313/313` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `a8f36b7` `fix(@qgs/web-antd): correct issue form labels and switch width`
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start，未完成真实页面验收。
+
+---
+
+### 2026-08-14 修复：不合格编号改为可选的系统正式标识
+
+**执行内容：**
+
+- 不合格项编号改为可选且不可手填：独立新建、报检任务 FAIL 关闭、普通检验记录 FAIL 三个入口均明确提交 `generateNcNumber`；关闭时 `nonConformanceNumber` 持久化为 `NULL`，开启时仅由后端事务内编号服务分配。
+- 普通检验记录与关联不合格项收敛为同一 Prisma 事务；后端从已落库检验记录继承 inspection、供应商和工单的 canonical 事实，校验失败会同时回滚，前端不再在保存记录后发送第二次创建请求。
+- 新增一次性补号接口、权限 `QMS:Inspection:Issues:AssignNcNumber`、审计和 Web/WeApp 受权限控制的操作入口；只有未编号项可补号，已编号项不可修改、清空、删除后复用或重复生成。
+- 报检关闭强制校验 `QMS:Inspection:Requests:Close`，非系统管理员只可关闭派发给自己的任务；并发或重复 FAIL 在事务锁后读取当前 `linkedIssueId`，复用原不合格项而不覆盖关联、不再创建或重号。
+- 补齐手工编号拒绝、空编号 `null` 类型契约、导入生成策略、编号器新年度首号与并发保护；关单和普通记录的提交后附件、审计、评分副作用改为 best-effort，避免已提交事务被误报为失败。
+- 修复售后核心与对抗测试 fixture，使 DeptService 新增的 `departments.findMany` 读取使用完整 Prisma mock；未改生产代码。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2595/2595` 用例通过。
+- Web happy-dom Vitest：`61/61` 文件、`312/312` 用例通过。
+- WeApp Vitest：`10/10` 文件、`46/46` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、Prisma migration 检查、shared build 与 `rtk git diff --check` 均通过。
+
+**commit:** `9cc90993`、`bb88eda3`、`2000d63c`、`2f79dfe4`
+
+**遗留问题：**
+
+- 未读取凭据，未运行真实 MySQL 并发集成验证。
+- 未运行前端 dev/build/start，未完成真实页面验收或生产发布。
+
+---
+
+### 2026-08-14 修复：部门改名后的责任部门在线展示
+
+**执行内容：**
+
+- 新增 Dept 模块 active 部门的批量 ID→当前名称和当前名称→ID 查询；inspection、after-sales 和 report 仅经该公开服务访问，避免跨模块读 departments 与 N+1。
+- 检验记录和不合格项的列表、详情、导出、统计与责任部门筛选现以 active `responsibleDepartmentId` 的当前名称为准；PROCESS 历史关联报检兼容按 canonical ID 判定唯一性，冲突保持 unresolved。
+- 售后列表/详情、统计、动态图表以及日报、周报现以 active `respDeptId` 的当前名称为准。Web 优先渲染的 legacy 多值责任部门数组同步替换主项，避免详情和移动列表继续展示旧快照。
+- 名称筛选把 active 当前名称解析出的 ID 条件与 legacy 快照条件一并放进查询谓词，count、分页和导出共用同一数据库语义；无 ID 行保留快照，非空失效或软删 ID 不猜测名称并保留 unresolved 状态。持久化快照未作批量修改。
+
+**验证结果：**
+
+- 后端定向 Vitest：`10/10` 文件、`119/119` 用例通过，覆盖部门改名后的检验记录详情/导出/筛选、不合格项列表/详情/筛选/统计、售后列表/筛选/统计/图表和日报/周报。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `85e49d4` `fix(project): resolve current responsibility department names`
+
+**遗留问题：**
+
+- 未运行 dev/build/start，未推送或发布。
+
+---
+
+### 2026-08-13 修复：过程报检内部责任部门作为班组展示
+
+**执行内容：**
+
+- 统一 `PROCESS + INTERNAL_DEPARTMENT` 的业务班组语义：Web 和 WeApp 报检入口移除执行班组控件及提交字段，V2 服务端拒绝客户端携带的 `team/teamId`。
+- PROCESS 外协报检仅选择外协单位：Web/WeApp 隐藏且不提交责任部门，服务端复用 shared 既有外协责任部门策略唯一解析活跃 canonical 部门；缺失或重名配置 fail-closed。PROCESS 责任类型去除 SUPPLIER，INCOMING 保持原有供应商语义。
+- 请求、检验记录、导出与班组筛选统一把 `PROCESS + OUTSOURCING_UNIT` 显示和匹配为 canonical `supplierName`，不依赖或写入 `team/teamId`；关单继续以同一 R 原子投影 inspection 与 NC。
+- 报检任务 API 与检验记录 API 现共享同一 PROCESS 内部班组展示规则：创建后、关闭前的任务列表/详情已将 `responsibleDepartment` 返回为 `team`；Web 表格、顶部详情抽屉、待派单提醒及 WeApp 列表、派单详情、关单页均直接展示该 API 字段，无需各自补偿。
+- 关单事务提取报检任务完整责任 R，并逐条复制至新建多工单检验记录、空事实的显式关联检验记录和 FAIL 不合格项；partial/conflict 记录与 PASS legacy 无 R 均 fail-closed，不把部门 ID 写入 `teamId`。
+- 列表、详情、导出和班组筛选使用责任部门作为内部过程检验的班组展示；历史记录自身缺失时批量读取关联报检任务，只有唯一内部责任部门才兼容展示，冲突保持空，外协和真实 TEAM 记录不变。
+- 追加关单 R 投影、existing 冲突、PASS/FAIL 与详情/列表/导出/筛选历史兼容回归，并更新 inspection 架构与进度文档。
+
+**验证结果：**
+
+- 后端定向 Vitest：`10/10` 文件、`106/106` 用例通过，覆盖新建多工单、PASS/FAIL、显式关联记录、NC 责任投影、历史详情/列表/导出、筛选和冲突关联。
+- 本次报检前展示回归：后端 `3/3` 文件、`15/15` 用例及 Web 顶部详情抽屉 `1/1` 文件、`3/3` 用例通过，覆盖 `Structure BU1` 的 API 列表/详情映射和卡片展示。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** 未提交（按本次任务要求）。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start，未推送或发布。
+
+---
+
+### 2026-08-13 修复：报检详情身份字段按类别展示
+
+**执行内容：**
+
+- `DispatchDetailDrawer` 仅对 `INCOMING` 显示“供应商”及 API 已透传的 `supplierName` 快照；快照缺失时显示 `-`，不再回退读取或写入 `team`。
+- `PROCESS` 与无类别的历史记录继续显示“班组”及 `team`，保持执行上下文和供应商身份边界。
+- 新增抽屉组件回归测试，覆盖进货供应商、缺失供应商快照和过程班组三种情形；更新 inspection 架构约定与项目进度。
+
+**验证结果：**
+
+- 定向 Vitest：`2/2` 文件、`10/10` 用例通过（详情抽屉 `3/3`、详情查询 `7/7`）。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过；未运行前端 dev/build/start。
 ## [0.25.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.13...qgs-v0.25.0) (2026-08-13)
 
 
@@ -65,6 +312,30 @@
 
 **遗留问题：**
 
+- 无。
+
+---
+
+### 2026-08-13 修复：报检入口责任部门默认值
+
+**执行内容：**
+
+- 在共享报检责任纯函数中按完整 canonical 部门选项执行唯一精确名称匹配：外协单位匹配“生产 OBU”，供应商匹配“采购部”；不硬编码部门 ID，零/多匹配保持未选。
+- Web 扫码报检和 WeApp 报检创建页共用该规则；只在切换责任类型后的完整选项加载成功时填充空字段，不覆盖同一责任类型下已经手动选择的部门。空字段在选项加载失败或不存在时仍保持未选，由既有提交校验拒绝不完整责任信息。
+- 更新 inspection 架构约定，明确这是仅用于 UI 初始值的 canonical ID 解析，不改变服务端责任事实校验。
+
+**验证结果：**
+
+- 共享定向 Vitest：`1/1` 文件、`26/26` 用例通过。
+- Web 定向 Vitest：`1/1` 文件、`11/11` 用例通过。
+- WeApp 定向 Vitest：`1/1` 文件、`10/10` 用例通过。
+- `pnpm --dir packages/qgs-shared run build` 通过；未运行前端 dev/build/start。
+
+**commit:** 本次独立提交。
+
+**遗留问题：**
+
+- 无。
 - 无；生产环境未受影响。
 
 ---
@@ -6742,3 +7013,16 @@
 - P3009 recovery 定向测试 `10/10` 通过；root `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。当前数据库只读检测输出 `NOT_REQUIRED`。Codex 未执行任何数据库 apply；生产发布和推送均未执行。
 
 **commits:** `40070cf`（后端/共享契约）、`d84297c`（Web/WeApp 入口）、`1704d7d`（历史治理与发布维护）、`8e33910`（测试夹具修正）、`88bc724`（后端/共享契约修正）、`5311921`（Web/WeApp 选项修正）、`2051341`（P3009 migration recovery）。
+### 2026-08-13 PROCESS 外协报检责任部门 canonical ID 修复
+
+**执行内容：**
+
+- 根因：外协报检的隐藏责任部门每次仅按共享显示名称查询；本地存在两个 active 同名部门时，正确的 fail-closed 保护阻断了 public V2 创建，但名称并不是稳定身份。
+- 新增系统设置 `INSPECTION_REQUEST_PROCESS_OUTSOURCING_RESPONSIBLE_DEPARTMENT_ID`。已有设置时，运行时只按 active canonical ID 解析；部门改名后以当前名称快照写入请求、检验记录与不合格项责任事实，ID 不变。
+- 设置缺失时只允许用现有共享旧名称进行一次原子引导：唯一候选用 `create` 固化，唯一键并发竞争后回读赢家配置；零个或多个候选、无效或停用配置均 fail-closed。没有按名称排序、ID 格式或 `first` 选择。
+- release maintenance 在请求责任回填前显式运行相同的幂等引导，歧义不会被跳过或绕过。
+
+**验证结果：**
+
+- 后端定向 Vitest：`6/6` 文件、`48/48` 用例通过，覆盖配置 ID 改名后解析、首次唯一 bootstrap、零/多候选拒绝、停用 ID 拒绝、并发 create 竞争回读及 release-maintenance 接线。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`rtk git diff --check`：通过。

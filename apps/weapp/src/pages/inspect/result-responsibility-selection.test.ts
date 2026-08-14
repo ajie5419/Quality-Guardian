@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildInspectionResultResponsibilityPayload } from './result-responsibility-selection';
+import {
+  buildInspectionResultResponsibilityPayload,
+  getInspectionResultResponsibilityLabels,
+  getInspectionResultResponsibilityTypes,
+} from './result-responsibility-selection';
 
 describe('mobile inspection close responsibility payload', () => {
   it.each([
@@ -20,12 +24,10 @@ describe('mobile inspection close responsibility payload', () => {
       'SUPPLIER',
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
     ],
@@ -33,12 +35,11 @@ describe('mobile inspection close responsibility payload', () => {
       'OUTSOURCING_UNIT',
       {
         responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
+        responsibleDepartmentId: '',
         supplierId: 'supplier-b',
       },
       {
         responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-b',
       },
     ],
@@ -59,5 +60,25 @@ describe('mobile inspection close responsibility payload', () => {
         supplierId: '',
       }),
     ).toBeNull();
+  });
+
+  it('uses category-specific types while preserving uncategorized fallback', () => {
+    expect(getInspectionResultResponsibilityTypes('INCOMING')).toEqual([
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getInspectionResultResponsibilityTypes('PROCESS')).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getInspectionResultResponsibilityTypes()).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getInspectionResultResponsibilityLabels('PROCESS')).toEqual([
+      '内部部门',
+      '外协单位',
+    ]);
   });
 });

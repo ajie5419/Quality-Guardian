@@ -52,6 +52,10 @@ function displayValue(value?: null | number | string) {
   if (value === undefined || value === null || value === '') return '-';
   return String(value);
 }
+
+function displayNcNumber(value?: null | string) {
+  return value || 'Unnumbered';
+}
 </script>
 
 <template>
@@ -64,7 +68,7 @@ function displayValue(value?: null | number | string) {
       <div class="flex min-w-0 items-start justify-between gap-2">
         <div class="min-w-0">
           <div class="truncate font-medium text-gray-900">
-            {{ displayValue(record.ncNumber) }}
+            {{ displayNcNumber(record.ncNumber) }}
           </div>
           <div class="truncate text-xs text-gray-500">
             {{ displayValue(record.partName) }}

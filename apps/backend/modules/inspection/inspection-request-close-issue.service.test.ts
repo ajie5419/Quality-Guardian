@@ -3,7 +3,14 @@ import type { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildCloseLinkedIssueCreateResult } from '~/modules/inspection/inspection-request-close-issue.service';
 
-const tx = {} as Prisma.TransactionClient;
+const tx = {
+  quality_records: {
+    update: vi.fn().mockImplementation(({ data, where }) => ({
+      ...data,
+      id: where.id,
+    })),
+  },
+} as unknown as Prisma.TransactionClient;
 const mocks = vi.hoisted(() => ({
   createInTransaction: vi.fn(),
   findInspectionForIssue: vi.fn(),
@@ -61,11 +68,17 @@ const request = {
   process: { name: 'Welding' },
   processName: 'Welding',
   reporter: 'Reporter A',
+  responsibilityType: 'INTERNAL_DEPARTMENT',
+  responsibleDepartment: 'Assembly',
+  responsibleDepartmentId: 'dept-assembly',
+  supplierId: null,
+  supplierName: null,
   workOrderNumber: 'WO-1',
 };
 const linkedIssue = {
   defectCategoryId: 'cat-1',
   defectSubcategoryId: 'sub-1',
+  generateNcNumber: false,
   description: 'defect',
   partName: 'Bearing',
   photos: ['/uploads/defect.jpg'],
@@ -80,6 +93,13 @@ const linkedIssue = {
 describe('buildCloseLinkedIssueCreateResult', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(tx.quality_records.update).mockImplementation(
+      ({ data, where }) =>
+        ({
+          ...data,
+          id: where.id,
+        }) as never,
+    );
     mocks.findInspectionForIssue.mockResolvedValue({ id: 'inspection-1' });
     mocks.resolveRequestResponsibility.mockResolvedValue({
       responsibilityType: 'INTERNAL_DEPARTMENT',
@@ -117,9 +137,13 @@ describe('buildCloseLinkedIssueCreateResult', () => {
     expect(mocks.createInTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
+          generateNcNumber: false,
           inspectionId: 'inspection-1',
+          responsibleDepartment: 'Assembly',
           responsibilityType: 'INTERNAL_DEPARTMENT',
           responsibleDepartmentId: 'dept-assembly',
+          supplierId: undefined,
+          supplierName: undefined,
         }),
         tx,
       }),
@@ -133,6 +157,16 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         record: expect.objectContaining({ id: 'issue-1' }),
       }),
     );
+    expect(tx.quality_records.update).toHaveBeenCalledWith({
+      data: {
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Assembly',
+        responsibleDepartmentId: 'dept-assembly',
+        supplierId: null,
+        supplierName: null,
+      },
+      where: { id: 'issue-1' },
+    });
   });
 
   it('uses the request supplier identity for supplier responsibility', async () => {
@@ -152,7 +186,14 @@ describe('buildCloseLinkedIssueCreateResult', () => {
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-1',
       },
-      request: { ...request, supplierId: 'supplier-1' },
+      request: {
+        ...request,
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartment: '采购部',
+        responsibleDepartmentId: 'dept-purchasing',
+        supplierId: 'supplier-1',
+        supplierName: 'Supplier A',
+      },
       tx,
       userinfo: { id: 'user-1', username: 'qc' } as never,
     });
@@ -160,8 +201,11 @@ describe('buildCloseLinkedIssueCreateResult', () => {
     expect(mocks.createInTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
+          responsibleDepartment: '采购部',
           responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchasing',
           supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
         }),
       }),
     );

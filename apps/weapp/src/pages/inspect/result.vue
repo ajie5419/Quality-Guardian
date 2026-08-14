@@ -18,15 +18,20 @@ import { getQualityClassificationOptions } from '@/api/issues';
 import { buildResourceUrl, uploadFile } from '@/api/request';
 import { onLoad } from '@dcloudio/uni-app';
 import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   isExternalInspectionIssueResponsibility,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 
 import {
-  hasEmptyInspectionRequestIssueResponsibilityContext,
+  resolveEditableInspectionRequestIssueResponsibility,
   resolveLockedInspectionRequestIssueResponsibility,
 } from './result-responsibility';
-import { buildInspectionResultResponsibilityPayload } from './result-responsibility-selection';
+import {
+  buildInspectionResultResponsibilityPayload,
+  getInspectionResultResponsibilityLabels,
+  getInspectionResultResponsibilityTypes,
+} from './result-responsibility-selection';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -35,17 +40,13 @@ interface TaskDetail {
   responsibilityType?: null | string;
   responsibleDepartment?: null | string;
   responsibleDepartmentId?: null | string;
+  supplierId?: null | string;
   requestNo: string;
+  team?: null | string;
   workOrderNumber: string;
   partName: string;
   processName: string;
   quantity: number;
-  issueResponsibility: null | {
-    responsibilityType: string;
-    responsibleDepartment: string;
-    responsibleDepartmentId?: string;
-    supplierId?: null | string;
-  };
 }
 
 interface Attachment {
@@ -92,12 +93,14 @@ const legacyDepartments = ref<
 const legacySuppliers = ref<InspectionRequestResponsibilitySupplierOption[]>(
   [],
 );
+let responsibilityOptionsRequestSequence = 0;
 
 // ── Step 3 fields ─────────────────────────────────────────────────────────────
 const description = ref('');
 const rootCause = ref('');
 const solution = ref('');
 const lossAmount = ref(0);
+const generateNcNumber = ref(false);
 
 // ─── Derived ─────────────────────────────────────────────────────────────────
 
@@ -127,18 +130,23 @@ const isExternalResponsibility = computed(() =>
     : false,
 );
 const legacyResponsibilityTypeLabels = computed(() =>
-  task.value?.category === 'INCOMING'
-    ? ['供应商']
-    : ['内部部门', '供应商', '外协单位'],
+  getInspectionResultResponsibilityLabels(task.value?.category),
 );
 const legacySupplierLabels = computed(() =>
   legacySuppliers.value.map((supplier) => supplier.label),
 );
+function getSelectedResponsibilityType() {
+  if (responsibilityType.value === 'SUPPLIER') {
+    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER;
+  }
+  if (responsibilityType.value === 'OUTSOURCING_UNIT') {
+    return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+  }
+  return INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+}
 const legacyResponsibilityTypeIndex = computed(() => {
-  if (task.value?.category === 'INCOMING') return 0;
-  if (responsibilityType.value === 'SUPPLIER') return 1;
-  if (responsibilityType.value === 'OUTSOURCING_UNIT') return 2;
-  return 0;
+  const types = getInspectionResultResponsibilityTypes(task.value?.category);
+  return Math.max(0, types.indexOf(getSelectedResponsibilityType()));
 });
 const legacySupplierIndex = computed(() =>
   legacySuppliers.value.findIndex(
@@ -176,6 +184,7 @@ async function fetchDetail() {
             ? d.category
             : undefined,
         requestNo: (d.requestNo as string) || '',
+        team: (d.team as null | string) || null,
         workOrderNumber: (d.workOrderNumber as string) || '',
         partName: ((d.partName ?? d.componentName) as string) || '',
         processName: (d.processName as string) || '',
@@ -185,30 +194,35 @@ async function fetchDetail() {
           (d.responsibleDepartment as null | string) || null,
         responsibleDepartmentId:
           (d.responsibleDepartmentId as null | string) || null,
-        issueResponsibility:
-          d.issueResponsibility && typeof d.issueResponsibility === 'object'
-            ? (d.issueResponsibility as TaskDetail['issueResponsibility'])
-            : null,
+        supplierId: (d.supplierId as null | string) || null,
       };
-      const responsibility = resolveLockedInspectionRequestIssueResponsibility(
-        d.issueResponsibility,
-      );
+      const responsibility =
+        resolveLockedInspectionRequestIssueResponsibility(d);
+      const editableResponsibility =
+        resolveEditableInspectionRequestIssueResponsibility({
+          category: task.value.category,
+          value: d,
+        });
       responsibilityLocked.value = Boolean(responsibility);
       responsibilityType.value =
         responsibility?.responsibilityType ||
+        editableResponsibility?.responsibilityType ||
         (task.value.category === 'INCOMING'
-          ? 'SUPPLIER'
-          : 'INTERNAL_DEPARTMENT');
-      responsibleDepartmentId.value =
-        responsibility?.responsibleDepartmentId || '';
-      supplierId.value = responsibility?.supplierId || '';
+          ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+          : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT);
+      responsibleDepartmentId.value = isExternalResponsibility.value
+        ? ''
+        : responsibility?.responsibleDepartmentId ||
+          editableResponsibility?.responsibleDepartmentId ||
+          task.value.responsibleDepartmentId ||
+          '';
+      supplierId.value =
+        responsibility?.supplierId ||
+        editableResponsibility?.supplierId ||
+        task.value.supplierId ||
+        '';
       if (!responsibility) {
-        if (hasEmptyInspectionRequestIssueResponsibilityContext(task.value)) {
-          await loadLegacyResponsibilityOptions();
-        } else {
-          legacyResponsibilityError.value =
-            '报检任务责任上下文不完整，无法关闭。';
-        }
+        await loadLegacyResponsibilityOptions();
       }
       quantity.value = task.value.quantity;
     } else {
@@ -241,27 +255,27 @@ function clearLegacyResponsibilityIdentity() {
 
 async function loadLegacyResponsibilityOptions() {
   if (responsibilityLocked.value || !responsibilityType.value) return;
+  const requestedType = responsibilityType.value;
+  const requestedSequence = ++responsibilityOptionsRequestSequence;
   legacyResponsibilityLoading.value = true;
   legacyResponsibilityError.value = '';
   try {
     const res = await getInspectionRequestResponsibilityOptions({
-      responsibilityType: responsibilityType.value,
+      responsibilityType: requestedType,
     });
+    if (requestedSequence !== responsibilityOptionsRequestSequence) return;
     if (
       res.code !== 0 ||
       !res.data ||
-      res.data.responsibilityType !== responsibilityType.value
+      res.data.responsibilityType !== requestedType
     ) {
       throw new Error('Missing responsibility options');
     }
     legacyDepartments.value = res.data.departments;
     legacySuppliers.value = res.data.suppliers;
     if (isExternalResponsibility.value) {
-      responsibleDepartmentId.value = res.data.departments[0]?.value || '';
-      supplierId.value = '';
-      return;
-    }
-    if (
+      responsibleDepartmentId.value = '';
+    } else if (
       responsibleDepartmentId.value &&
       !res.data.departments.some(
         (department) => department.value === responsibleDepartmentId.value,
@@ -269,15 +283,24 @@ async function loadLegacyResponsibilityOptions() {
     ) {
       responsibleDepartmentId.value = '';
     }
-    supplierId.value = '';
+    if (
+      !isExternalResponsibility.value ||
+      !res.data.suppliers.some(
+        (supplier) => supplier.value === supplierId.value,
+      )
+    ) {
+      supplierId.value = '';
+    }
   } catch {
-    legacyResponsibilityError.value =
-      '责任归属选项加载失败，无法提交不合格项。';
+    if (requestedSequence !== responsibilityOptionsRequestSequence) return;
+    legacyResponsibilityError.value = '责任归属选项加载失败，无法关闭任务。';
     legacyDepartments.value = [];
     legacySuppliers.value = [];
     clearLegacyResponsibilityIdentity();
   } finally {
-    legacyResponsibilityLoading.value = false;
+    if (requestedSequence === responsibilityOptionsRequestSequence) {
+      legacyResponsibilityLoading.value = false;
+    }
   }
 }
 
@@ -339,11 +362,12 @@ function onSeverityChange(e: { detail: { value: string } }) {
     SEVERITY_OPTIONS[Number(e.detail.value)] ?? SEVERITY_OPTIONS[0];
 }
 
+function onDocumentsChange(e: { detail: { value: boolean } }) {
+  hasDocuments.value = e.detail.value;
+}
+
 function onLegacyResponsibilityTypeChange(e: { detail: { value: string } }) {
-  const options =
-    task.value?.category === 'INCOMING'
-      ? ['SUPPLIER']
-      : ['INTERNAL_DEPARTMENT', 'SUPPLIER', 'OUTSOURCING_UNIT'];
+  const options = getInspectionResultResponsibilityTypes(task.value?.category);
   const type = options[Number(e.detail.value)] as
     | InspectionIssueResponsibilityType
     | undefined;
@@ -353,7 +377,7 @@ function onLegacyResponsibilityTypeChange(e: { detail: { value: string } }) {
   void loadLegacyResponsibilityOptions();
 }
 
-function onLegacyInternalDepartmentChange(e: { detail: { value: string } }) {
+function onLegacyDepartmentChange(e: { detail: { value: string } }) {
   const department = legacyDepartments.value[Number(e.detail.value)];
   responsibleDepartmentId.value = department?.value || '';
   supplierId.value = '';
@@ -374,23 +398,22 @@ function validateStep1(): boolean {
     uni.showToast({ title: '不合格数量必须大于0', icon: 'none' });
     return false;
   }
+  if (!validateCloseResponsibility()) return false;
   return true;
 }
 
-function validateStep2(): boolean {
-  if (!defectCategoryId.value || !defectSubcategoryId.value) {
-    uni.showToast({ title: '请选择缺陷分类和二级分类', icon: 'none' });
+function validateCloseResponsibility(): boolean {
+  if (responsibilityLocked.value) return true;
+  if (legacyResponsibilityError.value || legacyResponsibilityLoading.value) {
+    uni.showToast({ title: '责任归属选项尚未加载完成', icon: 'none' });
     return false;
   }
-  if (!responsibilityLocked.value && legacyResponsibilityError.value) {
-    uni.showToast({
-      title: '责任归属选项加载失败，无法提交不合格项',
-      icon: 'none',
-    });
+  if (!responsibilityType.value) {
+    uni.showToast({ title: '请选择责任类型', icon: 'none' });
     return false;
   }
-  if (!responsibilityType.value || !responsibleDepartmentId.value) {
-    uni.showToast({ title: '报检任务责任上下文无效', icon: 'none' });
+  if (!isExternalResponsibility.value && !responsibleDepartmentId.value) {
+    uni.showToast({ title: '请选择责任部门', icon: 'none' });
     return false;
   }
   if (isExternalResponsibility.value && !supplierId.value) {
@@ -398,6 +421,14 @@ function validateStep2(): boolean {
       title: `请选择${legacyExternalUnitLabel.value}`,
       icon: 'none',
     });
+    return false;
+  }
+  return true;
+}
+
+function validateStep2(): boolean {
+  if (!defectCategoryId.value || !defectSubcategoryId.value) {
+    uni.showToast({ title: '请选择缺陷分类和二级分类', icon: 'none' });
     return false;
   }
   return true;
@@ -456,19 +487,23 @@ async function submitResult() {
     closeRemark: closeRemark.value || undefined,
   };
 
+  const responsibilityPayload = buildInspectionResultResponsibilityPayload({
+    responsibilityType: responsibilityType.value,
+    responsibleDepartmentId: responsibleDepartmentId.value,
+    supplierId: supplierId.value,
+  });
+  if (!responsibilityPayload) {
+    uni.hideLoading();
+    submitting.value = false;
+    uni.showToast({ title: '责任归属无效', icon: 'none' });
+    return;
+  }
+  if (!responsibilityLocked.value) {
+    payload.responsibility = responsibilityPayload;
+  }
+
   if (isFail.value && task.value) {
     const severityCode = severity.value.split('-')[0] ?? 'Minor';
-    const responsibilityPayload = buildInspectionResultResponsibilityPayload({
-      responsibilityType: responsibilityType.value,
-      responsibleDepartmentId: responsibleDepartmentId.value,
-      supplierId: supplierId.value,
-    });
-    if (!responsibilityPayload) {
-      uni.hideLoading();
-      submitting.value = false;
-      uni.showToast({ title: '责任归属无效', icon: 'none' });
-      return;
-    }
     payload.linkedIssue = {
       partName: task.value.partName,
       processName: task.value.processName,
@@ -483,6 +518,7 @@ async function submitResult() {
       quantity: unqualified,
       lossAmount: lossAmount.value,
       photos: attachments.value.map((item) => item.url),
+      generateNcNumber: generateNcNumber.value,
     };
   }
 
@@ -533,6 +569,10 @@ onLoad((options) => {
       <view class="detail-row">
         <text class="detail-label">工序</text>
         <text class="detail-value">{{ task.processName }}</text>
+      </view>
+      <view v-if="task.category === 'PROCESS'" class="detail-row">
+        <text class="detail-label">班组</text>
+        <text class="detail-value">{{ task.team || '-' }}</text>
       </view>
     </view>
 
@@ -624,10 +664,7 @@ onLoad((options) => {
             <switch
               :checked="hasDocuments"
               color="#1890ff"
-              @change="
-                (e: { detail: { value: boolean } }) =>
-                  (hasDocuments = e.detail.value)
-              "
+              @change="onDocumentsChange"
             />
             <text class="switch-label">{{ hasDocuments ? '有' : '无' }}</text>
           </view>
@@ -672,10 +709,85 @@ onLoad((options) => {
             auto-height
           ></textarea>
         </view>
+
+        <template v-if="!responsibilityLocked">
+          <view class="card">
+            <view class="field-label required">责任归属类型</view>
+            <picker
+              :disabled="legacyResponsibilityLoading"
+              :range="legacyResponsibilityTypeLabels"
+              :value="legacyResponsibilityTypeIndex"
+              @change="onLegacyResponsibilityTypeChange"
+            >
+              <view class="picker-val">
+                <text>{{
+                  legacyResponsibilityTypeLabels[legacyResponsibilityTypeIndex]
+                }}</text>
+                <text class="picker-arrow">›</text>
+              </view>
+            </picker>
+          </view>
+          <view v-if="!isExternalResponsibility" class="card">
+            <view class="field-label required">责任部门</view>
+            <picker
+              :disabled="
+                legacyResponsibilityLoading || legacyDepartments.length === 0
+              "
+              :range="legacyDepartments"
+              range-key="label"
+              :value="
+                legacyDepartments.findIndex(
+                  (department) => department.value === responsibleDepartmentId,
+                )
+              "
+              @change="onLegacyDepartmentChange"
+            >
+              <view class="picker-val">
+                <text>{{ legacyDepartmentLabel || '请选择责任部门' }}</text>
+                <text class="picker-arrow">›</text>
+              </view>
+            </picker>
+          </view>
+          <view v-if="isExternalResponsibility" class="card">
+            <view class="field-label required">{{
+              legacyExternalUnitLabel
+            }}</view>
+            <picker
+              :disabled="
+                legacyResponsibilityLoading || legacySuppliers.length === 0
+              "
+              :range="legacySupplierLabels"
+              :value="legacySupplierIndex"
+              @change="onLegacySupplierChange"
+            >
+              <view class="picker-val">
+                <text>{{
+                  legacySuppliers[legacySupplierIndex]?.label ||
+                  `请选择${legacyExternalUnitLabel}`
+                }}</text>
+                <text class="picker-arrow">›</text>
+              </view>
+            </picker>
+          </view>
+          <view v-if="legacyResponsibilityError" class="card">
+            <text class="error-text">{{ legacyResponsibilityError }}</text>
+          </view>
+        </template>
       </view>
 
       <!-- ── STEP 2 - 不合格品信息 ─────────────────────────────────────── -->
       <view v-show="currentStep === 2">
+        <view class="card">
+          <view class="field-label">Generate NC Number</view>
+          <view class="switch-row">
+            <switch v-model="generateNcNumber" color="#1890ff" />
+            <text class="switch-label">{{
+              generateNcNumber
+                ? 'Generate automatically on submission'
+                : 'Unnumbered'
+            }}</text>
+          </view>
+        </view>
         <!-- 缺陷分类 -->
         <view class="card">
           <view class="field-label required">缺陷分类</view>
@@ -731,89 +843,15 @@ onLoad((options) => {
           </picker>
         </view>
 
-        <view v-if="responsibilityLocked" class="card">
+        <view
+          v-if="responsibilityLocked && !isExternalResponsibility"
+          class="card"
+        >
           <view class="field-label required">责任部门</view>
           <view class="picker-val">
-            <text>{{
-              task?.issueResponsibility?.responsibleDepartment ||
-              '责任上下文加载中'
-            }}</text>
+            <text>{{ task?.responsibleDepartment || '责任上下文加载中' }}</text>
           </view>
         </view>
-        <template v-else>
-          <view class="card">
-            <view class="field-label required">责任归属类型</view>
-            <picker
-              :disabled="legacyResponsibilityLoading"
-              :range="legacyResponsibilityTypeLabels"
-              :value="legacyResponsibilityTypeIndex"
-              @change="onLegacyResponsibilityTypeChange"
-            >
-              <view class="picker-val">
-                <text>{{
-                  legacyResponsibilityTypeLabels[legacyResponsibilityTypeIndex]
-                }}</text>
-                <text class="picker-arrow">›</text>
-              </view>
-            </picker>
-          </view>
-          <view
-            v-if="responsibilityType === 'INTERNAL_DEPARTMENT'"
-            class="card"
-          >
-            <view class="field-label required">责任部门</view>
-            <picker
-              :disabled="
-                legacyResponsibilityLoading || legacyDepartments.length === 0
-              "
-              :range="legacyDepartments"
-              range-key="label"
-              :value="
-                legacyDepartments.findIndex(
-                  (department) => department.value === responsibleDepartmentId,
-                )
-              "
-              @change="onLegacyInternalDepartmentChange"
-            >
-              <view class="picker-val">
-                <text>{{ legacyDepartmentLabel || '请选择责任部门' }}</text>
-                <text class="picker-arrow">›</text>
-              </view>
-            </picker>
-          </view>
-          <template v-else>
-            <view class="card">
-              <view class="field-label required">责任部门</view>
-              <view class="picker-val">
-                <text>{{ legacyDepartmentLabel || '责任部门策略加载中' }}</text>
-              </view>
-            </view>
-            <view class="card">
-              <view class="field-label required">{{
-                legacyExternalUnitLabel
-              }}</view>
-              <picker
-                :disabled="
-                  legacyResponsibilityLoading || legacySuppliers.length === 0
-                "
-                :range="legacySupplierLabels"
-                :value="legacySupplierIndex"
-                @change="onLegacySupplierChange"
-              >
-                <view class="picker-val">
-                  <text>{{
-                    legacySuppliers[legacySupplierIndex]?.label ||
-                    `请选择${legacyExternalUnitLabel}`
-                  }}</text>
-                  <text class="picker-arrow">›</text>
-                </view>
-              </picker>
-            </view>
-          </template>
-          <view v-if="legacyResponsibilityError" class="card">
-            <text class="error-text">{{ legacyResponsibilityError }}</text>
-          </view>
-        </template>
       </view>
 
       <!-- ── STEP 3 - 补充信息 ──────────────────────────────────────────── -->

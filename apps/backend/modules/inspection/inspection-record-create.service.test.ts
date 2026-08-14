@@ -5,6 +5,9 @@ import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write'
 import prisma from '~/utils/prisma';
 
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
+import { InspectionRecordRules } from './inspection-record-types';
+
+const issueMocks = vi.hoisted(() => ({ createInTransaction: vi.fn() }));
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -48,6 +51,10 @@ vi.mock('~/modules/supplier-identity', () => ({
 
 vi.mock('./inspection-issue-responsibility.service', () => ({
   resolveInspectionIssueResponsibility: vi.fn(),
+}));
+
+vi.mock('./inspection-issue-create.service', () => ({
+  InspectionIssueCreateService: issueMocks,
 }));
 
 vi.mock('~/modules/file-storage/file-storage.service', () => ({
@@ -103,6 +110,7 @@ describe('inspectionRecordCreateService', () => {
       responsibleDepartment: 'Machining BU',
       responsibleDepartmentId: 'dept-machining',
       supplierId: null,
+      supplierCategory: null,
       supplierName: null,
     });
   });
@@ -129,6 +137,88 @@ describe('inspectionRecordCreateService', () => {
   });
 
   describe('create', () => {
+    it('creates an enabled linked issue in the same transaction', async () => {
+      vi.mocked(InspectionRecordRules.resolveOverallResult).mockReturnValueOnce(
+        'FAIL',
+      );
+      vi.mocked(
+        InspectionRecordRules.normalizeQuantitySummary,
+      ).mockReturnValueOnce({
+        qualifiedQuantity: 9,
+        quantity: 10,
+        unqualifiedQuantity: 1,
+      });
+      issueMocks.createInTransaction.mockResolvedValue({
+        ncNumber: null,
+        record: { id: 'issue-1', nonConformanceNumber: null },
+      });
+      (prisma.$transaction as any).mockImplementation(async (callback: any) =>
+        callback({
+          inspections: {
+            create: vi.fn().mockResolvedValue({
+              id: 'insp-linked',
+              inspectionDate: new Date('2026-01-01'),
+              inspector: 'Tester',
+              materialName: 'Bearing',
+              partName: 'Bearing',
+              processName: 'Welding',
+              result: 'FAIL',
+              supplierId: 'supplier-1',
+              unqualifiedQuantity: 1,
+              workOrderNumber: 'WO-1',
+            }),
+            findFirst: vi.fn().mockResolvedValue(null),
+          },
+        }),
+      );
+
+      const result = await InspectionRecordCreateService.create(
+        {
+          category: 'PROCESS',
+          inspector: 'Tester',
+          inspectionDate: '2026-01-01',
+          items: [],
+          linkedIssue: {
+            description: 'Crack',
+            defectCategoryId: 'cat-1',
+            defectSubcategoryId: 'sub-1',
+            enabled: true,
+            generateNcNumber: false,
+            responsibilityType: 'SUPPLIER',
+            responsibleDepartmentId: 'dept-purchasing',
+            responsibleWelder: 'welder-1',
+            rootCause: 'Fatigue',
+            severity: 'Major',
+            solution: 'Repair',
+            status: 'OPEN',
+          },
+          processName: 'Welding',
+          quantity: 10,
+          teamId: 'team-1',
+          unqualifiedQuantity: 1,
+          workOrderNumber: 'WO-1',
+        },
+        undefined,
+        { id: 'user-1', roles: [], username: 'qc', realName: 'QC' },
+      );
+
+      expect(issueMocks.createInTransaction).toHaveBeenCalledWith(
+        expect.objectContaining({
+          body: expect.objectContaining({
+            generateNcNumber: false,
+            inspectionId: 'insp-linked',
+            sourceType: 'INSPECTION_RECORD',
+            supplierId: 'supplier-1',
+          }),
+        }),
+      );
+      expect(result).toEqual(
+        expect.objectContaining({
+          linkedIssue: expect.objectContaining({ id: 'issue-1' }),
+        }),
+      );
+    });
+
     it('should call prisma transaction with correct data', async () => {
       const mockInspection = {
         id: 'insp-1',

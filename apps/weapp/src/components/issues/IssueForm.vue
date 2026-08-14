@@ -78,9 +78,20 @@ onMounted(initialize);
 
     <scroll-view scroll-y class="form-scroll">
       <view v-show="currentStep === 1" class="form-card">
-        <view class="field">
+        <view v-if="props.mode === 'create'" class="field">
+          <text class="label">Generate NC Number</text>
+          <switch v-model="form.generateNcNumber" color="#1890ff" />
+          <view class="field-tip">{{
+            form.generateNcNumber
+              ? 'Generate automatically on submission'
+              : 'Unnumbered'
+          }}</view>
+        </view>
+        <view v-else class="field">
           <text class="label">不合格单号</text>
-          <view class="readonly-value">提交后自动生成</view>
+          <view class="readonly-value">{{
+            props.initialData?.ncNumber || 'Unnumbered'
+          }}</view>
         </view>
         <view class="field">
           <text class="label required">发现日期</text>

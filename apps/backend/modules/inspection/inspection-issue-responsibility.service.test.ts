@@ -36,6 +36,7 @@ describe('inspection issue responsibility resolver', () => {
       responsibleDepartment: 'Machining BU',
       responsibleDepartmentId: 'dept-machining',
       supplierId: null,
+      supplierCategory: null,
       supplierName: null,
     });
     expect(SupplierIdentityService.resolveSupplierById).not.toHaveBeenCalled();
@@ -62,6 +63,7 @@ describe('inspection issue responsibility resolver', () => {
       responsibleDepartment: 'Machining BU',
       responsibleDepartmentId: 'dept-machining',
       supplierId: 'supplier-1',
+      supplierCategory: 'Outsourcing',
       supplierName: 'Supplier A',
     });
   });

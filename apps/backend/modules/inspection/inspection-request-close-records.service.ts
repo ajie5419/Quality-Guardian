@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import prisma from '~/utils/prisma';
 
 import { buildInspectionRecordFromRequest } from './inspection-request';
+import { buildCloseInspectionResponsibilityWrite } from './inspection-request-close-responsibility.service';
 import { assertWorkOrdersExist } from './inspection-request-work-orders';
 
 export type CloseRecordRequest = Prisma.qms_inspection_requestsGetPayload<{
@@ -42,6 +43,13 @@ export async function createCloseInspectionRecords(options: {
       },
       options.tx,
     );
+    await client.inspections.update({
+      data: buildCloseInspectionResponsibilityWrite({
+        inspection,
+        request: options.request,
+      }),
+      where: { id: inspection.id },
+    });
     links.push({
       inspectionId: String(inspection.id),
       isPrimary: index === 0,

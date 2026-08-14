@@ -1,9 +1,13 @@
 import type { Prisma } from '@prisma/client';
-import type { InspectionIssueResponsibilityType } from '@qgs/shared';
+import type {
+  InspectionIssueResponsibilityType,
+  SupplierCategory,
+} from '@qgs/shared';
 
 import {
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   normalizeInspectionIssueResponsibilityType,
+  SUPPLIER_CATEGORY,
 } from '@qgs/shared';
 import { DeptService } from '~/modules/dept';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
@@ -14,6 +18,7 @@ export interface ResolvedInspectionIssueResponsibility {
   responsibleDepartmentId: string;
   responsibilityType: InspectionIssueResponsibilityType;
   supplierId: null | string;
+  supplierCategory: null | SupplierCategory;
   supplierName: null | string;
 }
 
@@ -63,6 +68,7 @@ export async function resolveInspectionIssueResponsibility(
       responsibleDepartmentId: department.id,
       responsibilityType,
       supplierId: null,
+      supplierCategory: null,
       supplierName: null,
     };
   }
@@ -85,10 +91,19 @@ export async function resolveInspectionIssueResponsibility(
     responsibleDepartmentId: department.id,
     responsibilityType,
     supplierId: supplier.id,
+    supplierCategory: resolveSupplierCategory(supplier.category),
     supplierName: supplier.name,
   };
 }
 
 function normalizeResponsibilityId(value: unknown) {
   return String(value ?? '').trim();
+}
+
+function resolveSupplierCategory(value: unknown): SupplierCategory {
+  const category = String(value ?? '').trim();
+  for (const allowedCategory of Object.values(SUPPLIER_CATEGORY)) {
+    if (category === allowedCategory) return allowedCategory;
+  }
+  throw new BusinessError('VALIDATION', '不合格项供应商类别无效', 400);
 }

@@ -8,6 +8,7 @@ import {
 
 const BASE_ISSUE = {
   description: 'Surface scratch',
+  generateNcNumber: true,
   ncNumber: 'NC-client-generated',
   responsibleDepartment: '生产 OBU',
   responsibleDepartments: ['dept-production'],
@@ -37,6 +38,7 @@ describe('inspection issue payload assembler', () => {
       expect(requestPayload).toEqual(standalonePayload);
       expect(standalonePayload).toMatchObject({
         description: 'Surface scratch',
+        generateNcNumber: true,
         responsibilityType,
         responsibleDepartmentId: 'dept-production',
       });

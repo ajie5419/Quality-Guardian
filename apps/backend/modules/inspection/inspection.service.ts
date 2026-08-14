@@ -13,7 +13,6 @@ export const InspectionService = {
   findSupplierHistory: InspectionCoreService.findSupplierHistory,
   findById: InspectionCoreService.findById,
   findIssueIdBySerialNumber: InspectionCoreService.findIssueIdBySerialNumber,
-  generateNextNcNumber: InspectionCoreService.generateNextNcNumber,
   getStatsForDashboard: InspectionCoreService.getStatsForDashboard,
   generateSerialNumber: InspectionCoreService.generateSerialNumber,
   getArchiveTasks: InspectionCoreService.getArchiveTasks,

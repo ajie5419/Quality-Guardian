@@ -13,6 +13,7 @@ import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 import { findInspectionForIssue } from './inspection-issue';
 import { InspectionIssueCreateService } from './inspection-issue-create.service';
 import { normalizeInspectionRequestText } from './inspection-request';
+import { requireCanonicalCloseResponsibility } from './inspection-request-close-responsibility.service';
 import {
   failCloseRequest,
   parseCloseRequestNumber,
@@ -20,7 +21,7 @@ import {
 import { resolveInspectionRequestIssueResponsibilityInTransaction } from './inspection-request-responsibility.service';
 
 export interface CloseLinkedIssueCreateResult {
-  auditVariables: { issue: string; nonConformanceNumber: string };
+  auditVariables: { issue: string; nonConformanceNumber: null | string };
   record: Prisma.quality_recordsGetPayload<Record<string, never>>;
 }
 
@@ -81,9 +82,17 @@ export async function buildCloseLinkedIssueCreateResult(options: {
   });
 
   const created = await InspectionIssueCreateService.createInTransaction({
-    body: issueBody,
+    body: {
+      ...issueBody,
+      generateNcNumber: options.linkedIssue.generateNcNumber,
+    },
     tx: options.tx,
     userinfo: options.userinfo,
+  });
+  const responsibility = requireCanonicalCloseResponsibility(options.request);
+  const record = await options.tx.quality_records.update({
+    data: responsibility,
+    where: { id: created.record.id },
   });
 
   return {
@@ -91,7 +100,7 @@ export async function buildCloseLinkedIssueCreateResult(options: {
       issue: issueBody.partName,
       nonConformanceNumber: created.ncNumber,
     },
-    record: created.record,
+    record,
   };
 }
 

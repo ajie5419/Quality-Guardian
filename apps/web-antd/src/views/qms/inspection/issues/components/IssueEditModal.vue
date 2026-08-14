@@ -76,7 +76,7 @@ function buildInitialData() {
   const inspector =
     userStore.userInfo?.realName || userStore.userInfo?.username || '';
   return {
-    ncNumber: '',
+    generateNcNumber: false,
     reportDate: new Date().toISOString().split('T')[0],
     status: DEFAULT_VALUES.DEFAULT_STATUS,
     quantity: DEFAULT_VALUES.DEFAULT_QUANTITY,

@@ -20,7 +20,6 @@ vi.mock('~/modules/inspection/inspection-issue-stats.service', () => ({
 
 vi.mock('~/modules/inspection/inspection-issue-numbering.service', () => ({
   InspectionIssueNumberingService: {
-    generateNextNcNumber: vi.fn(),
     deleteRecord: vi.fn(),
   },
 }));
@@ -51,12 +50,6 @@ describe('inspectionIssueQueryService', () => {
   it('should expose buildIssueTrendData from InspectionIssueStatsService', () => {
     expect(InspectionIssueQueryService.buildIssueTrendData).toBe(
       InspectionIssueStatsService.buildIssueTrendData,
-    );
-  });
-
-  it('should expose generateNextNcNumber from InspectionIssueNumberingService', () => {
-    expect(InspectionIssueQueryService.generateNextNcNumber).toBe(
-      InspectionIssueNumberingService.generateNextNcNumber,
     );
   });
 

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DeptService } from '~/modules/dept/dept.service';
+import { DeptService } from '~/modules/dept';
 import { ReportService } from '~/modules/report/report.service';
 import prisma from '~/utils/prisma';
 
@@ -17,9 +17,9 @@ vi.mock('~/utils/prisma', () => ({
   },
 }));
 
-vi.mock('~/modules/dept/dept.service', () => ({
+vi.mock('~/modules/dept', () => ({
   DeptService: {
-    findAll: vi.fn(),
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -53,10 +53,12 @@ describe('reportService', () => {
   });
 
   it('maps tracking statuses and applies author from user context', async () => {
-    (DeptService.findAll as any).mockResolvedValue([
-      { id: 'd1', name: '质量部', children: [] },
-      { id: 'd2', name: '生产部', children: [] },
-    ]);
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+      new Map([
+        ['d1', '质量部'],
+        ['d2', '生产部'],
+      ]),
+    );
 
     (prisma.quality_losses.findMany as any).mockResolvedValue([
       {
@@ -158,7 +160,7 @@ describe('reportService', () => {
   });
 
   it('keeps legacy department evidence when canonical resolution fails', async () => {
-    (DeptService.findAll as any).mockRejectedValue(new Error('db down'));
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(new Map());
     (prisma.quality_losses.findMany as any).mockResolvedValue([
       {
         id: 'loss-1',
@@ -198,7 +200,7 @@ describe('reportService', () => {
     ).mockResolvedValue(
       new Map([['defect-subcategory-1', 'Renamed Subcategory']]),
     );
-    (DeptService.findAll as any).mockResolvedValue([]);
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(new Map());
     (prisma.quality_losses.findMany as any).mockResolvedValue([]);
     (prisma.quality_records.findMany as any).mockResolvedValue([]);
     (prisma.after_sales.findMany as any).mockResolvedValue([
@@ -235,7 +237,7 @@ describe('reportService', () => {
   });
 
   it('keeps legacy after-sales classification snapshots without IDs', async () => {
-    (DeptService.findAll as any).mockResolvedValue([]);
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(new Map());
     (prisma.quality_losses.findMany as any).mockResolvedValue([]);
     (prisma.quality_records.findMany as any).mockResolvedValue([]);
     (prisma.after_sales.findMany as any).mockResolvedValue([

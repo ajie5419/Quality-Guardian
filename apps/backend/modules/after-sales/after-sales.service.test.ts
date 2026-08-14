@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { DeptService } from '~/modules/dept';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
@@ -60,6 +61,13 @@ vi.mock('~/modules/quality-classification', () => {
     },
   };
 });
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    findActiveByNameContains: vi.fn().mockResolvedValue([]),
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
 
 describe('afterSalesService', () => {
   beforeEach(() => {
@@ -134,7 +142,8 @@ describe('afterSalesService', () => {
           claimStatus: 'OPEN',
           materialCost: 100,
           laborTravelCost: 50,
-          respDept: 'Quality',
+          respDept: 'Old Quality',
+          respDeptId: 'dept-quality',
           responsibleDepartments: JSON.stringify(['Quality', 'Engineering']),
           solution: 'Repair',
           isClaim: true,
@@ -152,6 +161,9 @@ describe('afterSalesService', () => {
       ];
 
       (prisma.after_sales.findMany as any).mockResolvedValue(mockRecords);
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([['dept-quality', 'Renamed Quality']]),
+      );
 
       const result = await AfterSalesService.getList({});
 
@@ -159,7 +171,11 @@ describe('afterSalesService', () => {
       const item = result[0];
       expect(item.id).toBe('AS-1');
       expect(item.qualityLoss).toBe(150);
-      expect(item.responsibleDepartments).toEqual(['Quality', 'Engineering']);
+      expect(item.responsibleDept).toBe('Renamed Quality');
+      expect(item.responsibleDepartments).toEqual([
+        'Renamed Quality',
+        'Engineering',
+      ]);
       expect(item.supplierBrandId).toBe('supplier-1');
     });
 
@@ -237,6 +253,20 @@ describe('afterSalesService', () => {
           ],
         },
       ]);
+    });
+
+    it('filters the after-sales list by current active department ID', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+      vi.mocked(DeptService.findActiveByNameContains).mockResolvedValue([
+        { businessUnit: null, id: 'dept-quality', name: 'Renamed Quality' },
+      ]);
+
+      await AfterSalesService.getList({ responsibleDept: 'Renamed Quality' });
+
+      const where = (prisma.after_sales.findMany as any).mock.calls[0][0].where;
+      expect(where.AND).toContainEqual({
+        OR: expect.arrayContaining([{ respDeptId: { in: ['dept-quality'] } }]),
+      });
     });
   });
 });

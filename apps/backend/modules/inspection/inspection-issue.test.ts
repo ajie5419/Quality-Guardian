@@ -217,7 +217,7 @@ describe('inspection-issue processId dual write', () => {
     );
   });
 
-  it('injects processId into upsert payload when processName is provided', async () => {
+  it('injects processId into import create payload when processName is provided', async () => {
     const { resolveProcessIdForWrite } = await import(
       '~/utils/process-resolver'
     );
@@ -225,28 +225,20 @@ describe('inspection-issue processId dual write', () => {
 
     const payload = await buildInspectionIssueUpsertPayload(
       {
-        ncNumber: 'NC-25KJ-001',
         processName: '组装',
       },
       100,
     );
 
-    expect(payload).not.toBeNull();
     expect(resolveProcessIdForWrite).toHaveBeenCalledWith({
       processName: '组装',
     });
-    expect(payload?.create.process).toEqual({
+    expect(payload.process).toEqual({
       connect: {
         id: 'process-assemble',
       },
     });
-    expect(payload?.update.process).toEqual({
-      connect: {
-        id: 'process-assemble',
-      },
-    });
-    expect(payload?.create.processName).toBe('组装');
-    expect(payload?.update.processName).toBe('组装');
+    expect(payload.processName).toBe('组装');
   });
 
   it('normalizes wave1 governed fields in upsert payload', async () => {
@@ -262,22 +254,15 @@ describe('inspection-issue processId dual write', () => {
         division: '  车辆 ',
         responsibleDepartment: ' 生产 OBU ',
         supplierName: ' 供应商B ',
-        ncNumber: 'NC-25KJ-002',
       },
       101,
     );
 
-    expect(payload).not.toBeNull();
-    expect(payload?.create.defectType).toBe('焊接缺陷');
-    expect(payload?.create.defectSubtype).toBe('气孔');
-    expect(payload?.create.division).toBe('车辆');
-    expect(payload?.create.responsibleDepartment).toBe('生产 OBU');
-    expect(payload?.create.supplierName).toBe('供应商B');
-    expect(payload?.update.defectType).toBe('焊接缺陷');
-    expect(payload?.update.defectSubtype).toBe('气孔');
-    expect(payload?.update.division).toBe('车辆');
-    expect(payload?.update.responsibleDepartment).toBe('生产 OBU');
-    expect(payload?.update.supplierName).toBe('供应商B');
+    expect(payload.defectType).toBe('焊接缺陷');
+    expect(payload.defectSubtype).toBe('气孔');
+    expect(payload.division).toBe('车辆');
+    expect(payload.responsibleDepartment).toBe('生产 OBU');
+    expect(payload.supplierName).toBe('供应商B');
   });
 
   it('writes canonical ids for defect fields when governance kernel resolves', async () => {
@@ -297,15 +282,12 @@ describe('inspection-issue processId dual write', () => {
       {
         defectType: '焊接缺陷',
         defectSubtype: '气孔',
-        ncNumber: 'NC-25KJ-003',
       },
       102,
     );
 
-    expect(payload?.create.defectTypeId).toBe('dict-defect-type');
-    expect(payload?.create.defectSubtypeId).toBe('dict-defect-subtype');
-    expect(payload?.update.defectTypeId).toBe('dict-defect-type');
-    expect(payload?.update.defectSubtypeId).toBe('dict-defect-subtype');
+    expect(payload.defectTypeId).toBe('dict-defect-type');
+    expect(payload.defectSubtypeId).toBe('dict-defect-subtype');
   });
 
   it('writes rootCauseId into quality record payloads when governance helper resolves', async () => {
@@ -346,14 +328,10 @@ describe('inspection-issue processId dual write', () => {
     const payload = await buildInspectionIssueUpsertPayload(
       {
         rootCause: '焊缝污染',
-        ncNumber: 'NC-25KJ-004',
       },
       103,
     );
-    expect((payload?.create as Record<string, unknown>)?.rootCauseId).toBe(
-      'dict-root-cause',
-    );
-    expect((payload?.update as Record<string, unknown>)?.rootCauseId).toBe(
+    expect((payload as Record<string, unknown>).rootCauseId).toBe(
       'dict-root-cause',
     );
   });

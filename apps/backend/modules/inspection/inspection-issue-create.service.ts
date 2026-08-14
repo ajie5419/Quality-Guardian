@@ -4,8 +4,6 @@ import { Prisma } from '@prisma/client';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { BusinessError } from '~/utils/business-error';
-import { createModuleLogger } from '~/utils/logger';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 import {
   buildInspectionIssueCreateData,
@@ -14,15 +12,14 @@ import {
   getNextInspectionIssueSerialNumber,
   normalizeOptionalInspectionIssueString,
 } from './inspection-issue';
+import { reserveInspectionIssueNcNumber } from './inspection-issue-nc-number.service';
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 type IssueCreateTransaction = Prisma.TransactionClient;
 
-const logger = createModuleLogger('InspectionIssueCreate');
-
 export interface InspectionIssueCreateResult {
-  ncNumber: string;
+  ncNumber: null | string;
   record: Prisma.quality_recordsGetPayload<Record<string, never>>;
 }
 
@@ -46,11 +43,12 @@ export const InspectionIssueCreateService = {
       body,
       options.tx,
     );
-    const ncNumber = await reserveInspectionIssueNcNumber(options.tx);
+    const ncNumber = body.generateNcNumber
+      ? await reserveInspectionIssueNcNumber(options.tx)
+      : null;
     const createData = await buildInspectionIssueCreateData(
       {
         ...body,
-        ncNumber,
         responsibleDepartment: responsibility.responsibleDepartment,
         responsibleDepartmentId: responsibility.responsibleDepartmentId,
         responsibilityType: responsibility.responsibilityType,
@@ -64,6 +62,7 @@ export const InspectionIssueCreateService = {
         id: createInspectionIssueId(),
         inspection,
         inspectorUsername: options.userinfo.username,
+        nonConformanceNumber: ncNumber,
         serialNumber: await getNextInspectionIssueSerialNumber(options.tx),
       },
     );
@@ -89,14 +88,11 @@ export const InspectionIssueCreateService = {
   },
 };
 
-function rejectLegacyIssueCreateFields(body: Record<string, unknown>) {
+function rejectLegacyIssueCreateFields(
+  body: Record<string, unknown>,
+): Record<string, unknown> {
   validateOnlineInspectionIssueResponsibilityInput(body);
-  const {
-    ncNumber: _ignoredNcNumber,
-    responsibleDepartments: _ignoredResponsibleDepartments,
-    ...rest
-  } = body;
-  return rest;
+  return { ...body, generateNcNumber: body.generateNcNumber === true };
 }
 
 export function validateOnlineInspectionIssueResponsibilityInput(
@@ -118,49 +114,11 @@ export function validateOnlineInspectionIssueResponsibilityInput(
   if (body.responsibleDepartments !== undefined) {
     throw new BusinessError('VALIDATION', '不支持多个责任部门', 400);
   }
-}
-
-async function reserveInspectionIssueNcNumber(tx: IssueCreateTransaction) {
-  const year = new Date().getFullYear();
-  const prefix = `NC-${String(year).slice(-2)}KJ-`;
-  const name = `inspection_issue_nc_${year}`;
-  const latestLegacyRows = await tx.$queryRaw<
-    Array<{ value: bigint | null | number }>
-  >(Prisma.sql`
-    SELECT MAX(CAST(SUBSTRING(nonConformanceNumber, ${prefix.length + 1}) AS UNSIGNED)) AS value
-    FROM quality_records
-    WHERE nonConformanceNumber LIKE ${`${prefix}%`}
-  `);
-  const latestLegacyValue = Number(latestLegacyRows[0]?.value ?? 0);
-  const floorValue = Number.isFinite(latestLegacyValue)
-    ? latestLegacyValue + 1
-    : 1;
-  // Compare-and-set loop keeps NC allocation race-free: each transaction
-  // reads the current sequence, computes a candidate above the legacy MAX,
-  // and only wins when it writes the value it just read. Losers retry and
-  // observe the winner's value, so concurrent creates always diverge.
-  for (let attempt = 1; attempt <= 5; attempt++) {
-    const existing = await tx.sequences.findUnique({ where: { name } });
-    if (!existing) {
-      try {
-        await tx.sequences.create({ data: { currentValue: 1, name, prefix } });
-      } catch (error) {
-        logger.error(
-          { err: error },
-          'inspection issue NC sequence row could not be created',
-        );
-        if (!isPrismaUniqueConstraintError(error)) throw error;
-      }
-      continue;
-    }
-    const candidate = Math.max(existing.currentValue + 1, floorValue);
-    const updated = await tx.sequences.updateMany({
-      where: { name, currentValue: existing.currentValue },
-      data: { currentValue: candidate },
-    });
-    if (updated.count === 1) {
-      return `${prefix}${String(candidate).padStart(3, '0')}`;
-    }
+  if (body.ncNumber !== undefined || body.nonConformanceNumber !== undefined) {
+    throw new BusinessError(
+      'VALIDATION',
+      '不合格编号由系统生成，不能手工提交',
+      400,
+    );
   }
-  throw new BusinessError('CONFLICT', '不合格项编号生成失败，请重试', 409);
 }

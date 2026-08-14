@@ -1,8 +1,4 @@
-import type {
-  InspectionIssueResponsibilityType,
-  InspectionRequestTeamOption,
-  InspectionRequestTeamResolutionReason,
-} from '@qgs/shared';
+import type { InspectionIssueResponsibilityType } from '@qgs/shared';
 
 import type { LocationQuery, LocationQueryRaw } from 'vue-router';
 
@@ -34,43 +30,52 @@ export const inspectionRequestResponsibilityTypeOptions: Array<{
   },
 ];
 
+export function getInspectionRequestResponsibilityTypeOptions(
+  isIncoming: boolean,
+) {
+  return isIncoming
+    ? inspectionRequestResponsibilityTypeOptions.filter(
+        (option) =>
+          option.value !==
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+      )
+    : inspectionRequestResponsibilityTypeOptions.filter(
+        (option) =>
+          option.value !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+      );
+}
+
 export function buildInspectionRequestEntryResponsibilityPayload(input: {
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartmentId: string;
   supplierId: string;
-  teamId: string;
-  teamResponsibleDepartmentId?: string;
 }) {
+  if (
+    input.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
+    input.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    const supplierId = input.supplierId.trim();
+    return supplierId
+      ? {
+          responsibilityType: input.responsibilityType,
+          supplierId,
+        }
+      : null;
+  }
   const responsibleDepartmentId = input.responsibleDepartmentId.trim();
   if (!responsibleDepartmentId) return null;
   if (
     input.responsibilityType ===
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   ) {
-    const teamId = input.teamId.trim();
-    if (!teamId) {
-      return {
-        responsibilityType: input.responsibilityType,
-        responsibleDepartmentId,
-      };
-    }
-    if (input.teamResponsibleDepartmentId?.trim() !== responsibleDepartmentId) {
-      return null;
-    }
     return {
       responsibilityType: input.responsibilityType,
       responsibleDepartmentId,
-      teamId,
     };
   }
-  const supplierId = input.supplierId.trim();
-  return supplierId
-    ? {
-        responsibilityType: input.responsibilityType,
-        responsibleDepartmentId,
-        supplierId,
-      }
-    : null;
+  return null;
 }
 
 type WorkOrderOptionSource = {
@@ -80,17 +85,6 @@ type WorkOrderOptionSource = {
   quantity?: null | number;
   workOrderNumber: string;
 };
-
-const unresolvedTeamReasonLabels: Record<
-  InspectionRequestTeamResolutionReason,
-  string
-> = {
-  AMBIGUOUS_DEPARTMENT_SOURCE: '关联了多个责任部门',
-  CONFLICTING_TEAM_SOURCES: '同时存在内部部门和供应商来源',
-  INACTIVE_DEPARTMENT_SOURCE: '关联责任部门已停用',
-  INVALID_EXTERNAL_SUPPLIER_MAPPING: '外协供应商映射无效',
-  MISSING_RESPONSIBILITY_SOURCE: '未关联内部部门或外协供应商',
-} as const;
 
 type BomPartOptionSource = {
   partId?: null | string;
@@ -128,36 +122,6 @@ export function mapInspectionRequestEntryWorkOrderOptions(
     quantity: item.quantity || 0,
     value: item.workOrderNumber,
   }));
-}
-
-export function mapInspectionRequestEntryTeamOptions(
-  items: InspectionRequestTeamOption[],
-) {
-  const internalOptions = items
-    .filter((item) => item.group === 'internal')
-    .map((item) => ({ label: item.label, value: item.value }));
-  const externalOptions = items
-    .filter((item) => item.group === 'external')
-    .map((item) => ({ label: item.label, value: item.value }));
-  const unresolvedOptions = items
-    .filter((item) => item.group === 'unresolved')
-    .map((item) => {
-      const reason = item.reason
-        ? unresolvedTeamReasonLabels[item.reason]
-        : '责任身份未解析';
-      return {
-        disabled: true,
-        label: `${item.label}（${reason}）`,
-        title: reason,
-        value: item.value,
-      };
-    });
-
-  return [
-    { label: '内部生产车间', options: internalOptions },
-    { label: '外协加工单位', options: externalOptions },
-    { label: '待治理班组（不可选）', options: unresolvedOptions },
-  ].filter((group) => group.options.length > 0);
 }
 
 export function mapInspectionRequestEntryBomPartOptions(
@@ -223,8 +187,6 @@ export function getInspectionRequestEntryCopy(isIncoming: boolean) {
         processLabel: '检验类型',
         shellTitle: '进货检验扫码报检',
         submitSuccessPrefix: '进货检验任务已提交',
-        teamLabel: '供应商/来料单位',
-        teamPlaceholder: '请选择或搜索供应商/来料单位',
       }
     : {
         attachmentLabel: '自检记录',
@@ -236,8 +198,6 @@ export function getInspectionRequestEntryCopy(isIncoming: boolean) {
         processLabel: '工序',
         shellTitle: '扫码报检',
         submitSuccessPrefix: '报检任务已提交',
-        teamLabel: '班组',
-        teamPlaceholder: '请选择或搜索班组/外协单位',
       };
 }
 
@@ -269,11 +229,20 @@ export function buildInspectionRequestEntryRequiredMessage(
   const incomingTypeText = isIncoming ? '进货类型、' : '';
   const stationText = requiresStationSelection ? '台数、' : '';
   const responsibilityText =
+    getInspectionRequestResponsibilityRequiredText(responsibilityType);
+  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${stationText}${responsibilityText}报检人、${copy.attachmentRequiredMessage}`;
+}
+
+function getInspectionRequestResponsibilityRequiredText(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
+  if (
     responsibilityType ===
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
-      ? '责任归属类型、责任部门、'
-      : `责任归属类型、责任部门、${getInspectionRequestResponsibilityUnitCopy(responsibilityType).label}、`;
-  return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${stationText}${responsibilityText}报检人、${copy.attachmentRequiredMessage}`;
+  ) {
+    return '责任归属类型、责任部门、';
+  }
+  return `责任归属类型、${getInspectionRequestResponsibilityUnitCopy(responsibilityType).label}、`;
 }
 
 export function buildIncomingInspectionRequestInfo(input: {

@@ -50,6 +50,13 @@ const drawerWidth = computed(() =>
 function stationSelectionText(request: InspectionRequest) {
   return formatInspectionStationSelection(request.stationSelection);
 }
+
+function requestIdentity(request: InspectionRequest) {
+  if (request.category === 'INCOMING') {
+    return { label: '供应商', value: request.supplierName || '-' };
+  }
+  return { label: '班组', value: request.team || '-' };
+}
 </script>
 
 <template>
@@ -109,9 +116,14 @@ function stationSelectionText(request: InspectionRequest) {
               </div>
             </div>
             <div class="rounded bg-gray-50 px-2 py-2">
-              <div class="text-gray-500">班组</div>
-              <div class="mt-1 truncate font-semibold text-gray-900">
-                {{ props.request.team || '-' }}
+              <div class="text-gray-500" data-testid="request-identity-label">
+                {{ requestIdentity(props.request).label }}
+              </div>
+              <div
+                class="mt-1 truncate font-semibold text-gray-900"
+                data-testid="request-identity-value"
+              >
+                {{ requestIdentity(props.request).value }}
               </div>
             </div>
             <div class="rounded bg-gray-50 px-2 py-2">
@@ -253,7 +265,10 @@ function stationSelectionText(request: InspectionRequest) {
               <div class="mb-1 text-xs text-gray-500">关联不合格项</div>
               <div class="flex flex-wrap items-center gap-2">
                 <Tag :color="props.inspectionResultColor(props.request)">
-                  {{ props.request.linkedIssueNo || '已生成不合格项' }}
+                  {{
+                    props.request.linkedIssueNo ||
+                    'Linked unnumbered inspection issue'
+                  }}
                 </Tag>
                 <Tag
                   :color="

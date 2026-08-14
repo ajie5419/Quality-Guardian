@@ -1,4 +1,5 @@
 import type { inspection_result, Prisma } from '@prisma/client';
+import type { UserSession } from '~/utils/jwt-utils';
 
 import type {
   InspectionItemInput,
@@ -21,7 +22,9 @@ import {
 } from '~/utils/process-resolver';
 
 import { syncInspectionArchiveTask } from './inspection-archive-sync.service';
+import { InspectionIssueCreateService } from './inspection-issue-create.service';
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
+import { parseInspectionIssueCreateBody } from './inspection-issue.schema';
 import { syncInspectionProjectDocuments } from './inspection-project-document-sync.service';
 import {
   InspectionRecordRules,
@@ -60,7 +63,11 @@ export const InspectionRecordCreateService = {
 
     return `${prefix}${String(seq).padStart(3, '0')}`;
   },
-  async create(data: InspectionRecordInput, client?: Prisma.TransactionClient) {
+  async create(
+    data: InspectionRecordInput,
+    client?: Prisma.TransactionClient,
+    userinfo?: UserSession,
+  ) {
     const overallResult = InspectionRecordRules.resolveOverallResult(data);
     const quantitySummary = InspectionRecordRules.normalizeQuantitySummary({
       quantity: data.quantity,
@@ -284,7 +291,13 @@ export const InspectionRecordCreateService = {
             },
             'inspection.created',
           );
-          return inspection;
+          const linkedIssue = await createLinkedIssueForInspection({
+            data,
+            inspection,
+            tx,
+            userinfo,
+          });
+          return linkedIssue ? { ...inspection, linkedIssue } : inspection;
         };
         const inspection = await (client
           ? execute(client)
@@ -305,3 +318,75 @@ export const InspectionRecordCreateService = {
     throw new Error('创建检验记录失败：流水号冲突重试超限');
   },
 };
+
+async function createLinkedIssueForInspection(options: {
+  data: InspectionRecordInput;
+  inspection: Awaited<
+    ReturnType<Prisma.TransactionClient['inspections']['create']>
+  >;
+  tx: Prisma.TransactionClient;
+  userinfo?: UserSession;
+}) {
+  const linkedIssue = options.data.linkedIssue;
+  if (!linkedIssue?.enabled) return null;
+  if (options.inspection.result !== 'FAIL') {
+    throw new BusinessError(
+      'VALIDATION',
+      'A linked inspection issue requires a failed inspection result',
+      400,
+    );
+  }
+  if (!options.userinfo) {
+    throw new BusinessError(
+      'INSPECTION_ISSUE_USER_REQUIRED',
+      'A user session is required to create a linked inspection issue',
+      400,
+    );
+  }
+  if (typeof linkedIssue.generateNcNumber !== 'boolean') {
+    throw new BusinessError(
+      'VALIDATION',
+      'generateNcNumber must be an explicit boolean',
+      400,
+    );
+  }
+  const {
+    enabled: _enabled,
+    generateNcNumber,
+    qualifiedQuantity: _qualifiedQuantity,
+    supplierName: _supplierName,
+    unqualifiedQuantity: _unqualifiedQuantity,
+    ...issueFields
+  } = linkedIssue;
+  const issueBody = parseInspectionIssueCreateBody({
+    ...issueFields,
+    generateNcNumber,
+    inspectionId: options.inspection.id,
+    partName:
+      String(issueFields.partName || '').trim() ||
+      options.inspection.materialName ||
+      options.inspection.partName ||
+      '',
+    processName:
+      String(issueFields.processName || '').trim() ||
+      options.inspection.processName ||
+      '',
+    quantity:
+      issueFields.quantity || options.inspection.unqualifiedQuantity || 1,
+    reportDate:
+      String(issueFields.reportDate || '').trim() ||
+      options.inspection.inspectionDate.toISOString(),
+    reportedBy:
+      String(issueFields.reportedBy || '').trim() ||
+      options.inspection.inspector,
+    sourceType: 'INSPECTION_RECORD',
+    supplierId: options.inspection.supplierId || undefined,
+    workOrderNumber: options.inspection.workOrderNumber,
+  });
+  const issue = await InspectionIssueCreateService.createInTransaction({
+    body: issueBody,
+    tx: options.tx,
+    userinfo: options.userinfo,
+  });
+  return issue.record;
+}

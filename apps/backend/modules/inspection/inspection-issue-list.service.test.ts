@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DeptService } from '~/modules/dept';
 import { InspectionIssueListService } from '~/modules/inspection/inspection-issue-list.service';
 import prisma from '~/utils/prisma';
 
@@ -17,9 +18,11 @@ vi.mock('~/modules/dept/dept-tree', () => ({
   findDeptSubtree: vi.fn().mockReturnValue([]),
 }));
 
-vi.mock('~/modules/dept/dept.service', () => ({
+vi.mock('~/modules/dept', () => ({
   DeptService: {
-    findAll: vi.fn().mockResolvedValue([]),
+    findActiveByNameContains: vi.fn().mockResolvedValue([]),
+    findActiveTree: vi.fn().mockResolvedValue([]),
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -105,6 +108,28 @@ describe('inspectionIssueListService', () => {
 
       expect(result.items).toEqual([]);
       expect(result.total).toBe(0);
+    });
+
+    it('filters by the current active department name before pagination', async () => {
+      (prisma.quality_records.count as any).mockResolvedValue(0);
+      (prisma.quality_records.findMany as any).mockResolvedValue([]);
+      vi.mocked(DeptService.findActiveByNameContains).mockResolvedValue([
+        { businessUnit: null, id: 'dept-quality', name: 'Renamed Quality' },
+      ]);
+
+      await InspectionIssueListService.getIssues({
+        responsibleDepartment: 'Renamed Quality',
+        year: 2024,
+      });
+
+      const where = (prisma.quality_records.findMany as any).mock.calls[0][0]
+        .where;
+      expect(where.AND).toContainEqual({
+        OR: expect.arrayContaining([
+          { responsibleDepartmentId: { in: ['dept-quality'] } },
+        ]),
+      });
+      expect(prisma.quality_records.count).toHaveBeenCalledWith({ where });
     });
 
     it('should apply supplierName filter', async () => {
@@ -391,6 +416,49 @@ describe('inspectionIssueListService', () => {
       expect(result.items[0].title).toBe('');
       expect(result.items[0].claim).toBe('No');
     });
+
+    it('uses the current department name in list rows without mutating snapshots', async () => {
+      (prisma.quality_records.count as any).mockResolvedValue(1);
+      (prisma.quality_records.findMany as any).mockResolvedValue([
+        {
+          id: 'rec-renamed',
+          nonConformanceNumber: 'NC-RENAMED',
+          date: new Date('2024-01-15'),
+          defectType: '',
+          defectSubtype: '',
+          severity: 'Minor',
+          status: 'OPEN',
+          lossAmount: 0,
+          inspector: null,
+          responsibleDepartment: 'Old Quality',
+          responsibleDepartmentId: 'dept-quality',
+          responsibleDepartments: null,
+          responsibleWelder: null,
+          rootCause: null,
+          solution: null,
+          partName: null,
+          description: null,
+          isClaim: false,
+          issuePhoto: null,
+          projectName: null,
+          workOrderNumber: null,
+          supplierName: null,
+          quantity: null,
+          updatedAt: new Date('2024-01-15'),
+          process: null,
+        },
+      ]);
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([['dept-quality', 'Renamed Quality']]),
+      );
+
+      const result = await InspectionIssueListService.getIssues({ year: 2024 });
+
+      expect(result.items[0]?.responsibleDepartment).toBe('Renamed Quality');
+      expect(result.items[0]?.responsibleDepartments).toEqual([
+        'Renamed Quality',
+      ]);
+    });
   });
 
   describe('getIssueById', () => {
@@ -408,6 +476,7 @@ describe('inspectionIssueListService', () => {
         lossAmount: 12,
         inspector: 'inspector',
         responsibleDepartment: 'dept-1',
+        responsibleDepartmentId: 'dept-1',
         responsibleDepartments: null,
         responsibleWelder: null,
         rootCause: 'Cause',
@@ -422,6 +491,9 @@ describe('inspectionIssueListService', () => {
         updatedAt: new Date('2026-07-10'),
         process: { name: 'Welding' },
       });
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([['dept-1', 'Renamed Quality']]),
+      );
 
       const result = await InspectionIssueListService.getIssueById({
         id: 'rec-1',
@@ -445,6 +517,7 @@ describe('inspectionIssueListService', () => {
         id: 'rec-1',
         ncNumber: 'NC-26KJ-001',
         processName: 'Welding',
+        responsibleDepartment: 'Renamed Quality',
       });
     });
 

@@ -22,6 +22,7 @@ import { resolveTaskDispatchCurrentUserId } from '~/modules/task-dispatch/task-d
 import { resolveCanonicalProcessName } from '~/utils/process-resolver';
 
 import { InspectionRecordCreateService } from './inspection-record-create.service';
+import { resolveInspectionTeamDisplay } from './inspection-team-display';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
@@ -140,17 +141,26 @@ export async function generateInspectionRequestNo(
 }
 
 type InspectionRequestMappableRecord = InspectionRequestRecordLike & {
+  category?: null | string;
   process?: null | { name?: null | string };
   processName?: null | string;
+  responsibilityType?: null | string;
+  responsibleDepartment?: null | string;
+  supplierName?: null | string;
+  team?: null | string;
 };
 
 export function mapInspectionRequest<T extends InspectionRequestMappableRecord>(
   record: T,
 ) {
-  return mapInspectionRequestRecordRule({
+  const mapped = mapInspectionRequestRecordRule({
     ...record,
     processName: resolveCanonicalProcessName(record) || '',
   });
+  return {
+    ...mapped,
+    team: resolveInspectionTeamDisplay(record),
+  };
 }
 
 export async function resolveInspectionRequestCurrentUserId(

@@ -47,6 +47,7 @@ vi.mock('~/modules/inspection/inspection-request-close.schema', async () => {
       const map: Record<string, number> = {
         VALIDATION: 400,
         BAD_REQUEST: 400,
+        CONFLICT: 409,
         NOT_FOUND: 404,
         FORBIDDEN: 403,
         INTERNAL: 500,
@@ -134,9 +135,16 @@ vi.mock('~/modules/inspection/inspection-request-close-issue.service', () => ({
   }),
 }));
 
+vi.mock('~/modules/inspection/inspection-request-close-access.service', () => ({
+  ensureCloseRequestAccess: vi.fn(),
+}));
+
 vi.mock(
   '~/modules/inspection/inspection-request-close-effects.service',
   () => ({
+    runClosePostCommitTask: vi
+      .fn()
+      .mockImplementation((_label, task) => task()),
     syncCloseAttachments: vi.fn(),
     syncCloseIssueEffects: vi.fn(),
   }),
@@ -208,7 +216,21 @@ function mockTransaction(updates: Record<string, unknown> = {}) {
   };
   return (prisma.$transaction as any).mockImplementation(async (cb: any) =>
     cb({
+      departments: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'dept-assembly',
+          name: 'Assembly',
+        }),
+      },
       inspections: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'insp-9',
+          responsibilityType: null,
+          responsibleDepartment: null,
+          responsibleDepartmentId: null,
+          supplierId: null,
+          supplierName: null,
+        }),
         findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn().mockResolvedValue({}),
       },
@@ -217,6 +239,11 @@ function mockTransaction(updates: Record<string, unknown> = {}) {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       qms_inspection_requests: {
+        findUnique: vi.fn().mockResolvedValue({
+          linkedIssueId: requestUpdate.linkedIssueId,
+          linkedIssueNo: requestUpdate.linkedIssueNo,
+          linkedIssueStatus: requestUpdate.linkedIssueStatus,
+        }),
         update: vi.fn().mockResolvedValue(requestUpdate),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
@@ -231,7 +258,21 @@ function makeTxMock(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   return {
+    departments: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'dept-assembly',
+        name: 'Assembly',
+      }),
+    },
     inspections: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'insp-9',
+        responsibilityType: null,
+        responsibleDepartment: null,
+        responsibleDepartmentId: null,
+        supplierId: null,
+        supplierName: null,
+      }),
       findMany: vi.fn().mockResolvedValue([]),
       update: vi.fn().mockResolvedValue({}),
     },
@@ -240,6 +281,11 @@ function makeTxMock(overrides: Record<string, unknown> = {}) {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     qms_inspection_requests: {
+      findUnique: vi.fn().mockResolvedValue({
+        linkedIssueId: requestUpdate.linkedIssueId,
+        linkedIssueNo: requestUpdate.linkedIssueNo,
+        linkedIssueStatus: requestUpdate.linkedIssueStatus,
+      }),
       update: vi.fn().mockResolvedValue(requestUpdate),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -251,6 +297,7 @@ const VALID_LINKED_ISSUE = {
   description: 'defect',
   defectSubtype: 'crack',
   defectType: 'surface',
+  generateNcNumber: false,
   partName: 'Bearing',
   photos: [{ name: 'defect.jpg', url: 'http://example.com/defect.jpg' }],
   processName: 'Welding',

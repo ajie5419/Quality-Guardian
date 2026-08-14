@@ -32,8 +32,6 @@ function createRequestForm() {
     selfCheckResult: 'PASS' as InspectionRequestCheckResult,
     stationSelection: null,
     supplierId: 'supplier-stale',
-    team: 'Stale team',
-    teamId: 'team-stale',
     workOrderNumber: '',
     workOrderNumbers: [],
   });
@@ -47,8 +45,6 @@ describe('inspection request entry form state', () => {
       clearResponsibilityIdentity: () => {
         requestForm.responsibleDepartmentId = '';
         requestForm.supplierId = '';
-        requestForm.team = '';
-        requestForm.teamId = '';
       },
       incomingMaterialFreeInputEnabled: ref(false),
       isIncomingEntry: computed(() => true),
@@ -69,7 +65,6 @@ describe('inspection request entry form state', () => {
       responsibilityType: 'SUPPLIER',
       responsibleDepartmentId: '',
       supplierId: '',
-      teamId: '',
       workOrderNumber: 'WO-001',
       workOrderNumbers: ['WO-001'],
     });

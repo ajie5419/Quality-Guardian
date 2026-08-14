@@ -41,7 +41,6 @@ vi.mock('~/modules/inspection/inspection-issue-query.service', () => ({
     getIssueStats: vi.fn(),
     getIssueChartAggregation: vi.fn(),
     buildIssueTrendData: vi.fn(),
-    generateNextNcNumber: vi.fn(),
     deleteRecord: vi.fn(),
   },
 }));
@@ -80,7 +79,6 @@ describe('inspectionCoreService', () => {
     expect(InspectionCoreService.getIssueStats).toBeDefined();
     expect(InspectionCoreService.getIssueChartAggregation).toBeDefined();
     expect(InspectionCoreService.buildIssueTrendData).toBeDefined();
-    expect(InspectionCoreService.generateNextNcNumber).toBeDefined();
     expect(InspectionCoreService.deleteRecord).toBeDefined();
   });
 });

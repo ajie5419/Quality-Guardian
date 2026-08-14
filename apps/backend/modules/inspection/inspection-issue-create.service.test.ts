@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
+import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueCreateService } from '~/modules/inspection/inspection-issue-create.service';
 
@@ -42,6 +43,9 @@ function createTx(
   options: { legacyMax?: number; sequenceStart?: number } = {},
 ): Prisma.TransactionClient {
   let currentValue = options.sequenceStart ?? 40;
+  const legacyMax = options.legacyMax ?? 40;
+  let queryCount = 0;
+  let executeCount = 0;
   return {
     quality_records: {
       create: vi.fn(async ({ data }) => ({
@@ -51,22 +55,15 @@ function createTx(
         lossAmount: 100,
       })),
     },
-    quality_loss_index_jobs: {
-      createMany: vi.fn().mockResolvedValue({ count: 1 }),
-    },
-    sequences: {
-      create: vi.fn(async () => {
-        currentValue = 1;
-        return { currentValue };
-      }),
-      findUnique: vi.fn(async () => ({ currentValue })),
-      updateMany: vi.fn(async ({ data, where }) => {
-        if (where.currentValue !== currentValue) return { count: 0 };
-        currentValue = data.currentValue;
-        return { count: 1 };
-      }),
-    },
-    $queryRaw: vi.fn().mockResolvedValue([{ value: options.legacyMax ?? 40 }]),
+    $executeRaw: vi.fn(async () => {
+      if (executeCount++ === 0)
+        currentValue = Math.max(currentValue, legacyMax);
+      else currentValue++;
+      return 1;
+    }),
+    $queryRaw: vi.fn(async () =>
+      queryCount++ % 2 === 0 ? [{ value: legacyMax }] : [{ currentValue }],
+    ),
   } as unknown as Prisma.TransactionClient;
 }
 
@@ -99,8 +96,8 @@ describe('inspectionIssueCreateService', () => {
       id: 'supplier-1',
       name: 'Supplier A',
     });
-    mocks.buildCreateData.mockImplementation(async (body) => ({
-      nonConformanceNumber: body.ncNumber,
+    mocks.buildCreateData.mockImplementation(async (body, options) => ({
+      nonConformanceNumber: options.nonConformanceNumber,
       partName: body.partName,
       supplierId: body.supplierId ?? null,
     }));
@@ -109,7 +106,11 @@ describe('inspectionIssueCreateService', () => {
   it('creates an internal issue with a server-generated NC number and all transactional projections', async () => {
     const tx = createTx();
     const result = await InspectionIssueCreateService.createInTransaction({
-      body: { ...baseBody, responsibilityType: 'INTERNAL_DEPARTMENT' },
+      body: {
+        ...baseBody,
+        generateNcNumber: true,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+      },
       tx,
       userinfo: { id: 'u-1', username: 'qc' } as never,
     });
@@ -135,27 +136,31 @@ describe('inspectionIssueCreateService', () => {
     );
   });
 
-  it('ignores a client NC number when a trusted internal caller reaches the service', async () => {
-    const result = await InspectionIssueCreateService.createInTransaction({
-      body: {
-        ...baseBody,
-        ncNumber: 'NC-FORGED-001',
-        responsibilityType: 'INTERNAL_DEPARTMENT',
-      },
-      tx: createTx(),
-      userinfo: { id: 'u-1', username: 'qc' } as never,
-    });
-
-    expect(result.ncNumber).toBe('NC-26KJ-041');
-    expect(mocks.buildCreateData).toHaveBeenCalledWith(
-      expect.objectContaining({ ncNumber: 'NC-26KJ-041' }),
-      expect.any(Object),
-    );
+  it('rejects client-provided NC numbers even for internal service callers', async () => {
+    await expect(
+      InspectionIssueCreateService.createInTransaction({
+        body: {
+          ...baseBody,
+          ncNumber: 'NC-FORGED-001',
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+        },
+        tx: createTx(),
+        userinfo: { id: 'u-1', username: 'qc' } as never,
+      }),
+    ).rejects.toThrow('不合格编号由系统生成');
   });
 
-  it.each(['SUPPLIER', 'OUTSOURCING_UNIT'] as const)(
+  it.each([
+    ['SUPPLIER', SUPPLIER_CATEGORY.SUPPLIER],
+    ['OUTSOURCING_UNIT', SUPPLIER_CATEGORY.OUTSOURCING],
+  ] as const)(
     'canonicalizes supplier identity for %s responsibility',
-    async (responsibilityType) => {
+    async (responsibilityType, supplierCategory) => {
+      mocks.resolveSupplier.mockResolvedValueOnce({
+        category: supplierCategory,
+        id: 'supplier-1',
+        name: 'Supplier A',
+      });
       const result = await InspectionIssueCreateService.createInTransaction({
         body: { ...baseBody, responsibilityType, supplierId: 'supplier-1' },
         tx: createTx(),
@@ -213,27 +218,37 @@ describe('inspectionIssueCreateService', () => {
     ).rejects.toThrow(message);
   });
 
-  it('uses distinct atomic sequence values for concurrent issue creates', async () => {
+  it('advances the transactional sequence for each generated issue', async () => {
     const tx = createTx();
-    const [first, second] = await Promise.all([
-      InspectionIssueCreateService.createInTransaction({
-        body: { ...baseBody, responsibilityType: 'INTERNAL_DEPARTMENT' },
-        tx,
-        userinfo: { id: 'u-1', username: 'qc' } as never,
-      }),
-      InspectionIssueCreateService.createInTransaction({
-        body: { ...baseBody, responsibilityType: 'INTERNAL_DEPARTMENT' },
-        tx,
-        userinfo: { id: 'u-1', username: 'qc' } as never,
-      }),
-    ]);
+    const first = await InspectionIssueCreateService.createInTransaction({
+      body: {
+        ...baseBody,
+        generateNcNumber: true,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+      },
+      tx,
+      userinfo: { id: 'u-1', username: 'qc' } as never,
+    });
+    const second = await InspectionIssueCreateService.createInTransaction({
+      body: {
+        ...baseBody,
+        generateNcNumber: true,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+      },
+      tx,
+      userinfo: { id: 'u-1', username: 'qc' } as never,
+    });
 
     expect(new Set([first.ncNumber, second.ncNumber]).size).toBe(2);
   });
 
   it('bootstraps from a four-digit legacy number using its numeric suffix', async () => {
     const result = await InspectionIssueCreateService.createInTransaction({
-      body: { ...baseBody, responsibilityType: 'INTERNAL_DEPARTMENT' },
+      body: {
+        ...baseBody,
+        generateNcNumber: true,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+      },
       tx: createTx({ legacyMax: 1000, sequenceStart: 0 }),
       userinfo: { id: 'u-1', username: 'qc' } as never,
     });
@@ -241,50 +256,27 @@ describe('inspectionIssueCreateService', () => {
     expect(result.ncNumber).toBe('NC-26KJ-1001');
   });
 
-  it('retries the CAS loop when the sequence row moved concurrently', async () => {
-    let currentValue = 40;
-    const updateMany = vi
-      .fn()
-      .mockImplementationOnce(async () => {
-        // Simulate a concurrent winner advancing 40 -> 41 before this CAS.
-        currentValue = 41;
-        return { count: 0 };
-      })
-      .mockImplementationOnce(
-        async ({ data }: { data: { currentValue: number } }) => {
-          currentValue = data.currentValue;
-          return { count: 1 };
-        },
-      );
-    const tx = {
-      quality_records: {
-        create: vi.fn(
-          async ({ data }: { data: { nonConformanceNumber: string } }) => ({
-            id: 'issue-1',
-            nonConformanceNumber: data.nonConformanceNumber,
-            supplierId: null,
-            lossAmount: 100,
-          }),
-        ),
-      },
-      quality_loss_index_jobs: {
-        createMany: vi.fn().mockResolvedValue({ count: 1 }),
-      },
-      sequences: {
-        create: vi.fn(),
-        findUnique: vi.fn(async () => ({ currentValue })),
-        updateMany,
-      },
-      $queryRaw: vi.fn().mockResolvedValue([{ value: 40 }]),
-    } as unknown as Prisma.TransactionClient;
-
+  it('does not allocate a formal number when generation is disabled', async () => {
     const result = await InspectionIssueCreateService.createInTransaction({
       body: { ...baseBody, responsibilityType: 'INTERNAL_DEPARTMENT' },
-      tx,
+      tx: createTx(),
       userinfo: { id: 'u-1', username: 'qc' } as never,
     });
 
-    expect(result.ncNumber).toBe('NC-26KJ-042');
-    expect(updateMany).toHaveBeenCalledTimes(2);
+    expect(result.ncNumber).toBeNull();
+  });
+
+  it('starts a new year at formal number 001', async () => {
+    const result = await InspectionIssueCreateService.createInTransaction({
+      body: {
+        ...baseBody,
+        generateNcNumber: true,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+      },
+      tx: createTx({ legacyMax: 0, sequenceStart: 0 }),
+      userinfo: { id: 'u-1', username: 'qc' } as never,
+    });
+
+    expect(result.ncNumber).toBe('NC-26KJ-001');
   });
 });

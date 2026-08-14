@@ -79,6 +79,15 @@ export interface InspectionRequestStats {
   todaySubmittedProcessCount: number;
 }
 
+/**
+ * V2 delegates conditional responsibility fields to the server schema: PROCESS
+ * outsourcing omits its server-resolved department while other types require it.
+ */
+type CreateInspectionRequestV2Params = Omit<
+  CreateInspectionRequestParams,
+  'responsibleDepartmentId'
+> & { responsibleDepartmentId?: string };
+
 export async function getInspectionRequests(params?: {
   current?: boolean;
   includeClosed?: boolean;
@@ -122,7 +131,7 @@ export async function getInspectionRequest(id: string) {
 }
 
 export async function createInspectionRequest(
-  data: CreateInspectionRequestParams,
+  data: CreateInspectionRequestV2Params,
 ) {
   return requestClient.post<InspectionRequest>(
     QMS_API.INSPECTION_REQUESTS_V2,
@@ -131,7 +140,7 @@ export async function createInspectionRequest(
 }
 
 export async function createPublicInspectionRequest(
-  data: CreateInspectionRequestParams,
+  data: CreateInspectionRequestV2Params,
 ) {
   return publicRequestClient.post<InspectionRequest>(
     QMS_API.PUBLIC_INSPECTION_REQUESTS_V2,

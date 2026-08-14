@@ -15,6 +15,12 @@ vi.mock('~/modules/data-scope/data-scope.service', () => ({
   },
 }));
 
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 vi.mock('~/utils/canonical-master-data', async () => {
   const actual = await vi.importActual<
     typeof import('~/utils/canonical-master-data')
@@ -130,9 +136,7 @@ describe('after-sales-chart-aggregation.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
-    const { MasterDataGovernanceKernel } = await import(
-      '~/utils/canonical-master-data'
-    );
+    const { DeptService } = await import('~/modules/dept');
 
     (prisma.after_sales.groupBy as any).mockResolvedValue([
       {
@@ -144,9 +148,7 @@ describe('after-sales-chart-aggregation.service', () => {
         _sum: { materialCost: 20, laborTravelCost: 5 },
       },
     ]);
-    vi.mocked(
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
-    ).mockResolvedValue(
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
       new Map([
         ['dept-1', 'Quality'],
         ['dept-2', 'Service'],

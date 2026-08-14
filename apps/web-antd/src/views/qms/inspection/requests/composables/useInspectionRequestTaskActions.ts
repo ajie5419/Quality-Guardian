@@ -44,6 +44,7 @@ type LinkedIssueDraftState = {
   description: string;
   division: string;
   divisionId: string;
+  generateNcNumber: boolean;
   lossAmount: number;
   ncNumber: string;
   partName: string;
@@ -63,13 +64,6 @@ type LinkedIssueDraftState = {
   supplierId: string;
   supplierName: string;
   unqualifiedQuantity: number;
-};
-
-type CompleteIssueResponsibility = Omit<
-  NonNullable<InspectionRequest['issueResponsibility']>,
-  'responsibleDepartmentId'
-> & {
-  responsibleDepartmentId: string;
 };
 
 type DivisionIdentitySource = {
@@ -158,6 +152,7 @@ export function useInspectionRequestTaskActions(
     description: '',
     division: '',
     divisionId: '',
+    generateNcNumber: false,
     lossAmount: 0,
     ncNumber: '',
     partName: '',
@@ -195,6 +190,15 @@ export function useInspectionRequestTaskActions(
     const parsed = Number(value);
     if (!Number.isFinite(parsed)) return fallback;
     return Math.max(1, Math.trunc(parsed));
+  }
+
+  function omitExternalResponsibleDepartment<
+    T extends { responsibleDepartmentId: string },
+  >(payload: T, isExternal: boolean) {
+    if (!isExternal) return payload;
+    const { responsibleDepartmentId: _responsibleDepartmentId, ...rest } =
+      payload;
+    return rest;
   }
 
   function syncLinkedIssueQuantities(unqualifiedValue?: unknown) {
@@ -244,8 +248,13 @@ export function useInspectionRequestTaskActions(
     const requiredFields = [
       [linkedIssueDraft.value.partName, '部件名称'],
       [linkedIssueDraft.value.processName, '工序'],
-      [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
-      [linkedIssueDraft.value.responsibleDepartmentId, '责任部门'],
+      ...(linkedIssueDraft.value.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+        ? []
+        : [
+            [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
+            [linkedIssueDraft.value.responsibleDepartmentId, '责任部门'],
+          ]),
       [linkedIssueDraft.value.defectCategoryId, '缺陷分类'],
       [linkedIssueDraft.value.defectSubcategoryId, '二级分类'],
       [linkedIssueDraft.value.severity, '严重程度'],
@@ -416,46 +425,31 @@ export function useInspectionRequestTaskActions(
     });
   }
 
-  function hasCompleteIssueResponsibility(
+  function hasCompletePersistedResponsibility(
     request: InspectionRequest,
   ): request is InspectionRequest & {
-    issueResponsibility: CompleteIssueResponsibility;
+    responsibilityType: InspectionIssueResponsibilityType;
+    responsibleDepartmentId: string;
   } {
-    const responsibility = request.issueResponsibility;
-    if (
-      !responsibility ||
-      !normalizeCloseText(responsibility.responsibleDepartmentId)
-    ) {
+    const responsibilityType = request.responsibilityType;
+    if (!responsibilityType) {
       return false;
     }
-    return (
-      !isExternalInspectionIssueResponsibility(
-        responsibility.responsibilityType,
-      ) || !!normalizeCloseText(responsibility.supplierId)
-    );
-  }
-
-  function hasEmptyIssueResponsibilityContext(request: InspectionRequest) {
-    return ![
-      request.responsibilityType,
-      request.responsibleDepartment,
-      request.responsibleDepartmentId,
-    ].some((value) => normalizeCloseText(value));
+    if (!normalizeCloseText(request.responsibleDepartmentId)) return false;
+    if (isExternalInspectionIssueResponsibility(responsibilityType)) {
+      return !!normalizeCloseText(request.supplierId);
+    }
+    return !normalizeCloseText(request.supplierId);
   }
 
   async function resolveCloseRequest(
     record: InspectionRequest,
   ): Promise<InspectionRequest | null> {
-    if (hasCompleteIssueResponsibility(record)) return record;
+    if (hasCompletePersistedResponsibility(record)) return record;
     try {
       const refreshed = await getInspectionRequest(record.id);
-      if (refreshed && hasCompleteIssueResponsibility(refreshed)) {
-        return refreshed;
-      }
-      if (refreshed && hasEmptyIssueResponsibilityContext(refreshed)) {
-        return refreshed;
-      }
-      message.warning('报检任务责任上下文不完整，无法关闭');
+      if (refreshed) return refreshed;
+      message.warning('无法获取报检任务责任上下文，暂不能关闭');
     } catch (error: unknown) {
       handleApiError(error, 'Load Inspection Request Responsibility');
       message.warning('无法获取报检任务责任上下文，暂不能关闭');
@@ -477,6 +471,12 @@ export function useInspectionRequestTaskActions(
     closeForm.quantity = request.quantity || 1;
     closeForm.result = 'PASS';
 
+    const responsibilityType =
+      request.responsibilityType ||
+      issueResponsibility?.responsibilityType ||
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+    const isExternal =
+      isExternalInspectionIssueResponsibility(responsibilityType);
     linkedIssueDraft.value = {
       claim: DEFAULT_VALUES.DEFAULT_CLAIM,
       defectCategoryId: '',
@@ -484,6 +484,7 @@ export function useInspectionRequestTaskActions(
       description: '',
       division: '',
       divisionId: '',
+      generateNcNumber: false,
       lossAmount: 0,
       ncNumber: '',
       partName: request.componentName || request.partName || '',
@@ -491,18 +492,29 @@ export function useInspectionRequestTaskActions(
       qualifiedQuantity: 0,
       reportDate: dayjs().format('YYYY-MM-DD'),
       reportedBy: request.inspectorName || getCurrentUserName() || '',
-      responsibilityType:
-        issueResponsibility?.responsibilityType ||
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
-      responsibleDepartment: issueResponsibility?.responsibleDepartment || '',
-      responsibleDepartmentId:
-        issueResponsibility?.responsibleDepartmentId || '',
+      responsibilityType,
+      responsibleDepartment: isExternal
+        ? ''
+        : request.responsibleDepartment ||
+          issueResponsibility?.responsibleDepartment ||
+          '',
+      responsibleDepartmentId: isExternal
+        ? ''
+        : request.responsibleDepartmentId ||
+          issueResponsibility?.responsibleDepartmentId ||
+          '',
       responsibleWelder: '',
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierId: issueResponsibility?.supplierId || '',
-      supplierName: issueResponsibility?.supplierName || '',
+      supplierId:
+        (request.responsibilityType ? request.supplierId : '') ||
+        issueResponsibility?.supplierId ||
+        '',
+      supplierName:
+        (request.responsibilityType ? request.supplierName : '') ||
+        issueResponsibility?.supplierName ||
+        '',
       photos: [] as UploadFileWithResponse[],
       unqualifiedQuantity: request.quantity || 1,
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
@@ -523,16 +535,49 @@ export function useInspectionRequestTaskActions(
     if (!currentRequest.value) return;
     if (!validateCloseForm()) return;
 
+    const requiresResponsibilityDecision = !hasCompletePersistedResponsibility(
+      currentRequest.value,
+    );
+    const responsibilityType = linkedIssueDraft.value.responsibilityType;
+    const isExternal =
+      isExternalInspectionIssueResponsibility(responsibilityType);
+    const selectedResponsibility = {
+      responsibilityType,
+      responsibleDepartmentId: isExternal
+        ? ''
+        : normalizeCloseText(linkedIssueDraft.value.responsibleDepartmentId),
+      supplierId: isExternalInspectionIssueResponsibility(responsibilityType)
+        ? normalizeCloseText(linkedIssueDraft.value.supplierId)
+        : '',
+    };
+    if (
+      requiresResponsibilityDecision &&
+      ((!isExternal && !selectedResponsibility.responsibleDepartmentId) ||
+        (isExternalInspectionIssueResponsibility(
+          selectedResponsibility.responsibilityType,
+        ) &&
+          !selectedResponsibility.supplierId))
+    ) {
+      message.warning('请补全历史报检任务的责任归属信息');
+      return;
+    }
+
     submitting.value = true;
     try {
       syncLinkedIssueQuantities();
       const payloadLinkedIssue = shouldCreateLinkedIssue.value
-        ? buildInspectionIssuePayload({
-            ...linkedIssueDraft.value,
-            photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
-            quantity: linkedIssueDraft.value.unqualifiedQuantity,
-            responsibilityType: linkedIssueDraft.value.responsibilityType,
-          })
+        ? omitExternalResponsibleDepartment(
+            buildInspectionIssuePayload({
+              ...linkedIssueDraft.value,
+              photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
+              quantity: linkedIssueDraft.value.unqualifiedQuantity,
+              responsibilityType: selectedResponsibility.responsibilityType,
+              responsibleDepartmentId:
+                selectedResponsibility.responsibleDepartmentId,
+              supplierId: selectedResponsibility.supplierId || undefined,
+            }),
+            isExternal,
+          )
         : undefined;
 
       await closeInspectionRequest(currentRequest.value.id, {
@@ -544,6 +589,18 @@ export function useInspectionRequestTaskActions(
         inspectionId: closeForm.inspectionId || undefined,
         inspector: closeForm.inspector,
         linkedIssue: payloadLinkedIssue,
+        responsibility: requiresResponsibilityDecision
+          ? {
+              responsibilityType: selectedResponsibility.responsibilityType,
+              ...(isExternal
+                ? {}
+                : {
+                    responsibleDepartmentId:
+                      selectedResponsibility.responsibleDepartmentId,
+                  }),
+              supplierId: selectedResponsibility.supplierId || undefined,
+            }
+          : undefined,
         qualifiedQuantity: shouldCreateLinkedIssue.value
           ? linkedIssueDraft.value.qualifiedQuantity
           : closeForm.quantity,

@@ -17,7 +17,9 @@ export const InspectionRequestResponsibilityOptionsService = {
       options.responsibilityType,
     );
     const [departments, suppliers] = await Promise.all([
-      DeptService.listActiveOptions(keyword),
+      options.responsibilityType === 'OUTSOURCING_UNIT'
+        ? Promise.resolve([])
+        : DeptService.listActiveOptions(keyword),
       supplierCategory
         ? SupplierService.listActiveOptions({
             category: supplierCategory,

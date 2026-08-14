@@ -5,12 +5,25 @@ import {
   buildInspectionRequestEntryRequiredMessage,
   buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
+  getInspectionRequestResponsibilityTypeOptions,
   getInspectionRequestResponsibilityUnitCopy,
   mapInspectionRequestEntryBomPartOptions,
-  mapInspectionRequestEntryTeamOptions,
 } from './entry-mode';
 
 describe('inspection request entry identity options', () => {
+  it('uses category-specific responsibility choices', () => {
+    expect(
+      getInspectionRequestResponsibilityTypeOptions(false).map(
+        (item) => item.value,
+      ),
+    ).toEqual(['INTERNAL_DEPARTMENT', 'OUTSOURCING_UNIT']);
+    expect(
+      getInspectionRequestResponsibilityTypeOptions(true).map(
+        (item) => item.value,
+      ),
+    ).toEqual(['SUPPLIER', 'OUTSOURCING_UNIT']);
+  });
+
   it.each([
     [
       'internal',
@@ -18,13 +31,10 @@ describe('inspection request entry identity options', () => {
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-assembly',
         supplierId: 'supplier-stale',
-        teamId: 'team-assembly',
-        teamResponsibleDepartmentId: 'dept-assembly',
       },
       {
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-assembly',
-        teamId: 'team-assembly',
       },
     ],
     [
@@ -33,11 +43,9 @@ describe('inspection request entry identity options', () => {
         responsibilityType: 'SUPPLIER',
         responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
-        teamId: 'team-stale',
       },
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
     ],
@@ -47,11 +55,9 @@ describe('inspection request entry identity options', () => {
         responsibilityType: 'OUTSOURCING_UNIT',
         responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-b',
-        teamId: 'team-stale',
       },
       {
         responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-b',
       },
     ],
@@ -70,11 +76,23 @@ describe('inspection request entry identity options', () => {
         responsibilityType: 'INTERNAL_DEPARTMENT',
         responsibleDepartmentId: 'dept-structure',
         supplierId: '',
-        teamId: '',
       }),
     ).toEqual({
       responsibilityType: 'INTERNAL_DEPARTMENT',
       responsibleDepartmentId: 'dept-structure',
+    });
+  });
+
+  it('submits outsourcing without a client department ID', () => {
+    expect(
+      buildInspectionRequestEntryResponsibilityPayload({
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: '',
+        supplierId: 'supplier-outsourcing',
+      }),
+    ).toEqual({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      supplierId: 'supplier-outsourcing',
     });
   });
 
@@ -91,8 +109,6 @@ describe('inspection request entry identity options', () => {
           processLabel: '工序',
           shellTitle: '扫码报检',
           submitSuccessPrefix: '报检任务已提交',
-          teamLabel: '班组',
-          teamPlaceholder: '请选择班组',
         },
         false,
         false,
@@ -100,36 +116,6 @@ describe('inspection request entry identity options', () => {
         'INTERNAL_DEPARTMENT',
       ),
     ).not.toContain('班组');
-  });
-
-  it('rejects an execution TEAM assigned to a different department', () => {
-    expect(
-      buildInspectionRequestEntryResponsibilityPayload({
-        responsibilityType: 'INTERNAL_DEPARTMENT',
-        responsibleDepartmentId: 'dept-structure',
-        supplierId: '',
-        teamId: 'team-assembly',
-        teamResponsibleDepartmentId: 'dept-assembly',
-      }),
-    ).toBeNull();
-  });
-
-  it('keeps canonical TEAM IDs as selector values', () => {
-    expect(
-      mapInspectionRequestEntryTeamOptions([
-        { group: 'internal', label: 'Internal Team', value: 'team-1' },
-        { group: 'external', label: 'Resident Team', value: 'team-2' },
-      ]),
-    ).toEqual([
-      {
-        label: '内部生产车间',
-        options: [{ label: 'Internal Team', value: 'team-1' }],
-      },
-      {
-        label: '外协加工单位',
-        options: [{ label: 'Resident Team', value: 'team-2' }],
-      },
-    ]);
   });
 
   it.each([
@@ -144,31 +130,6 @@ describe('inspection request entry identity options', () => {
       });
     },
   );
-
-  it('retains unresolved TEAMs as disabled options with their canonical IDs and reasons', () => {
-    expect(
-      mapInspectionRequestEntryTeamOptions([
-        {
-          group: 'unresolved',
-          label: 'Conflicted Team',
-          reason: 'CONFLICTING_TEAM_SOURCES',
-          value: 'team-conflicted',
-        },
-      ]),
-    ).toEqual([
-      {
-        label: '待治理班组（不可选）',
-        options: [
-          {
-            disabled: true,
-            label: 'Conflicted Team（同时存在内部部门和供应商来源）',
-            title: '同时存在内部部门和供应商来源',
-            value: 'team-conflicted',
-          },
-        ],
-      },
-    ]);
-  });
 
   it('uses canonical part IDs instead of names or BOM row IDs', () => {
     expect(

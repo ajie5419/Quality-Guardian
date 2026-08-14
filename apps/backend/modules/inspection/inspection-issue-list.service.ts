@@ -11,8 +11,8 @@ import {
   normalizeInspectionIssueResponsibilityType,
   tryParsePhotos,
 } from '@qgs/shared';
+import { DeptService } from '~/modules/dept';
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
-import { DeptService } from '~/modules/dept/dept.service';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
 import { resolveCanonicalClassificationName } from '~/utils/classification-resolver';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
@@ -109,25 +109,45 @@ function normalizeQualityRecordStatusFilter(
   return Array.isArray(value) ? { in: values } : values[0];
 }
 
-function getResponsibleDepartmentsForResponse(issue: {
-  responsibleDepartment: null | string;
-  responsibleDepartments: null | string;
-}): string[] {
+function getResponsibleDepartmentsForResponse(
+  issue: {
+    responsibleDepartment: null | string;
+    responsibleDepartments: null | string;
+  },
+  currentResponsibleDepartmentName?: null | string,
+): string[] {
   const responsibleDepartments = parseResponsibleDepartments(
     issue.responsibleDepartments,
   );
+  const snapshotResponsibleDepartment = String(
+    issue.responsibleDepartment || '',
+  ).trim();
+  if (currentResponsibleDepartmentName) {
+    const remainingDepartments = responsibleDepartments.includes(
+      snapshotResponsibleDepartment,
+    )
+      ? responsibleDepartments.filter(
+          (department) => department !== snapshotResponsibleDepartment,
+        )
+      : responsibleDepartments.slice(1);
+    return [currentResponsibleDepartmentName, ...remainingDepartments];
+  }
   if (responsibleDepartments.length > 0) {
     return responsibleDepartments;
   }
-  return issue.responsibleDepartment ? [issue.responsibleDepartment] : [];
+  return snapshotResponsibleDepartment ? [snapshotResponsibleDepartment] : [];
 }
 
 export function mapInspectionIssueRecord(
   issue: InspectionIssueRecord,
+  currentResponsibleDepartmentName?: null | string,
 ): InspectionIssue {
   const photos = tryParsePhotos(issue.issuePhoto as string);
   const canonicalProcessName = resolveCanonicalProcessNameByRelation(issue);
-  const responsibleDepartments = getResponsibleDepartmentsForResponse(issue);
+  const responsibleDepartments = getResponsibleDepartmentsForResponse(
+    issue,
+    currentResponsibleDepartmentName,
+  );
 
   return {
     ...issue,
@@ -142,7 +162,7 @@ export function mapInspectionIssueRecord(
         issue.defectSubtype,
       ) || '',
     inspectionId: issue.inspectionId || undefined,
-    ncNumber: issue.nonConformanceNumber || '',
+    ncNumber: issue.nonConformanceNumber,
     reportDate: formatDate(issue.date),
     date: formatDate(issue.date),
     claim: issue.isClaim ? 'Yes' : 'No',
@@ -151,7 +171,8 @@ export function mapInspectionIssueRecord(
     severity: (issue.severity as 'Critical' | 'Major' | 'Minor') || 'Minor',
     status: issue.status as InspectionIssueStatusEnum,
     lossAmount: Number(issue.lossAmount) || 0,
-    responsibleDepartment: issue.responsibleDepartment || '',
+    responsibleDepartment:
+      currentResponsibleDepartmentName || issue.responsibleDepartment || '',
     responsibleDepartmentId: issue.responsibleDepartmentId || null,
     responsibilityType: normalizeInspectionIssueResponsibilityType(
       issue.responsibilityType,
@@ -186,7 +207,14 @@ export const InspectionIssueListService = {
       where,
       include: inspectionIssueInclude,
     });
-    return issue ? mapInspectionIssueRecord(issue) : null;
+    if (!issue) return null;
+    const departmentNames = await DeptService.resolveActiveNamesByIds([
+      issue.responsibleDepartmentId,
+    ]);
+    return mapInspectionIssueRecord(
+      issue,
+      departmentNames.get(issue.responsibleDepartmentId || '') || null,
+    );
   },
 
   async findSupplierIssues(params: {
@@ -210,8 +238,16 @@ export const InspectionIssueListService = {
       }),
     ]);
 
+    const departmentNames = await DeptService.resolveActiveNamesByIds(
+      issues.map((issue) => issue.responsibleDepartmentId),
+    );
     return {
-      items: issues.map((issue) => mapInspectionIssueRecord(issue)),
+      items: issues.map((issue) =>
+        mapInspectionIssueRecord(
+          issue,
+          departmentNames.get(issue.responsibleDepartmentId || '') || null,
+        ),
+      ),
       total,
     };
   },
@@ -295,7 +331,6 @@ export const InspectionIssueListService = {
     }
 
     if (params.responsibleDepartment) {
-      const deptTree = await DeptService.findAll().catch(() => []);
       const searchTerms = (
         Array.isArray(params.responsibleDepartment)
           ? params.responsibleDepartment
@@ -303,6 +338,10 @@ export const InspectionIssueListService = {
       )
         .map((item) => String(item || '').trim())
         .filter(Boolean);
+      const [deptTree, currentDepartments] = await Promise.all([
+        DeptService.findActiveTree(),
+        DeptService.findActiveByNameContains(searchTerms),
+      ]);
 
       const matchedDeptIds = new Set<string>();
       const matchedDeptNames = new Set<string>();
@@ -320,6 +359,11 @@ export const InspectionIssueListService = {
         if (nodeName) matchedDeptNames.add(nodeName);
       }
 
+      for (const department of currentDepartments) {
+        matchedDeptIds.add(department.id);
+        matchedDeptNames.add(department.name);
+      }
+
       const exactCandidates = [
         ...new Set([...matchedDeptIds, ...matchedDeptNames, ...searchTerms]),
       ];
@@ -335,6 +379,9 @@ export const InspectionIssueListService = {
       const responsibleDepartmentConditions = [
         ...(exactCandidates.length > 0
           ? [{ responsibleDepartment: { in: exactCandidates } }]
+          : []),
+        ...(matchedDeptIds.size > 0
+          ? [{ responsibleDepartmentId: { in: [...matchedDeptIds] } }]
           : []),
         ...fuzzyConditions,
       ];
@@ -373,7 +420,15 @@ export const InspectionIssueListService = {
       }),
     ]);
 
-    const items = issues.map((issue) => mapInspectionIssueRecord(issue));
+    const departmentNames = await DeptService.resolveActiveNamesByIds(
+      issues.map((issue) => issue.responsibleDepartmentId),
+    );
+    const items = issues.map((issue) =>
+      mapInspectionIssueRecord(
+        issue,
+        departmentNames.get(issue.responsibleDepartmentId || '') || null,
+      ),
+    );
 
     return { items, total };
   },

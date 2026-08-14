@@ -26,8 +26,10 @@ import { useQualityClassificationOptions } from '../../../shared/composables/use
 import { useAiAnalysis } from '../composables/useAiAnalysis';
 import {
   getIssueFormSchemaWithStatusOptions,
+  ISSUE_RESPONSIBILITY_TYPE_OPTIONS,
   isWeldingDefectSubcategory,
   isWeldingProcessName,
+  RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
 } from './issueFormData';
 import { isExternalInspectionIssueResponsibility } from './issueFormPayload';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
@@ -46,8 +48,13 @@ interface Props {
   deptTreeData: DeptTreeLikeNode[];
   mode?: IssueFormMode;
   isEditMode?: boolean;
+  hideResponsibilityDepartment?: boolean;
   processOptions?: Array<{ label: string; value: string }>;
   responsibilityType?: InspectionIssueResponsibilityType;
+  responsibilityTypeOptions?: Array<{
+    label: string;
+    value: InspectionIssueResponsibilityType;
+  }>;
   statusOptions?: StatusOption[];
 }
 
@@ -56,8 +63,10 @@ defineOptions({ name: 'IssueFormFields' });
 const props = withDefaults(defineProps<Props>(), {
   mode: 'standalone',
   isEditMode: false,
+  hideResponsibilityDepartment: false,
   processOptions: () => [],
   responsibilityType: undefined,
+  responsibilityTypeOptions: () => [...ISSUE_RESPONSIBILITY_TYPE_OPTIONS],
   statusOptions: () => [],
 });
 
@@ -75,6 +84,7 @@ type IssueFormValues = Partial<{
   defectSubcategoryId: string;
   description: string;
   division: string;
+  generateNcNumber: boolean;
   inspector: string;
   ncNumber: string;
   partName: string;
@@ -149,6 +159,48 @@ function isTestWelderRecord(params: { code?: string; name?: string }) {
   );
 }
 
+function buildFormSchema() {
+  const isResponsibilityLocked = !!props.responsibilityType;
+  return getIssueFormSchemaWithStatusOptions(
+    props.statusOptions,
+    props.processOptions,
+    [],
+    props.isEditMode,
+    props.responsibilityTypeOptions,
+  ).map((field) => {
+    const isResponsibilityField = [
+      'responsibilityType',
+      'responsibleDepartmentId',
+      'supplierId',
+    ].includes(field.fieldName);
+    if (!isResponsibilityField) return field;
+
+    return {
+      ...field,
+      ...(field.fieldName === 'responsibleDepartmentId' &&
+      props.hideResponsibilityDepartment
+        ? {
+            dependencies: {
+              triggerFields: ['responsibilityType'],
+              show: () => false,
+            },
+            rules: undefined,
+          }
+        : {}),
+      componentProps: {
+        ...field.componentProps,
+        ...(field.fieldName === 'responsibleDepartmentId'
+          ? {
+              ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+              treeData: props.deptTreeData,
+            }
+          : {}),
+        disabled: isResponsibilityLocked,
+      },
+    };
+  });
+}
+
 const [Form, formApi] = useVbenForm({
   commonConfig: {
     labelWidth: 100,
@@ -162,10 +214,7 @@ const [Form, formApi] = useVbenForm({
     formValues.value = vals as IssueFormValues;
     emit('valuesChange', vals as Record<string, unknown>);
   },
-  schema: getIssueFormSchemaWithStatusOptions(
-    props.statusOptions,
-    props.processOptions,
-  ),
+  schema: buildFormSchema(),
   showDefaultActions: false,
 });
 
@@ -176,6 +225,14 @@ const resolvedResponsibilityType = computed(() => {
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   );
 });
+
+function isAllowedResponsibilityType(
+  value: InspectionIssueResponsibilityType | undefined,
+) {
+  return props.responsibilityTypeOptions.some(
+    (option) => option.value === value,
+  );
+}
 
 const targetUnitCategory = computed(() => {
   return resolvedResponsibilityType.value ===
@@ -190,18 +247,21 @@ const shouldShowSupplier = computed(() => {
   );
 });
 
-watch(
-  () => props.deptTreeData,
-  (data) => {
-    formApi.updateSchema([
-      {
-        fieldName: 'responsibleDepartmentId',
-        componentProps: { treeData: data },
+function syncDepartmentTreeSchema(data: DeptTreeLikeNode[]) {
+  formApi.updateSchema([
+    {
+      fieldName: 'responsibleDepartmentId',
+      componentProps: {
+        ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+        treeData: data,
       },
-    ]);
-  },
-  { immediate: true },
-);
+    },
+  ]);
+}
+
+watch(() => props.deptTreeData, syncDepartmentTreeSchema, {
+  immediate: true,
+});
 
 watch(
   shouldShowSupplier,
@@ -239,6 +299,41 @@ watch(
     ]);
     if (responsibilityType) {
       formApi.setFieldValue('responsibilityType', responsibilityType);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.hideResponsibilityDepartment,
+  (hideResponsibilityDepartment) => {
+    formApi.setState({ schema: buildFormSchema() });
+    if (hideResponsibilityDepartment) {
+      formApi.setFieldValue('responsibleDepartmentId', undefined);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.responsibilityTypeOptions,
+  (options) => {
+    formApi.updateSchema([
+      {
+        fieldName: 'responsibilityType',
+        componentProps: { allowClear: false, options },
+      },
+    ]);
+    if (
+      !props.responsibilityType &&
+      !isAllowedResponsibilityType(formValues.value.responsibilityType)
+    ) {
+      formApi.setFieldValue(
+        'responsibilityType',
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+      );
+      formApi.setFieldValue('supplierId', undefined);
+      formApi.setFieldValue('supplierName', '');
     }
   },
   { immediate: true },
@@ -283,6 +378,16 @@ watch(
         },
       },
     ]);
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.isEditMode,
+  () => {
+    formApi.setState({
+      schema: buildFormSchema(),
+    });
   },
   { immediate: true },
 );
@@ -464,7 +569,7 @@ defineExpose({
         <span
           class="ant-input ant-input-disabled inline-block w-full rounded border bg-gray-50 px-2 py-1"
         >
-          {{ modelValue || '提交后自动生成' }}
+          {{ modelValue || 'Unnumbered' }}
         </span>
       </template>
 

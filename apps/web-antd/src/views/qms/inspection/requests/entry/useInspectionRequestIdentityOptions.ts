@@ -2,25 +2,22 @@ import type {
   InspectionIssueResponsibilityType,
   InspectionRequestResponsibilityDepartmentOption,
   InspectionRequestResponsibilitySupplierOption,
-  InspectionRequestTeamOption,
 } from '@qgs/shared';
 
 import { ref } from 'vue';
 
-import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
-
 import {
-  getPublicInspectionRequestResponsibilityOptions,
-  getPublicInspectionRequestTeams,
-} from '#/api/qms/inspection-request';
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  resolveInspectionRequestResponsibilityDepartmentDefault,
+} from '@qgs/shared';
+
+import { getPublicInspectionRequestResponsibilityOptions } from '#/api/qms/inspection-request';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 interface InspectionRequestIdentityForm {
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartmentId: string;
   supplierId: string;
-  team: string;
-  teamId: string;
 }
 
 function isExternalResponsibility(
@@ -49,13 +46,10 @@ export function useInspectionRequestIdentityOptions(options: {
   const supplierOptions = ref<InspectionRequestResponsibilitySupplierOption[]>(
     [],
   );
-  const internalTeamOptions = ref<InspectionRequestTeamOption[]>([]);
 
   function clearResponsibilityIdentity() {
     requestForm.responsibleDepartmentId = '';
     requestForm.supplierId = '';
-    requestForm.team = '';
-    requestForm.teamId = '';
   }
 
   function preserveSelectedOption<T extends { value: string }>(options: {
@@ -72,45 +66,52 @@ export function useInspectionRequestIdentityOptions(options: {
   }
 
   function applyResponsibilityOptions(
-    options: {
+    response: {
       departments: InspectionRequestResponsibilityDepartmentOption[];
       responsibilityType: InspectionIssueResponsibilityType;
       suppliers: InspectionRequestResponsibilitySupplierOption[];
     },
     preserveSelection = false,
   ) {
-    const isExternal = isExternalResponsibility(options.responsibilityType);
+    const isExternal = isExternalResponsibility(response.responsibilityType);
     responsibilityDepartmentOptions.value = preserveSelection
       ? preserveSelectedOption({
           currentId: requestForm.responsibleDepartmentId,
-          next: options.departments,
+          next: response.departments,
           previous: responsibilityDepartmentOptions.value,
         })
-      : options.departments;
+      : response.departments;
     supplierOptions.value = preserveSelection
       ? preserveSelectedOption({
           currentId: requestForm.supplierId,
-          next: options.suppliers,
+          next: response.suppliers,
           previous: supplierOptions.value,
         })
-      : options.suppliers;
+      : response.suppliers;
 
     if (
       !preserveSelection &&
       requestForm.responsibleDepartmentId &&
-      !options.departments.some(
+      !response.departments.some(
         (department) =>
           department.value === requestForm.responsibleDepartmentId,
       )
     ) {
       requestForm.responsibleDepartmentId = '';
-      requestForm.team = '';
-      requestForm.teamId = '';
     }
 
     if (isExternal) {
-      requestForm.team = '';
-      requestForm.teamId = '';
+      requestForm.responsibleDepartmentId = '';
+    } else if (!preserveSelection) {
+      requestForm.responsibleDepartmentId =
+        resolveInspectionRequestResponsibilityDepartmentDefault({
+          currentResponsibleDepartmentId: requestForm.responsibleDepartmentId,
+          departments: response.departments,
+          responsibilityType: response.responsibilityType,
+        });
+    }
+
+    if (isExternal) {
       return;
     }
 
@@ -127,72 +128,13 @@ export function useInspectionRequestIdentityOptions(options: {
         responsibilityType: requestForm.responsibilityType,
       });
       if (result.responsibilityType !== requestForm.responsibilityType) return;
-      if (
-        requestForm.responsibilityType ===
-          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
-        !preserveSelection
-      ) {
-        const teams = await getPublicInspectionRequestTeams({
-          keyword: undefined,
-        });
-        if (
-          requestForm.responsibilityType !==
-          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
-        ) {
-          return;
-        }
-        internalTeamOptions.value = teams.filter(
-          (team) =>
-            team.group === 'internal' && Boolean(team.responsibleDepartmentId),
-        );
-        if (
-          requestForm.teamId &&
-          !internalTeamOptions.value.some(
-            (team) =>
-              team.value === requestForm.teamId &&
-              team.responsibleDepartmentId ===
-                requestForm.responsibleDepartmentId,
-          )
-        ) {
-          requestForm.team = '';
-          requestForm.teamId = '';
-        }
-      } else {
-        if (!preserveSelection) internalTeamOptions.value = [];
-      }
       applyResponsibilityOptions(result, preserveSelection);
     } catch (error: unknown) {
       handleApiError(error, 'Load Inspection Request Responsibility Options');
       if (!preserveSelection) {
         responsibilityDepartmentOptions.value = [];
-        internalTeamOptions.value = [];
         supplierOptions.value = [];
-        clearResponsibilityIdentity();
       }
-    } finally {
-      responsibilityLoading.value = false;
-    }
-  }
-
-  async function loadInternalTeamOptions(keyword = '') {
-    if (
-      requestForm.responsibilityType !==
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
-    ) {
-      return;
-    }
-    responsibilityLoading.value = true;
-    try {
-      const teams = await getPublicInspectionRequestTeams({
-        keyword: keyword.trim() || undefined,
-      });
-      internalTeamOptions.value = teams.filter(
-        (team) =>
-          team.group === 'internal' && Boolean(team.responsibleDepartmentId),
-      );
-    } catch (error: unknown) {
-      handleApiError(error, 'Load Inspection Request Internal Teams');
-      internalTeamOptions.value = [];
     } finally {
       responsibilityLoading.value = false;
     }
@@ -211,8 +153,6 @@ export function useInspectionRequestIdentityOptions(options: {
     changeResponsibilityType,
     clearResponsibilityIdentity,
     loadResponsibilityOptions,
-    internalTeamOptions,
-    loadInternalTeamOptions,
     responsibilityDepartmentOptions,
     responsibilityLoading,
     supplierOptions,

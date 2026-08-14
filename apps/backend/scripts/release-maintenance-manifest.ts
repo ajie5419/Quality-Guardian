@@ -25,6 +25,7 @@ export const retiredHistoricalReleaseMaintenanceTaskKeys = [
   'identity-relation-backfill',
   'inspection-request-category-backfill',
   'inspection-request-process-option-backfill',
+  'inspection-request-process-outsourcing-responsibility-bootstrap',
   'inspection-request-responsibility-backfill',
   'inspection-issue-responsibility-backfill',
   'quality-classification-backfill',

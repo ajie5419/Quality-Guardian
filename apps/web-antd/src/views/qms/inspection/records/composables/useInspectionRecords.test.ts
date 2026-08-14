@@ -5,13 +5,11 @@ import { useInspectionRecords } from './useInspectionRecords';
 const {
   mockCreateInspectionRecord,
   mockUpdateInspectionRecord,
-  mockCreateInspectionIssue,
   mockHandleApiError,
   mockMessageSuccess,
   mockMessageError,
   mockMessageWarning,
 } = vi.hoisted(() => ({
-  mockCreateInspectionIssue: vi.fn(),
   mockCreateInspectionRecord: vi.fn(),
   mockHandleApiError: vi.fn(),
   mockMessageError: vi.fn(),
@@ -21,7 +19,6 @@ const {
 }));
 
 vi.mock('#/api/qms/inspection', () => ({
-  createInspectionIssue: mockCreateInspectionIssue,
   createInspectionRecord: mockCreateInspectionRecord,
   updateInspectionRecord: mockUpdateInspectionRecord,
 }));
@@ -132,11 +129,11 @@ describe('useInspectionRecords', () => {
 
     expect(mockUpdateInspectionRecord).toHaveBeenCalledWith('existing-1', {
       category: 'INCOMING',
-      linkedIssue: undefined,
+      linkedIssue: {},
     });
   });
 
-  it('handleSubmit creates linked issue when enabled', async () => {
+  it('submits an enabled linked issue with the inspection record transaction', async () => {
     mockCreateInspectionRecord.mockResolvedValueOnce({ id: 'rec-1' });
     const { handleSubmit, formRef } = useInspectionRecords();
 
@@ -164,27 +161,20 @@ describe('useInspectionRecords', () => {
 
     await handleSubmit();
 
-    expect(mockCreateInspectionIssue).toHaveBeenCalledWith(
+    expect(mockCreateInspectionRecord).toHaveBeenCalledWith(
       expect.objectContaining({
-        defectType: '焊缝缺陷',
-        inspectionId: 'rec-1',
-        lossAmount: 500,
-        partName: 'Steel',
-        severity: 'Minor',
-        sourceType: 'INSPECTION_RECORD',
-        supplierId: 'supplier-1',
-        responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
+        category: 'INCOMING',
+        linkedIssue: expect.objectContaining({
+          defectType: '焊缝缺陷',
+          enabled: true,
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchasing',
+        }),
       }),
     );
-    const payload = mockCreateInspectionIssue.mock.calls[0]?.[0];
-    expect(payload).not.toHaveProperty('ncNumber');
-    expect(payload).not.toHaveProperty('responsibleDepartment');
-    expect(payload).not.toHaveProperty('supplierName');
-    expect(mockMessageSuccess).toHaveBeenCalledWith('已自动创建关联不合格项');
   });
 
-  it('inherits the persisted supplier identity for a linked process issue', async () => {
+  it('does not create a second linked issue request after the record is saved', async () => {
     mockCreateInspectionRecord.mockResolvedValueOnce({
       id: 'rec-process-1',
       supplierId: 'supplier-team-1',
@@ -212,17 +202,17 @@ describe('useInspectionRecords', () => {
 
     await handleSubmit();
 
-    expect(mockCreateInspectionIssue).toHaveBeenCalledWith(
+    expect(mockCreateInspectionRecord).toHaveBeenCalledWith(
       expect.objectContaining({
-        inspectionId: 'rec-process-1',
-        supplierId: 'supplier-team-1',
-        responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
+        linkedIssue: expect.objectContaining({
+          supplierId: 'stale-supplier',
+          responsibilityType: 'OUTSOURCING_UNIT',
+        }),
       }),
     );
   });
 
-  it('drops an inspection supplier when the explicit responsibility is internal', async () => {
+  it('passes internal linked issue responsibility through to the record request', async () => {
     mockCreateInspectionRecord.mockResolvedValueOnce({
       id: 'rec-internal-1',
       supplierId: 'supplier-should-not-write',
@@ -242,20 +232,18 @@ describe('useInspectionRecords', () => {
 
     await handleSubmit();
 
-    expect(mockCreateInspectionIssue).toHaveBeenCalledWith(
+    expect(mockCreateInspectionRecord).toHaveBeenCalledWith(
       expect.objectContaining({
-        responsibilityType: 'INTERNAL_DEPARTMENT',
-        responsibleDepartmentId: 'dept-quality',
+        linkedIssue: expect.objectContaining({
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-quality',
+        }),
       }),
-    );
-    expect(mockCreateInspectionIssue.mock.calls[0]?.[0]).not.toHaveProperty(
-      'supplierId',
     );
   });
 
-  it('handleSubmit shows warning when linked issue creation fails', async () => {
-    mockCreateInspectionRecord.mockResolvedValueOnce({ id: 'rec-2' });
-    mockCreateInspectionIssue.mockRejectedValueOnce(new Error('issue fail'));
+  it('surfaces an atomic record creation failure without reporting partial success', async () => {
+    mockCreateInspectionRecord.mockRejectedValueOnce(new Error('issue fail'));
     const { handleSubmit, formRef } = useInspectionRecords();
 
     formRef.value = {
@@ -267,10 +255,8 @@ describe('useInspectionRecords', () => {
 
     await handleSubmit();
 
-    expect(mockMessageWarning).toHaveBeenCalledWith(
-      '检验记录已保存，但关联不合格项创建失败',
-    );
-    expect(mockMessageSuccess).toHaveBeenCalledWith('保存成功');
+    expect(mockMessageError).toHaveBeenCalledWith('issue fail');
+    expect(mockMessageSuccess).not.toHaveBeenCalledWith('保存成功');
   });
 
   it('handleSubmit shows error on validation failure', async () => {

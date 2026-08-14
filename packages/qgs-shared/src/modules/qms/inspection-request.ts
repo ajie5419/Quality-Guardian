@@ -154,7 +154,8 @@ export interface CreateInspectionRequestParams {
   requestedPartName?: string;
   requestInfo?: string;
   responsibilityType: InspectionIssueResponsibilityType;
-  responsibleDepartmentId: string;
+  /** Outsourcing responsibility is resolved from the server-side setting. */
+  responsibleDepartmentId?: string;
   selfCheckResult?: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection;
   supplierId?: string;
@@ -198,6 +199,13 @@ export interface DispatchInspectionRequestParams {
   priority?: number;
 }
 
+export interface CloseInspectionRequestResponsibility {
+  responsibilityType: InspectionIssueResponsibilityType;
+  /** Outsourcing responsibility is resolved from the server-side setting. */
+  responsibleDepartmentId?: string;
+  supplierId?: string;
+}
+
 export interface CloseInspectionRequestParams {
   attachments?: InspectionRequestAttachment[];
   closeRemark?: string;
@@ -223,6 +231,7 @@ export interface CloseInspectionRequestParams {
     description?: string;
     division?: string;
     divisionId?: string;
+    generateNcNumber: boolean;
     lossAmount?: number;
     partName?: string;
     photos?: string[];
@@ -231,18 +240,24 @@ export interface CloseInspectionRequestParams {
     quantity?: number;
     reportDate?: string;
     reportedBy?: string;
-    responsibilityType: InspectionIssueResponsibilityType;
-    responsibleDepartmentId: string;
+    responsibilityType: CloseInspectionRequestResponsibility['responsibilityType'];
+    responsibleDepartmentId?: CloseInspectionRequestResponsibility['responsibleDepartmentId'];
     responsibleWelder?: string;
     rootCause?: string;
     severity?: string;
     solution?: string;
     status?: string;
-    supplierId?: string;
+    supplierId?: CloseInspectionRequestResponsibility['supplierId'];
     unqualifiedQuantity?: number;
   };
   qualifiedQuantity?: number;
   quantity?: number;
+  /**
+   * Canonical responsibility selected while closing a historical request whose
+   * persisted responsibility fact is incomplete. It is independent of the
+   * FAIL-only linked issue payload.
+   */
+  responsibility?: CloseInspectionRequestResponsibility;
   result?: 'FAIL' | 'PASS';
   unqualifiedQuantity?: number;
 }

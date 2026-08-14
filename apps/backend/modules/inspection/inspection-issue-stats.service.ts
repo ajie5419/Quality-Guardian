@@ -14,6 +14,7 @@ import {
   formatDate,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+import { DeptService } from '~/modules/dept';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
@@ -356,17 +357,19 @@ export const InspectionIssueStatsService = {
         );
     } else if (controlledConfigKey) {
       canonicalNames =
-        await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-          configKey: controlledConfigKey,
-          canonicalIds,
-          canonicalIdById,
-          idLikeNameById: aggregateRows
-            .map((item) => ({
-              id: item.identity?.id ?? '',
-              rawName: item.identity?.rawName ?? null,
-            }))
-            .filter((pair) => pair.id !== ''),
-        });
+        params.dimension === 'responsibleDepartment'
+          ? await DeptService.resolveActiveNamesByIds(canonicalIds)
+          : await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+              configKey: controlledConfigKey,
+              canonicalIds,
+              canonicalIdById,
+              idLikeNameById: aggregateRows
+                .map((item) => ({
+                  id: item.identity?.id ?? '',
+                  rawName: item.identity?.rawName ?? null,
+                }))
+                .filter((pair) => pair.id !== ''),
+            });
     }
     const top = Number(params.top) > 0 ? Number(params.top) : 15;
     return MasterDataGovernanceKernel.mergeResolvedIdentityAggregateItems(

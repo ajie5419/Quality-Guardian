@@ -51,6 +51,51 @@ export function getInspectionRequestResponsibilitySupplierCategory(
   return null;
 }
 
+export type InspectionRequestResponsibilityDepartmentCandidate = {
+  label: string;
+  value: string;
+};
+
+/**
+ * Resolves only client-selectable policy departments. Outsourcing departments
+ * are resolved from the server-side system setting to prevent client-side
+ * display names or identifiers from becoming an authority source.
+ */
+export function resolveInspectionRequestResponsibilityDepartmentDefault(input: {
+  currentResponsibleDepartmentId?: unknown;
+  departments: ReadonlyArray<InspectionRequestResponsibilityDepartmentCandidate>;
+  responsibilityType: InspectionIssueResponsibilityType;
+}) {
+  if (
+    input.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return '';
+  }
+  const currentResponsibleDepartmentId = normalizeInspectionRequestText(
+    input.currentResponsibleDepartmentId,
+  );
+  if (currentResponsibleDepartmentId) return currentResponsibleDepartmentId;
+
+  let targetDepartmentName = '';
+  if (
+    input.responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+  ) {
+    targetDepartmentName = INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT;
+  }
+  if (!targetDepartmentName) return '';
+
+  const matches = input.departments.filter(
+    (department) =>
+      normalizeInspectionRequestText(department.label) ===
+        targetDepartmentName &&
+      Boolean(normalizeInspectionRequestText(department.value)),
+  );
+  return matches.length === 1
+    ? normalizeInspectionRequestText(matches[0]?.value)
+    : '';
+}
+
 export function mergeInspectionProcessNames(
   ...groups: ReadonlyArray<ReadonlyArray<unknown>>
 ): string[] {
