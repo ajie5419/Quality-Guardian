@@ -27,6 +27,38 @@
 
 ---
 
+## [0.26.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.25.0...qgs-v0.26.0) (2026-08-14)
+
+
+### Features
+
+* **other:** add optional NC number controls ([2000d63](https://github.com/ajie5419/Quality-Guardian/commit/2000d63ca0040caa97c8afc815e54e82b7c27a47))
+* **other:** support optional inspection issue numbers ([9cc9099](https://github.com/ajie5419/Quality-Guardian/commit/9cc90993f8c24b24960f18cb427f4e4633a4d08f))
+* **project:** default external responsibility departments ([dafb0d8](https://github.com/ajie5419/Quality-Guardian/commit/dafb0d835f4fa7d79718ecd17dfd76f0d9636193))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** canonicalize incoming responsibility ([b9b4855](https://github.com/ajie5419/Quality-Guardian/commit/b9b485550cc4f1f8be820ac56f6c60020dcbdc08))
+* **@qgs/backend:** complete legacy close responsibility ([47c7540](https://github.com/ajie5419/Quality-Guardian/commit/47c75400000f528931103e298955a38e2101b335))
+* **@qgs/backend:** repair historical inspection close responsibility ([2dd47b0](https://github.com/ajie5419/Quality-Guardian/commit/2dd47b0c082ffda348f271f61fbbda5af6f8e2d1))
+* **@qgs/backend:** unify outsourcing responsibility resolution ([e32d466](https://github.com/ajie5419/Quality-Guardian/commit/e32d46613e50221bfbcb221649b00937e0c11b67))
+* **@qgs/weapp:** align incoming responsibility entry ([a84b291](https://github.com/ajie5419/Quality-Guardian/commit/a84b291fb709be6d1fed6dbdfc5ff26ae798ed48))
+* **@qgs/weapp:** complete historical inspection close flows ([804b0d0](https://github.com/ajie5419/Quality-Guardian/commit/804b0d082a86e91c1cde985640e72d15439142e6))
+* **@qgs/weapp:** unify incoming outsourcing responsibility ([f2f0e7f](https://github.com/ajie5419/Quality-Guardian/commit/f2f0e7f926e5542b198e6756c7348ca2558a988d))
+* **@qgs/web-antd:** adjudicate historical inspection close responsibility ([97b3265](https://github.com/ajie5419/Quality-Guardian/commit/97b32657bb0391c1ca7e01bc2dab3c285173ba0d))
+* **@qgs/web-antd:** align incoming outsourcing close flow ([04141cc](https://github.com/ajie5419/Quality-Guardian/commit/04141ccaab4e47c1e857b0e5c8401afe3724ebb2))
+* **@qgs/web-antd:** align incoming responsibility entry ([bec0103](https://github.com/ajie5419/Quality-Guardian/commit/bec0103ac1942d7418f82a319aa70ef4a283ec3f))
+* **@qgs/web-antd:** align issue responsibility forms ([abf51d0](https://github.com/ajie5419/Quality-Guardian/commit/abf51d04b2e36bb82f29d4f3bf706b9aea7b6a92))
+* **@qgs/web-antd:** correct issue form labels and switch width ([a8f36b7](https://github.com/ajie5419/Quality-Guardian/commit/a8f36b7bb26fb1949961802e997f4a553b129c63))
+* **@qgs/web-antd:** preserve department labels on schema rebuild ([b15fec9](https://github.com/ajie5419/Quality-Guardian/commit/b15fec9e9845602a11897a2dd973245962df5bd7))
+* **@qgs/web-antd:** show incoming supplier in request details ([40a8491](https://github.com/ajie5419/Quality-Guardian/commit/40a8491746f0be4d5b68e8a352ebe756176a38db))
+* **other:** make linked inspection issues atomic ([bb88eda](https://github.com/ajie5419/Quality-Guardian/commit/bb88eda31aa5a6e701afbcbc8d654071685a342e))
+* **project:** persist outsourcing responsibility department id ([734992a](https://github.com/ajie5419/Quality-Guardian/commit/734992af3dfc7fd801a7a01ab113c91507016c1d))
+* **project:** resolve current responsibility department names ([85e49d4](https://github.com/ajie5419/Quality-Guardian/commit/85e49d48a9f68dc865ed7f6de933d792e4fe1d82))
+* **project:** unify inspection responsibility ownership ([a133ede](https://github.com/ajie5419/Quality-Guardian/commit/a133ede291d099bdb7e6de5d13b4a19a7ad31568))
+* **qms:** align inspection responsibility and NC numbering ([0c11d2b](https://github.com/ajie5419/Quality-Guardian/commit/0c11d2b574b1d0e3c280fcac5932e7bf4375f65e))
+
 ### 2026-08-14 合并：报检责任、可选 NC 编号与发布维护
 
 **执行内容：**
