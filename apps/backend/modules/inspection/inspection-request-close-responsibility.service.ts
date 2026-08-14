@@ -14,6 +14,7 @@ import {
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { normalizeInspectionRequestText } from './inspection-request';
 import { failCloseRequest } from './inspection-request-close.schema';
+import { resolveProcessOutsourcingResponsibleDepartmentId } from './inspection-request-responsibility-default.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
 type Request = {
@@ -255,6 +256,38 @@ function applyCanonicalResponsibility<T extends Request>(
   } as CanonicalCloseResponsibility & T;
 }
 
+async function resolveSubmittedCloseResponsibility(options: {
+  responsibility: Record<string, unknown>;
+  tx: Prisma.TransactionClient;
+}) {
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    options.responsibility.responsibilityType,
+  );
+  if (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    if (
+      normalizeInspectionRequestText(
+        options.responsibility.responsibleDepartmentId,
+      )
+    ) {
+      failCloseRequest('VALIDATION', '外协责任部门由系统配置解析');
+    }
+    return resolveInspectionIssueResponsibility(
+      {
+        ...options.responsibility,
+        responsibleDepartmentId:
+          await resolveProcessOutsourcingResponsibleDepartmentId(options.tx),
+      },
+      options.tx,
+    );
+  }
+  return resolveInspectionIssueResponsibility(
+    options.responsibility,
+    options.tx,
+  );
+}
+
 /**
  * Closing is the boundary where one request responsibility becomes durable on
  * every generated inspection and its linked NC. Only the request may supply
@@ -352,10 +385,10 @@ export async function resolveLegacyCloseRequestResponsibility<
   tx: Prisma.TransactionClient;
 }) {
   const submittedResponsibility = options.responsibility
-    ? await resolveInspectionIssueResponsibility(
-        options.responsibility,
-        options.tx,
-      )
+    ? await resolveSubmittedCloseResponsibility({
+        responsibility: options.responsibility,
+        tx: options.tx,
+      })
     : null;
   if (hasCompleteResponsibilityIdentity(options.request)) {
     const resolved = await resolveInspectionIssueResponsibility(

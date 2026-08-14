@@ -68,23 +68,29 @@ describe('inspection request create schema', () => {
     expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
   });
 
-  it('accepts PROCESS outsourcing without a client responsibility department', () => {
-    const parsed = inspectionRequestCreateV2BodySchema.parse({
-      ...buildValidPayload(),
-      category: 'PROCESS',
-      partId: 'part-1',
-      processId: 'process-1',
-      responsibilityType: 'OUTSOURCING_UNIT',
-      responsibleDepartmentId: undefined,
-      supplierId: 'supplier-outsourcing',
-      team: undefined,
-      teamId: undefined,
-    });
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'accepts %s outsourcing without a client responsibility department',
+    (category) => {
+      const parsed = inspectionRequestCreateV2BodySchema.parse({
+        ...buildValidPayload(),
+        category,
+        componentName: category === 'INCOMING' ? undefined : '组件A',
+        partId: category === 'INCOMING' ? undefined : 'part-1',
+        processId: `${category.toLowerCase()}-process-1`,
+        requestedPartName:
+          category === 'INCOMING' ? 'Unregistered bearing' : undefined,
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: undefined,
+        supplierId: 'supplier-outsourcing',
+        team: undefined,
+        teamId: undefined,
+      });
 
-    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
-  });
+      expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+    },
+  );
 
-  it('rejects PROCESS supplier responsibility and hidden client department input', () => {
+  it('rejects PROCESS supplier responsibility and all client-selected outsourcing departments', () => {
     expect(() =>
       inspectionRequestCreateV2BodySchema.parse({
         ...buildValidPayload(),
@@ -95,19 +101,21 @@ describe('inspection request create schema', () => {
         supplierId: 'supplier-1',
       }),
     ).toThrow('PROCESS inspection requests cannot use supplier responsibility');
-    expect(() =>
-      inspectionRequestCreateV2BodySchema.parse({
-        ...buildValidPayload(),
-        category: 'PROCESS',
-        partId: 'part-1',
-        processId: 'process-1',
-        responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-client',
-        supplierId: 'supplier-outsourcing',
-      }),
-    ).toThrow(
-      'PROCESS outsourcing responsibility department is server-resolved',
-    );
+    for (const category of ['INCOMING', 'PROCESS'] as const)
+      expect(() =>
+        inspectionRequestCreateV2BodySchema.parse({
+          ...buildValidPayload(),
+          category,
+          componentName: category === 'INCOMING' ? undefined : '组件A',
+          partId: category === 'INCOMING' ? undefined : 'part-1',
+          processId: `${category.toLowerCase()}-process-1`,
+          requestedPartName:
+            category === 'INCOMING' ? 'Unregistered bearing' : undefined,
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-client',
+          supplierId: 'supplier-outsourcing',
+        }),
+      ).toThrow('Outsourcing responsibility department is server-resolved');
   });
 
   it('rejects a V2 request without canonical IDs', () => {

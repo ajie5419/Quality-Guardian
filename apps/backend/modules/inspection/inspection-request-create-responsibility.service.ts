@@ -44,19 +44,17 @@ export async function resolveV2RequestResponsibility(
     );
   }
   if (
-    payload.category === 'PROCESS' &&
     responsibilityType ===
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT &&
     String(payload.v2Responsibility.responsibleDepartmentId || '').trim()
   ) {
     throw new BusinessError(
       'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
-      'PROCESS outsourcing responsibility department is server-resolved',
+      'Outsourcing responsibility department is server-resolved',
       400,
     );
   }
   const responsibleDepartmentId =
-    payload.category === 'PROCESS' &&
     responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
       ? await resolveProcessOutsourcingResponsibleDepartmentId(tx)
       : payload.v2Responsibility.responsibleDepartmentId;

@@ -75,11 +75,54 @@ describe('validateCloseRequestBody', () => {
         attachments: [{ name: 'record.pdf', url: '/uploads/record.pdf' }],
         responsibility: {
           responsibilityType: 'OUTSOURCING_UNIT',
-          responsibleDepartmentId: 'dept-production',
         },
         result: 'PASS',
       }),
     ).toThrow('关闭外部责任单位缺少 canonical 供应商 ID');
+  });
+
+  it('accepts an outsourcing top-level responsibility without a department ID', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        attachments: [{ name: 'record.pdf', url: '/uploads/record.pdf' }],
+        responsibility: {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          supplierId: 'supplier-outsourcing',
+        },
+        result: 'PASS',
+      }),
+    ).not.toThrow();
+  });
+
+  it('accepts an outsourcing linked issue without a department ID', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        linkedIssue: {
+          ...VALID_LINKED_ISSUE,
+          photos: ['/api/uploads/defect.jpg'],
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: undefined,
+          supplierId: 'supplier-outsourcing',
+        },
+        quantity: 2,
+        result: 'FAIL',
+        unqualifiedQuantity: 1,
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects a client-selected outsourcing department', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        attachments: [{ name: 'record.pdf', url: '/uploads/record.pdf' }],
+        responsibility: {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-client',
+          supplierId: 'supplier-outsourcing',
+        },
+        result: 'PASS',
+      }),
+    ).toThrow('外协责任部门由系统配置解析');
   });
 
   it('rejects an unknown responsibility type', () => {

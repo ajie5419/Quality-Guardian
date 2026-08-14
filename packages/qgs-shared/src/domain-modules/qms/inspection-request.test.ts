@@ -210,37 +210,26 @@ describe('inspection station selection', () => {
 });
 
 describe('resolveInspectionRequestIssueResponsibility', () => {
-  it.each([
-    [
-      'OUTSOURCING_UNIT',
-      [{ label: '生产 OBU', value: 'dept-production' }],
-      'dept-production',
-    ],
-    [
-      'SUPPLIER',
-      [{ label: '采购部', value: 'dept-purchasing' }],
-      'dept-purchasing',
-    ],
-  ] as const)(
-    'defaults %s to its uniquely matching canonical department',
-    (responsibilityType, departments, expected) => {
-      expect(
-        resolveInspectionRequestResponsibilityDepartmentDefault({
-          departments,
-          responsibilityType,
-        }),
-      ).toBe(expected);
-    },
-  );
+  it('defaults supplier to its uniquely matching canonical department', () => {
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentDefault({
+        departments: [{ label: '采购部', value: 'dept-purchasing' }],
+        responsibilityType: 'SUPPLIER',
+      }),
+    ).toBe('dept-purchasing');
+  });
+
+  it('never derives an outsourcing department from client state', () => {
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentDefault({
+        currentResponsibleDepartmentId: 'dept-client',
+        departments: [{ label: '生产 OBU', value: 'dept-production' }],
+        responsibilityType: 'OUTSOURCING_UNIT',
+      }),
+    ).toBe('');
+  });
 
   it.each([
-    {
-      departments: [
-        { label: '生产 OBU', value: 'dept-production-a' },
-        { label: '生产 OBU', value: 'dept-production-b' },
-      ],
-      responsibilityType: 'OUTSOURCING_UNIT' as const,
-    },
     {
       departments: [],
       responsibilityType: 'SUPPLIER' as const,

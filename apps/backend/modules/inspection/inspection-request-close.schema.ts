@@ -41,14 +41,32 @@ function buildCloseResponsibilitySchema(
         (value) => normalizeInspectionIssueResponsibilityType(value) || value,
         z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE),
       ),
-      responsibleDepartmentId: z.preprocess(
-        (value) => value ?? '',
-        z.string().trim().min(1, messages.departmentIdRequired),
-      ),
+      responsibleDepartmentId: z.string().trim().optional(),
       supplierId: z.string().trim().min(1).optional(),
     })
     .passthrough()
     .superRefine((value, context) => {
+      const responsibleDepartmentId = normalizeInspectionRequestText(
+        value.responsibleDepartmentId,
+      );
+      if (
+        value.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+      ) {
+        if (responsibleDepartmentId) {
+          context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: '外协责任部门由系统配置解析',
+            path: ['responsibleDepartmentId'],
+          });
+        }
+      } else if (!responsibleDepartmentId) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: messages.departmentIdRequired,
+          path: ['responsibleDepartmentId'],
+        });
+      }
       if (
         value.responsibilityType ===
           INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&

@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeptService } from '~/modules/dept';
-import { InspectionRequestCloseService } from '~/modules/inspection/inspection-request-close.service';
+import {
+  hydrateOutsourcingLinkedIssueResponsibility,
+  InspectionRequestCloseService,
+} from '~/modules/inspection/inspection-request-close.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { TeamIdentityService } from '~/modules/team';
 import prisma from '~/utils/prisma';
@@ -160,6 +163,35 @@ describe('inspectionRequestCloseService', () => {
         teamId: 'team-1',
       },
     ] as never);
+  });
+
+  it('hydrates an outsourcing linked issue with the canonical close department', () => {
+    expect(
+      hydrateOutsourcingLinkedIssueResponsibility({
+        linkedIssue: {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          supplierId: 'supplier-outsourcing',
+        },
+        responsibility: { responsibleDepartmentId: 'dept-production' },
+      }),
+    ).toEqual({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartmentId: 'dept-production',
+      supplierId: 'supplier-outsourcing',
+    });
+  });
+
+  it('rejects a client-selected outsourcing linked issue department', () => {
+    expect(() =>
+      hydrateOutsourcingLinkedIssueResponsibility({
+        linkedIssue: {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-client',
+          supplierId: 'supplier-outsourcing',
+        },
+        responsibility: { responsibleDepartmentId: 'dept-production' },
+      }),
+    ).toThrow('外协责任部门由系统配置解析');
   });
 
   it('should close request with PASS result', async () => {

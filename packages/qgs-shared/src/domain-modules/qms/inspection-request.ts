@@ -57,15 +57,21 @@ export type InspectionRequestResponsibilityDepartmentCandidate = {
 };
 
 /**
- * Resolves the policy department only from one exact canonical display-name
- * match. Ambiguous or unavailable option lists intentionally leave the form
- * unselected so the server remains the final authority for responsibility.
+ * Resolves only client-selectable policy departments. Outsourcing departments
+ * are resolved from the server-side system setting to prevent client-side
+ * display names or identifiers from becoming an authority source.
  */
 export function resolveInspectionRequestResponsibilityDepartmentDefault(input: {
   currentResponsibleDepartmentId?: unknown;
   departments: ReadonlyArray<InspectionRequestResponsibilityDepartmentCandidate>;
   responsibilityType: InspectionIssueResponsibilityType;
 }) {
+  if (
+    input.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return '';
+  }
   const currentResponsibleDepartmentId = normalizeInspectionRequestText(
     input.currentResponsibleDepartmentId,
   );
@@ -73,11 +79,6 @@ export function resolveInspectionRequestResponsibilityDepartmentDefault(input: {
 
   let targetDepartmentName = '';
   if (
-    input.responsibilityType ===
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-  ) {
-    targetDepartmentName = OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT;
-  } else if (
     input.responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
   ) {
     targetDepartmentName = INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT;

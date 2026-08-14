@@ -4,6 +4,10 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
 
+import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  normalizeInspectionIssueResponsibilityType,
+} from '@qgs/shared';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
@@ -52,6 +56,30 @@ function buildLinkedIssueWhere(
   if (ids.length > 0) OR.push({ id: { in: [...new Set(ids)] } });
   if (issueNo) OR.push({ nonConformanceNumber: issueNo });
   return OR.length > 0 ? { isDeleted: false, OR } : null;
+}
+
+export function hydrateOutsourcingLinkedIssueResponsibility(options: {
+  linkedIssue: Record<string, unknown>;
+  responsibility: {
+    responsibleDepartmentId: string;
+  };
+}) {
+  if (
+    normalizeInspectionIssueResponsibilityType(
+      options.linkedIssue.responsibilityType,
+    ) !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return options.linkedIssue;
+  }
+  if (
+    normalizeInspectionRequestText(options.linkedIssue.responsibleDepartmentId)
+  ) {
+    failCloseRequest('VALIDATION', '外协责任部门由系统配置解析');
+  }
+  return {
+    ...options.linkedIssue,
+    responsibleDepartmentId: options.responsibility.responsibleDepartmentId,
+  };
 }
 
 export const InspectionRequestCloseService = {
@@ -173,9 +201,16 @@ export const InspectionRequestCloseService = {
         const requestWithResponsibility = responsibilityResolution.request;
         const canonicalCloseResponsibility =
           requireCanonicalCloseResponsibility(requestWithResponsibility);
-        if (result === 'FAIL' && linkedIssue) {
+        const linkedIssueWithCanonicalResponsibility =
+          result === 'FAIL' && linkedIssue
+            ? hydrateOutsourcingLinkedIssueResponsibility({
+                linkedIssue,
+                responsibility: canonicalCloseResponsibility,
+              })
+            : linkedIssue;
+        if (result === 'FAIL' && linkedIssueWithCanonicalResponsibility) {
           assertCloseLinkedIssueResponsibilityMatches({
-            linkedIssue,
+            linkedIssue: linkedIssueWithCanonicalResponsibility,
             responsibility: canonicalCloseResponsibility,
           });
         }
@@ -263,11 +298,11 @@ export const InspectionRequestCloseService = {
               issue: issueRecord,
               responsibility: canonicalCloseResponsibility,
             });
-          } else if (linkedIssue) {
+          } else if (linkedIssueWithCanonicalResponsibility) {
             const built = await buildCloseLinkedIssueCreateResult({
               body,
               inspectionId,
-              linkedIssue,
+              linkedIssue: linkedIssueWithCanonicalResponsibility,
               request: requestWithResponsibility,
               tx,
               userinfo,

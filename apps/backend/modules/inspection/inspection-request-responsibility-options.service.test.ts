@@ -26,7 +26,6 @@ describe('inspection request responsibility options', () => {
   it.each([
     ['INTERNAL_DEPARTMENT', undefined],
     ['SUPPLIER', 'Supplier'],
-    ['OUTSOURCING_UNIT', 'Outsourcing'],
   ] as const)(
     'returns every active department for %s and only its matching suppliers',
     async (responsibilityType, supplierCategory) => {
@@ -51,4 +50,18 @@ describe('inspection request responsibility options', () => {
       }
     },
   );
+
+  it('does not expose client-selectable departments for outsourcing responsibility', async () => {
+    const result = await InspectionRequestResponsibilityOptionsService.list({
+      keyword: 'quality',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    });
+
+    expect(DeptService.listActiveOptions).not.toHaveBeenCalled();
+    expect(result.departments).toEqual([]);
+    expect(SupplierService.listActiveOptions).toHaveBeenCalledWith({
+      category: 'Outsourcing',
+      keyword: 'quality',
+    });
+  });
 });

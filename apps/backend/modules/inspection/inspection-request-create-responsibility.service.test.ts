@@ -76,7 +76,7 @@ describe('resolveV2RequestResponsibility', () => {
     });
   });
 
-  it('allows INCOMING external responsibility when its supplier category matches', async () => {
+  it('server-resolves the INCOMING outsourcing department when its supplier category matches', async () => {
     vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
       responsibilityType: 'OUTSOURCING_UNIT',
       responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
@@ -99,7 +99,6 @@ describe('resolveV2RequestResponsibility', () => {
           category: 'INCOMING',
           v2Responsibility: {
             responsibilityType: 'OUTSOURCING_UNIT',
-            responsibleDepartmentId: 'dept-production',
             supplierId: 'supplier-outsourcing',
           },
         },
@@ -109,7 +108,37 @@ describe('resolveV2RequestResponsibility', () => {
       supplierId: 'supplier-outsourcing',
       teamId: null,
     });
+    expect(resolveProcessOutsourcingResponsibleDepartmentId).toHaveBeenCalled();
+    expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+      expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
+      expect.any(Object),
+    );
   });
+
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'rejects a client-selected outsourcing department for %s',
+    async (category) => {
+      await expect(
+        resolveV2RequestResponsibility(
+          {
+            category,
+            v2Responsibility: {
+              responsibilityType: 'OUTSOURCING_UNIT',
+              responsibleDepartmentId: 'dept-client',
+              supplierId: 'supplier-outsourcing',
+            },
+          },
+          {} as any,
+        ),
+      ).rejects.toMatchObject({
+        code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
+      });
+      expect(
+        resolveProcessOutsourcingResponsibleDepartmentId,
+      ).not.toHaveBeenCalled();
+      expect(resolveInspectionIssueResponsibility).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects an external supplier whose category does not match the selected type', async () => {
     vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({

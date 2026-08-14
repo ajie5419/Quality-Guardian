@@ -154,7 +154,8 @@ export interface CreateInspectionRequestParams {
   requestedPartName?: string;
   requestInfo?: string;
   responsibilityType: InspectionIssueResponsibilityType;
-  responsibleDepartmentId: string;
+  /** Outsourcing responsibility is resolved from the server-side setting. */
+  responsibleDepartmentId?: string;
   selfCheckResult?: InspectionRequestCheckResult;
   stationSelection?: InspectionStationSelection;
   supplierId?: string;
@@ -200,7 +201,8 @@ export interface DispatchInspectionRequestParams {
 
 export interface CloseInspectionRequestResponsibility {
   responsibilityType: InspectionIssueResponsibilityType;
-  responsibleDepartmentId: string;
+  /** Outsourcing responsibility is resolved from the server-side setting. */
+  responsibleDepartmentId?: string;
   supplierId?: string;
 }
 
@@ -239,7 +241,7 @@ export interface CloseInspectionRequestParams {
     reportDate?: string;
     reportedBy?: string;
     responsibilityType: CloseInspectionRequestResponsibility['responsibilityType'];
-    responsibleDepartmentId: CloseInspectionRequestResponsibility['responsibleDepartmentId'];
+    responsibleDepartmentId?: CloseInspectionRequestResponsibility['responsibleDepartmentId'];
     responsibleWelder?: string;
     rootCause?: string;
     severity?: string;
