@@ -412,10 +412,11 @@ describe('useInspectionRequestTaskActions', () => {
     },
   );
 
-  it('prefills incoming supplier as supplierName and purchasing as responsible department', async () => {
+  it('prefills an incoming supplier without a client responsibility department', async () => {
     const composable = createComposable();
 
     await composable.openClose({
+      category: 'INCOMING',
       id: 'request-1',
       componentName: '',
       inspectorName: 'Inspector A',
@@ -440,14 +441,14 @@ describe('useInspectionRequestTaskActions', () => {
 
     expect(composable.linkedIssueDraft.value).toMatchObject({
       responsibilityType: 'SUPPLIER',
-      responsibleDepartment: '采购部',
-      responsibleDepartmentId: 'dept-purchase',
+      responsibleDepartment: '',
+      responsibleDepartmentId: '',
       supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });
   });
 
-  it('prefills incoming responsibility for INCOMING category with a configured process name', async () => {
+  it('keeps configured incoming supplier identity without a client department ID', async () => {
     const composable = createComposable();
 
     await composable.openClose({
@@ -476,11 +477,46 @@ describe('useInspectionRequestTaskActions', () => {
 
     expect(composable.linkedIssueDraft.value).toMatchObject({
       responsibilityType: 'SUPPLIER',
-      responsibleDepartment: '采购部',
-      responsibleDepartmentId: 'dept-purchase',
+      responsibleDepartment: '',
+      responsibleDepartmentId: '',
       supplierId: 'supplier-1',
       supplierName: 'Supplier A',
     });
+  });
+
+  it('submits an incoming supplier without a client responsibility department', async () => {
+    const composable = createComposable();
+    const request = {
+      category: 'INCOMING',
+      componentName: 'Bearing',
+      id: 'request-incoming-supplier',
+      inspectorName: 'Inspector A',
+      partName: 'Bearing',
+      processName: 'Incoming',
+      quantity: 2,
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      supplierId: 'supplier-a',
+      supplierName: 'Supplier A',
+      workOrderNumber: 'WO-1',
+    };
+    mockGetInspectionRequest.mockResolvedValue(request);
+
+    await composable.openClose(request as any);
+    composable.closeForm.attachments = [
+      { name: 'inspection.pdf', url: '/api/uploads/inspection.pdf' },
+    ] as any;
+    await composable.submitClose();
+
+    const payload = mockCloseInspectionRequest.mock.calls.at(-1)?.[1];
+    expect(payload?.responsibility).toEqual({
+      responsibilityType: 'SUPPLIER',
+      supplierId: 'supplier-a',
+    });
+    expect(payload?.responsibility).not.toHaveProperty(
+      'responsibleDepartmentId',
+    );
   });
 
   it('prefills outsourcing unit without a client responsibility department', async () => {

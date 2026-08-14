@@ -113,10 +113,15 @@ function mountFields(
       ],
       responsibilityLoading: false,
       responsibilityTypeOptions: [
-        { label: 'Internal department', value: 'INTERNAL_DEPARTMENT' },
-        { label: 'Supplier', value: 'SUPPLIER' },
-        { label: 'Outsourcing', value: 'OUTSOURCING_UNIT' },
-      ],
+        {
+          label: 'Internal department',
+          value: 'INTERNAL_DEPARTMENT' as const,
+        },
+        { label: 'Supplier', value: 'SUPPLIER' as const },
+        { label: 'Outsourcing', value: 'OUTSOURCING_UNIT' as const },
+      ].filter(
+        (option) => !isIncomingEntry || option.value !== 'INTERNAL_DEPARTMENT',
+      ),
       requiresComponentName: false,
       requiresStationSelection: false,
       stationQuantity: 0,
@@ -132,7 +137,7 @@ function mountFields(
 }
 
 describe('inspection request entry responsibility identity', () => {
-  it('keeps all responsibility types and canonical department selection available for incoming entry', async () => {
+  it('shows only external responsibility types and hides the department for incoming entry', async () => {
     const { wrapper } = mountFields(true);
     const typeSelect = wrapper
       .findAllComponents({ name: 'MockSelect' })
@@ -148,14 +153,10 @@ describe('inspection request entry responsibility identity', () => {
       );
 
     expect(typeSelect?.props('options')).toEqual([
-      { label: 'Internal department', value: 'INTERNAL_DEPARTMENT' },
       { label: 'Supplier', value: 'SUPPLIER' },
       { label: 'Outsourcing', value: 'OUTSOURCING_UNIT' },
     ]);
-    expect(departmentSelect?.props('options')).toEqual([
-      { label: 'Assembly Department', value: 'dept-assembly' },
-      { label: 'Structure BU', value: 'dept-structure' },
-    ]);
+    expect(departmentSelect).toBeUndefined();
 
     typeSelect?.vm.$emit('change', 'OUTSOURCING_UNIT');
     await wrapper.vm.$nextTick();

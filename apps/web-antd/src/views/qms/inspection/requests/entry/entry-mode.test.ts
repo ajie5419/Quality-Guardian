@@ -11,7 +11,7 @@ import {
 } from './entry-mode';
 
 describe('inspection request entry identity options', () => {
-  it('removes supplier responsibility from PROCESS while preserving INCOMING choices', () => {
+  it('uses category-specific responsibility choices', () => {
     expect(
       getInspectionRequestResponsibilityTypeOptions(false).map(
         (item) => item.value,
@@ -21,7 +21,7 @@ describe('inspection request entry identity options', () => {
       getInspectionRequestResponsibilityTypeOptions(true).map(
         (item) => item.value,
       ),
-    ).toEqual(['INTERNAL_DEPARTMENT', 'SUPPLIER', 'OUTSOURCING_UNIT']);
+    ).toEqual(['SUPPLIER', 'OUTSOURCING_UNIT']);
   });
 
   it.each([
@@ -46,7 +46,6 @@ describe('inspection request entry identity options', () => {
       },
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
     ],

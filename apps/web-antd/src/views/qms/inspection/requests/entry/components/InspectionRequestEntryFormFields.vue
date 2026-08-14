@@ -13,6 +13,7 @@ import type {
 
 import { computed } from 'vue';
 
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { Form, Input, InputNumber, Select } from 'ant-design-vue';
 
 import { getInspectionRequestResponsibilityUnitCopy } from '../entry-mode';
@@ -113,8 +114,12 @@ const incomingTypeOptions = computed(() =>
 const responsibilityUnitCopy = computed(() =>
   getInspectionRequestResponsibilityUnitCopy(form.value.responsibilityType),
 );
-const isOutsourcing = computed(
-  () => form.value.responsibilityType === 'OUTSOURCING_UNIT',
+const isExternalResponsibility = computed(
+  () =>
+    form.value.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
+    form.value.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
 );
 function handleWorkOrderChange(value: SelectProps['value']) {
   if (props.isIncomingEntry) {
@@ -330,7 +335,7 @@ function handleProcessIdentityChange(
         @change="handleResponsibilityTypeChange"
       />
     </Form.Item>
-    <Form.Item v-if="!isOutsourcing" label="责任部门" required>
+    <Form.Item v-if="!isExternalResponsibility" label="责任部门" required>
       <Select
         data-testid="responsible-department-select"
         :value="form.responsibleDepartmentId"

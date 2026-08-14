@@ -1,3 +1,5 @@
+// @vitest-environment happy-dom
+
 import type {
   InspectionIssueResponsibilityType,
   InspectionRequest,
@@ -328,6 +330,43 @@ describe('close inspection request responsibility adjudication', () => {
         .findAll('option')
         .map((option) => option.attributes('value')),
     ).toEqual(['INTERNAL_DEPARTMENT', 'OUTSOURCING_UNIT']);
+  });
+
+  it('limits partial INCOMING requests to external responsibility types and hides the department', async () => {
+    mockGetResponsibilityOptions.mockResolvedValueOnce({
+      departments: [],
+      responsibilityType: 'SUPPLIER',
+      suppliers: [{ label: 'Supplier A', value: 'supplier-a' }],
+    });
+    const wrapper = mount(CloseInspectionModal, {
+      props: createProps({
+        currentRequest: createRequest({
+          category: 'INCOMING',
+          id: 'request-incoming-partial',
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: null,
+          supplierId: null,
+        }),
+        linkedIssueDraft: {
+          ...createProps().linkedIssueDraft,
+          responsibilityType: 'SUPPLIER',
+        },
+      }),
+    });
+    await flushPromises();
+
+    expect(
+      wrapper
+        .find('[data-testid="close-responsibility-type"]')
+        .findAll('option')
+        .map((option) => option.attributes('value')),
+    ).toEqual(['SUPPLIER', 'OUTSOURCING_UNIT']);
+    expect(
+      wrapper.find('[data-testid="close-responsibility-department"]').exists(),
+    ).toBe(false);
+    expect(
+      wrapper.find('[data-testid="close-responsibility-supplier"]').exists(),
+    ).toBe(true);
   });
 
   it.each(['INCOMING', 'PROCESS'] as const)(

@@ -76,7 +76,7 @@ describe('inspection request responsibility options', () => {
     ]);
   });
 
-  it('defaults a supplier responsibility to the unique purchasing department', async () => {
+  it('keeps supplier responsibility free of client department defaults', async () => {
     const requestForm = createForm();
     getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
       departments: [{ label: '采购部', value: 'dept-purchasing' }],
@@ -87,7 +87,7 @@ describe('inspection request responsibility options', () => {
 
     await composable.changeResponsibilityType('SUPPLIER');
 
-    expect(requestForm.responsibleDepartmentId).toBe('dept-purchasing');
+    expect(requestForm.responsibleDepartmentId).toBe('');
   });
 
   it('leaves the department unselected when production OBU is ambiguous', async () => {
@@ -152,7 +152,7 @@ describe('inspection request responsibility options', () => {
     },
   );
 
-  it('retains an external department while searching suppliers', async () => {
+  it('clears an external department while searching suppliers', async () => {
     const requestForm = createForm();
     requestForm.responsibilityType = 'SUPPLIER';
     requestForm.responsibleDepartmentId = 'dept-structure';
@@ -170,7 +170,7 @@ describe('inspection request responsibility options', () => {
     await composable.loadResponsibilityOptions('supplier a');
 
     expect(requestForm).toMatchObject({
-      responsibleDepartmentId: 'dept-structure',
+      responsibleDepartmentId: '',
       supplierId: 'supplier-a',
     });
     expect(composable.responsibilityDepartmentOptions.value).toEqual([

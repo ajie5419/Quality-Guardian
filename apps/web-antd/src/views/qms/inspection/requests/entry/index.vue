@@ -293,8 +293,8 @@ async function submitRequest() {
     (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     (requiresStationSelection.value && !requestForm.stationSelection) ||
-    (requestForm.responsibilityType !==
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT &&
+    (requestForm.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
       !requestForm.responsibleDepartmentId) ||
     (requestForm.responsibilityType !==
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&

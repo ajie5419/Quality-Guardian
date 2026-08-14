@@ -100,10 +100,7 @@ export function useInspectionRequestIdentityOptions(options: {
       requestForm.responsibleDepartmentId = '';
     }
 
-    const isOutsourcing =
-      response.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
-    if (isOutsourcing) {
+    if (isExternal) {
       requestForm.responsibleDepartmentId = '';
     } else if (!preserveSelection) {
       requestForm.responsibleDepartmentId =

@@ -34,7 +34,11 @@ export function getInspectionRequestResponsibilityTypeOptions(
   isIncoming: boolean,
 ) {
   return isIncoming
-    ? inspectionRequestResponsibilityTypeOptions
+    ? inspectionRequestResponsibilityTypeOptions.filter(
+        (option) =>
+          option.value !==
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+      )
     : inspectionRequestResponsibilityTypeOptions.filter(
         (option) =>
           option.value !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
@@ -48,7 +52,9 @@ export function buildInspectionRequestEntryResponsibilityPayload(input: {
 }) {
   if (
     input.responsibilityType ===
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
+    input.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
   ) {
     const supplierId = input.supplierId.trim();
     return supplierId
@@ -69,14 +75,7 @@ export function buildInspectionRequestEntryResponsibilityPayload(input: {
       responsibleDepartmentId,
     };
   }
-  const supplierId = input.supplierId.trim();
-  return supplierId
-    ? {
-        responsibilityType: input.responsibilityType,
-        responsibleDepartmentId,
-        supplierId,
-      }
-    : null;
+  return null;
 }
 
 type WorkOrderOptionSource = {
@@ -238,17 +237,12 @@ function getInspectionRequestResponsibilityRequiredText(
   responsibilityType: InspectionIssueResponsibilityType,
 ) {
   if (
-    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-  ) {
-    return '责任归属类型、外协单位、';
-  }
-  if (
     responsibilityType ===
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   ) {
     return '责任归属类型、责任部门、';
   }
-  return `责任归属类型、责任部门、${getInspectionRequestResponsibilityUnitCopy(responsibilityType).label}、`;
+  return `责任归属类型、${getInspectionRequestResponsibilityUnitCopy(responsibilityType).label}、`;
 }
 
 export function buildIncomingInspectionRequestInfo(input: {
