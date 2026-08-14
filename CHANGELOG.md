@@ -38,16 +38,17 @@
 
 **验证结果：**
 
-- 后端关闭责任定向 Vitest：`26/26` 文件、`89/89` 用例通过。
-- Web/H5/WeApp 关单定向 Vitest：`5/5` 文件、`41/41` 用例通过。
-- 后端定向 ESLint、`pnpm --dir apps/backend exec tsc --noEmit` 与 `rtk git diff --check` 均通过。
+- 后端全量 Vitest：`288/288` 文件、`2610/2610` 用例通过。
+- Web happy-dom Vitest：`148/148` 文件、`328/328` 用例通过。
+- WeApp Vitest：`10/10` 文件、`48/48` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all` 与 `rtk git diff --check HEAD~5..HEAD` 均通过。
 
-**commit:** `2dd47b0c` `fix(@qgs/backend): repair historical inspection close responsibility`、`97b32657` `fix(@qgs/web-antd): adjudicate historical inspection close responsibility`、`804b0d08` `fix(@qgs/weapp): complete historical inspection close flows`。
+**commit:** `2dd47b0c` `fix(@qgs/backend): repair historical inspection close responsibility`、`97b32657` `fix(@qgs/web-antd): adjudicate historical inspection close responsibility`、`804b0d08` `fix(@qgs/weapp): complete historical inspection close flows`、`ac08e6ff` `test(@qgs/backend): align issue supplier fixture`。全量验收发现旧测试 fixture 未返回生产 `SupplierIdentityService` 既有的 supplier category，已按两类外部责任的 canonical category 对齐。
 
 **遗留问题：**
 
 - 未运行真实 MySQL 并发集成验证；事务回滚与行锁边界由同一 Prisma transaction client 的定向测试覆盖。
-- 未运行前端 dev/build/start、真实浏览器或小程序点击验收，也未运行最终全仓门禁。
+- 未运行前端 dev/build/start、真实浏览器或小程序点击验收。
 
 ---
 
