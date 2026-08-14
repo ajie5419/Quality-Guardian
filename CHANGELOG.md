@@ -27,6 +27,30 @@
 
 ---
 
+### 2026-08-14 修复：进货与过程外协历史报检统一关单
+
+**执行内容：**
+
+- 根因是外协责任契约分裂：入口只对过程检验隐藏部门，关单 schema 又要求所有责任类型提交部门；桌面端还把“已有外协单位但缺持久部门”的历史任务误判为完整并锁定，最终后端只能报“报检任务责任事实缺失”。
+- `INCOMING` 与 `PROCESS` 的报检入口、桌面关单、H5 和小程序统一为外协只选择 `supplierId`，不显示、不提交 `responsibleDepartmentId`。完整历史事实仍锁定；缺持久部门的历史外协任务进入显式裁决流程。
+- 后端在创建和关单事务中复用同一系统设置解析 canonical “生产 OBU”部门；FAIL 的 `linkedIssue` 在一致性校验和创建 NC 前注入同一部门。客户端显式提交外协部门、设置缺失/失效/歧义以及持久事实冲突继续 fail-closed。
+- 回归测试同时覆盖进货与过程、PASS 与 FAIL、完整与 partial 历史事实，以及顶层责任和 FAIL `linkedIssue` 均不携带外协部门字段。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2621/2621` 用例通过。
+- Web happy-dom Vitest：`65/65` 文件、`340/340` 用例通过。
+- WeApp Vitest：`10/10` 文件、`52/52` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** `e32d466` `fix(@qgs/backend): unify outsourcing responsibility resolution`、`04141cc` `fix(@qgs/web-antd): align incoming outsourcing close flow`、`f2f0e7f` `fix(@qgs/weapp): unify incoming outsourcing responsibility`。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start；真实登录页面与生产数据关单未执行。
+
+---
+
 ### 2026-08-14 修复：历史报检任务关闭责任裁决
 
 **执行内容：**
