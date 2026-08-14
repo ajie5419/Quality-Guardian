@@ -56,7 +56,17 @@ describe('mobile inspection result responsibility context', () => {
     ).toBeNull();
   });
 
-  it('permits legacy reconstruction from an all-empty raw triad even when the derived context is unresolved', () => {
+  it('rejects an internal context with a stale supplier ID so the close flow can repair it', () => {
+    expect(
+      resolveLockedInspectionRequestIssueResponsibility({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-quality',
+        supplierId: 'supplier-stale',
+      }),
+    ).toBeNull();
+  });
+
+  it('treats an all-empty top-level triad as eligible for close-time selection', () => {
     expect(
       hasEmptyInspectionRequestIssueResponsibilityContext({
         issueResponsibility: {
@@ -70,7 +80,7 @@ describe('mobile inspection result responsibility context', () => {
     ).toBe(true);
   });
 
-  it('rejects a partial raw responsibility triad without considering the legacy supplier field', () => {
+  it('does not treat a legacy supplier display value as a persisted responsibility fact', () => {
     expect(
       hasEmptyInspectionRequestIssueResponsibilityContext({
         supplierId: 'legacy-supplier-only',

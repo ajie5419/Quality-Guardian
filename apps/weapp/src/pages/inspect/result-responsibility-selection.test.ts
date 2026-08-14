@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildInspectionResultResponsibilityPayload } from './result-responsibility-selection';
+import {
+  buildInspectionResultResponsibilityPayload,
+  getInspectionResultResponsibilityLabels,
+  getInspectionResultResponsibilityTypes,
+} from './result-responsibility-selection';
 
 describe('mobile inspection close responsibility payload', () => {
   it.each([
@@ -59,5 +63,26 @@ describe('mobile inspection close responsibility payload', () => {
         supplierId: '',
       }),
     ).toBeNull();
+  });
+
+  it('keeps all types for incoming or uncategorized tasks and excludes supplier for process tasks', () => {
+    expect(getInspectionResultResponsibilityTypes('INCOMING')).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getInspectionResultResponsibilityTypes('PROCESS')).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getInspectionResultResponsibilityTypes()).toEqual([
+      'INTERNAL_DEPARTMENT',
+      'SUPPLIER',
+      'OUTSOURCING_UNIT',
+    ]);
+    expect(getInspectionResultResponsibilityLabels('PROCESS')).toEqual([
+      '内部部门',
+      '外协单位',
+    ]);
   });
 });

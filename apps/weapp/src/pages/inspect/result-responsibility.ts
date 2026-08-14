@@ -58,6 +58,12 @@ export function resolveLockedInspectionRequestIssueResponsibility(
   ) {
     return null;
   }
+  if (
+    !isExternalInspectionIssueResponsibility(responsibilityType) &&
+    supplierId
+  ) {
+    return null;
+  }
   return {
     responsibilityType,
     responsibleDepartmentId,
