@@ -66,13 +66,6 @@ type LinkedIssueDraftState = {
   unqualifiedQuantity: number;
 };
 
-type CompleteIssueResponsibility = Omit<
-  NonNullable<InspectionRequest['issueResponsibility']>,
-  'responsibleDepartmentId'
-> & {
-  responsibleDepartmentId: string;
-};
-
 type DivisionIdentitySource = {
   division?: null | string;
   divisionId?: null | string;
@@ -418,46 +411,33 @@ export function useInspectionRequestTaskActions(
     });
   }
 
-  function hasCompleteIssueResponsibility(
+  function hasCompletePersistedResponsibility(
     request: InspectionRequest,
   ): request is InspectionRequest & {
-    issueResponsibility: CompleteIssueResponsibility;
+    responsibilityType: InspectionIssueResponsibilityType;
+    responsibleDepartmentId: string;
   } {
-    const responsibility = request.issueResponsibility;
+    const responsibilityType = request.responsibilityType;
     if (
-      !responsibility ||
-      !normalizeCloseText(responsibility.responsibleDepartmentId)
+      !responsibilityType ||
+      !normalizeCloseText(request.responsibleDepartmentId)
     ) {
       return false;
     }
-    return (
-      !isExternalInspectionIssueResponsibility(
-        responsibility.responsibilityType,
-      ) || !!normalizeCloseText(responsibility.supplierId)
-    );
-  }
-
-  function hasEmptyIssueResponsibilityContext(request: InspectionRequest) {
-    return ![
-      request.responsibilityType,
-      request.responsibleDepartment,
-      request.responsibleDepartmentId,
-    ].some((value) => normalizeCloseText(value));
+    if (isExternalInspectionIssueResponsibility(responsibilityType)) {
+      return !!normalizeCloseText(request.supplierId);
+    }
+    return !normalizeCloseText(request.supplierId);
   }
 
   async function resolveCloseRequest(
     record: InspectionRequest,
   ): Promise<InspectionRequest | null> {
-    if (hasCompleteIssueResponsibility(record)) return record;
+    if (hasCompletePersistedResponsibility(record)) return record;
     try {
       const refreshed = await getInspectionRequest(record.id);
-      if (refreshed && hasCompleteIssueResponsibility(refreshed)) {
-        return refreshed;
-      }
-      if (refreshed && hasEmptyIssueResponsibilityContext(refreshed)) {
-        return refreshed;
-      }
-      message.warning('报检任务责任上下文不完整，无法关闭');
+      if (refreshed) return refreshed;
+      message.warning('无法获取报检任务责任上下文，暂不能关闭');
     } catch (error: unknown) {
       handleApiError(error, 'Load Inspection Request Responsibility');
       message.warning('无法获取报检任务责任上下文，暂不能关闭');
@@ -495,17 +475,29 @@ export function useInspectionRequestTaskActions(
       reportDate: dayjs().format('YYYY-MM-DD'),
       reportedBy: request.inspectorName || getCurrentUserName() || '',
       responsibilityType:
+        request.responsibilityType ||
         issueResponsibility?.responsibilityType ||
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
-      responsibleDepartment: issueResponsibility?.responsibleDepartment || '',
+      responsibleDepartment:
+        request.responsibleDepartment ||
+        issueResponsibility?.responsibleDepartment ||
+        '',
       responsibleDepartmentId:
-        issueResponsibility?.responsibleDepartmentId || '',
+        request.responsibleDepartmentId ||
+        issueResponsibility?.responsibleDepartmentId ||
+        '',
       responsibleWelder: '',
       rootCause: '',
       solution: '',
       status: 'OPEN',
-      supplierId: issueResponsibility?.supplierId || '',
-      supplierName: issueResponsibility?.supplierName || '',
+      supplierId:
+        (request.responsibilityType ? request.supplierId : '') ||
+        issueResponsibility?.supplierId ||
+        '',
+      supplierName:
+        (request.responsibilityType ? request.supplierName : '') ||
+        issueResponsibility?.supplierName ||
+        '',
       photos: [] as UploadFileWithResponse[],
       unqualifiedQuantity: request.quantity || 1,
       severity: DEFAULT_VALUES.DEFAULT_SEVERITY,
@@ -526,6 +518,31 @@ export function useInspectionRequestTaskActions(
     if (!currentRequest.value) return;
     if (!validateCloseForm()) return;
 
+    const requiresResponsibilityDecision = !hasCompletePersistedResponsibility(
+      currentRequest.value,
+    );
+    const responsibilityType = linkedIssueDraft.value.responsibilityType;
+    const selectedResponsibility = {
+      responsibilityType,
+      responsibleDepartmentId: normalizeCloseText(
+        linkedIssueDraft.value.responsibleDepartmentId,
+      ),
+      supplierId: isExternalInspectionIssueResponsibility(responsibilityType)
+        ? normalizeCloseText(linkedIssueDraft.value.supplierId)
+        : '',
+    };
+    if (
+      requiresResponsibilityDecision &&
+      (!selectedResponsibility.responsibleDepartmentId ||
+        (isExternalInspectionIssueResponsibility(
+          selectedResponsibility.responsibilityType,
+        ) &&
+          !selectedResponsibility.supplierId))
+    ) {
+      message.warning('请补全历史报检任务的责任归属信息');
+      return;
+    }
+
     submitting.value = true;
     try {
       syncLinkedIssueQuantities();
@@ -534,7 +551,10 @@ export function useInspectionRequestTaskActions(
             ...linkedIssueDraft.value,
             photos: normalizeIssuePhotoUrls(linkedIssueDraft.value.photos),
             quantity: linkedIssueDraft.value.unqualifiedQuantity,
-            responsibilityType: linkedIssueDraft.value.responsibilityType,
+            responsibilityType: selectedResponsibility.responsibilityType,
+            responsibleDepartmentId:
+              selectedResponsibility.responsibleDepartmentId,
+            supplierId: selectedResponsibility.supplierId || undefined,
           })
         : undefined;
 
@@ -547,6 +567,14 @@ export function useInspectionRequestTaskActions(
         inspectionId: closeForm.inspectionId || undefined,
         inspector: closeForm.inspector,
         linkedIssue: payloadLinkedIssue,
+        responsibility: requiresResponsibilityDecision
+          ? {
+              responsibilityType: selectedResponsibility.responsibilityType,
+              responsibleDepartmentId:
+                selectedResponsibility.responsibleDepartmentId,
+              supplierId: selectedResponsibility.supplierId || undefined,
+            }
+          : undefined,
         qualifiedQuantity: shouldCreateLinkedIssue.value
           ? linkedIssueDraft.value.qualifiedQuantity
           : closeForm.quantity,
