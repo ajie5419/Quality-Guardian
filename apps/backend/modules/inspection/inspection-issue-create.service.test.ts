@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 
+import { SUPPLIER_CATEGORY } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueCreateService } from '~/modules/inspection/inspection-issue-create.service';
 
@@ -147,9 +148,17 @@ describe('inspectionIssueCreateService', () => {
     ).rejects.toThrow('不合格编号由系统生成');
   });
 
-  it.each(['SUPPLIER', 'OUTSOURCING_UNIT'] as const)(
+  it.each([
+    ['SUPPLIER', SUPPLIER_CATEGORY.SUPPLIER],
+    ['OUTSOURCING_UNIT', SUPPLIER_CATEGORY.OUTSOURCING],
+  ] as const)(
     'canonicalizes supplier identity for %s responsibility',
-    async (responsibilityType) => {
+    async (responsibilityType, supplierCategory) => {
+      mocks.resolveSupplier.mockResolvedValueOnce({
+        category: supplierCategory,
+        id: 'supplier-1',
+        name: 'Supplier A',
+      });
       const result = await InspectionIssueCreateService.createInTransaction({
         body: { ...baseBody, responsibilityType, supplierId: 'supplier-1' },
         tx: createTx(),
