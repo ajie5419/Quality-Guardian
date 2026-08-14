@@ -162,7 +162,7 @@ export function mapInspectionIssueRecord(
         issue.defectSubtype,
       ) || '',
     inspectionId: issue.inspectionId || undefined,
-    ncNumber: issue.nonConformanceNumber || '',
+    ncNumber: issue.nonConformanceNumber,
     reportDate: formatDate(issue.date),
     date: formatDate(issue.date),
     claim: issue.isClaim ? 'Yes' : 'No',

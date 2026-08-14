@@ -14,7 +14,12 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-const schema = z.object({ items: z.unknown() });
+const schema = z
+  .object({
+    generateNcNumber: z.boolean().default(false),
+    items: z.unknown(),
+  })
+  .strict();
 
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
@@ -24,7 +29,12 @@ export default defineEventHandler(async (event) => {
     const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
     if (!items) return badRequestResponse(event, '未发现可导入的数据');
     return useResponseSuccess(
-      await InspectionApiService.importIssues(event, userinfo, items),
+      await InspectionApiService.importIssues(
+        event,
+        userinfo,
+        items,
+        body.generateNcNumber,
+      ),
     );
   } catch (error: unknown) {
     logApiError('import', error, undefined, event);

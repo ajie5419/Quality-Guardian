@@ -154,6 +154,7 @@ export interface InspectionIssueCreateDataInput {
     | null;
   inspectorUsername?: string;
   mapStatus: (value: null | string | undefined) => string;
+  nonConformanceNumber?: null | string;
   now?: Date;
   serialNumber: number;
   uuid: string;
@@ -214,8 +215,7 @@ export function buildInspectionIssueCreateDataCore(
     status: input.mapStatus(
       normalizeOptionalInspectionIssueString(input.body.status),
     ),
-    nonConformanceNumber:
-      normalizeOptionalInspectionIssueString(input.body.ncNumber) ?? null,
+    nonConformanceNumber: input.nonConformanceNumber ?? null,
     work_orders: workOrderNumber
       ? {
           connect: {
@@ -268,18 +268,12 @@ export function buildInspectionIssueCreateDataCore(
 
 export function buildInspectionIssueUpdateDataCore(
   body: Record<string, unknown>,
-  existingNcNumber: null | string,
   mapStatus: (value: null | string | undefined) => string,
   now = new Date(),
 ) {
   const updateData: Record<string, unknown> = {
     updatedAt: now,
   };
-
-  if (body.ncNumber !== undefined && body.ncNumber !== existingNcNumber) {
-    updateData.nonConformanceNumber =
-      normalizeOptionalInspectionIssueString(body.ncNumber) ?? null;
-  }
 
   const stringFields = [
     'workOrderNumber',
@@ -340,8 +334,6 @@ export function buildInspectionIssueUpdateDataCore(
 export interface InspectionIssueUpsertPayloadItem {
   description?: unknown;
   division?: unknown;
-  ncNumber?: unknown;
-  nonConformanceNumber?: unknown;
   partName?: unknown;
   projectName?: unknown;
   quantity?: unknown;
@@ -356,55 +348,33 @@ export function buildInspectionIssueUpsertPayloadCore(
   serialNumber: number,
   mapStatus: (value: null | string | undefined) => string,
   createId: () => string,
-  options: { createdBy?: string } = {},
+  options: {
+    createdBy?: string;
+    nonConformanceNumber: null | string;
+  },
 ) {
-  const ncNumber =
-    normalizeOptionalInspectionIssueString(item.nonConformanceNumber) ??
-    normalizeOptionalInspectionIssueString(item.ncNumber);
-  if (!ncNumber) {
-    return null;
-  }
-
   const quantity = normalizeOptionalInspectionIssueNumber(item.quantity);
   const status = mapStatus(normalizeOptionalInspectionIssueString(item.status));
 
   return {
-    create: {
-      id: createId(),
-      serialNumber,
-      date: new Date(),
-      status,
-      partName:
-        normalizeOptionalInspectionIssueString(item.partName) ?? '未知零件',
-      description:
-        normalizeOptionalInspectionIssueString(item.description) ?? '',
-      quantity: quantity ?? 0,
-      projectName:
-        normalizeOptionalInspectionIssueString(item.projectName) ?? '',
-      division: normalizeOptionalInspectionIssueString(item.division) ?? '',
-      responsibleDepartment:
-        normalizeOptionalInspectionIssueString(item.responsibleDepartment) ??
-        '质量部',
-      responsibleWelder:
-        normalizeOptionalInspectionIssueString(item.responsibleWelder) ?? null,
-      nonConformanceNumber: ncNumber,
-      workOrderNumber:
-        normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,
-      createdBy: options.createdBy ?? null,
-    },
-    update: {
-      partName: normalizeOptionalInspectionIssueString(item.partName),
-      description: normalizeOptionalInspectionIssueString(item.description),
-      quantity,
-      projectName: normalizeOptionalInspectionIssueString(item.projectName),
-      responsibleDepartment: normalizeOptionalInspectionIssueString(
-        item.responsibleDepartment,
-      ),
-      responsibleWelder: normalizeOptionalInspectionIssueString(
-        item.responsibleWelder,
-      ),
-      status,
-    },
-    where: { nonConformanceNumber: ncNumber },
+    id: createId(),
+    serialNumber,
+    date: new Date(),
+    status,
+    partName:
+      normalizeOptionalInspectionIssueString(item.partName) ?? '未知零件',
+    description: normalizeOptionalInspectionIssueString(item.description) ?? '',
+    quantity: quantity ?? 0,
+    projectName: normalizeOptionalInspectionIssueString(item.projectName) ?? '',
+    division: normalizeOptionalInspectionIssueString(item.division) ?? '',
+    responsibleDepartment:
+      normalizeOptionalInspectionIssueString(item.responsibleDepartment) ??
+      '质量部',
+    responsibleWelder:
+      normalizeOptionalInspectionIssueString(item.responsibleWelder) ?? null,
+    nonConformanceNumber: options.nonConformanceNumber,
+    workOrderNumber:
+      normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,
+    createdBy: options.createdBy ?? null,
   };
 }

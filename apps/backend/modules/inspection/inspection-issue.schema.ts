@@ -115,7 +115,10 @@ const issueFields = {
 };
 
 const createSchema = z
-  .object(issueFields)
+  .object({
+    ...issueFields,
+    generateNcNumber: z.boolean().default(false),
+  })
   .strict()
   .refine(
     (value) =>

@@ -167,6 +167,7 @@ export async function buildInspectionIssueCreateData(
     id: string;
     inspection?: Awaited<ReturnType<typeof findInspectionForIssue>>;
     inspectorUsername?: string;
+    nonConformanceNumber?: null | string;
     serialNumber: number;
   },
 ) {
@@ -178,6 +179,7 @@ export async function buildInspectionIssueCreateData(
     inspection: options.inspection,
     inspectorUsername: options.inspectorUsername,
     mapStatus: (value) => toQualityRecordStatus(value),
+    nonConformanceNumber: options.nonConformanceNumber,
     serialNumber: options.serialNumber,
     uuid: options.id,
   }) as Prisma.quality_recordsCreateInput;
@@ -391,7 +393,7 @@ function normalizeWorkOrderRelationForIssueUpdate(
 
 export async function buildInspectionIssueUpdateData(
   body: Record<string, unknown>,
-  existingNcNumber: null | string,
+  _existingNcNumber?: null | string,
   inspection?: null | {
     category: string;
     supplierId?: null | string;
@@ -402,7 +404,6 @@ export async function buildInspectionIssueUpdateData(
     await resolveInspectionIssueUpdateBody(body, inspection);
   const updateData = buildInspectionIssueUpdateDataCore(
     canonicalBody,
-    existingNcNumber,
     (value) => toQualityRecordStatus(value),
   ) as Prisma.quality_recordsUpdateInput;
   const withRelations = await attachProcessIdToIssueUpdateData(
@@ -416,18 +417,18 @@ export async function buildInspectionIssueUpdateData(
 export async function buildInspectionIssueUpsertPayload(
   item: InspectionIssueImportItem,
   serialNumber: number,
-  options: { createdBy?: string } = {},
+  options: {
+    createdBy?: string;
+    nonConformanceNumber?: null | string;
+  } = {},
 ) {
   const payload = buildInspectionIssueUpsertPayloadCore(
     item,
     serialNumber,
     (value) => toQualityRecordStatus(value),
     createInspectionIssueId,
-    options,
-  ) as null | Prisma.quality_recordsUpsertArgs;
-  if (!payload) {
-    return null;
-  }
+    { ...options, nonConformanceNumber: options.nonConformanceNumber ?? null },
+  ) as Prisma.quality_recordsCreateInput;
 
   const processName = normalizeOptionalInspectionIssueString(
     (item as { processName?: unknown }).processName,
@@ -444,17 +445,9 @@ export async function buildInspectionIssueUpsertPayload(
   if (!processName) {
     return {
       ...payload,
-      create: {
-        ...payload.create,
-        ...governedFields,
-        ...governedCanonicalIds,
-      },
-      update: {
-        ...payload.update,
-        ...governedFields,
-        ...governedCanonicalIds,
-      },
-    } as Prisma.quality_recordsUpsertArgs;
+      ...governedFields,
+      ...governedCanonicalIds,
+    } as Prisma.quality_recordsCreateInput;
   }
   const processId = await resolveProcessIdForWrite({ processName });
   const processWrite = processId
@@ -466,25 +459,11 @@ export async function buildInspectionIssueUpsertPayload(
     : { disconnect: true };
   return {
     ...payload,
-    create: {
-      ...payload.create,
-      ...governedFields,
-      ...governedCanonicalIds,
-      processName,
-      ...(processId
-        ? {
-            process: processWrite,
-          }
-        : {}),
-    },
-    update: {
-      ...payload.update,
-      ...governedFields,
-      ...governedCanonicalIds,
-      processName,
-      process: processWrite,
-    },
-  } as Prisma.quality_recordsUpsertArgs;
+    ...governedFields,
+    ...governedCanonicalIds,
+    processName,
+    ...(processId ? { process: processWrite } : {}),
+  } as Prisma.quality_recordsCreateInput;
 }
 
 export { type InspectionIssueDateMode } from '@qgs/shared';

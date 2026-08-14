@@ -2,6 +2,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 
+import { InspectionIssueAssignNcNumberService } from './inspection-issue-assign-nc-number.service';
 import { InspectionIssueMutationService } from './inspection-issue-mutation.service';
 import { InspectionPublicQueryService } from './inspection-public-query.service';
 import { InspectionRequestCreateService } from './inspection-request-create.service';
@@ -65,6 +66,9 @@ export const InspectionApiService = {
       existingNcNumber,
     );
   },
+  async assignIssueNcNumber(userinfo: UserSession, id: string) {
+    return InspectionIssueAssignNcNumberService.assignNcNumber(userinfo, id);
+  },
   async batchDeleteIssues(
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
@@ -80,8 +84,14 @@ export const InspectionApiService = {
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
     items: Array<Record<string, unknown>>,
+    generateNcNumber = false,
   ) {
-    return InspectionIssueMutationService.importIssues(event, userinfo, items);
+    return InspectionIssueMutationService.importIssues(
+      event,
+      userinfo,
+      items,
+      generateNcNumber,
+    );
   },
   async getPublicProcesses(workOrderNumber: string) {
     return InspectionPublicQueryService.getPublicProcesses(workOrderNumber);

@@ -52,6 +52,13 @@ vi.mock('~/modules/welder/welder-score.service', () => ({
   },
 }));
 
+vi.mock('~/modules/quality-loss', () => ({
+  QualityLossIndexService: {
+    softDeleteSourceMany: vi.fn(),
+    upsertFromInternalInTransaction: vi.fn(),
+  },
+}));
+
 vi.mock('~/modules/file-storage/import-report', () => ({
   buildImportRowError: vi.fn().mockReturnValue({}),
   buildImportSummary: vi.fn().mockReturnValue({}),
@@ -881,9 +888,7 @@ describe('inspectionIssueMutationService', () => {
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { nonConformanceNumber: 'NC-001' },
-        create: { partName: 'Part' },
-        update: { partName: 'Part' },
+        partName: 'Part',
       } as any);
       vi.mocked(buildImportSummary).mockReturnValue({
         errorCount: 0,
@@ -904,11 +909,11 @@ describe('inspectionIssueMutationService', () => {
         InspectionIssueAccessService.ensurePermission,
       ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Create');
       expect(prisma.quality_records.create).toHaveBeenCalledWith({
-        data: { partName: 'Part' },
+        data: { nonConformanceNumber: null, partName: 'Part' },
       });
     });
 
-    it('should record row error when upsert payload is null', async () => {
+    it('should record row error when import payload construction fails', async () => {
       const { buildImportRowError, buildImportSummary } = await import(
         '~/modules/file-storage/import-report'
       );
@@ -917,7 +922,9 @@ describe('inspectionIssueMutationService', () => {
       );
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
-      vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue(null);
+      vi.mocked(buildInspectionIssueUpsertPayload).mockRejectedValue(
+        new Error('invalid import row'),
+      );
       vi.mocked(buildImportSummary).mockReturnValue({
         errorCount: 1,
         errors: [{ reason: 'error', row: 1 }],
@@ -945,9 +952,7 @@ describe('inspectionIssueMutationService', () => {
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { nonConformanceNumber: 'NC-001' },
-        create: {},
-        update: {},
+        partName: 'Part',
       } as any);
       (prisma.quality_records.create as any).mockRejectedValue(
         new Error('duplicate'),
@@ -966,10 +971,7 @@ describe('inspectionIssueMutationService', () => {
       expect(buildImportRowError).toHaveBeenCalled();
     });
 
-    it('should resolve successfully and log error when welder sync throws in importIssues', async () => {
-      const { WelderScoreService } = await import(
-        '~/modules/welder/welder-score.service'
-      );
+    it('returns the import summary when a created import has no NC number', async () => {
       const { buildInspectionIssueUpsertPayload } = await import(
         '~/modules/inspection/inspection-issue'
       );
@@ -979,9 +981,7 @@ describe('inspectionIssueMutationService', () => {
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
 
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { nonConformanceNumber: 'NC-002' },
-        create: { partName: 'Part' },
-        update: { partName: 'Part' },
+        partName: 'Part',
       } as any);
       (prisma.quality_records.create as any).mockResolvedValue({
         id: 'ISS-2026-010',
@@ -993,11 +993,6 @@ describe('inspectionIssueMutationService', () => {
         successCount: 1,
         totalCount: 1,
       } as any);
-      const syncError = new Error('welder import sync failed');
-      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
-        syncError,
-      );
-
       const result = await InspectionIssueMutationService.importIssues(
         {} as any,
         mockUser,
@@ -1005,10 +1000,6 @@ describe('inspectionIssueMutationService', () => {
       );
 
       expect(result.successCount).toBe(1);
-      expect(mockLoggerFns.error).toHaveBeenCalledWith(
-        syncError,
-        'welder-score-sync after importIssues',
-      );
     });
 
     it('records a row error instead of overwriting another user record', async () => {
@@ -1024,9 +1015,7 @@ describe('inspectionIssueMutationService', () => {
         roles: ['admin'],
       } as any;
       vi.mocked(buildInspectionIssueUpsertPayload).mockResolvedValue({
-        where: { nonConformanceNumber: 'NC-OTHER' },
-        create: { partName: 'Part' },
-        update: { partName: 'Changed' },
+        partName: 'Part',
       } as any);
       (prisma.quality_records.findUnique as any).mockResolvedValue({
         createdBy: 'user-2',

@@ -6,6 +6,7 @@ import {
 } from './inspection-request';
 
 export const INSPECTION_ISSUE_PERMISSION_CODES = {
+  ASSIGN_NC_NUMBER: 'QMS:Inspection:Issues:AssignNcNumber',
   CREATE: 'QMS:Inspection:Issues:Create',
   DELETE: 'QMS:Inspection:Issues:Delete',
   EDIT: 'QMS:Inspection:Issues:Edit',
@@ -67,6 +68,7 @@ export function buildInspectionIssuePayload<T extends Record<string, unknown>>(
   Omit<
     T,
     | 'ncNumber'
+    | 'nonConformanceNumber'
     | 'responsibilityType'
     | 'responsibleDepartment'
     | 'responsibleDepartmentId'
@@ -76,6 +78,7 @@ export function buildInspectionIssuePayload<T extends Record<string, unknown>>(
   > {
   const {
     ncNumber: _ncNumber,
+    nonConformanceNumber: _nonConformanceNumber,
     responsibleDepartment: _responsibleDepartment,
     responsibleDepartments: _responsibleDepartments,
     supplierName: _supplierName,
@@ -104,6 +107,7 @@ export function buildInspectionIssuePayload<T extends Record<string, unknown>>(
     Omit<
       T,
       | 'ncNumber'
+      | 'nonConformanceNumber'
       | 'responsibilityType'
       | 'responsibleDepartment'
       | 'responsibleDepartmentId'
