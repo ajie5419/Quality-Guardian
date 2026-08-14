@@ -1,4 +1,7 @@
-import type { QualityClassificationCategory } from '@qgs/shared';
+import type {
+  InspectionIssueResponsibilityType,
+  QualityClassificationCategory,
+} from '@qgs/shared';
 
 import type { StatusOption } from '../constants';
 
@@ -21,17 +24,34 @@ import {
 import { isExternalInspectionIssueResponsibility } from './issueFormPayload';
 
 /**
- * Issue department options are supplied as { label, value, children } nodes.
- * Keep the form value as the canonical department ID while TreeSelect renders
- * the matching label after its asynchronous options load.
+ * Department options use Ant Design Vue's native { title, value, children }
+ * shape. This keeps asynchronous ID values renderable without converting the
+ * form value into a labelled object.
  */
 export const RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS = {
-  fieldNames: { children: 'children', label: 'label', value: 'value' },
   labelInValue: false,
   treeDefaultExpandAll: true,
-  treeNodeFilterProp: 'label',
-  treeNodeLabelProp: 'label',
+  treeNodeFilterProp: 'title',
+  treeNodeLabelProp: 'title',
 } as const;
+
+export const ISSUE_RESPONSIBILITY_TYPE_OPTIONS: ReadonlyArray<{
+  label: string;
+  value: InspectionIssueResponsibilityType;
+}> = [
+  {
+    label: '内部部门',
+    value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+  },
+  {
+    label: '供应商',
+    value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+  },
+  {
+    label: '外协单位',
+    value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+  },
+];
 
 export function isWeldingProcessName(value: unknown) {
   return String(value ?? '')
@@ -59,6 +79,7 @@ export function getIssueFormSchema(
   processOptionsOverride?: Array<{ label: string; value: string }>,
   classificationOptions: QualityClassificationCategory[] = [],
   isEditMode = false,
+  responsibilityTypeOptions = ISSUE_RESPONSIBILITY_TYPE_OPTIONS,
 ): VbenFormSchema[] {
   const { t } = useI18n();
   const { statusOptions: fallbackStatusOptions } = useStatusOptions();
@@ -93,7 +114,7 @@ export function getIssueFormSchema(
       : [
           {
             fieldName: 'generateNcNumber',
-            label: 'Generate NC Number',
+            label: '生成不合格编号',
             component: 'Switch' as const,
             componentProps: {
               // The form defaults every control to w-full. A switch must keep
@@ -180,20 +201,7 @@ export function getIssueFormSchema(
       rules: 'selectRequired',
       componentProps: {
         allowClear: false,
-        options: [
-          {
-            label: '内部部门',
-            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
-          },
-          {
-            label: '供应商',
-            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
-          },
-          {
-            label: '外协单位',
-            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
-          },
-        ],
+        options: responsibilityTypeOptions,
       },
     },
     {
@@ -360,11 +368,13 @@ export function getIssueFormSchemaWithStatusOptions(
   processOptions?: Array<{ label: string; value: string }>,
   classificationOptions: QualityClassificationCategory[] = [],
   isEditMode = false,
+  responsibilityTypeOptions = ISSUE_RESPONSIBILITY_TYPE_OPTIONS,
 ): VbenFormSchema[] {
   const schema = getIssueFormSchema(
     processOptions,
     classificationOptions,
     isEditMode,
+    responsibilityTypeOptions,
   );
   const target = schema.find((item) => item.fieldName === 'status');
   if (target) {

@@ -102,7 +102,7 @@ describe('issue form welding conditions', () => {
     );
     expect(department?.componentProps).toMatchObject({
       labelInValue: false,
-      treeNodeLabelProp: 'label',
+      treeNodeLabelProp: 'title',
     });
   });
 
@@ -130,11 +130,6 @@ describe('issue form welding conditions', () => {
       class: '!w-auto',
       style: { width: 'auto' },
     });
-    expect(generateNcNumber?.componentProps).not.toHaveProperty(
-      'checkedChildren',
-    );
-    expect(generateNcNumber?.componentProps).not.toHaveProperty(
-      'unCheckedChildren',
-    );
+    expect(generateNcNumber?.label).toBe('生成不合格编号');
   });
 });

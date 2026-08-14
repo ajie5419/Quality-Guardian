@@ -14,6 +14,7 @@ import { computed, nextTick, reactive, ref, watch } from 'vue';
 
 import { IconifyIcon } from '@vben/icons';
 
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import {
   Button,
   Form,
@@ -39,6 +40,7 @@ import {
 } from '../../issues/components/issueFormPayload';
 import { useStatusOptions } from '../../issues/constants';
 import { resolveDivisionIdentity } from '../composables/useInspectionRequestTaskActions';
+import { getInspectionRequestResponsibilityTypeOptions } from '../entry/entry-mode';
 import { resolveTreeDepartmentIdentity } from '../inspection-request-responsibility';
 import { resolveLegacyExternalResponsibilityDepartment } from './legacyResponsibilityDepartment';
 
@@ -148,6 +150,9 @@ const legacySuppliers = ref<InspectionRequestResponsibilitySupplierOption[]>(
 const hasLockedResponsibility = computed(() => {
   const responsibility = props.currentRequest?.issueResponsibility;
   if (!responsibility?.responsibleDepartmentId) return false;
+  if (!isAllowedResponsibilityType(responsibility.responsibilityType)) {
+    return false;
+  }
   return (
     !isExternalInspectionIssueResponsibility(
       responsibility.responsibilityType,
@@ -155,14 +160,29 @@ const hasLockedResponsibility = computed(() => {
   );
 });
 
-const responsibilityTypeOptions = [
-  {
-    label: '内部部门',
-    value: 'INTERNAL_DEPARTMENT' as const,
-  },
-  { label: '供应商', value: 'SUPPLIER' as const },
-  { label: '外协单位', value: 'OUTSOURCING_UNIT' as const },
-];
+const responsibilityTypeOptions = computed(() =>
+  getInspectionRequestResponsibilityTypeOptions(
+    props.currentRequest?.category === 'INCOMING',
+  ),
+);
+
+function isAllowedResponsibilityType(
+  value: string,
+): value is InspectionIssueResponsibilityType {
+  return responsibilityTypeOptions.value.some(
+    (option) => option.value === value,
+  );
+}
+
+function resetUnsupportedResponsibilityType() {
+  if (isAllowedResponsibilityType(localLinkedIssueDraft.responsibilityType)) {
+    return;
+  }
+  localLinkedIssueDraft.responsibilityType =
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+  localLinkedIssueDraft.supplierId = '';
+  localLinkedIssueDraft.supplierName = '';
+}
 
 function syncLocalLinkedIssueQuantities(unqualifiedValue?: unknown) {
   const totalQuantity = normalizeQuantity(localCloseForm.quantity);
@@ -244,11 +264,7 @@ async function loadLegacyResponsibilityOptions() {
 }
 
 async function changeLegacyResponsibilityType(value: SelectProps['value']) {
-  if (
-    value !== 'INTERNAL_DEPARTMENT' &&
-    value !== 'SUPPLIER' &&
-    value !== 'OUTSOURCING_UNIT'
-  ) {
+  if (typeof value !== 'string' || !isAllowedResponsibilityType(value)) {
     return;
   }
   localLinkedIssueDraft.responsibilityType = value;
@@ -353,6 +369,7 @@ watch(
   async (open) => {
     if (open) {
       syncFromProps();
+      resetUnsupportedResponsibilityType();
       if (shouldCreateLinkedIssue.value) {
         if (!hasLockedResponsibility.value) {
           await loadLegacyResponsibilityOptions();
@@ -360,6 +377,14 @@ watch(
         await applyEmbeddedValues();
       }
     }
+  },
+  { immediate: true },
+);
+
+watch(
+  responsibilityTypeOptions,
+  () => {
+    resetUnsupportedResponsibilityType();
   },
   { immediate: true },
 );
@@ -471,6 +496,12 @@ async function collectIssueFromForm() {
 async function handleSubmit() {
   if (props.submitting) return;
   if (shouldCreateLinkedIssue.value) {
+    if (
+      !isAllowedResponsibilityType(localLinkedIssueDraft.responsibilityType)
+    ) {
+      message.error('当前报检类型不允许该责任归属类型');
+      return;
+    }
     if (!hasLockedResponsibility.value && legacyResponsibilityError.value) {
       message.error('责任归属选项加载失败，无法提交不合格项');
       return;
@@ -667,6 +698,7 @@ async function handleBeforeUpload(file: File) {
           :is-edit-mode="false"
           :dept-tree-data="props.deptTreeData"
           :responsibility-type="localLinkedIssueDraft.responsibilityType"
+          :responsibility-type-options="responsibilityTypeOptions"
           :status-options="statusOptions"
         />
       </div>

@@ -167,7 +167,7 @@ describe('issue form fields responsibility contract', () => {
   it('shows the automatic NC number generation switch only while creating', () => {
     const wrapper = mountComponent(false);
 
-    expect(wrapper.text()).toContain('Generate NC Number');
+    expect(wrapper.text()).toContain('生成不合格编号');
     expect(wrapper.text()).not.toContain('qms.inspection.issues.ncNumber');
   });
 
@@ -176,7 +176,7 @@ describe('issue form fields responsibility contract', () => {
 
     expect(wrapper.text()).toContain('qms.inspection.issues.ncNumber');
     expect(wrapper.text()).toContain('Unnumbered');
-    expect(wrapper.text()).not.toContain('Generate NC Number');
+    expect(wrapper.text()).not.toContain('生成不合格编号');
   });
 
   it('keeps the canonical department ID while async options supply its label', async () => {
@@ -194,14 +194,9 @@ describe('issue form fields responsibility contract', () => {
       expect.arrayContaining([
         expect.objectContaining({
           componentProps: expect.objectContaining({
-            fieldNames: {
-              children: 'children',
-              label: 'label',
-              value: 'value',
-            },
             labelInValue: false,
             treeData: departments,
-            treeNodeLabelProp: 'label',
+            treeNodeLabelProp: 'title',
           }),
           fieldName: 'responsibleDepartmentId',
         }),
@@ -247,5 +242,44 @@ describe('issue form fields responsibility contract', () => {
     expect(
       wrapper.findComponent({ name: 'MockSupplierSelect' }).props('category'),
     ).toBe('Outsourcing');
+  });
+
+  it('does not retain supplier as an available embedded PROCESS choice', () => {
+    mount(IssueFormFields, {
+      props: {
+        deptTreeData: [],
+        mode: 'embedded',
+        responsibilityTypeOptions: [
+          {
+            label: '内部部门',
+            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+          },
+          {
+            label: '外协单位',
+            value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+          },
+        ],
+      },
+    });
+
+    expect(mockUpdateSchema).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          componentProps: expect.objectContaining({
+            options: [
+              {
+                label: '内部部门',
+                value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+              },
+              {
+                label: '外协单位',
+                value: INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+              },
+            ],
+          }),
+          fieldName: 'responsibilityType',
+        }),
+      ]),
+    );
   });
 });

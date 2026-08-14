@@ -81,6 +81,7 @@ export interface InspectionIssue {
 export interface DeptNode {
   id: string;
   label: string;
+  title: string;
   value: string;
   children?: DeptNode[];
 }

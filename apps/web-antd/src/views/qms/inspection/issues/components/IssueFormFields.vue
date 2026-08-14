@@ -26,6 +26,7 @@ import { useQualityClassificationOptions } from '../../../shared/composables/use
 import { useAiAnalysis } from '../composables/useAiAnalysis';
 import {
   getIssueFormSchemaWithStatusOptions,
+  ISSUE_RESPONSIBILITY_TYPE_OPTIONS,
   isWeldingDefectSubcategory,
   isWeldingProcessName,
   RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
@@ -49,6 +50,10 @@ interface Props {
   isEditMode?: boolean;
   processOptions?: Array<{ label: string; value: string }>;
   responsibilityType?: InspectionIssueResponsibilityType;
+  responsibilityTypeOptions?: Array<{
+    label: string;
+    value: InspectionIssueResponsibilityType;
+  }>;
   statusOptions?: StatusOption[];
 }
 
@@ -59,6 +64,7 @@ const props = withDefaults(defineProps<Props>(), {
   isEditMode: false,
   processOptions: () => [],
   responsibilityType: undefined,
+  responsibilityTypeOptions: () => [...ISSUE_RESPONSIBILITY_TYPE_OPTIONS],
   statusOptions: () => [],
 });
 
@@ -169,6 +175,7 @@ const [Form, formApi] = useVbenForm({
     props.processOptions,
     [],
     props.isEditMode,
+    props.responsibilityTypeOptions,
   ),
   showDefaultActions: false,
 });
@@ -180,6 +187,14 @@ const resolvedResponsibilityType = computed(() => {
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   );
 });
+
+function isAllowedResponsibilityType(
+  value: InspectionIssueResponsibilityType | undefined,
+) {
+  return props.responsibilityTypeOptions.some(
+    (option) => option.value === value,
+  );
+}
 
 const targetUnitCategory = computed(() => {
   return resolvedResponsibilityType.value ===
@@ -252,6 +267,30 @@ watch(
 );
 
 watch(
+  () => props.responsibilityTypeOptions,
+  (options) => {
+    formApi.updateSchema([
+      {
+        fieldName: 'responsibilityType',
+        componentProps: { allowClear: false, options },
+      },
+    ]);
+    if (
+      !props.responsibilityType &&
+      !isAllowedResponsibilityType(formValues.value.responsibilityType)
+    ) {
+      formApi.setFieldValue(
+        'responsibilityType',
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+      );
+      formApi.setFieldValue('supplierId', undefined);
+      formApi.setFieldValue('supplierName', '');
+    }
+  },
+  { immediate: true },
+);
+
+watch(
   shouldShowSupplier,
   (show) => {
     if (!show) {
@@ -303,6 +342,7 @@ watch(
         props.processOptions,
         [],
         props.isEditMode,
+        props.responsibilityTypeOptions,
       ),
     });
   },
