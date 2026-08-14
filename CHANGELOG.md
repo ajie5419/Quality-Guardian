@@ -27,6 +27,27 @@
 
 ---
 
+### 2026-08-14 修复：不合格项编辑责任部门回显
+
+**执行内容：**
+
+- 修复 `IssueFormFields` 中编辑态完整 schema 重建覆盖异步部门树的问题：统一 schema 构造现在始终注入当前 `deptTreeData`，因此 TreeSelect 能用 `title` 显示名称、用 primitive `value` 保持 canonical 部门 ID。
+- 同时将责任归属类型、责任部门和供应商的锁定态纳入完整 schema 构造，避免编辑态重建后解除受控字段禁用状态。
+- 补齐回归测试：真实 TreeSelect 在异步树到达后将 `dept-1770026473133` 回显为部门名称；编辑态重建后最终 schema 仍保留树数据和锁定态；编辑弹窗优先回填显式 canonical 部门 ID，不采用旧名称或数组猜测。
+
+**验证结果：**
+
+- Web 定向 Vitest：`5/5` 文件、`18/18` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `b15fec9` `fix(@qgs/web-antd): preserve department labels on schema rebuild`。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start，未进行真实浏览器页面验收。
+
+---
+
 ### 2026-08-14 修复：关单不合格表单与历史责任事实兼容
 
 **执行内容：**
