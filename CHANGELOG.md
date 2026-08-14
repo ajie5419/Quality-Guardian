@@ -27,6 +27,26 @@
 
 ---
 
+### 2026-08-14 修复：不合格项表单责任部门回显与编号开关布局
+
+**执行内容：**
+
+- 不合格项表单的责任部门 `TreeSelect` 显式采用 `label/value/children` 映射；异步部门选项到达、编辑回填和预填均显示 canonical ID 对应的部门名称，提交值仍保持部门 ID。
+- “Generate NC Number” 开关移除会拉宽控件的状态文字，并抵消表单统一 `w-full`，恢复为紧凑的原生开关；编辑态继续不显示该开关。
+
+**验证结果：**
+
+- Web happy-dom Vitest：`61/61` 文件、`313/313` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `a8f36b7` `fix(@qgs/web-antd): correct issue form labels and switch width`
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start，未完成真实页面验收。
+
+---
+
 ### 2026-08-14 修复：不合格编号改为可选的系统正式标识
 
 **执行内容：**
