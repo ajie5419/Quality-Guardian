@@ -27,6 +27,30 @@
 
 ---
 
+### 2026-08-14 修复：历史报检任务关闭责任裁决
+
+**执行内容：**
+
+- 关闭 payload 新增独立顶层 canonical `responsibility`，由 `responsibilityType + responsibleDepartmentId + supplierId?` 组成；完整报检任务的既有责任事实不可被该字段覆盖，冲突输入直接拒绝。
+- 历史 partial 或 missing responsibility 在关闭事务的状态锁后重新读取类别、TEAM 与责任字段；通过 active 主数据、类别/TEAM policy 和字段级 CAS 补齐，PASS 与 FAIL 共用同一最终事实。`PROCESS + SUPPLIER`、供应商类别错误、失效 ID、partial conflict 和 CAS 失败继续 fail-closed。
+- FAIL 的 `linkedIssue` 必须与最终关闭责任精确一致；重复或并发 FAIL 复用已有 NC 前也验证其持久化三元组，避免两个事实源漂移。旧 FAIL 客户端仅在未提交顶层字段时才临时以 `linkedIssue` 为 fallback，PASS 不推断缺失责任。
+- 桌面关单弹窗、H5 检验结果页和小程序关闭页都补齐历史责任选择；H5 PASS 强制关闭附件，FAIL 走完整不合格项表单并提交同一顶层责任事实。
+
+**验证结果：**
+
+- 后端关闭责任定向 Vitest：`26/26` 文件、`89/89` 用例通过。
+- Web/H5/WeApp 关单定向 Vitest：`5/5` 文件、`41/41` 用例通过。
+- 后端定向 ESLint、`pnpm --dir apps/backend exec tsc --noEmit` 与 `rtk git diff --check` 均通过。
+
+**commit:** `2dd47b0c` `fix(@qgs/backend): repair historical inspection close responsibility`、`97b32657` `fix(@qgs/web-antd): adjudicate historical inspection close responsibility`、`804b0d08` `fix(@qgs/weapp): complete historical inspection close flows`。
+
+**遗留问题：**
+
+- 未运行真实 MySQL 并发集成验证；事务回滚与行锁边界由同一 Prisma transaction client 的定向测试覆盖。
+- 未运行前端 dev/build/start、真实浏览器或小程序点击验收，也未运行最终全仓门禁。
+
+---
+
 ### 2026-08-14 修复：不合格项编辑责任部门回显
 
 **执行内容：**
