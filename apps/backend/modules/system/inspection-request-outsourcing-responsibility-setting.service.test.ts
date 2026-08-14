@@ -1,9 +1,14 @@
-import { OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT } from '@qgs/shared';
+import {
+  INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+  OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+} from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeptService } from '~/modules/dept';
 import prisma from '~/utils/prisma';
 
 import {
+  INCOMING_SUPPLIER_RESPONSIBLE_DEPARTMENT_ID_SETTING_KEY,
+  InspectionRequestResponsibilityDepartmentSettingService,
   PROCESS_OUTSOURCING_RESPONSIBLE_DEPARTMENT_ID_SETTING_KEY,
   ProcessOutsourcingResponsibleDepartmentSettingService,
 } from './inspection-request-outsourcing-responsibility-setting.service';
@@ -44,6 +49,38 @@ describe('process outsourcing responsibility department setting', () => {
       name: 'Renamed production unit',
     });
     expect(DeptService.findActiveByIdsOrNames).not.toHaveBeenCalled();
+  });
+
+  it('bootstraps the incoming supplier department under its own canonical setting', async () => {
+    vi.mocked(prisma.system_settings.findUnique).mockResolvedValue(null);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      {
+        businessUnit: null,
+        id: 'dept-purchasing',
+        name: INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+      },
+    ]);
+    vi.mocked(DeptService.findActiveById).mockResolvedValue({
+      businessUnit: null,
+      id: 'dept-purchasing',
+      name: INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT,
+    });
+
+    await expect(
+      InspectionRequestResponsibilityDepartmentSettingService.resolveConfiguredDepartment(
+        'SUPPLIER',
+      ),
+    ).resolves.toMatchObject({ id: 'dept-purchasing' });
+    expect(DeptService.findActiveByIdsOrNames).toHaveBeenCalledWith(
+      { names: [INCOMING_INSPECTION_RESPONSIBLE_DEPARTMENT] },
+      prisma,
+    );
+    expect(prisma.system_settings.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        key: INCOMING_SUPPLIER_RESPONSIBLE_DEPARTMENT_ID_SETTING_KEY,
+        value: 'dept-purchasing',
+      }),
+    });
   });
 
   it('bootstraps an absent setting from one active legacy candidate', async () => {

@@ -90,7 +90,7 @@ describe('inspection request create schema', () => {
     },
   );
 
-  it('rejects PROCESS supplier responsibility and all client-selected outsourcing departments', () => {
+  it('rejects PROCESS supplier responsibility and all client-selected external departments', () => {
     expect(() =>
       inspectionRequestCreateV2BodySchema.parse({
         ...buildValidPayload(),
@@ -115,7 +115,7 @@ describe('inspection request create schema', () => {
           responsibleDepartmentId: 'dept-client',
           supplierId: 'supplier-outsourcing',
         }),
-      ).toThrow('Outsourcing responsibility department is server-resolved');
+      ).toThrow('External responsibility department is server-resolved');
   });
 
   it('rejects a V2 request without canonical IDs', () => {
@@ -137,7 +137,7 @@ describe('inspection request create schema', () => {
       requestedPartName: 'Unregistered bearing',
       supplierId: 'supplier-1',
       responsibilityType: 'SUPPLIER',
-      responsibleDepartmentId: 'dept-purchasing',
+      responsibleDepartmentId: undefined,
       teamId: undefined,
       team: undefined,
     });
@@ -145,22 +145,39 @@ describe('inspection request create schema', () => {
     expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
   });
 
-  it('accepts INCOMING internal responsibility without a supplier or execution TEAM', () => {
-    const parsed = inspectionRequestCreateV2BodySchema.parse({
-      ...buildValidPayload(),
-      category: 'INCOMING',
-      componentName: undefined,
-      partId: undefined,
-      processId: 'incoming-process-1',
-      requestedPartName: 'Unregistered bearing',
-      responsibilityType: 'INTERNAL_DEPARTMENT',
-      responsibleDepartmentId: 'dept-quality',
-      supplierId: undefined,
-      team: undefined,
-      teamId: undefined,
-    });
-
-    expect(validateInspectionRequestCreateV2Body(parsed).isValid).toBe(true);
+  it('rejects INCOMING internal responsibility and client-controlled departments', () => {
+    expect(() =>
+      inspectionRequestCreateV2BodySchema.parse({
+        ...buildValidPayload(),
+        category: 'INCOMING',
+        componentName: undefined,
+        partId: undefined,
+        processId: 'incoming-process-1',
+        requestedPartName: 'Unregistered bearing',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-quality',
+        supplierId: undefined,
+        team: undefined,
+        teamId: undefined,
+      }),
+    ).toThrow(
+      'INCOMING inspection requests cannot use internal department responsibility',
+    );
+    expect(() =>
+      inspectionRequestCreateV2BodySchema.parse({
+        ...buildValidPayload(),
+        category: 'INCOMING',
+        componentName: undefined,
+        partId: undefined,
+        processId: 'incoming-process-1',
+        requestedPartName: 'Unregistered bearing',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-client',
+        supplierId: 'supplier-1',
+        team: undefined,
+        teamId: undefined,
+      }),
+    ).toThrow('External responsibility department is server-resolved');
   });
 
   it('rejects an incoming request with both material identity forms', () => {
@@ -173,7 +190,7 @@ describe('inspection request create schema', () => {
         requestedPartName: 'Unregistered bearing',
         supplierId: 'supplier-1',
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
+        responsibleDepartmentId: undefined,
       }),
     ).toThrow();
   });

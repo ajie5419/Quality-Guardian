@@ -10,7 +10,7 @@ import {
 
 const mocks = vi.hoisted(() => ({
   assertPolicy: vi.fn(),
-  resolveOutsourcingDepartmentId: vi.fn(),
+  resolveResponsibilityDepartmentId: vi.fn(),
   resolveResponsibility: vi.fn(),
   resolveSupplierById: vi.fn(),
 }));
@@ -22,8 +22,8 @@ vi.mock('./inspection-request-responsibility-policy.service', () => ({
   assertInspectionRequestResponsibilityPolicy: mocks.assertPolicy,
 }));
 vi.mock('./inspection-request-responsibility-default.service', () => ({
-  resolveProcessOutsourcingResponsibleDepartmentId:
-    mocks.resolveOutsourcingDepartmentId,
+  resolveInspectionRequestResponsibilityDepartmentId:
+    mocks.resolveResponsibilityDepartmentId,
 }));
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: {
@@ -51,7 +51,9 @@ describe('legacy inspection request close responsibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     updateMany.mockResolvedValue({ count: 1 });
-    mocks.resolveOutsourcingDepartmentId.mockResolvedValue('dept-production');
+    mocks.resolveResponsibilityDepartmentId.mockResolvedValue(
+      'dept-production',
+    );
     mocks.resolveSupplierById.mockResolvedValue({
       category: 'Outsourcing',
       id: 'supplier-before-close',
@@ -237,7 +239,10 @@ describe('legacy inspection request close responsibility', () => {
         }),
       }),
     );
-    expect(mocks.resolveOutsourcingDepartmentId).toHaveBeenCalledWith(tx);
+    expect(mocks.resolveResponsibilityDepartmentId).toHaveBeenCalledWith(
+      'OUTSOURCING_UNIT',
+      tx,
+    );
     expect(mocks.resolveResponsibility).toHaveBeenCalledWith(
       expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
       tx,
@@ -401,7 +406,10 @@ describe('legacy inspection request close responsibility', () => {
           responsibleDepartmentId: 'dept-production',
         }),
       });
-      expect(mocks.resolveOutsourcingDepartmentId).toHaveBeenCalledWith(tx);
+      expect(mocks.resolveResponsibilityDepartmentId).toHaveBeenCalledWith(
+        'OUTSOURCING_UNIT',
+        tx,
+      );
       expect(mocks.assertPolicy).toHaveBeenCalledWith(
         expect.objectContaining({
           responsibleDepartmentId: 'dept-production',
@@ -423,6 +431,60 @@ describe('legacy inspection request close responsibility', () => {
       );
     },
   );
+
+  it('resolves an INCOMING supplier responsibility from the server setting', async () => {
+    mocks.resolveResponsibility.mockResolvedValueOnce({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: 'Purchasing',
+      responsibleDepartmentId: 'dept-purchasing',
+      supplierId: 'supplier-1',
+      supplierCategory: 'Supplier',
+      supplierName: 'Supplier A',
+    });
+    mocks.resolveResponsibilityDepartmentId.mockResolvedValueOnce(
+      'dept-purchasing',
+    );
+
+    await expect(
+      resolveLegacyCloseRequestResponsibility({
+        responsibility: {
+          responsibilityType: 'SUPPLIER',
+          supplierId: 'supplier-1',
+        },
+        request: { ...baseRequest, category: 'INCOMING' },
+        tx,
+      }),
+    ).resolves.toMatchObject({
+      request: expect.objectContaining({
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartmentId: 'dept-purchasing',
+      }),
+    });
+    expect(mocks.resolveResponsibilityDepartmentId).toHaveBeenCalledWith(
+      'SUPPLIER',
+      tx,
+    );
+    expect(mocks.resolveResponsibility).toHaveBeenCalledWith(
+      expect.objectContaining({ responsibleDepartmentId: 'dept-purchasing' }),
+      tx,
+    );
+  });
+
+  it('rejects a client-selected incoming supplier department before a CAS write', async () => {
+    await expect(
+      resolveLegacyCloseRequestResponsibility({
+        responsibility: {
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-client',
+          supplierId: 'supplier-1',
+        },
+        request: { ...baseRequest, category: 'INCOMING' },
+        tx,
+      }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
+    expect(mocks.resolveResponsibilityDepartmentId).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
+  });
 
   it('rejects a client-selected outsourcing department before a CAS write', async () => {
     await expect(

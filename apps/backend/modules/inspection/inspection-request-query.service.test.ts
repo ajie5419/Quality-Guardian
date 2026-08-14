@@ -123,6 +123,49 @@ describe('inspection request query service', () => {
     });
   });
 
+  it('maps the persisted incoming supplier name to the task-list team display', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([
+      {
+        attachments: null,
+        category: 'INCOMING',
+        closeAttachments: null,
+        dispatcher: null,
+        inspection: null,
+        inspectionId: null,
+        inspector: null,
+        linkedIssueId: null,
+        process: { name: 'Incoming inspection' },
+        processName: 'Incoming inspection',
+        requestNo: 'IR-incoming',
+        responsibilityType: 'SUPPLIER',
+        responsibleDepartment: 'Purchasing',
+        responsibleDepartmentId: 'dept-purchasing',
+        supplierId: 'supplier-1',
+        supplierName: 'Incoming Supplier A',
+        team: null,
+        teamId: null,
+        workOrderNumber: 'WO-001',
+        workOrders: [],
+      },
+    ] as any);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(1);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-purchasing', name: 'Purchasing' },
+    ]);
+
+    const result = await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1' } as any,
+      {},
+    );
+
+    expect(result.items[0]).toMatchObject({
+      supplierName: 'Incoming Supplier A',
+      team: 'Incoming Supplier A',
+      teamId: null,
+    });
+  });
+
   it('returns persisted direct internal responsibility without a TEAM', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       attachments: null,

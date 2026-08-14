@@ -26,6 +26,13 @@ export function resolveInspectionTeamDisplay(input: {
   ) {
     return String(input.supplierName || '').trim() || null;
   }
+  if (
+    input.category === 'INCOMING' &&
+    (input.responsibilityType === 'SUPPLIER' ||
+      input.responsibilityType === 'OUTSOURCING_UNIT')
+  ) {
+    return String(input.supplierName || '').trim() || null;
+  }
 
   return String(input.team || '').trim() || null;
 }

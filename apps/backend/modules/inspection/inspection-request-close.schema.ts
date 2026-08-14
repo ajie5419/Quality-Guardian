@@ -60,7 +60,11 @@ function buildCloseResponsibilitySchema(
             path: ['responsibleDepartmentId'],
           });
         }
-      } else if (!responsibleDepartmentId) {
+      } else if (
+        value.responsibilityType ===
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+        !responsibleDepartmentId
+      ) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
           message: messages.departmentIdRequired,

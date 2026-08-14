@@ -25,4 +25,15 @@ describe('resolveInspectionTeamDisplay', () => {
       }),
     ).toBe('Outsourcing Unit A');
   });
+
+  it('uses the persisted incoming supplier name without forging a TEAM', () => {
+    expect(
+      resolveInspectionTeamDisplay({
+        category: 'INCOMING',
+        responsibilityType: 'SUPPLIER',
+        supplierName: 'Incoming Supplier A',
+        team: null,
+      }),
+    ).toBe('Incoming Supplier A');
+  });
 });

@@ -10,9 +10,11 @@ import { resolveInspectionIssueResponsibility } from './inspection-issue-respons
 import { resolveV2RequestResponsibility } from './inspection-request-create-responsibility.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
-const { resolveProcessOutsourcingResponsibleDepartmentId } = vi.hoisted(() => ({
-  resolveProcessOutsourcingResponsibleDepartmentId: vi.fn(),
-}));
+const { resolveInspectionRequestResponsibilityDepartmentId } = vi.hoisted(
+  () => ({
+    resolveInspectionRequestResponsibilityDepartmentId: vi.fn(),
+  }),
+);
 
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: {
@@ -30,7 +32,7 @@ vi.mock('./inspection-request-responsibility-policy.service', () => ({
 }));
 
 vi.mock('./inspection-request-responsibility-default.service', () => ({
-  resolveProcessOutsourcingResponsibleDepartmentId,
+  resolveInspectionRequestResponsibilityDepartmentId,
 }));
 
 describe('resolveV2RequestResponsibility', () => {
@@ -44,7 +46,7 @@ describe('resolveV2RequestResponsibility', () => {
       supplierCategory: null,
       supplierName: null,
     });
-    resolveProcessOutsourcingResponsibleDepartmentId.mockResolvedValue(
+    resolveInspectionRequestResponsibilityDepartmentId.mockResolvedValue(
       'dept-production',
     );
   });
@@ -108,11 +110,79 @@ describe('resolveV2RequestResponsibility', () => {
       supplierId: 'supplier-outsourcing',
       teamId: null,
     });
-    expect(resolveProcessOutsourcingResponsibleDepartmentId).toHaveBeenCalled();
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentId,
+    ).toHaveBeenCalledWith('OUTSOURCING_UNIT', expect.any(Object));
     expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
       expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
       expect.any(Object),
     );
+  });
+
+  it('server-resolves the INCOMING supplier department before creating R', async () => {
+    vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: 'Purchasing',
+      responsibleDepartmentId: 'dept-purchasing',
+      supplierId: 'supplier-1',
+      supplierCategory: SUPPLIER_CATEGORY.SUPPLIER,
+      supplierName: 'Supplier A',
+    });
+    resolveInspectionRequestResponsibilityDepartmentId.mockResolvedValueOnce(
+      'dept-purchasing',
+    );
+    vi.mocked(
+      SupplierIdentityService.resolveSupplierById,
+    ).mockResolvedValueOnce({
+      category: SUPPLIER_CATEGORY.SUPPLIER,
+      id: 'supplier-1',
+      name: 'Supplier A',
+    });
+
+    await expect(
+      resolveV2RequestResponsibility(
+        {
+          category: 'INCOMING',
+          v2Responsibility: {
+            responsibilityType: 'SUPPLIER',
+            supplierId: 'supplier-1',
+          },
+        },
+        {} as any,
+      ),
+    ).resolves.toMatchObject({
+      supplierId: 'supplier-1',
+      teamId: null,
+    });
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentId,
+    ).toHaveBeenCalledWith('SUPPLIER', expect.any(Object));
+    expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+      expect.objectContaining({ responsibleDepartmentId: 'dept-purchasing' }),
+      expect.any(Object),
+    );
+  });
+
+  it('rejects INCOMING internal responsibility before resolving any department', async () => {
+    await expect(
+      resolveV2RequestResponsibility(
+        {
+          category: 'INCOMING',
+          v2Responsibility: {
+            responsibilityType: 'INTERNAL_DEPARTMENT',
+            responsibleDepartmentId: 'dept-client',
+            supplierId: '',
+          },
+        },
+        {} as any,
+      ),
+    ).rejects.toMatchObject({
+      code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
+    });
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentId,
+    ).not.toHaveBeenCalled();
+    expect(resolveInspectionIssueResponsibility).not.toHaveBeenCalled();
   });
 
   it.each(['INCOMING', 'PROCESS'] as const)(
@@ -134,7 +204,7 @@ describe('resolveV2RequestResponsibility', () => {
         code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
       });
       expect(
-        resolveProcessOutsourcingResponsibleDepartmentId,
+        resolveInspectionRequestResponsibilityDepartmentId,
       ).not.toHaveBeenCalled();
       expect(resolveInspectionIssueResponsibility).not.toHaveBeenCalled();
     },
@@ -160,10 +230,9 @@ describe('resolveV2RequestResponsibility', () => {
     await expect(
       resolveV2RequestResponsibility(
         {
-          category: 'PROCESS',
+          category: 'INCOMING',
           v2Responsibility: {
             responsibilityType: 'SUPPLIER',
-            responsibleDepartmentId: 'dept-quality',
             supplierId: 'supplier-outsourcing',
           },
         },
@@ -218,7 +287,9 @@ describe('resolveV2RequestResponsibility', () => {
       team: '',
       teamId: null,
     });
-    expect(resolveProcessOutsourcingResponsibleDepartmentId).toHaveBeenCalled();
+    expect(
+      resolveInspectionRequestResponsibilityDepartmentId,
+    ).toHaveBeenCalledWith('OUTSOURCING_UNIT', expect.any(Object));
     expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
       expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
       expect.any(Object),

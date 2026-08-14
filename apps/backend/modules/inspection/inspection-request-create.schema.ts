@@ -110,6 +110,16 @@ export const inspectionRequestCreateV2BodySchema =
       const isOutsourcing =
         body.responsibilityType ===
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+      const isServerResolvedDepartment =
+        body.category === 'INCOMING' || isOutsourcing;
+      if (body.category === 'INCOMING' && isInternal) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            'INCOMING inspection requests cannot use internal department responsibility',
+          path: ['responsibilityType'],
+        });
+      }
       if (
         body.category === 'PROCESS' &&
         body.responsibilityType ===
@@ -122,10 +132,10 @@ export const inspectionRequestCreateV2BodySchema =
           path: ['responsibilityType'],
         });
       }
-      if (isOutsourcing && body.responsibleDepartmentId) {
+      if (isServerResolvedDepartment && body.responsibleDepartmentId) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
-          message: 'Outsourcing responsibility department is server-resolved',
+          message: 'External responsibility department is server-resolved',
           path: ['responsibleDepartmentId'],
         });
       }
@@ -225,8 +235,9 @@ export function validateInspectionRequestCreateV2Body(
       hasPartIdentity &&
       Boolean(normalizeInspectionRequestText(body.processId)) &&
       Boolean(normalizeInspectionRequestText(body.reporter)) &&
-      (body.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+      (body.category === 'INCOMING' ||
+      body.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
         ? !normalizeInspectionRequestText(body.responsibleDepartmentId)
         : Boolean(
             normalizeInspectionRequestText(body.responsibleDepartmentId),

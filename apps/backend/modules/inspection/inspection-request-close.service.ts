@@ -64,17 +64,20 @@ export function hydrateOutsourcingLinkedIssueResponsibility(options: {
     responsibleDepartmentId: string;
   };
 }) {
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    options.linkedIssue.responsibilityType,
+  );
   if (
-    normalizeInspectionIssueResponsibilityType(
-      options.linkedIssue.responsibilityType,
-    ) !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+    responsibilityType !==
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT &&
+    responsibilityType !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
   ) {
     return options.linkedIssue;
   }
   if (
     normalizeInspectionRequestText(options.linkedIssue.responsibleDepartmentId)
   ) {
-    failCloseRequest('VALIDATION', '外协责任部门由系统配置解析');
+    failCloseRequest('VALIDATION', '外部责任部门由系统配置解析');
   }
   return {
     ...options.linkedIssue,

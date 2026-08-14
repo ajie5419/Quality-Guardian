@@ -14,7 +14,7 @@ import {
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { normalizeInspectionRequestText } from './inspection-request';
 import { failCloseRequest } from './inspection-request-close.schema';
-import { resolveProcessOutsourcingResponsibleDepartmentId } from './inspection-request-responsibility-default.service';
+import { resolveInspectionRequestResponsibilityDepartmentId } from './inspection-request-responsibility-default.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
 type Request = {
@@ -257,27 +257,34 @@ function applyCanonicalResponsibility<T extends Request>(
 }
 
 async function resolveSubmittedCloseResponsibility(options: {
+  category?: null | string;
   responsibility: Record<string, unknown>;
   tx: Prisma.TransactionClient;
 }) {
   const responsibilityType = normalizeInspectionIssueResponsibilityType(
     options.responsibility.responsibilityType,
   );
-  if (
-    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-  ) {
+  const isServerResolvedDepartment =
+    responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT ||
+    (options.category === 'INCOMING' &&
+      responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER);
+  if (isServerResolvedDepartment) {
     if (
       normalizeInspectionRequestText(
         options.responsibility.responsibleDepartmentId,
       )
     ) {
-      failCloseRequest('VALIDATION', '外协责任部门由系统配置解析');
+      failCloseRequest('VALIDATION', '外部责任部门由系统配置解析');
     }
     return resolveInspectionIssueResponsibility(
       {
         ...options.responsibility,
         responsibleDepartmentId:
-          await resolveProcessOutsourcingResponsibleDepartmentId(options.tx),
+          await resolveInspectionRequestResponsibilityDepartmentId(
+            responsibilityType,
+            options.tx,
+          ),
       },
       options.tx,
     );
@@ -386,6 +393,7 @@ export async function resolveLegacyCloseRequestResponsibility<
 }) {
   const submittedResponsibility = options.responsibility
     ? await resolveSubmittedCloseResponsibility({
+        category: options.request.category,
         responsibility: options.responsibility,
         tx: options.tx,
       })

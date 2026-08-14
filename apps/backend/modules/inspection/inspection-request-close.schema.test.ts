@@ -94,6 +94,19 @@ describe('validateCloseRequestBody', () => {
     ).not.toThrow();
   });
 
+  it('allows supplier responsibility to omit a department until the request category is resolved', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        attachments: [{ name: 'record.pdf', url: '/uploads/record.pdf' }],
+        responsibility: {
+          responsibilityType: 'SUPPLIER',
+          supplierId: 'supplier-1',
+        },
+        result: 'PASS',
+      }),
+    ).not.toThrow();
+  });
+
   it('accepts an outsourcing linked issue without a department ID', () => {
     expect(() =>
       validateCloseRequestBody({
@@ -140,7 +153,7 @@ describe('validateCloseRequestBody', () => {
     ).toThrow();
   });
 
-  it('requires a canonical department ID for an explicit responsibility type', () => {
+  it('requires a canonical department ID for an internal responsibility type', () => {
     expect(() =>
       validateCloseRequestBody({
         linkedIssue: {

@@ -3,12 +3,13 @@ import type { Prisma } from '@prisma/client';
 import {
   getInspectionRequestResponsibilitySupplierCategory,
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  normalizeInspectionIssueResponsibilityType,
 } from '@qgs/shared';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
 
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
-import { resolveProcessOutsourcingResponsibleDepartmentId } from './inspection-request-responsibility-default.service';
+import { resolveInspectionRequestResponsibilityDepartmentId } from './inspection-request-responsibility-default.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
 export type V2RequestResponsibilityInput = {
@@ -22,17 +23,34 @@ export type V2RequestResponsibilityInput = {
 };
 
 /**
- * V2 stores the chosen responsibility directly. An internal responsibility
- * department is the production team shown to users; TEAM identity is not part
- * of this request contract.
+ * V2 stores the chosen responsibility directly. PROCESS internal responsibility
+ * is a production department; TEAM identity is not part of this request contract.
  */
 export async function resolveV2RequestResponsibility(
   payload: V2RequestResponsibilityInput,
   tx: Prisma.TransactionClient,
 ) {
-  const responsibilityType = String(
-    payload.v2Responsibility.responsibilityType || '',
-  ).trim();
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    payload.v2Responsibility.responsibilityType,
+  );
+  if (!responsibilityType) {
+    throw new BusinessError(
+      'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
+      'Inspection request responsibilityType is invalid',
+      400,
+    );
+  }
+  if (
+    payload.category === 'INCOMING' &&
+    responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+  ) {
+    throw new BusinessError(
+      'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
+      'INCOMING inspection requests cannot use internal department responsibility',
+      400,
+    );
+  }
   if (
     payload.category === 'PROCESS' &&
     responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
@@ -43,21 +61,26 @@ export async function resolveV2RequestResponsibility(
       400,
     );
   }
-  if (
+  const isServerResolvedDepartment =
+    payload.category === 'INCOMING' ||
     responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT &&
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+  if (
+    isServerResolvedDepartment &&
     String(payload.v2Responsibility.responsibleDepartmentId || '').trim()
   ) {
     throw new BusinessError(
       'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
-      'Outsourcing responsibility department is server-resolved',
+      'External responsibility department is server-resolved',
       400,
     );
   }
-  const responsibleDepartmentId =
-    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-      ? await resolveProcessOutsourcingResponsibleDepartmentId(tx)
-      : payload.v2Responsibility.responsibleDepartmentId;
+  const responsibleDepartmentId = isServerResolvedDepartment
+    ? await resolveInspectionRequestResponsibilityDepartmentId(
+        responsibilityType,
+        tx,
+      )
+    : payload.v2Responsibility.responsibleDepartmentId;
   const responsibility = await resolveInspectionIssueResponsibility(
     { ...payload.v2Responsibility, responsibleDepartmentId },
     tx,

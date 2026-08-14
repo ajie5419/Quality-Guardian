@@ -225,7 +225,7 @@ describe('inspectionRequestCreateService', () => {
     expect(prisma.$transaction).toHaveBeenCalled();
   });
 
-  it('persists a V2 incoming request with direct internal responsibility', async () => {
+  it('persists a V2 incoming request with the server-resolved supplier responsibility', async () => {
     const create = vi.fn().mockResolvedValue(mockRequest);
     (prisma.$transaction as any).mockImplementation(async (callback: any) =>
       callback({ qms_inspection_requests: { create } }),
@@ -238,8 +238,8 @@ describe('inspectionRequestCreateService', () => {
         category: 'INCOMING',
         partId: 'part-1',
         processId: 'process-1',
-        responsibilityType: 'INTERNAL_DEPARTMENT',
-        responsibleDepartmentId: 'dept-quality',
+        responsibilityType: 'SUPPLIER',
+        supplierId: 'supplier-1',
         workOrderNumber: 'WO-001',
       },
       false,
@@ -250,9 +250,8 @@ describe('inspectionRequestCreateService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           category: 'INCOMING',
-          responsibilityType: 'INTERNAL_DEPARTMENT',
-          responsibleDepartmentId: 'dept-quality',
-          supplierId: null,
+          responsibilityType: 'SUPPLIER',
+          supplierId: 'supplier-1',
           teamId: null,
         }),
       }),

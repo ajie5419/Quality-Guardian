@@ -191,7 +191,23 @@ describe('inspectionRequestCloseService', () => {
         },
         responsibility: { responsibleDepartmentId: 'dept-production' },
       }),
-    ).toThrow('外协责任部门由系统配置解析');
+    ).toThrow('外部责任部门由系统配置解析');
+  });
+
+  it('hydrates a supplier linked issue with the canonical incoming department', () => {
+    expect(
+      hydrateOutsourcingLinkedIssueResponsibility({
+        linkedIssue: {
+          responsibilityType: 'SUPPLIER',
+          supplierId: 'supplier-1',
+        },
+        responsibility: { responsibleDepartmentId: 'dept-purchasing' },
+      }),
+    ).toEqual({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartmentId: 'dept-purchasing',
+      supplierId: 'supplier-1',
+    });
   });
 
   it('should close request with PASS result', async () => {
