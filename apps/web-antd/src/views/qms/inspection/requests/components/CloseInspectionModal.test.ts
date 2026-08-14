@@ -311,12 +311,12 @@ describe('close inspection request responsibility adjudication', () => {
           id: 'request-partial',
           responsibilityType: 'OUTSOURCING_UNIT',
           responsibleDepartmentId: null,
-          supplierId: 'supplier-1',
+          supplierId: null,
         }),
         linkedIssueDraft: {
           ...createProps().linkedIssueDraft,
           responsibilityType: 'OUTSOURCING_UNIT',
-          supplierId: 'supplier-1',
+          supplierId: '',
         },
       }),
     });
@@ -329,6 +329,78 @@ describe('close inspection request responsibility adjudication', () => {
         .map((option) => option.attributes('value')),
     ).toEqual(['INTERNAL_DEPARTMENT', 'OUTSOURCING_UNIT']);
   });
+
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'does not show a responsibility department for partial %s outsourcing',
+    async (category) => {
+      const wrapper = mount(CloseInspectionModal, {
+        props: createProps({
+          currentRequest: createRequest({
+            category,
+            id: `request-${category.toLowerCase()}-outsourcing`,
+            responsibilityType: 'OUTSOURCING_UNIT',
+            responsibleDepartmentId: null,
+            supplierId: null,
+          }),
+          linkedIssueDraft: {
+            ...createProps().linkedIssueDraft,
+            responsibilityType: 'OUTSOURCING_UNIT',
+          },
+        }),
+      });
+      await flushPromises();
+
+      expect(
+        wrapper
+          .find('[data-testid="close-responsibility-department"]')
+          .exists(),
+      ).toBe(false);
+      expect(
+        wrapper.find('[data-testid="close-responsibility-supplier"]').exists(),
+      ).toBe(true);
+    },
+  );
+
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'keeps %s outsourcing with a missing persisted department editable',
+    async (category) => {
+      mockGetResponsibilityOptions.mockResolvedValueOnce({
+        departments: [],
+        responsibilityType: 'OUTSOURCING_UNIT',
+        suppliers: [{ label: 'External Plant', value: 'supplier-external' }],
+      });
+      const wrapper = mount(CloseInspectionModal, {
+        props: createProps({
+          currentRequest: createRequest({
+            category,
+            id: `request-${category.toLowerCase()}-supplier-only`,
+            responsibilityType: 'OUTSOURCING_UNIT',
+            responsibleDepartmentId: null,
+            supplierId: 'supplier-external',
+          }),
+          linkedIssueDraft: {
+            ...createProps().linkedIssueDraft,
+            responsibilityType: 'OUTSOURCING_UNIT',
+            supplierId: 'supplier-external',
+            supplierName: 'External Plant',
+          },
+        }),
+      });
+      await flushPromises();
+
+      expect(
+        wrapper.find('[data-testid="close-responsibility-type"]').exists(),
+      ).toBe(true);
+      expect(
+        wrapper
+          .find('[data-testid="close-responsibility-department"]')
+          .exists(),
+      ).toBe(false);
+      expect(mockGetResponsibilityOptions).toHaveBeenCalledWith({
+        responsibilityType: 'OUTSOURCING_UNIT',
+      });
+    },
+  );
 
   it('keeps a complete persisted responsibility locked and does not load choices', async () => {
     const wrapper = mount(CloseInspectionModal, {

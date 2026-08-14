@@ -59,7 +59,6 @@ describe('inspection request entry identity options', () => {
       },
       {
         responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-b',
       },
     ],
@@ -85,10 +84,9 @@ describe('inspection request entry identity options', () => {
     });
   });
 
-  it('submits PROCESS outsourcing without a hidden department ID', () => {
+  it('submits outsourcing without a client department ID', () => {
     expect(
       buildInspectionRequestEntryResponsibilityPayload({
-        category: 'PROCESS',
         responsibilityType: 'OUTSOURCING_UNIT',
         responsibleDepartmentId: '',
         supplierId: 'supplier-outsourcing',

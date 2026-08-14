@@ -48,6 +48,7 @@ interface Props {
   deptTreeData: DeptTreeLikeNode[];
   mode?: IssueFormMode;
   isEditMode?: boolean;
+  hideResponsibilityDepartment?: boolean;
   processOptions?: Array<{ label: string; value: string }>;
   responsibilityType?: InspectionIssueResponsibilityType;
   responsibilityTypeOptions?: Array<{
@@ -62,6 +63,7 @@ defineOptions({ name: 'IssueFormFields' });
 const props = withDefaults(defineProps<Props>(), {
   mode: 'standalone',
   isEditMode: false,
+  hideResponsibilityDepartment: false,
   processOptions: () => [],
   responsibilityType: undefined,
   responsibilityTypeOptions: () => [...ISSUE_RESPONSIBILITY_TYPE_OPTIONS],
@@ -175,6 +177,16 @@ function buildFormSchema() {
 
     return {
       ...field,
+      ...(field.fieldName === 'responsibleDepartmentId' &&
+      props.hideResponsibilityDepartment
+        ? {
+            dependencies: {
+              triggerFields: ['responsibilityType'],
+              show: () => false,
+            },
+            rules: undefined,
+          }
+        : {}),
       componentProps: {
         ...field.componentProps,
         ...(field.fieldName === 'responsibleDepartmentId'
@@ -287,6 +299,17 @@ watch(
     ]);
     if (responsibilityType) {
       formApi.setFieldValue('responsibilityType', responsibilityType);
+    }
+  },
+  { immediate: true },
+);
+
+watch(
+  () => props.hideResponsibilityDepartment,
+  (hideResponsibilityDepartment) => {
+    formApi.setState({ schema: buildFormSchema() });
+    if (hideResponsibilityDepartment) {
+      formApi.setFieldValue('responsibleDepartmentId', undefined);
     }
   },
   { immediate: true },

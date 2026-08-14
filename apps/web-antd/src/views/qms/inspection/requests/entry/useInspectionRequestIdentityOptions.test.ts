@@ -55,7 +55,7 @@ describe('inspection request responsibility options', () => {
     expect(requestForm.supplierId).toBe('');
   });
 
-  it('does not retain a hidden client department for PROCESS outsourcing', async () => {
+  it('does not retain a hidden client department for outsourcing', async () => {
     const requestForm = createForm();
     getPublicInspectionRequestResponsibilityOptions.mockResolvedValue({
       departments: [{ label: '生产 OBU', value: 'dept-production' }],
@@ -126,10 +126,7 @@ describe('inspection request responsibility options', () => {
     expect(composable.responsibilityDepartmentOptions.value).toEqual([]);
   });
 
-  it.each([
-    ['SUPPLIER', 'dept-incoming', 'supplier-incoming'],
-    ['OUTSOURCING_UNIT', 'dept-outsourcing', 'supplier-outsourcing'],
-  ] as const)(
+  it.each([['SUPPLIER', 'dept-incoming', 'supplier-incoming']] as const)(
     'clears a stale %s department when a complete options reload no longer contains it',
     async (responsibilityType, departmentId, supplierId) => {
       const requestForm = createForm();

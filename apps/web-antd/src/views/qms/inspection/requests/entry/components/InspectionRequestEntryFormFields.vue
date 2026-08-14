@@ -113,10 +113,8 @@ const incomingTypeOptions = computed(() =>
 const responsibilityUnitCopy = computed(() =>
   getInspectionRequestResponsibilityUnitCopy(form.value.responsibilityType),
 );
-const isProcessOutsourcing = computed(
-  () =>
-    !props.isIncomingEntry &&
-    form.value.responsibilityType === 'OUTSOURCING_UNIT',
+const isOutsourcing = computed(
+  () => form.value.responsibilityType === 'OUTSOURCING_UNIT',
 );
 function handleWorkOrderChange(value: SelectProps['value']) {
   if (props.isIncomingEntry) {
@@ -332,7 +330,7 @@ function handleProcessIdentityChange(
         @change="handleResponsibilityTypeChange"
       />
     </Form.Item>
-    <Form.Item v-if="!isProcessOutsourcing" label="责任部门" required>
+    <Form.Item v-if="!isOutsourcing" label="责任部门" required>
       <Select
         data-testid="responsible-department-select"
         :value="form.responsibleDepartmentId"

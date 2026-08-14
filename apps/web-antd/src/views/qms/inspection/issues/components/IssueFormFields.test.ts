@@ -300,6 +300,36 @@ describe('issue form fields responsibility contract', () => {
     }
   });
 
+  it('removes the required department field for embedded outsourcing close', () => {
+    mount(IssueFormFields, {
+      props: {
+        deptTreeData: [],
+        hideResponsibilityDepartment: true,
+        mode: 'embedded',
+        responsibilityType:
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+      },
+    });
+
+    const schema = mockSetFormState.mock.calls
+      .map((call) => call[0]?.schema)
+      .find((value) => Array.isArray(value));
+    const departmentField = schema?.find(
+      (field: { fieldName: string }) =>
+        field.fieldName === 'responsibleDepartmentId',
+    );
+    expect(departmentField).toMatchObject({
+      dependencies: expect.objectContaining({
+        show: expect.any(Function),
+      }),
+      rules: undefined,
+    });
+    expect(mockSetFieldValue).toHaveBeenCalledWith(
+      'responsibleDepartmentId',
+      undefined,
+    );
+  });
+
   it('does not retain supplier as an available embedded PROCESS choice', () => {
     mount(IssueFormFields, {
       props: {

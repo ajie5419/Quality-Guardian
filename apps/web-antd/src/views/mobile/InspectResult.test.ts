@@ -168,6 +168,84 @@ describe('inspect result', () => {
     );
   });
 
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'submits historical %s outsourcing responsibility without a department',
+    async (category) => {
+      getInspectionRequestMock.mockResolvedValue({
+        category,
+        id: 'request-1',
+        quantity: 1,
+        requestNo: 'IR-001',
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: null,
+        supplierId: 'supplier-legacy',
+      });
+      optionsMock.mockResolvedValue({
+        departments: [],
+        responsibilityType: 'OUTSOURCING_UNIT',
+        suppliers: [{ label: 'External Plant', value: 'supplier-external' }],
+      });
+      closeInspectionRequestMock.mockResolvedValue({});
+
+      const wrapper = mount(InspectResult);
+      await flushPromises();
+
+      expect(wrapper.text()).toContain('责任归属类型');
+      expect(wrapper.text()).not.toContain('责任部门');
+      const supplierSelect = wrapper.findAll('select').at(2);
+      if (!supplierSelect) throw new Error('Supplier select not rendered');
+      await supplierSelect.setValue('supplier-external');
+      await wrapper.get('button.upload').trigger('click');
+      const submitButton = wrapper.findAll('button').at(-1);
+      if (!submitButton) throw new Error('Submit button not rendered');
+      await submitButton.trigger('click');
+      await flushPromises();
+
+      expect(closeInspectionRequestMock).toHaveBeenCalledWith(
+        'request-1',
+        expect.objectContaining({
+          responsibility: {
+            responsibilityType: 'OUTSOURCING_UNIT',
+            supplierId: 'supplier-external',
+          },
+        }),
+      );
+      expect(closeInspectionRequestMock.mock.calls[0]?.[1]).not.toHaveProperty(
+        'responsibility.responsibleDepartmentId',
+      );
+    },
+  );
+
+  it('locks a complete outsourcing task only when its persisted department exists', async () => {
+    getInspectionRequestMock.mockResolvedValue({
+      category: 'PROCESS',
+      id: 'request-1',
+      quantity: 1,
+      requestNo: 'IR-001',
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartmentId: 'dept-production',
+      supplierId: 'supplier-external',
+    });
+    closeInspectionRequestMock.mockResolvedValue({});
+
+    const wrapper = mount(InspectResult);
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('责任归属类型');
+    expect(wrapper.text()).not.toContain('责任部门');
+    await wrapper.get('button.upload').trigger('click');
+    const submitButton = wrapper.findAll('button').at(-1);
+    if (!submitButton) throw new Error('Submit button not rendered');
+    await submitButton.trigger('click');
+    await flushPromises();
+
+    expect(optionsMock).not.toHaveBeenCalled();
+    expect(closeInspectionRequestMock).toHaveBeenCalledWith(
+      'request-1',
+      expect.not.objectContaining({ responsibility: expect.anything() }),
+    );
+  });
+
   it('does not call the close API for a PASS result without an inspection record', async () => {
     getInspectionRequestMock.mockResolvedValue({
       category: 'PROCESS',
@@ -275,5 +353,83 @@ describe('inspect result', () => {
         unqualifiedQuantity: 3,
       }),
     );
+  });
+
+  it('keeps top-level and linked-issue outsourcing responsibility department-free', async () => {
+    getInspectionRequestMock.mockResolvedValue({
+      category: 'PROCESS',
+      id: 'request-1',
+      partName: 'Frame',
+      processName: 'Welding',
+      quantity: 3,
+      requestNo: 'IR-001',
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartmentId: null,
+      supplierId: null,
+    });
+    optionsMock.mockResolvedValue({
+      departments: [],
+      responsibilityType: 'OUTSOURCING_UNIT',
+      suppliers: [{ label: 'External Plant', value: 'supplier-external' }],
+    });
+    classificationOptionsMock.mockResolvedValue([
+      {
+        id: 'category-1',
+        name: 'Surface',
+        subcategories: [{ id: 'subcategory-1', name: 'Scratch' }],
+      },
+    ]);
+    closeInspectionRequestMock.mockResolvedValue({});
+
+    const wrapper = mount(InspectResult);
+    await flushPromises();
+
+    expect(wrapper.text()).not.toContain('责任部门');
+    await wrapper.get('select.segmented').setValue('FAIL');
+    await flushPromises();
+    const selects = wrapper.findAll('select');
+    const supplierSelect = selects.at(2);
+    const categorySelect = selects.at(3);
+    const subcategorySelect = selects.at(4);
+    if (!supplierSelect || !categorySelect || !subcategorySelect) {
+      throw new Error('Outsourcing FAIL controls not rendered');
+    }
+    await supplierSelect.setValue('supplier-external');
+    await categorySelect.setValue('category-1');
+    await subcategorySelect.setValue('subcategory-1');
+    const textareas = wrapper.findAll('textarea');
+    const description = textareas.at(1);
+    const rootCause = textareas.at(2);
+    const solution = textareas.at(3);
+    if (!description || !rootCause || !solution) {
+      throw new Error('Outsourcing FAIL text controls not rendered');
+    }
+    await description.setValue('Surface scratch');
+    await rootCause.setValue('Fixture shifted');
+    await solution.setValue('Adjust fixture');
+    await wrapper.get('button.upload').trigger('click');
+    const submitButton = wrapper.findAll('button').at(-1);
+    if (!submitButton) throw new Error('Submit button not rendered');
+    await submitButton.trigger('click');
+    await flushPromises();
+
+    expect(closeInspectionRequestMock).toHaveBeenCalledWith(
+      'request-1',
+      expect.objectContaining({
+        linkedIssue: expect.objectContaining({
+          responsibilityType: 'OUTSOURCING_UNIT',
+          supplierId: 'supplier-external',
+        }),
+        responsibility: {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          supplierId: 'supplier-external',
+        },
+      }),
+    );
+    const payload = closeInspectionRequestMock.mock.calls[0]?.[1];
+    expect(payload?.responsibility).not.toHaveProperty(
+      'responsibleDepartmentId',
+    );
+    expect(payload?.linkedIssue).not.toHaveProperty('responsibleDepartmentId');
   });
 });

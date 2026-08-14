@@ -119,13 +119,18 @@ const responsibilityTypeOptions = computed(() => {
     : options;
 });
 const hasLockedResponsibility = computed(() => {
-  if (!task.value?.responsibilityType || !task.value.responsibleDepartmentId) {
-    return false;
-  }
-  return isExternalInspectionIssueResponsibility(task.value.responsibilityType)
+  const responsibilityType = task.value?.responsibilityType;
+  if (!responsibilityType) return false;
+  if (!task.value?.responsibleDepartmentId) return false;
+  return isExternalInspectionIssueResponsibility(responsibilityType)
     ? Boolean(task.value.supplierId)
     : !task.value.supplierId;
 });
+const isOutsourcingResponsibility = computed(
+  () =>
+    responsibility.responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+);
 const requiresSupplier = computed(() =>
   isExternalInspectionIssueResponsibility(responsibility.responsibilityType),
 );
@@ -176,14 +181,13 @@ async function loadDetail() {
   loading.value = true;
   try {
     task.value = await getInspectionRequest(requestId.value);
-    if (
-      hasLockedResponsibility.value &&
-      task.value.responsibilityType &&
-      task.value.responsibleDepartmentId
-    ) {
+    if (hasLockedResponsibility.value && task.value.responsibilityType) {
       responsibility.responsibilityType = task.value.responsibilityType;
       responsibility.responsibleDepartmentId =
-        task.value.responsibleDepartmentId;
+        task.value.responsibilityType ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+          ? ''
+          : task.value.responsibleDepartmentId || '';
       responsibility.supplierId = task.value.supplierId || '';
       return;
     }
@@ -196,7 +200,10 @@ async function loadDetail() {
       responsibility.responsibilityType = task.value.responsibilityType;
     }
     responsibility.responsibleDepartmentId =
-      task.value.responsibleDepartmentId || '';
+      responsibility.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+        ? ''
+        : task.value.responsibleDepartmentId || '';
     responsibility.supplierId = task.value.supplierId || '';
     await loadResponsibilityOptions();
   } finally {
@@ -231,6 +238,7 @@ async function loadResponsibilityOptions() {
     responsibilityDepartments.value = options.departments;
     responsibilitySuppliers.value = options.suppliers;
     if (
+      !isOutsourcingResponsibility.value &&
       responsibility.responsibleDepartmentId &&
       !options.departments.some(
         (option) => option.value === responsibility.responsibleDepartmentId,
@@ -288,6 +296,15 @@ function changeDefectCategory(value: SelectProps['value']) {
 }
 
 function buildCloseResponsibility() {
+  const supplierId = responsibility.supplierId.trim();
+  if (isOutsourcingResponsibility.value) {
+    return supplierId
+      ? {
+          responsibilityType: responsibility.responsibilityType,
+          supplierId,
+        }
+      : null;
+  }
   const responsibleDepartmentId = responsibility.responsibleDepartmentId.trim();
   if (!responsibleDepartmentId) return null;
   if (!requiresSupplier.value) {
@@ -296,7 +313,6 @@ function buildCloseResponsibility() {
       responsibleDepartmentId,
     };
   }
-  const supplierId = responsibility.supplierId.trim();
   return supplierId
     ? {
         responsibilityType: responsibility.responsibilityType,
@@ -451,7 +467,11 @@ onMounted(() => {
               @update:value="changeResponsibilityType"
             />
           </FormItem>
-          <FormItem label="责任部门" required>
+          <FormItem
+            v-if="!isOutsourcingResponsibility"
+            label="责任部门"
+            required
+          >
             <Select
               v-model:value="responsibility.responsibleDepartmentId"
               :disabled="responsibilityLoading"

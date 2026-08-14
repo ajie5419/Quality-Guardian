@@ -207,26 +207,30 @@ describe('inspection request entry responsibility identity', () => {
     ).toBe(false);
   });
 
-  it('hides the client responsibility department for PROCESS outsourcing', () => {
-    const { wrapper } = mountFields(false, 'OUTSOURCING_UNIT');
+  it.each([false, true])(
+    'hides the client responsibility department for outsourcing in %s entry',
+    (isIncomingEntry) => {
+      const { wrapper } = mountFields(isIncomingEntry, 'OUTSOURCING_UNIT');
 
-    expect(
-      wrapper
-        .findAllComponents({ name: 'MockSelect' })
-        .some(
-          (item) =>
-            item.attributes('data-testid') === 'responsible-department-select',
-        ),
-    ).toBe(false);
-    expect(
-      wrapper
-        .findAllComponents({ name: 'MockSelect' })
-        .some(
-          (item) =>
-            item.attributes('data-testid') === 'responsible-supplier-select',
-        ),
-    ).toBe(true);
-  });
+      expect(
+        wrapper
+          .findAllComponents({ name: 'MockSelect' })
+          .some(
+            (item) =>
+              item.attributes('data-testid') ===
+              'responsible-department-select',
+          ),
+      ).toBe(false);
+      expect(
+        wrapper
+          .findAllComponents({ name: 'MockSelect' })
+          .some(
+            (item) =>
+              item.attributes('data-testid') === 'responsible-supplier-select',
+          ),
+      ).toBe(true);
+    },
+  );
 });
 
 describe('inspection request entry material identity', () => {

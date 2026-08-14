@@ -145,14 +145,23 @@ const responsibilitySuppliers = ref<
   InspectionRequestResponsibilitySupplierOption[]
 >([]);
 
+function isOutsourcingResponsibility(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
+  return (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  );
+}
+
 const hasLockedResponsibility = computed(() => {
   const request = props.currentRequest;
-  if (!request?.responsibilityType || !request.responsibleDepartmentId) {
+  if (!request?.responsibilityType) {
     return false;
   }
   if (!isAllowedResponsibilityType(request.responsibilityType)) {
     return false;
   }
+  if (!request.responsibleDepartmentId) return false;
   if (isExternalInspectionIssueResponsibility(request.responsibilityType)) {
     return Boolean(request.supplierId);
   }
@@ -203,14 +212,23 @@ function syncFromProps() {
     localLinkedIssueDraft,
     cloneLinkedIssueDraft(props.linkedIssueDraft),
   );
+  if (isOutsourcingResponsibility(localLinkedIssueDraft.responsibilityType)) {
+    localLinkedIssueDraft.responsibleDepartmentId = '';
+    localLinkedIssueDraft.responsibleDepartment = '';
+  }
 }
 
 function syncSelectedResponsibilityOption() {
-  const department = responsibilityDepartments.value.find(
-    (item) => item.value === localLinkedIssueDraft.responsibleDepartmentId,
-  );
-  localLinkedIssueDraft.responsibleDepartmentId = department?.value || '';
-  localLinkedIssueDraft.responsibleDepartment = department?.label || '';
+  if (isOutsourcingResponsibility(localLinkedIssueDraft.responsibilityType)) {
+    localLinkedIssueDraft.responsibleDepartmentId = '';
+    localLinkedIssueDraft.responsibleDepartment = '';
+  } else {
+    const department = responsibilityDepartments.value.find(
+      (item) => item.value === localLinkedIssueDraft.responsibleDepartmentId,
+    );
+    localLinkedIssueDraft.responsibleDepartmentId = department?.value || '';
+    localLinkedIssueDraft.responsibleDepartment = department?.label || '';
+  }
 
   if (
     !isExternalInspectionIssueResponsibility(
@@ -293,6 +311,9 @@ async function selectResponsibilitySupplier(value: SelectProps['value']) {
 
 function buildEmbeddedIssueValues() {
   const total = normalizeQuantity(localCloseForm.quantity);
+  const isOutsourcing = isOutsourcingResponsibility(
+    localLinkedIssueDraft.responsibilityType,
+  );
   const responsibleDepartment = resolveTreeDepartmentIdentity(
     props.deptTreeData,
     {
@@ -310,7 +331,7 @@ function buildEmbeddedIssueValues() {
     inspector: localLinkedIssueDraft.reportedBy,
     reportDate: localLinkedIssueDraft.reportDate,
     responsibilityType: localLinkedIssueDraft.responsibilityType,
-    responsibleDepartmentId: responsibleDepartment.id,
+    responsibleDepartmentId: isOutsourcing ? '' : responsibleDepartment.id,
     responsibleWelder: localLinkedIssueDraft.responsibleWelder,
     supplierId: localLinkedIssueDraft.supplierId,
     supplierName: localLinkedIssueDraft.supplierName,
@@ -450,6 +471,7 @@ async function collectIssueFromForm() {
   );
   const isExternal =
     isExternalInspectionIssueResponsibility(responsibilityType);
+  const isOutsourcing = isOutsourcingResponsibility(responsibilityType);
   const divisionIdentity = resolveDivisionIdentity(props.deptTreeData, {
     division: String(values.division || localLinkedIssueDraft.division || ''),
     divisionId: localLinkedIssueDraft.divisionId,
@@ -457,8 +479,10 @@ async function collectIssueFromForm() {
   Object.assign(localLinkedIssueDraft, {
     ...divisionIdentity,
     responsibilityType,
-    responsibleDepartment: responsibleDepartment.name,
-    responsibleDepartmentId: localLinkedIssueDraft.responsibleDepartmentId,
+    responsibleDepartment: isOutsourcing ? '' : responsibleDepartment.name,
+    responsibleDepartmentId: isOutsourcing
+      ? ''
+      : localLinkedIssueDraft.responsibleDepartmentId,
     supplierId: isExternal ? localLinkedIssueDraft.supplierId : '',
     supplierName: isExternal ? localLinkedIssueDraft.supplierName : '',
     partName: normalizeInspectionIssueText(values.partName),
@@ -494,7 +518,10 @@ async function handleSubmit() {
       message.error('当前报检类型不允许该责任归属类型');
       return;
     }
-    if (!localLinkedIssueDraft.responsibleDepartmentId) {
+    if (
+      !isOutsourcingResponsibility(localLinkedIssueDraft.responsibilityType) &&
+      !localLinkedIssueDraft.responsibleDepartmentId
+    ) {
       message.error('请选择责任部门');
       return;
     }
@@ -641,7 +668,13 @@ async function handleBeforeUpload(file: File) {
               @change="changeResponsibilityType"
             />
           </Form.Item>
-          <Form.Item label="责任部门" required>
+          <Form.Item
+            v-if="
+              localLinkedIssueDraft.responsibilityType !== 'OUTSOURCING_UNIT'
+            "
+            label="责任部门"
+            required
+          >
             <Select
               data-testid="close-responsibility-department"
               :value="localLinkedIssueDraft.responsibleDepartmentId"
@@ -693,6 +726,9 @@ async function handleBeforeUpload(file: File) {
           ref="formFieldsRef"
           mode="embedded"
           :is-edit-mode="false"
+          :hide-responsibility-department="
+            localLinkedIssueDraft.responsibilityType === 'OUTSOURCING_UNIT'
+          "
           :dept-tree-data="props.deptTreeData"
           :responsibility-type="localLinkedIssueDraft.responsibilityType"
           :responsibility-type-options="responsibilityTypeOptions"

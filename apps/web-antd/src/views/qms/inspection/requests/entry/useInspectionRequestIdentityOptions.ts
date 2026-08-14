@@ -4,8 +4,6 @@ import type {
   InspectionRequestResponsibilitySupplierOption,
 } from '@qgs/shared';
 
-import type { Ref } from 'vue';
-
 import { ref } from 'vue';
 
 import {
@@ -37,7 +35,6 @@ function isExternalResponsibility(
  * recreating it from TEAM or supplier display names in either client.
  */
 export function useInspectionRequestIdentityOptions(options: {
-  isIncomingEntry?: Ref<boolean>;
   requestForm: InspectionRequestIdentityForm;
 }) {
   const { requestForm } = options;
@@ -103,11 +100,10 @@ export function useInspectionRequestIdentityOptions(options: {
       requestForm.responsibleDepartmentId = '';
     }
 
-    const isProcessOutsourcing =
-      !options.isIncomingEntry?.value &&
+    const isOutsourcing =
       response.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
-    if (isProcessOutsourcing) {
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+    if (isOutsourcing) {
       requestForm.responsibleDepartmentId = '';
     } else if (!preserveSelection) {
       requestForm.responsibleDepartmentId =

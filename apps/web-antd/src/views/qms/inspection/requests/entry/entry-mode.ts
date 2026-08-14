@@ -42,15 +42,13 @@ export function getInspectionRequestResponsibilityTypeOptions(
 }
 
 export function buildInspectionRequestEntryResponsibilityPayload(input: {
-  category?: 'INCOMING' | 'PROCESS';
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartmentId: string;
   supplierId: string;
 }) {
   if (
-    input.category === 'PROCESS' &&
     input.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
   ) {
     const supplierId = input.supplierId.trim();
     return supplierId
@@ -231,31 +229,26 @@ export function buildInspectionRequestEntryRequiredMessage(
   const componentText = requiresComponentName ? `${copy.componentLabel}、` : '';
   const incomingTypeText = isIncoming ? '进货类型、' : '';
   const stationText = requiresStationSelection ? '台数、' : '';
-  const responsibilityText = getInspectionRequestResponsibilityRequiredText({
-    isIncoming,
-    responsibilityType,
-  });
+  const responsibilityText =
+    getInspectionRequestResponsibilityRequiredText(responsibilityType);
   return `工单号、${copy.processLabel}、${incomingTypeText}${copy.partLabel}、${componentText}数量、${stationText}${responsibilityText}报检人、${copy.attachmentRequiredMessage}`;
 }
 
-function getInspectionRequestResponsibilityRequiredText(input: {
-  isIncoming: boolean;
-  responsibilityType: InspectionIssueResponsibilityType;
-}) {
+function getInspectionRequestResponsibilityRequiredText(
+  responsibilityType: InspectionIssueResponsibilityType,
+) {
   if (
-    !input.isIncoming &&
-    input.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
   ) {
     return '责任归属类型、外协单位、';
   }
   if (
-    input.responsibilityType ===
+    responsibilityType ===
     INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
   ) {
     return '责任归属类型、责任部门、';
   }
-  return `责任归属类型、责任部门、${getInspectionRequestResponsibilityUnitCopy(input.responsibilityType).label}、`;
+  return `责任归属类型、责任部门、${getInspectionRequestResponsibilityUnitCopy(responsibilityType).label}、`;
 }
 
 export function buildIncomingInspectionRequestInfo(input: {

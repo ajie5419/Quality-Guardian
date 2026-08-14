@@ -138,7 +138,6 @@ const {
   responsibilityLoading,
   supplierOptions,
 } = useInspectionRequestIdentityOptions({
-  isIncomingEntry,
   requestForm,
 });
 
@@ -294,11 +293,8 @@ async function submitRequest() {
     (requiresComponentName.value && !requestForm.componentName) ||
     !requestForm.quantity ||
     (requiresStationSelection.value && !requestForm.stationSelection) ||
-    (!(
-      !isIncomingEntry.value &&
-      requestForm.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-    ) &&
+    (requestForm.responsibilityType !==
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT &&
       !requestForm.responsibleDepartmentId) ||
     (requestForm.responsibilityType !==
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
@@ -328,7 +324,6 @@ async function submitRequest() {
     const responsibilityPayload =
       buildInspectionRequestEntryResponsibilityPayload({
         ...requestForm,
-        category: isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
       });
     if (!responsibilityPayload) {
       message.warning('请选择完整的责任归属信息');
