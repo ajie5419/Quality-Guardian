@@ -94,7 +94,7 @@ export async function syncCloseIssueEffects(options: {
     nonConformanceNumber: null | string;
     partName: string;
   };
-  issueAuditVariables?: { issue: string; nonConformanceNumber: string };
+  issueAuditVariables?: { issue: string; nonConformanceNumber: null | string };
   linkedIssue?: Record<string, unknown>;
   updated: {
     linkedIssueId: null | string;

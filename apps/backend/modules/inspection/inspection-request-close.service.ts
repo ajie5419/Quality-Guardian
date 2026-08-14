@@ -17,7 +17,9 @@ import {
   parseInspectionRequestQuantity,
   resolveInspectionRequestCurrentUserId,
 } from './inspection-request';
+import { ensureCloseRequestAccess } from './inspection-request-close-access.service';
 import {
+  runClosePostCommitTask,
   syncCloseAttachments,
   syncCloseIssueEffects,
 } from './inspection-request-close-effects.service';
@@ -69,6 +71,7 @@ export const InspectionRequestCloseService = {
       where: { id, isDeleted: false },
     });
     if (!request) failCloseRequest('NOT_FOUND', '报检任务不存在');
+    await ensureCloseRequestAccess({ request, userinfo });
     if (request.status === INSPECTION_REQUEST_STATUS.CLOSED)
       failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
 
@@ -127,6 +130,18 @@ export const InspectionRequestCloseService = {
         });
         if (guard.count === 0)
           failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
+
+        // The update guard above serializes concurrent closes. Read its current
+        // link afterwards so a second FAIL reuses the first transaction's issue.
+        const currentLink = await tx.qms_inspection_requests.findUnique({
+          select: {
+            linkedIssueId: true,
+            linkedIssueNo: true,
+            linkedIssueStatus: true,
+          },
+          where: { id },
+        });
+        if (!currentLink) failCloseRequest('NOT_FOUND', '报检任务不存在');
 
         let inspectionId = explicitInspectionId;
         const responsibilityResolution =
@@ -201,28 +216,42 @@ export const InspectionRequestCloseService = {
         }
 
         let issueRecord = null;
+        let createdIssue = false;
         let issueAuditVariables:
           | undefined
-          | { issue: string; nonConformanceNumber: string };
-        if (result === 'FAIL' && linkedIssue && inspectionId) {
-          const built = await buildCloseLinkedIssueCreateResult({
-            body,
-            inspectionId,
-            linkedIssue,
-            request: requestWithResponsibility,
-            tx,
-            userinfo,
-          });
-          issueRecord = built.record;
-          issueAuditVariables = built.auditVariables;
+          | { issue: string; nonConformanceNumber: null | string };
+        if (result === 'FAIL' && inspectionId) {
+          if (currentLink.linkedIssueId) {
+            issueRecord = await tx.quality_records.findFirst({
+              where: { id: currentLink.linkedIssueId, isDeleted: false },
+            });
+            if (!issueRecord) {
+              failCloseRequest(
+                'CONFLICT',
+                '关联的不合格项不存在，不能重复创建',
+              );
+            }
+          } else if (linkedIssue) {
+            const built = await buildCloseLinkedIssueCreateResult({
+              body,
+              inspectionId,
+              linkedIssue,
+              request: requestWithResponsibility,
+              tx,
+              userinfo,
+            });
+            createdIssue = true;
+            issueRecord = built.record;
+            issueAuditVariables = built.auditVariables;
+          }
         }
 
         const linkedIssueWhere = buildLinkedIssueWhere(
-          request,
+          { ...request, ...currentLink },
           issueRecord?.id,
         );
         let linkedIssueStatus =
-          issueRecord?.status || request.linkedIssueStatus || null;
+          issueRecord?.status || currentLink.linkedIssueStatus || null;
         let closedLinkedIssueCount = 0;
         if (shouldCloseRequest && linkedIssueWhere) {
           const linkedIssueUpdate = await tx.quality_records.updateMany({
@@ -253,10 +282,10 @@ export const InspectionRequestCloseService = {
             inspectionId,
             inspectionResult: result === 'FAIL' ? 'FAIL' : 'PASS',
             inspectorId: closeInspectorId || request.inspectorId,
-            linkedIssueId: issueRecord?.id || request.linkedIssueId || null,
+            linkedIssueId: issueRecord?.id || currentLink.linkedIssueId || null,
             linkedIssueNo:
               issueRecord?.nonConformanceNumber ||
-              request.linkedIssueNo ||
+              currentLink.linkedIssueNo ||
               null,
             linkedIssueStatus,
             qualifiedQuantity,
@@ -314,6 +343,7 @@ export const InspectionRequestCloseService = {
           inspectionLinks,
           issue: issueRecord,
           issueAuditVariables,
+          createdIssue,
           resolvedLegacyResponsibility: responsibilityResolution.resolvedLegacy,
           record,
         };
@@ -325,46 +355,57 @@ export const InspectionRequestCloseService = {
       inspectionLinks,
       issue,
       issueAuditVariables,
+      createdIssue,
       resolvedLegacyResponsibility,
       record: updated,
     } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
 
-    await syncCloseAttachments({
-      closeAttachments,
-      hasDocuments:
-        typeof body.hasDocuments === 'boolean' ? body.hasDocuments : undefined,
-      inspectionId,
-      inspectionIds: inspectionLinks.map((item) => item.inspectionId),
-      requestId: String(updated.id),
-      selfCheckAttachments: request.attachments,
-    });
-    await syncCloseIssueEffects({
-      closedLinkedIssueCount,
-      issue,
-      issueAuditVariables,
-      linkedIssue,
-      updated,
-      userinfo,
-    });
+    await runClosePostCommitTask('attachments', () =>
+      syncCloseAttachments({
+        closeAttachments,
+        hasDocuments:
+          typeof body.hasDocuments === 'boolean'
+            ? body.hasDocuments
+            : undefined,
+        inspectionId,
+        inspectionIds: inspectionLinks.map((item) => item.inspectionId),
+        requestId: String(updated.id),
+        selfCheckAttachments: request.attachments,
+      }),
+    );
+    await runClosePostCommitTask('issue-effects', () =>
+      syncCloseIssueEffects({
+        closedLinkedIssueCount,
+        issue: createdIssue ? issue : null,
+        issueAuditVariables,
+        linkedIssue: createdIssue ? linkedIssue : undefined,
+        updated,
+        userinfo,
+      }),
+    );
 
-    await recordBusinessAuditLog(event, {
-      action: 'UPDATE',
-      detailsTemplate:
-        '关闭报检任务: {{requestNo}}，关联检验记录: {{inspectionId}}',
-      detailsVariables: { inspectionId, requestNo: updated.requestNo },
-      targetId: String(updated.id),
-      targetType: 'inspection_request',
-      userId: userinfo?.id,
-    });
-    if (resolvedLegacyResponsibility) {
-      await recordBusinessAuditLog(event, {
+    await runClosePostCommitTask('audit-log', () =>
+      recordBusinessAuditLog(event, {
         action: 'UPDATE',
-        detailsTemplate: '关闭报检时裁决并固化责任事实: {{requestNo}}',
-        detailsVariables: { requestNo: updated.requestNo },
+        detailsTemplate:
+          '关闭报检任务: {{requestNo}}，关联检验记录: {{inspectionId}}',
+        detailsVariables: { inspectionId, requestNo: updated.requestNo },
         targetId: String(updated.id),
         targetType: 'inspection_request',
         userId: userinfo?.id,
-      });
+      }),
+    );
+    if (resolvedLegacyResponsibility) {
+      await runClosePostCommitTask('responsibility-audit-log', () =>
+        recordBusinessAuditLog(event, {
+          action: 'UPDATE',
+          detailsTemplate: '关闭报检时裁决并固化责任事实: {{requestNo}}',
+          detailsVariables: { requestNo: updated.requestNo },
+          targetId: String(updated.id),
+          targetType: 'inspection_request',
+          userId: userinfo?.id,
+        }),
+      );
     }
     return mapInspectionRequest(updated);
   },

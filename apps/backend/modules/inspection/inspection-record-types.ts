@@ -122,6 +122,11 @@ export interface InspectionRecordInput {
   reportDate?: Date | null | string;
   remarks?: string;
   items?: InspectionItemInput[];
+  linkedIssue?: {
+    [key: string]: unknown;
+    enabled?: boolean;
+    generateNcNumber?: boolean;
+  };
 }
 
 export function normalizeOptionalString(value?: string) {

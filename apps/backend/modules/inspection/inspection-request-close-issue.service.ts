@@ -21,7 +21,7 @@ import {
 import { resolveInspectionRequestIssueResponsibilityInTransaction } from './inspection-request-responsibility.service';
 
 export interface CloseLinkedIssueCreateResult {
-  auditVariables: { issue: string; nonConformanceNumber: string };
+  auditVariables: { issue: string; nonConformanceNumber: null | string };
   record: Prisma.quality_recordsGetPayload<Record<string, never>>;
 }
 
@@ -82,7 +82,10 @@ export async function buildCloseLinkedIssueCreateResult(options: {
   });
 
   const created = await InspectionIssueCreateService.createInTransaction({
-    body: issueBody,
+    body: {
+      ...issueBody,
+      generateNcNumber: options.linkedIssue.generateNcNumber,
+    },
     tx: options.tx,
     userinfo: options.userinfo,
   });

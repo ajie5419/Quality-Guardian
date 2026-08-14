@@ -5,6 +5,7 @@ import { validateCloseRequestBody } from './inspection-request-close.schema';
 const VALID_LINKED_ISSUE = {
   defectCategoryId: 'category-surface',
   defectSubcategoryId: 'subcategory-crack',
+  generateNcNumber: false,
   description: 'defect',
   partName: 'Bearing',
   processName: 'Welding',
@@ -98,5 +99,20 @@ describe('validateCloseRequestBody', () => {
         unqualifiedQuantity: 1,
       }),
     ).toThrow('内部责任部门不能同时指定供应商 ID');
+  });
+
+  it('requires an explicit NC number generation decision', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        linkedIssue: {
+          ...VALID_LINKED_ISSUE,
+          generateNcNumber: undefined,
+          photos: ['/api/uploads/defect.jpg'],
+        },
+        quantity: 2,
+        result: 'FAIL',
+        unqualifiedQuantity: 1,
+      }),
+    ).toThrow('是否生成不合格编号不能为空');
   });
 });

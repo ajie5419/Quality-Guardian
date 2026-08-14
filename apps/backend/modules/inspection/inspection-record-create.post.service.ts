@@ -1,4 +1,8 @@
 import { defineEventHandler, readBody } from 'h3';
+import {
+  runInspectionRecordPostCommitTask,
+  syncLinkedIssuePostCommitEffects,
+} from '~/modules/inspection/inspection-record-create-effects.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemService } from '~/modules/system/system.service';
@@ -28,17 +32,27 @@ export default defineEventHandler(async (event) => {
       );
     }
 
-    const result = await InspectionService.create(body);
-    await recordBusinessAuditLog(event, {
-      userId: userinfo?.id,
-      action: 'CREATE',
-      targetType: 'inspection_record',
-      targetId: String(result.id),
-      detailsTemplate: '新增检验记录: {{record}}',
-      detailsVariables: {
-        record: result.projectName || result.workOrderNumber || result.id,
-      },
-    });
+    const result = await InspectionService.create(body, undefined, userinfo);
+    await runInspectionRecordPostCommitTask('audit-log', () =>
+      recordBusinessAuditLog(event, {
+        userId: userinfo?.id,
+        action: 'CREATE',
+        targetType: 'inspection_record',
+        targetId: String(result.id),
+        detailsTemplate: '新增检验记录: {{record}}',
+        detailsVariables: {
+          record: result.projectName || result.workOrderNumber || result.id,
+        },
+      }),
+    );
+    const linkedIssue = 'linkedIssue' in result ? result.linkedIssue : null;
+    if (linkedIssue) {
+      await syncLinkedIssuePostCommitEffects({
+        issue: linkedIssue,
+        photos: body.linkedIssue?.photos,
+        userinfo,
+      });
+    }
     return useResponseSuccess(result);
   } catch (error: unknown) {
     logApiError('inspection-create', error, undefined, event);

@@ -52,9 +52,16 @@ vi.mock('~/modules/inspection/inspection-request-close-issue.service', () => ({
   buildCloseLinkedIssueCreateResult: vi.fn(),
 }));
 
+vi.mock('~/modules/inspection/inspection-request-close-access.service', () => ({
+  ensureCloseRequestAccess: vi.fn(),
+}));
+
 vi.mock(
   '~/modules/inspection/inspection-request-close-effects.service',
   () => ({
+    runClosePostCommitTask: vi
+      .fn()
+      .mockImplementation((_label, task) => task()),
     syncCloseAttachments: vi.fn(),
     syncCloseIssueEffects: vi.fn(),
   }),
@@ -138,6 +145,11 @@ describe('inspectionRequestCloseService', () => {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: null,
+            linkedIssueNo: null,
+            linkedIssueStatus: null,
+          }),
           update: vi.fn().mockResolvedValue({
             ...mockRequest,
             status: 'CLOSED',
@@ -255,6 +267,11 @@ describe('inspectionRequestCloseService', () => {
           createMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: null,
+            linkedIssueNo: null,
+            linkedIssueStatus: null,
+          }),
           update: vi.fn().mockResolvedValue({
             ...mockRequest,
             status: 'CLOSED',
@@ -287,5 +304,59 @@ describe('inspectionRequestCloseService', () => {
         }),
       }),
     );
+  });
+
+  it('reuses the already linked issue for a repeated FAIL close', async () => {
+    const existingIssue = {
+      id: 'issue-existing',
+      nonConformanceNumber: 'NC-26KJ-019',
+      status: 'OPEN',
+    };
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue({
+      ...mockRequest,
+      linkedIssueId: existingIssue.id,
+      linkedIssueNo: existingIssue.nonConformanceNumber,
+      linkedIssueStatus: existingIssue.status,
+    });
+    const createIssue = await import(
+      '~/modules/inspection/inspection-request-close-issue.service'
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: { findMany: vi.fn().mockResolvedValue([]) },
+        quality_records: {
+          findFirst: vi.fn().mockResolvedValue(existingIssue),
+        },
+        qms_inspection_request_inspections: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: existingIssue.id,
+            linkedIssueNo: existingIssue.nonConformanceNumber,
+            linkedIssueStatus: existingIssue.status,
+          }),
+          update: vi.fn().mockResolvedValue({
+            ...mockRequest,
+            linkedIssueId: existingIssue.id,
+            linkedIssueNo: existingIssue.nonConformanceNumber,
+            linkedIssueStatus: existingIssue.status,
+          }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_task_dispatches: { updateMany: vi.fn() },
+      }),
+    );
+
+    await InspectionRequestCloseService.closeRequest(
+      {} as any,
+      'req-1',
+      { result: 'FAIL', unqualifiedQuantity: 1 },
+      mockUserInfo,
+    );
+
+    expect(
+      createIssue.buildCloseLinkedIssueCreateResult,
+    ).not.toHaveBeenCalled();
   });
 });

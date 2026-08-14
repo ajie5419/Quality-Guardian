@@ -223,6 +223,7 @@ export interface CloseInspectionRequestParams {
     description?: string;
     division?: string;
     divisionId?: string;
+    generateNcNumber: boolean;
     lossAmount?: number;
     partName?: string;
     photos?: string[];

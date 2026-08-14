@@ -78,6 +78,7 @@ const request = {
 const linkedIssue = {
   defectCategoryId: 'cat-1',
   defectSubcategoryId: 'sub-1',
+  generateNcNumber: false,
   description: 'defect',
   partName: 'Bearing',
   photos: ['/uploads/defect.jpg'],
@@ -136,6 +137,7 @@ describe('buildCloseLinkedIssueCreateResult', () => {
     expect(mocks.createInTransaction).toHaveBeenCalledWith(
       expect.objectContaining({
         body: expect.objectContaining({
+          generateNcNumber: false,
           inspectionId: 'inspection-1',
           responsibleDepartment: 'Assembly',
           responsibilityType: 'INTERNAL_DEPARTMENT',

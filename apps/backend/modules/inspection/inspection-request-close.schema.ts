@@ -21,6 +21,9 @@ const PREFIX_STATUS_MAP: Record<string, number> = {
 
 const linkedIssueResponsibilitySchema = z
   .object({
+    generateNcNumber: z.boolean({
+      required_error: '是否生成不合格编号不能为空',
+    }),
     responsibilityType: z.preprocess(
       (value) => normalizeInspectionIssueResponsibilityType(value) || value,
       z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE),

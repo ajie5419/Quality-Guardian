@@ -134,9 +134,16 @@ vi.mock('~/modules/inspection/inspection-request-close-issue.service', () => ({
   }),
 }));
 
+vi.mock('~/modules/inspection/inspection-request-close-access.service', () => ({
+  ensureCloseRequestAccess: vi.fn(),
+}));
+
 vi.mock(
   '~/modules/inspection/inspection-request-close-effects.service',
   () => ({
+    runClosePostCommitTask: vi
+      .fn()
+      .mockImplementation((_label, task) => task()),
     syncCloseAttachments: vi.fn(),
     syncCloseIssueEffects: vi.fn(),
   }),
@@ -225,6 +232,11 @@ function mockTransaction(updates: Record<string, unknown> = {}) {
         createMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       qms_inspection_requests: {
+        findUnique: vi.fn().mockResolvedValue({
+          linkedIssueId: requestUpdate.linkedIssueId,
+          linkedIssueNo: requestUpdate.linkedIssueNo,
+          linkedIssueStatus: requestUpdate.linkedIssueStatus,
+        }),
         update: vi.fn().mockResolvedValue(requestUpdate),
         updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
@@ -256,6 +268,11 @@ function makeTxMock(overrides: Record<string, unknown> = {}) {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     qms_inspection_requests: {
+      findUnique: vi.fn().mockResolvedValue({
+        linkedIssueId: requestUpdate.linkedIssueId,
+        linkedIssueNo: requestUpdate.linkedIssueNo,
+        linkedIssueStatus: requestUpdate.linkedIssueStatus,
+      }),
       update: vi.fn().mockResolvedValue(requestUpdate),
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
@@ -267,6 +284,7 @@ const VALID_LINKED_ISSUE = {
   description: 'defect',
   defectSubtype: 'crack',
   defectType: 'surface',
+  generateNcNumber: false,
   partName: 'Bearing',
   photos: [{ name: 'defect.jpg', url: 'http://example.com/defect.jpg' }],
   processName: 'Welding',
