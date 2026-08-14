@@ -5,6 +5,7 @@ import {
   getRequestCreateResponsibilityLabels,
   getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
+  isRequestCreateOutsourcingResponsibility,
   REQUEST_CREATE_RESPONSIBILITY_LABELS,
   REQUEST_CREATE_RESPONSIBILITY_TYPES,
   resolveRequestCreateResponsibilityDepartmentDefault,
@@ -29,11 +30,6 @@ describe('request create responsibility payload', () => {
 
   it.each([
     [
-      'OUTSOURCING_UNIT' as const,
-      [{ label: '生产 OBU', value: 'dept-production' }],
-      'dept-production',
-    ],
-    [
       'SUPPLIER' as const,
       [{ label: '采购部', value: 'dept-purchasing' }],
       'dept-purchasing',
@@ -50,6 +46,16 @@ describe('request create responsibility payload', () => {
       ).toBe(expected);
     },
   );
+
+  it('never defaults a department for outsourcing responsibility', () => {
+    expect(
+      resolveRequestCreateResponsibilityDepartmentDefault({
+        currentResponsibleDepartmentId: '',
+        departments: [{ label: '生产 OBU', value: 'dept-production' }],
+        responsibilityType: 'OUTSOURCING_UNIT',
+      }),
+    ).toBe('');
+  });
 
   it('does not replace a manually selected department', () => {
     expect(
@@ -117,18 +123,6 @@ describe('request create responsibility payload', () => {
         supplierId: 'supplier-a',
       },
     ],
-    [
-      {
-        responsibilityType: 'OUTSOURCING_UNIT' as const,
-        responsibleDepartmentId: 'dept-production',
-        supplierId: 'supplier-b',
-      },
-      {
-        responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
-        supplierId: 'supplier-b',
-      },
-    ],
   ])(
     'keeps canonical IDs and drops incompatible identity fields',
     (input, expected) => {
@@ -159,17 +153,32 @@ describe('request create responsibility payload', () => {
     });
   });
 
-  it('submits PROCESS outsourcing without a hidden department ID', () => {
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'submits %s outsourcing without a hidden department ID',
+    (_category) => {
+      expect(
+        buildRequestCreateResponsibilityPayload({
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-stale',
+          supplierId: 'supplier-outsourcing',
+        }),
+      ).toEqual({
+        responsibilityType: 'OUTSOURCING_UNIT',
+        supplierId: 'supplier-outsourcing',
+      });
+      expect(isRequestCreateOutsourcingResponsibility('OUTSOURCING_UNIT')).toBe(
+        true,
+      );
+    },
+  );
+
+  it('fails closed when outsourcing has no supplier', () => {
     expect(
       buildRequestCreateResponsibilityPayload({
-        category: 'PROCESS',
         responsibilityType: 'OUTSOURCING_UNIT',
         responsibleDepartmentId: '',
-        supplierId: 'supplier-outsourcing',
+        supplierId: '',
       }),
-    ).toEqual({
-      responsibilityType: 'OUTSOURCING_UNIT',
-      supplierId: 'supplier-outsourcing',
-    });
+    ).toBeNull();
   });
 });

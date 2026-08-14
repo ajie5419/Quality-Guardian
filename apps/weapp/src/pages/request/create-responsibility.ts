@@ -68,17 +68,20 @@ export function resolveRequestCreateResponsibilityDepartmentDefault(input: {
   return resolveInspectionRequestResponsibilityDepartmentDefault(input);
 }
 
+export function isRequestCreateOutsourcingResponsibility(
+  responsibilityType: RequestCreateResponsibilityType,
+) {
+  return (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  );
+}
+
 export function buildRequestCreateResponsibilityPayload(input: {
-  category?: 'INCOMING' | 'PROCESS';
   responsibilityType: RequestCreateResponsibilityType;
   responsibleDepartmentId: string;
   supplierId: string;
 }) {
-  if (
-    input.category === 'PROCESS' &&
-    input.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-  ) {
+  if (isRequestCreateOutsourcingResponsibility(input.responsibilityType)) {
     const supplierId = input.supplierId.trim();
     return supplierId
       ? { responsibilityType: input.responsibilityType, supplierId }

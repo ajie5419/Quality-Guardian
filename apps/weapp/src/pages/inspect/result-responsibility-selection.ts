@@ -41,12 +41,18 @@ export function buildInspectionResultResponsibilityPayload(input: {
   supplierId: string;
 }) {
   const responsibilityType = input.responsibilityType;
+  if (!responsibilityType) return null;
+  const supplierId = input.supplierId.trim();
+  if (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+  ) {
+    return supplierId ? { responsibilityType, supplierId } : null;
+  }
   const responsibleDepartmentId = input.responsibleDepartmentId.trim();
-  if (!responsibilityType || !responsibleDepartmentId) return null;
+  if (!responsibleDepartmentId) return null;
   if (!isExternalInspectionIssueResponsibility(responsibilityType)) {
     return { responsibilityType, responsibleDepartmentId };
   }
-  const supplierId = input.supplierId.trim();
   return supplierId
     ? { responsibilityType, responsibleDepartmentId, supplierId }
     : null;

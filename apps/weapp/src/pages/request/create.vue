@@ -28,6 +28,7 @@ import {
   getRequestCreateResponsibilityLabels,
   getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
+  isRequestCreateOutsourcingResponsibility,
   resolveRequestCreateResponsibilityDepartmentDefault,
 } from './create-responsibility';
 
@@ -197,10 +198,8 @@ const responsibilityTypeLabels = computed(() =>
 const responsibilityTypeIndex = computed(() =>
   Math.max(0, responsibilityTypes.value.indexOf(form.responsibilityType)),
 );
-const isProcessOutsourcing = computed(
-  () =>
-    form.category === 'PROCESS' &&
-    form.responsibilityType === 'OUTSOURCING_UNIT',
+const isOutsourcingResponsibility = computed(() =>
+  isRequestCreateOutsourcingResponsibility(form.responsibilityType),
 );
 const responsibilityUnitLabel = computed(() =>
   form.responsibilityType === 'OUTSOURCING_UNIT' ? '外协单位' : '供应商',
@@ -259,7 +258,7 @@ async function loadResponsibilityOptions() {
     }
     departmentOptions.value = res.data.departments;
     supplierOptions.value = res.data.suppliers;
-    form.responsibleDepartmentId = isProcessOutsourcing.value
+    form.responsibleDepartmentId = isOutsourcingResponsibility.value
       ? ''
       : resolveRequestCreateResponsibilityDepartmentDefault({
           currentResponsibleDepartmentId: form.responsibleDepartmentId,
@@ -527,7 +526,7 @@ function validate(): boolean {
     (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
   errors.responsibility =
-    (!isProcessOutsourcing.value && !form.responsibleDepartmentId) ||
+    (!isOutsourcingResponsibility.value && !form.responsibleDepartmentId) ||
     (isExternalResponsibility.value ? !form.supplierId : false);
   errors.attachments = form.attachments.length === 0;
   return (
@@ -562,7 +561,6 @@ async function handleSubmit() {
     }
     const responsibilityPayload = buildRequestCreateResponsibilityPayload({
       ...form,
-      category: form.category || undefined,
     });
     if (!responsibilityPayload) {
       throw new Error('请填写完整的责任归属信息');
@@ -775,7 +773,7 @@ async function handleSubmit() {
         </view>
 
         <view
-          v-if="!isProcessOutsourcing"
+          v-if="!isOutsourcingResponsibility"
           class="form-item"
           :class="{ error: errors.responsibility }"
         >

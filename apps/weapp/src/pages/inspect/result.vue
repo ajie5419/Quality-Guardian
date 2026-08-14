@@ -23,7 +23,10 @@ import {
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 
-import { resolveLockedInspectionRequestIssueResponsibility } from './result-responsibility';
+import {
+  resolveEditableInspectionRequestIssueResponsibility,
+  resolveLockedInspectionRequestIssueResponsibility,
+} from './result-responsibility';
 import {
   buildInspectionResultResponsibilityPayload,
   getInspectionResultResponsibilityLabels,
@@ -126,6 +129,11 @@ const isExternalResponsibility = computed(() =>
     ? isExternalInspectionIssueResponsibility(responsibilityType.value)
     : false,
 );
+const isOutsourcingResponsibility = computed(
+  () =>
+    responsibilityType.value ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
+);
 const legacyResponsibilityTypeLabels = computed(() =>
   getInspectionResultResponsibilityLabels(task.value?.category),
 );
@@ -195,16 +203,29 @@ async function fetchDetail() {
       };
       const responsibility =
         resolveLockedInspectionRequestIssueResponsibility(d);
+      const editableResponsibility =
+        resolveEditableInspectionRequestIssueResponsibility({
+          category: task.value.category,
+          value: d,
+        });
       responsibilityLocked.value = Boolean(responsibility);
       responsibilityType.value =
         responsibility?.responsibilityType ||
+        editableResponsibility?.responsibilityType ||
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
       responsibleDepartmentId.value =
-        responsibility?.responsibleDepartmentId ||
-        task.value.responsibleDepartmentId ||
-        '';
+        responsibilityType.value ===
+        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+          ? ''
+          : responsibility?.responsibleDepartmentId ||
+            editableResponsibility?.responsibleDepartmentId ||
+            task.value.responsibleDepartmentId ||
+            '';
       supplierId.value =
-        responsibility?.supplierId || task.value.supplierId || '';
+        responsibility?.supplierId ||
+        editableResponsibility?.supplierId ||
+        task.value.supplierId ||
+        '';
       if (!responsibility) {
         await loadLegacyResponsibilityOptions();
       }
@@ -257,7 +278,9 @@ async function loadLegacyResponsibilityOptions() {
     }
     legacyDepartments.value = res.data.departments;
     legacySuppliers.value = res.data.suppliers;
-    if (
+    if (isOutsourcingResponsibility.value) {
+      responsibleDepartmentId.value = '';
+    } else if (
       responsibleDepartmentId.value &&
       !res.data.departments.some(
         (department) => department.value === responsibleDepartmentId.value,
@@ -390,8 +413,12 @@ function validateCloseResponsibility(): boolean {
     uni.showToast({ title: '责任归属选项尚未加载完成', icon: 'none' });
     return false;
   }
-  if (!responsibilityType.value || !responsibleDepartmentId.value) {
-    uni.showToast({ title: '请选择责任类型和责任部门', icon: 'none' });
+  if (!responsibilityType.value) {
+    uni.showToast({ title: '请选择责任类型', icon: 'none' });
+    return false;
+  }
+  if (!isOutsourcingResponsibility.value && !responsibleDepartmentId.value) {
+    uni.showToast({ title: '请选择责任部门', icon: 'none' });
     return false;
   }
   if (isExternalResponsibility.value && !supplierId.value) {
@@ -705,7 +732,7 @@ onLoad((options) => {
               </view>
             </picker>
           </view>
-          <view class="card">
+          <view v-if="!isOutsourcingResponsibility" class="card">
             <view class="field-label required">责任部门</view>
             <picker
               :disabled="

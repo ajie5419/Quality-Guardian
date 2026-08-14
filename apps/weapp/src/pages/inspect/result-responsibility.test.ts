@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   hasEmptyInspectionRequestIssueResponsibilityContext,
+  resolveEditableInspectionRequestIssueResponsibility,
   resolveLockedInspectionRequestIssueResponsibility,
 } from './result-responsibility';
+import { buildInspectionResultResponsibilityPayload } from './result-responsibility-selection';
 
 describe('mobile inspection result responsibility context', () => {
   it.each([
@@ -95,5 +97,50 @@ describe('mobile inspection result responsibility context', () => {
         responsibilityType: null,
       }),
     ).toBe(true);
+  });
+
+  it.each(['INCOMING', 'PROCESS'] as const)(
+    'keeps a partial %s outsourcing type and supplier as editable defaults',
+    (category) => {
+      const responsibility =
+        resolveEditableInspectionRequestIssueResponsibility({
+          category,
+          value: {
+            responsibilityType: 'OUTSOURCING_UNIT',
+            responsibleDepartmentId: null,
+            supplierId: 'supplier-outsourcing',
+          },
+        });
+
+      expect(responsibility).toEqual({
+        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibleDepartmentId: '',
+        supplierId: 'supplier-outsourcing',
+      });
+      expect(
+        buildInspectionResultResponsibilityPayload({
+          responsibilityType: responsibility?.responsibilityType || '',
+          responsibleDepartmentId:
+            responsibility?.responsibleDepartmentId || '',
+          supplierId: responsibility?.supplierId || '',
+        }),
+      ).toEqual({
+        responsibilityType: 'OUTSOURCING_UNIT',
+        supplierId: 'supplier-outsourcing',
+      });
+    },
+  );
+
+  it('does not preserve the supplier responsibility type for a PROCESS task', () => {
+    expect(
+      resolveEditableInspectionRequestIssueResponsibility({
+        category: 'PROCESS',
+        value: {
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchasing',
+          supplierId: 'supplier-1',
+        },
+      }),
+    ).toBeNull();
   });
 });

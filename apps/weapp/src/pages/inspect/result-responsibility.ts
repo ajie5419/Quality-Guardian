@@ -1,6 +1,7 @@
 import type { InspectionIssueResponsibilityType } from '@qgs/shared';
 
 import {
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   isExternalInspectionIssueResponsibility,
   normalizeInspectionIssueCanonicalId,
   normalizeInspectionIssueResponsibilityType,
@@ -10,6 +11,12 @@ export type LockedInspectionRequestIssueResponsibility = {
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartmentId: string;
   supplierId?: string;
+};
+
+export type EditableInspectionRequestIssueResponsibility = {
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
+  supplierId: string;
 };
 
 function hasStoredValue(value: unknown) {
@@ -68,5 +75,41 @@ export function resolveLockedInspectionRequestIssueResponsibility(
     responsibilityType,
     responsibleDepartmentId,
     ...(supplierId ? { supplierId } : {}),
+  };
+}
+
+/**
+ * A partial persisted fact must be completed explicitly, but its valid type
+ * and canonical IDs remain useful form defaults. In particular, do not turn a
+ * historical outsourcing task into an internal task just because the server
+ * has not yet persisted its responsibility department.
+ */
+export function resolveEditableInspectionRequestIssueResponsibility(input: {
+  category?: 'INCOMING' | 'PROCESS';
+  value: unknown;
+}): EditableInspectionRequestIssueResponsibility | null {
+  if (!input.value || typeof input.value !== 'object') return null;
+  const source = input.value as Record<string, unknown>;
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    source.responsibilityType,
+  );
+  if (
+    !responsibilityType ||
+    (input.category === 'PROCESS' &&
+      responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER)
+  ) {
+    return null;
+  }
+  const isOutsourcing =
+    responsibilityType ===
+    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+  return {
+    responsibilityType,
+    responsibleDepartmentId: isOutsourcing
+      ? ''
+      : normalizeInspectionIssueCanonicalId(source.responsibleDepartmentId),
+    supplierId: isExternalInspectionIssueResponsibility(responsibilityType)
+      ? normalizeInspectionIssueCanonicalId(source.supplierId)
+      : '',
   };
 }

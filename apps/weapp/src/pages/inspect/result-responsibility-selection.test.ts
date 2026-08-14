@@ -37,12 +37,11 @@ describe('mobile inspection close responsibility payload', () => {
       'OUTSOURCING_UNIT',
       {
         responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
+        responsibleDepartmentId: '',
         supplierId: 'supplier-b',
       },
       {
         responsibilityType: 'OUTSOURCING_UNIT',
-        responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-b',
       },
     ],
