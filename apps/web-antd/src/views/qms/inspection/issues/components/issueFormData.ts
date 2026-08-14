@@ -20,6 +20,19 @@ import {
 } from '../constants';
 import { isExternalInspectionIssueResponsibility } from './issueFormPayload';
 
+/**
+ * Issue department options are supplied as { label, value, children } nodes.
+ * Keep the form value as the canonical department ID while TreeSelect renders
+ * the matching label after its asynchronous options load.
+ */
+export const RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS = {
+  fieldNames: { children: 'children', label: 'label', value: 'value' },
+  labelInValue: false,
+  treeDefaultExpandAll: true,
+  treeNodeFilterProp: 'label',
+  treeNodeLabelProp: 'label',
+} as const;
+
 export function isWeldingProcessName(value: unknown) {
   return String(value ?? '')
     .trim()
@@ -83,8 +96,10 @@ export function getIssueFormSchema(
             label: 'Generate NC Number',
             component: 'Switch' as const,
             componentProps: {
-              checkedChildren: 'Generate automatically',
-              unCheckedChildren: 'Unnumbered',
+              // The form defaults every control to w-full. A switch must keep
+              // its intrinsic width instead of becoming a full-row toggle.
+              class: '!w-auto',
+              style: { width: 'auto' },
             },
           },
         ]),
@@ -188,7 +203,7 @@ export function getIssueFormSchema(
       rules: 'selectRequired',
       componentProps: {
         dropdownStyle: { maxHeight: '400px', overflow: 'auto' },
-        treeDefaultExpandAll: true,
+        ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
       },
     },
     {

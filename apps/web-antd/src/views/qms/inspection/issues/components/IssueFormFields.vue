@@ -28,6 +28,7 @@ import {
   getIssueFormSchemaWithStatusOptions,
   isWeldingDefectSubcategory,
   isWeldingProcessName,
+  RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
 } from './issueFormData';
 import { isExternalInspectionIssueResponsibility } from './issueFormPayload';
 import IssuePhotoUpload from './IssuePhotoUpload.vue';
@@ -199,7 +200,10 @@ watch(
     formApi.updateSchema([
       {
         fieldName: 'responsibleDepartmentId',
-        componentProps: { treeData: data },
+        componentProps: {
+          ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+          treeData: data,
+        },
       },
     ]);
   },

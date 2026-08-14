@@ -4,6 +4,7 @@ import {
   getIssueFormSchema,
   isWeldingDefectSubcategory,
   isWeldingProcessName,
+  RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
 } from './issueFormData';
 
 vi.mock('@vben/locales', () => ({
@@ -96,6 +97,13 @@ describe('issue form welding conditions', () => {
     expect(
       schema.some((field) => field.fieldName === 'responsibleDepartments'),
     ).toBe(false);
+    expect(department?.componentProps).toMatchObject(
+      RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+    );
+    expect(department?.componentProps).toMatchObject({
+      labelInValue: false,
+      treeNodeLabelProp: 'label',
+    });
   });
 
   it('only exposes automatic number generation while creating an issue', () => {
@@ -114,5 +122,19 @@ describe('issue form welding conditions', () => {
     expect(
       editSchema.some((field) => field.fieldName === 'generateNcNumber'),
     ).toBe(false);
+
+    const generateNcNumber = createSchema.find(
+      (field) => field.fieldName === 'generateNcNumber',
+    );
+    expect(generateNcNumber?.componentProps).toMatchObject({
+      class: '!w-auto',
+      style: { width: 'auto' },
+    });
+    expect(generateNcNumber?.componentProps).not.toHaveProperty(
+      'checkedChildren',
+    );
+    expect(generateNcNumber?.componentProps).not.toHaveProperty(
+      'unCheckedChildren',
+    );
   });
 });

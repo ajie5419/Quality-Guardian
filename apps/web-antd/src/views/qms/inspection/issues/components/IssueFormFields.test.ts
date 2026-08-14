@@ -5,17 +5,20 @@ import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import IssueFormFields from './IssueFormFields.vue';
+import { buildInspectionIssuePayload } from './issueFormPayload';
 
 const {
   mockGetWelderListPage,
   mockHandleApiError,
   mockSetFieldValue,
   mockSetFormState,
+  mockUpdateSchema,
 } = vi.hoisted(() => ({
   mockGetWelderListPage: vi.fn(),
   mockHandleApiError: vi.fn(),
   mockSetFieldValue: vi.fn(),
   mockSetFormState: vi.fn(),
+  mockUpdateSchema: vi.fn(),
 }));
 
 vi.mock('@vben/locales', () => ({
@@ -47,7 +50,7 @@ vi.mock('#/adapter/form', () => ({
       setFieldValue: mockSetFieldValue,
       setState: mockSetFormState,
       setValues: vi.fn(),
-      updateSchema: vi.fn(),
+      updateSchema: mockUpdateSchema,
       validate: vi.fn(),
     },
   ],
@@ -174,6 +177,43 @@ describe('issue form fields responsibility contract', () => {
     expect(wrapper.text()).toContain('qms.inspection.issues.ncNumber');
     expect(wrapper.text()).toContain('Unnumbered');
     expect(wrapper.text()).not.toContain('Generate NC Number');
+  });
+
+  it('keeps the canonical department ID while async options supply its label', async () => {
+    const wrapper = mountComponent();
+    const departments = [
+      {
+        label: 'Production OBU',
+        value: 'dept-1750026464925',
+      },
+    ];
+
+    await wrapper.setProps({ deptTreeData: departments });
+
+    expect(mockUpdateSchema).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          componentProps: expect.objectContaining({
+            fieldNames: {
+              children: 'children',
+              label: 'label',
+              value: 'value',
+            },
+            labelInValue: false,
+            treeData: departments,
+            treeNodeLabelProp: 'label',
+          }),
+          fieldName: 'responsibleDepartmentId',
+        }),
+      ]),
+    );
+    expect(
+      buildInspectionIssuePayload({
+        description: 'Surface scratch',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-1750026464925',
+      }).responsibleDepartmentId,
+    ).toBe('dept-1750026464925');
   });
 
   it('writes the supplier id and name snapshot together', async () => {
