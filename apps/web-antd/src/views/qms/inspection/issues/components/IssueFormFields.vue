@@ -157,6 +157,38 @@ function isTestWelderRecord(params: { code?: string; name?: string }) {
   );
 }
 
+function buildFormSchema() {
+  const isResponsibilityLocked = !!props.responsibilityType;
+  return getIssueFormSchemaWithStatusOptions(
+    props.statusOptions,
+    props.processOptions,
+    [],
+    props.isEditMode,
+    props.responsibilityTypeOptions,
+  ).map((field) => {
+    const isResponsibilityField = [
+      'responsibilityType',
+      'responsibleDepartmentId',
+      'supplierId',
+    ].includes(field.fieldName);
+    if (!isResponsibilityField) return field;
+
+    return {
+      ...field,
+      componentProps: {
+        ...field.componentProps,
+        ...(field.fieldName === 'responsibleDepartmentId'
+          ? {
+              ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+              treeData: props.deptTreeData,
+            }
+          : {}),
+        disabled: isResponsibilityLocked,
+      },
+    };
+  });
+}
+
 const [Form, formApi] = useVbenForm({
   commonConfig: {
     labelWidth: 100,
@@ -170,13 +202,7 @@ const [Form, formApi] = useVbenForm({
     formValues.value = vals as IssueFormValues;
     emit('valuesChange', vals as Record<string, unknown>);
   },
-  schema: getIssueFormSchemaWithStatusOptions(
-    props.statusOptions,
-    props.processOptions,
-    [],
-    props.isEditMode,
-    props.responsibilityTypeOptions,
-  ),
+  schema: buildFormSchema(),
   showDefaultActions: false,
 });
 
@@ -209,21 +235,21 @@ const shouldShowSupplier = computed(() => {
   );
 });
 
-watch(
-  () => props.deptTreeData,
-  (data) => {
-    formApi.updateSchema([
-      {
-        fieldName: 'responsibleDepartmentId',
-        componentProps: {
-          ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
-          treeData: data,
-        },
+function syncDepartmentTreeSchema(data: DeptTreeLikeNode[]) {
+  formApi.updateSchema([
+    {
+      fieldName: 'responsibleDepartmentId',
+      componentProps: {
+        ...RESPONSIBLE_DEPARTMENT_TREE_SELECT_PROPS,
+        treeData: data,
       },
-    ]);
-  },
-  { immediate: true },
-);
+    },
+  ]);
+}
+
+watch(() => props.deptTreeData, syncDepartmentTreeSchema, {
+  immediate: true,
+});
 
 watch(
   shouldShowSupplier,
@@ -337,13 +363,7 @@ watch(
   () => props.isEditMode,
   () => {
     formApi.setState({
-      schema: getIssueFormSchemaWithStatusOptions(
-        props.statusOptions,
-        props.processOptions,
-        [],
-        props.isEditMode,
-        props.responsibilityTypeOptions,
-      ),
+      schema: buildFormSchema(),
     });
   },
   { immediate: true },

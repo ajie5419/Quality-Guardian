@@ -13,12 +13,20 @@ const {
   mockSetFieldValue,
   mockSetFormState,
   mockUpdateSchema,
+  mockFormStates,
 } = vi.hoisted(() => ({
   mockGetWelderListPage: vi.fn(),
   mockHandleApiError: vi.fn(),
   mockSetFieldValue: vi.fn(),
   mockSetFormState: vi.fn(),
   mockUpdateSchema: vi.fn(),
+  mockFormStates: [] as Array<{
+    schema: Array<{
+      componentProps?: Record<string, unknown>;
+      fieldName: string;
+      label?: string;
+    }>;
+  }>,
 }));
 
 vi.mock('@vben/locales', () => ({
@@ -28,32 +36,61 @@ vi.mock('@vben/locales', () => ({
 
 vi.mock('#/adapter/form', () => ({
   useVbenForm: (config: {
-    schema: Array<{ fieldName: string; label?: string }>;
-  }) => [
-    defineComponent({
-      name: 'MockVbenForm',
-      setup(_, { slots }) {
-        return () =>
-          h('div', [
-            ...config.schema.map((field) => h('span', field.label || '')),
-            ...(config.schema.some((field) => field.fieldName === 'ncNumber')
-              ? [slots.ncNumber?.({ modelValue: '' })]
-              : []),
-            slots.supplierId?.({ value: undefined }),
-            slots['description-label']?.(),
-          ]);
+    schema: Array<{
+      componentProps?: Record<string, unknown>;
+      fieldName: string;
+      label?: string;
+    }>;
+  }) => {
+    const state = { schema: [...config.schema] };
+    mockFormStates.push(state);
+
+    return [
+      defineComponent({
+        name: 'MockVbenForm',
+        setup(_, { slots }) {
+          return () =>
+            h('div', [
+              ...config.schema.map((field) => h('span', field.label || '')),
+              ...(config.schema.some((field) => field.fieldName === 'ncNumber')
+                ? [slots.ncNumber?.({ modelValue: '' })]
+                : []),
+              slots.supplierId?.({ value: undefined }),
+              slots['description-label']?.(),
+            ]);
+        },
+      }),
+      {
+        getValues: vi.fn(),
+        resetForm: vi.fn(),
+        setFieldValue: mockSetFieldValue,
+        setState: (nextState: { schema?: typeof state.schema }) => {
+          mockSetFormState(nextState);
+          if (nextState.schema) state.schema = [...nextState.schema];
+        },
+        setValues: vi.fn(),
+        updateSchema: (updates: Array<(typeof state.schema)[number]>) => {
+          mockUpdateSchema(updates);
+          const updateMap = new Map(
+            updates.map((update) => [update.fieldName, update]),
+          );
+          state.schema = state.schema.map((field) => {
+            const update = updateMap.get(field.fieldName);
+            if (!update) return field;
+            return {
+              ...field,
+              ...update,
+              componentProps: {
+                ...field.componentProps,
+                ...update.componentProps,
+              },
+            };
+          });
+        },
+        validate: vi.fn(),
       },
-    }),
-    {
-      getValues: vi.fn(),
-      resetForm: vi.fn(),
-      setFieldValue: mockSetFieldValue,
-      setState: mockSetFormState,
-      setValues: vi.fn(),
-      updateSchema: mockUpdateSchema,
-      validate: vi.fn(),
-    },
-  ],
+    ];
+  },
 }));
 
 vi.mock('#/api/qms/welder', () => ({
@@ -150,6 +187,7 @@ vi.mock('./IssueSimilarCases.vue', () => ({
 describe('issue form fields responsibility contract', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockFormStates.length = 0;
     mockGetWelderListPage.mockResolvedValue({ items: [] });
   });
 
@@ -179,29 +217,35 @@ describe('issue form fields responsibility contract', () => {
     expect(wrapper.text()).not.toContain('生成不合格编号');
   });
 
-  it('keeps the canonical department ID while async options supply its label', async () => {
+  it('keeps async department options after the edit schema is rebuilt', async () => {
     const wrapper = mountComponent();
     const departments = [
       {
-        label: 'Production OBU',
+        title: 'Production OBU',
         value: 'dept-1750026464925',
       },
     ];
 
     await wrapper.setProps({ deptTreeData: departments });
+    await wrapper.setProps({ isEditMode: true });
 
-    expect(mockUpdateSchema).toHaveBeenCalledWith(
-      expect.arrayContaining([
-        expect.objectContaining({
-          componentProps: expect.objectContaining({
-            labelInValue: false,
-            treeData: departments,
-            treeNodeLabelProp: 'title',
-          }),
-          fieldName: 'responsibleDepartmentId',
-        }),
-      ]),
+    const state = mockFormStates[mockFormStates.length - 1];
+    const departmentField = state?.schema.find(
+      (field) => field.fieldName === 'responsibleDepartmentId',
     );
+    const rebuiltSchema = mockSetFormState.mock.calls.at(-1)?.[0]?.schema;
+    const rebuiltDepartmentField = rebuiltSchema?.find(
+      (field: { fieldName: string }) =>
+        field.fieldName === 'responsibleDepartmentId',
+    );
+    expect(rebuiltDepartmentField?.componentProps).toMatchObject({
+      treeData: departments,
+    });
+    expect(departmentField?.componentProps).toMatchObject({
+      labelInValue: false,
+      treeData: departments,
+      treeNodeLabelProp: 'title',
+    });
     expect(
       buildInspectionIssuePayload({
         description: 'Surface scratch',
@@ -230,7 +274,7 @@ describe('issue form fields responsibility contract', () => {
     );
   });
 
-  it('uses the explicit responsibility type for the supplier category', () => {
+  it('keeps explicit responsibility fields locked after a schema rebuild', () => {
     const wrapper = mount(IssueFormFields, {
       props: {
         deptTreeData: [],
@@ -242,6 +286,18 @@ describe('issue form fields responsibility contract', () => {
     expect(
       wrapper.findComponent({ name: 'MockSupplierSelect' }).props('category'),
     ).toBe('Outsourcing');
+    const state = mockFormStates[mockFormStates.length - 1];
+    const responsibilityFields = [
+      'responsibilityType',
+      'responsibleDepartmentId',
+      'supplierId',
+    ];
+    for (const fieldName of responsibilityFields) {
+      expect(
+        state?.schema.find((field) => field.fieldName === fieldName)
+          ?.componentProps?.disabled,
+      ).toBe(true);
+    }
   });
 
   it('does not retain supplier as an available embedded PROCESS choice', () => {

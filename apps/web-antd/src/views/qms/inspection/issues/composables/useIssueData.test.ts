@@ -8,8 +8,8 @@ import { mapIssueDepartmentTreeNode } from './useIssueData';
 
 const issueDepartmentTree = [
   mapIssueDepartmentTreeNode({
-    id: 'dept-1750026464925',
-    name: '结构 BU',
+    id: 'dept-1770026473133',
+    name: '质量部',
   }),
   mapIssueDepartmentTreeNode({
     id: 'dept-machining',
@@ -18,12 +18,12 @@ const issueDepartmentTree = [
 ];
 
 describe('inspection issue department TreeSelect', () => {
-  it('renders a department title for the selected canonical ID', async () => {
+  it('replaces an async canonical ID fallback with its department title', async () => {
     const Harness = defineComponent({
       components: { TreeSelect },
       setup() {
         return {
-          selectedDepartmentId: ref('dept-1750026464925'),
+          selectedDepartmentId: ref('dept-1770026473133'),
           treeData: ref<typeof issueDepartmentTree>([]),
         };
       },
@@ -43,8 +43,8 @@ describe('inspection issue department TreeSelect', () => {
     wrapper.vm.treeData = issueDepartmentTree;
     await nextTick();
 
-    expect(wrapper.get('.ant-select-selection-item').text()).toBe('结构 BU');
-    expect(wrapper.vm.selectedDepartmentId).toBe('dept-1750026464925');
+    expect(wrapper.get('.ant-select-selection-item').text()).toBe('质量部');
+    expect(wrapper.vm.selectedDepartmentId).toBe('dept-1770026473133');
 
     wrapper
       .findComponent(TreeSelect)
