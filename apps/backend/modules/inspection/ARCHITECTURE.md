@@ -67,6 +67,12 @@ Release maintenance backfills only incomplete legacy request responsibility fact
 
 The request and inspection responsibility migrations use bounded MySQL index names. The inspection migration adds the same nullable responsibility triad and a compact `(responsibilityType, responsibleDepartmentId)` index to `inspections`, so requests and generated records preserve the same canonical fact.
 
+### 责任部门在线读取契约
+
+`responsibleDepartmentId` 是责任部门的唯一 identity，`responsibleDepartment` 和 legacy `responsibleDepartments` 只是不批量回写的历史名称快照。检验记录、检验不合格项、列表详情和导出必须通过 `DeptService.resolveActiveNamesByIds` 一次批量读取 active canonical 部门的当前名称；不得在 inspection 模块跨表读取 departments，也不得逐行查询。存在有效 ID 时，响应中的主责任部门及 legacy 多值响应数组都以当前名称替换主快照，额外历史责任部门仍保留。无 ID 的历史行才回退快照；非空但失效或软删 ID 维持 unresolved 语义，不能用名称猜测或静默改写事实。
+
+按责任部门名称筛选时，服务端先通过 `DeptService.findActiveByNameContains` 取得 active IDs，再把 ID 条件与 legacy 快照匹配一并放入同一 Prisma `where`。`count`、分页查询和 export 查询必须复用该 `where`，禁止取页后在内存筛选。PROCESS 记录的历史关联报检任务兼容仍只接受唯一内部责任部门，关联冲突 fail-closed。
+
 ### P3009 migration 恢复
 
 旧请求责任 migration 的索引名曾长达 70 字符，超过 MySQL 64 字符限制并触发 MySQL 1059 / Prisma P3009。恢复 wrapper 只能识别该精确 migration：数据库既无 `20260811000000` 所属 `qms_inspection_requests` 的四个目标字段及短索引时才调用 Prisma `resolve --rolled-back`；只有该请求表的四字段与短索引完整时才调用 `resolve --applied`；任一 partial 或 drift 状态均 fail-closed 阻断。随后才允许 `migrate deploy` 应用或确认 `20260811000001` 的 `inspections` 变更。GitHub deploy、OSS deploy 和 local container up/dev 必须复用此 wrapper。恢复前后均先只读核对 migration steps、InnoDB、字段与索引；wrapper 本身不得直接执行未经该状态机授权的数据库修复。

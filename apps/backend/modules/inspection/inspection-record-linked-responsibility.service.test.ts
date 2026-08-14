@@ -11,6 +11,13 @@ vi.mock('~/utils/prisma', () => ({
   default: { qms_inspection_requests: { findMany } },
 }));
 
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    findActiveByNameContains: vi.fn().mockResolvedValue([]),
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
 describe('inspection record linked responsibility', () => {
   beforeEach(() => {
     vi.clearAllMocks();

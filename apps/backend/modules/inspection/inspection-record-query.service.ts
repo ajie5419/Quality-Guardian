@@ -9,6 +9,7 @@ import {
   formatDate,
   normalizeInspectionStationSelection,
 } from '@qgs/shared';
+import { DeptService } from '~/modules/dept';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
@@ -123,8 +124,13 @@ export const InspectionRecordQueryService = {
       return null;
     }
 
-    const linkedResponsibilityByInspectionId =
-      await resolveLinkedInternalResponsibilities([inspection]);
+    const [linkedResponsibilityByInspectionId, departmentNames] =
+      await Promise.all([
+        resolveLinkedInternalResponsibilities([inspection]),
+        DeptService.resolveActiveNamesByIds([
+          inspection.responsibleDepartmentId,
+        ]),
+      ]);
 
     let templateFields: InspectionItemInput[] = [];
     let templateMeta: InspectionTemplateMeta = {
@@ -181,6 +187,9 @@ export const InspectionRecordQueryService = {
       ),
       team: resolveInspectionRecordTeamDisplay({
         ...inspection,
+        responsibleDepartment:
+          departmentNames.get(inspection.responsibleDepartmentId || '') ||
+          inspection.responsibleDepartment,
         ...linkedResponsibilityByInspectionId.get(inspection.id),
       }),
     };
@@ -232,9 +241,12 @@ export const InspectionRecordQueryService = {
     const where: Prisma.inspectionsWhereInput = {
       isDeleted: false,
     };
-    const linkedInternalInspectionIds = team
-      ? await resolveUniqueLinkedInternalInspectionIdsForTeam(team)
-      : [];
+    const [linkedInternalInspectionIds, currentTeamDepartments] = team
+      ? await Promise.all([
+          resolveUniqueLinkedInternalInspectionIdsForTeam(team),
+          DeptService.findActiveByNameContains(team),
+        ])
+      : [[], []];
 
     if (sourceInspectionId) {
       where.id = sourceInspectionId;
@@ -256,6 +268,20 @@ export const InspectionRecordQueryService = {
       if (materialName) where.materialName = { contains: materialName };
       const additionalFilters: Prisma.inspectionsWhereInput[] = [];
       if (team) {
+        const currentTeamDepartmentFilters: Prisma.inspectionsWhereInput[] =
+          currentTeamDepartments.length > 0
+            ? [
+                {
+                  category: 'PROCESS',
+                  responsibilityType: 'INTERNAL_DEPARTMENT',
+                  responsibleDepartmentId: {
+                    in: currentTeamDepartments.map(
+                      (department) => department.id,
+                    ),
+                  },
+                },
+              ]
+            : [];
         additionalFilters.push({
           OR: [
             { team: { contains: team } },
@@ -264,6 +290,7 @@ export const InspectionRecordQueryService = {
               responsibilityType: 'INTERNAL_DEPARTMENT',
               responsibleDepartment: { contains: team },
             },
+            ...currentTeamDepartmentFilters,
             {
               category: 'PROCESS',
               responsibilityType: 'OUTSOURCING_UNIT',
@@ -391,8 +418,13 @@ export const InspectionRecordQueryService = {
         item.category === 'INCOMING' ? item.incomingTypeId : null,
       ),
     );
-    const linkedResponsibilityByInspectionId =
-      await resolveLinkedInternalResponsibilities(rawItems);
+    const [linkedResponsibilityByInspectionId, departmentNames] =
+      await Promise.all([
+        resolveLinkedInternalResponsibilities(rawItems),
+        DeptService.resolveActiveNamesByIds(
+          rawItems.map((item) => item.responsibleDepartmentId),
+        ),
+      ]);
     const items = rawItems.map((item) => {
       const linkedIssues = item.qualityRecords || [];
       const fallbackUnqualifiedQuantity = linkedIssues.reduce(
@@ -430,6 +462,9 @@ export const InspectionRecordQueryService = {
         ),
         team: resolveInspectionRecordTeamDisplay({
           ...item,
+          responsibleDepartment:
+            departmentNames.get(item.responsibleDepartmentId || '') ||
+            item.responsibleDepartment,
           ...linkedResponsibilityByInspectionId.get(item.id),
         }),
       };

@@ -60,9 +60,9 @@ vi.mock('~/modules/data-scope/data-scope.service', () => ({
   },
 }));
 
-vi.mock('~/modules/dept/dept.service', () => ({
+vi.mock('~/modules/dept', () => ({
   DeptService: {
-    findAll: vi.fn(),
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -204,6 +204,7 @@ describe('after-sales-analytics.service', () => {
     const { QualityClassificationService } = await import(
       '~/modules/quality-classification'
     );
+    const { DeptService } = await import('~/modules/dept');
     vi.mocked(
       QualityClassificationService.listForManagement,
     ).mockResolvedValueOnce([
@@ -226,9 +227,12 @@ describe('after-sales-analytics.service', () => {
         subcategories: [],
       },
     ]);
-    (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
-      .mockResolvedValueOnce(new Map([['supplier-1', 'Supplier A']]))
-      .mockResolvedValueOnce(new Map([['dept-1', 'QA']]));
+    (
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+    ).mockResolvedValueOnce(new Map([['supplier-1', 'Supplier A']]));
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValueOnce(
+      new Map([['dept-1', 'QA']]),
+    );
 
     const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
 
@@ -362,15 +366,19 @@ describe('after-sales-analytics.service', () => {
         subcategories: [],
       },
     ]);
-    (MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any)
-      .mockResolvedValueOnce(
-        new Map([
-          ['invalid-supplier', null],
-          ['supplier-a', 'Shared supplier'],
-          ['supplier-b', 'Shared supplier'],
-        ]),
-      )
-      .mockResolvedValueOnce(new Map([['invalid-dept', null]]));
+    (
+      MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
+    ).mockResolvedValueOnce(
+      new Map([
+        ['invalid-supplier', null],
+        ['supplier-a', 'Shared supplier'],
+        ['supplier-b', 'Shared supplier'],
+      ]),
+    );
+    const { DeptService } = await import('~/modules/dept');
+    vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValueOnce(
+      new Map(),
+    );
 
     const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
 

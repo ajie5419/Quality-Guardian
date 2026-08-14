@@ -11,6 +11,12 @@ const logger = createModuleLogger('DeptService');
 
 type DepartmentReadClient = Pick<Prisma.TransactionClient, 'departments'>;
 
+export interface ActiveDepartmentIdentity {
+  businessUnit: null | string;
+  id: string;
+  name: string;
+}
+
 export interface CreateDeptDto {
   businessUnit?: string;
   description?: string;
@@ -72,7 +78,7 @@ export const DeptService = {
       names?: ReadonlyArray<null | string | undefined>;
     },
     client: DepartmentReadClient = prisma,
-  ) {
+  ): Promise<ActiveDepartmentIdentity[]> {
     const ids = [
       ...new Set(
         (input.ids ?? []).map((id) => String(id || '').trim()).filter(Boolean),
@@ -96,7 +102,37 @@ export const DeptService = {
         ],
       },
       select: { businessUnit: true, id: true, name: true },
-    });
+    }) as Promise<ActiveDepartmentIdentity[]>;
+  },
+
+  async findActiveByNameContains(
+    keyword: ReadonlyArray<string> | string,
+    client: DepartmentReadClient = prisma,
+  ): Promise<ActiveDepartmentIdentity[]> {
+    const input: ReadonlyArray<string> =
+      typeof keyword === 'string' ? [keyword] : keyword;
+    const keywords = [
+      ...new Set(input.map((item) => item.trim()).filter(Boolean)),
+    ];
+    if (keywords.length === 0) return [];
+    return client.departments.findMany({
+      where: {
+        isDeleted: false,
+        OR: keywords.map((name) => ({ name: { contains: name } })),
+        status: 1,
+      },
+      select: { businessUnit: true, id: true, name: true },
+    }) as Promise<ActiveDepartmentIdentity[]>;
+  },
+
+  async resolveActiveNamesByIds(
+    ids: ReadonlyArray<null | string | undefined>,
+    client: DepartmentReadClient = prisma,
+  ): Promise<Map<string, string>> {
+    const departments = await this.findActiveByIdsOrNames({ ids }, client);
+    return new Map<string, string>(
+      departments.map((department) => [department.id, department.name]),
+    );
   },
 
   /**

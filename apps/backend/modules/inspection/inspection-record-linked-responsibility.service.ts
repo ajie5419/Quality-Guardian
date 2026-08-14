@@ -1,3 +1,4 @@
+import { DeptService } from '~/modules/dept';
 import prisma from '~/utils/prisma';
 
 import { requiresLinkedInternalResponsibility } from './inspection-record-display';
@@ -36,6 +37,7 @@ export async function resolveLinkedInternalResponsibilities(
         where: { inspectionId: { in: inspectionIds } },
       },
       responsibleDepartment: true,
+      responsibleDepartmentId: true,
     },
     where: {
       isDeleted: false,
@@ -47,9 +49,15 @@ export async function resolveLinkedInternalResponsibilities(
       ],
     },
   });
-  const departmentsByInspectionId = new Map<string, Set<string>>();
+  const departmentNames = await DeptService.resolveActiveNamesByIds(
+    linkedRequests.map((request) => request.responsibleDepartmentId),
+  );
+  const departmentsByInspectionId = new Map<string, Map<string, string>>();
   for (const request of linkedRequests) {
-    const department = String(request.responsibleDepartment || '').trim();
+    const departmentId = String(request.responsibleDepartmentId || '').trim();
+    const department =
+      departmentNames.get(departmentId) ||
+      String(request.responsibleDepartment || '').trim();
     if (!department) continue;
     const linkedInspectionIds = new Set(
       [
@@ -62,8 +70,12 @@ export async function resolveLinkedInternalResponsibilities(
     );
     for (const inspectionId of linkedInspectionIds) {
       const departments =
-        departmentsByInspectionId.get(inspectionId) ?? new Set();
-      departments.add(department);
+        departmentsByInspectionId.get(inspectionId) ??
+        new Map<string, string>();
+      departments.set(
+        departmentId ? `id:${departmentId}` : `name:${department}`,
+        department,
+      );
       departmentsByInspectionId.set(inspectionId, departments);
     }
   }
@@ -75,7 +87,8 @@ export async function resolveLinkedInternalResponsibilities(
           return [
             inspectionId,
             {
-              linkedInternalResponsibleDepartment: [...departments][0] || null,
+              linkedInternalResponsibleDepartment:
+                [...departments.values()][0] || null,
             },
           ];
         }
@@ -93,6 +106,7 @@ export async function resolveLinkedInternalResponsibilities(
 export async function resolveUniqueLinkedInternalInspectionIdsForTeam(
   team: string,
 ): Promise<string[]> {
+  const currentDepartments = await DeptService.findActiveByNameContains(team);
   const matchingRequests = await prisma.qms_inspection_requests.findMany({
     select: {
       inspectionId: true,
@@ -101,7 +115,18 @@ export async function resolveUniqueLinkedInternalInspectionIdsForTeam(
     where: {
       isDeleted: false,
       responsibilityType: 'INTERNAL_DEPARTMENT',
-      responsibleDepartment: { contains: team },
+      OR: [
+        { responsibleDepartment: { contains: team } },
+        ...(currentDepartments.length > 0
+          ? [
+              {
+                responsibleDepartmentId: {
+                  in: currentDepartments.map((department) => department.id),
+                },
+              },
+            ]
+          : []),
+      ],
     },
   });
   const candidateIds = [

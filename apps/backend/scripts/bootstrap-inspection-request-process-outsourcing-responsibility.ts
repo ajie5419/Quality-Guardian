@@ -13,7 +13,11 @@ export async function bootstrapProcessOutsourcingResponsibleDepartment() {
   return { id: department.id, name: department.name };
 }
 
-if (import.meta.main) {
+if (
+  process.argv[1]?.endsWith(
+    'bootstrap-inspection-request-process-outsourcing-responsibility.ts',
+  )
+) {
   bootstrapProcessOutsourcingResponsibleDepartment()
     .then((department) => {
       logger.info(

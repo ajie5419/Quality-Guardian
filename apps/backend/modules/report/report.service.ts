@@ -9,7 +9,6 @@ import {
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DeptService } from '~/modules/dept';
-import { flattenDeptTree } from '~/modules/dept/dept-tree';
 import { InspectionService } from '~/modules/inspection';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossService } from '~/modules/quality-loss';
@@ -49,32 +48,17 @@ function mapTrackingProgress(status?: null | string): string {
   return '已关闭';
 }
 
-async function createDepartmentNameResolver(): Promise<
-  (id: null | string, rawName?: null | string) => string
-> {
-  try {
-    const deptTree = await DeptService.findAll();
-    const deptMap = new Map<string, string>();
-    for (const node of flattenDeptTree(deptTree))
-      deptMap.set(node.id, node.name);
-    return (id: null | string, rawName?: null | string) =>
-      createIdentityAggregateItem({
-        canonicalName: id ? deptMap.get(id) : null,
-        id,
-        missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
-        rawName,
-        value: 0,
-      }).name;
-  } catch (error) {
-    logger.warn({ err: error }, 'Failed to resolve department map');
-    return (id: null | string, rawName?: null | string) =>
-      createIdentityAggregateItem({
-        id,
-        missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
-        rawName,
-        value: 0,
-      }).name;
-  }
+function createDepartmentNameResolver(
+  departmentNames: ReadonlyMap<string, string>,
+) {
+  return (id: null | string, rawName?: null | string) =>
+    createIdentityAggregateItem({
+      canonicalName: id ? departmentNames.get(id) : null,
+      id,
+      missingName: rawName ? undefined : QMS_DEFAULT_VALUES.UNASSIGNED,
+      rawName,
+      value: 0,
+    }).name;
 }
 
 function resolveGovernedDisplayName(
@@ -151,10 +135,14 @@ export const ReportService = {
         start,
       });
 
-      const [getDeptName, afterSalesClassificationNames] = await Promise.all([
-        createDepartmentNameResolver(),
-        resolveAfterSalesClassificationNames(externalIssuesRaw),
+      const departmentNames = await DeptService.resolveActiveNamesByIds([
+        ...trackingIssuesRaw.map((item) => item.respDeptId),
+        ...internalIssuesRaw.map((item) => item.responsibleDepartmentId),
+        ...externalIssuesRaw.map((item) => item.respDeptId),
       ]);
+      const afterSalesClassificationNames =
+        await resolveAfterSalesClassificationNames(externalIssuesRaw);
+      const getDeptName = createDepartmentNameResolver(departmentNames);
 
       // Transform Data
       const trackingIssues = await Promise.all(

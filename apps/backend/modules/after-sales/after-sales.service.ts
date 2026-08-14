@@ -15,6 +15,7 @@ import type { AfterSalesDateMode } from './after-sales-query';
 import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { DeptService } from '~/modules/dept';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
@@ -32,17 +33,31 @@ import {
 } from './after-sales-query';
 import { normalizeAfterSalesClaimStatus } from './after-sales-status';
 
-function getResponsibleDepartmentsForResponse(item: {
-  respDept: null | string;
-  responsibleDepartments: null | string;
-}): string[] {
+function getResponsibleDepartmentsForResponse(
+  item: {
+    respDept: null | string;
+    responsibleDepartments: null | string;
+  },
+  currentResponsibleDepartmentName?: null | string,
+): string[] {
   const responsibleDepartments = parseResponsibleDepartments(
     item.responsibleDepartments,
   );
+  const snapshotResponsibleDepartment = String(item.respDept || '').trim();
+  if (currentResponsibleDepartmentName) {
+    const remainingDepartments = responsibleDepartments.includes(
+      snapshotResponsibleDepartment,
+    )
+      ? responsibleDepartments.filter(
+          (department) => department !== snapshotResponsibleDepartment,
+        )
+      : responsibleDepartments.slice(1);
+    return [currentResponsibleDepartmentName, ...remainingDepartments];
+  }
   if (responsibleDepartments.length > 0) {
     return responsibleDepartments;
   }
-  return item.respDept ? [item.respDept] : [];
+  return snapshotResponsibleDepartment ? [snapshotResponsibleDepartment] : [];
 }
 
 function appendAndCondition(
@@ -298,11 +313,22 @@ export const AfterSalesService = {
     }
     if (responsibleDept && String(responsibleDept).trim() !== '') {
       const searchTerm = String(responsibleDept).trim();
+      const currentDepartments =
+        await DeptService.findActiveByNameContains(searchTerm);
       appendAndCondition(where, {
         OR: [
           { respDept: { contains: searchTerm } },
           { respDeptId: { contains: searchTerm } },
           { responsibleDepartments: { contains: searchTerm } },
+          ...(currentDepartments.length > 0
+            ? [
+                {
+                  respDeptId: {
+                    in: currentDepartments.map((department) => department.id),
+                  },
+                },
+              ]
+            : []),
         ],
       });
     }
@@ -345,12 +371,21 @@ export const AfterSalesService = {
         productSubcategory: { select: { name: true } },
       },
     });
+    const departmentNames = await DeptService.resolveActiveNamesByIds(
+      list.map((item) => item.respDeptId),
+    );
 
     // Map to frontend expectation with formatted dates
     return list.map((item) => {
       const materialCost = Number(item.materialCost) || 0;
       const laborTravelCost = Number(item.laborTravelCost) || 0;
-      const responsibleDepartments = getResponsibleDepartmentsForResponse(item);
+      const currentResponsibleDepartmentName = departmentNames.get(
+        item.respDeptId || '',
+      );
+      const responsibleDepartments = getResponsibleDepartmentsForResponse(
+        item,
+        currentResponsibleDepartmentName,
+      );
 
       return {
         ...item,
@@ -360,7 +395,8 @@ export const AfterSalesService = {
         closeDate: formatDate(item.closeDate),
         shipDate: formatDate(item.shipDate),
         createdAt: formatDate(item.createdAt),
-        responsibleDept: item.respDept || '',
+        responsibleDept:
+          currentResponsibleDepartmentName || item.respDept || '',
         responsibleDepartments,
         resolutionPlan: item.solution || '',
         status: item.claimStatus,

@@ -17,6 +17,7 @@ import {
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { DeptService } from '~/modules/dept';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
@@ -248,21 +249,27 @@ export const AfterSalesChartAggregationService = {
     const aggregateRows = [...aggregateMap.values()];
 
     const canonicalIdById = new Map<string, string>();
-    let canonicalNames = dimensionConfig.governanceKey
-      ? await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-          canonicalIds: aggregateRows.map(
-            (item) => item.identity?.id || item.rawId,
-          ),
-          configKey: dimensionConfig.governanceKey,
-          canonicalIdById,
-          idLikeNameById: aggregateRows
-            .map((item) => ({
-              id: item.identity?.id || item.rawId || '',
-              rawName: item.identity?.rawName ?? null,
-            }))
-            .filter((pair) => pair.id !== ''),
-        })
-      : new Map<string, null | string>();
+    let canonicalNames = new Map<string, null | string>();
+    if (dimensionConfig.governanceKey) {
+      canonicalNames =
+        dimension === 'responsibleDept'
+          ? await DeptService.resolveActiveNamesByIds(
+              aggregateRows.map((item) => item.identity?.id || item.rawId),
+            )
+          : await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
+              canonicalIds: aggregateRows.map(
+                (item) => item.identity?.id || item.rawId,
+              ),
+              configKey: dimensionConfig.governanceKey,
+              canonicalIdById,
+              idLikeNameById: aggregateRows
+                .map((item) => ({
+                  id: item.identity?.id || item.rawId || '',
+                  rawName: item.identity?.rawName ?? null,
+                }))
+                .filter((pair) => pair.id !== ''),
+            });
+    }
     if (dimensionConfig.classification) {
       const ids = aggregateRows
         .map((item) => item.identity?.id || item.rawId)

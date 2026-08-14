@@ -58,6 +58,40 @@ describe('deptService', () => {
     });
   });
 
+  it('resolves current names for active canonical department IDs in one query', async () => {
+    vi.mocked(prisma.departments.findMany).mockResolvedValue([
+      { businessUnit: null, id: 'dept-1', name: 'Renamed Production' },
+    ] as never);
+
+    await expect(
+      DeptService.resolveActiveNamesByIds(['dept-1', ' dept-1 ', null]),
+    ).resolves.toEqual(new Map([['dept-1', 'Renamed Production']]));
+
+    expect(prisma.departments.findMany).toHaveBeenCalledWith({
+      select: { businessUnit: true, id: true, name: true },
+      where: {
+        OR: [{ id: { in: ['dept-1'] } }],
+        isDeleted: false,
+        status: 1,
+      },
+    });
+  });
+
+  it('finds active canonical departments by current display name', async () => {
+    vi.mocked(prisma.departments.findMany).mockResolvedValue([] as never);
+
+    await DeptService.findActiveByNameContains(' Renamed ');
+
+    expect(prisma.departments.findMany).toHaveBeenCalledWith({
+      select: { businessUnit: true, id: true, name: true },
+      where: {
+        isDeleted: false,
+        OR: [{ name: { contains: 'Renamed' } }],
+        status: 1,
+      },
+    });
+  });
+
   it('builds and caches department tree when cache misses', async () => {
     vi.mocked(redis.get).mockResolvedValue(null as never);
     vi.mocked(prisma.departments.findMany).mockResolvedValue([

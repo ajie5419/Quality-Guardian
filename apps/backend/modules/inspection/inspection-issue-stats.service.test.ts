@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DeptService } from '~/modules/dept';
 import { InspectionIssueStatsService } from '~/modules/inspection/inspection-issue-stats.service';
 import { QualityClassificationService } from '~/modules/quality-classification';
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -32,6 +32,12 @@ vi.mock('~/modules/quality-classification', () => ({
   QualityClassificationService: {
     resolveCategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
     resolveSubcategoryNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
+}));
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
   },
 }));
 
@@ -770,7 +776,7 @@ describe('inspectionIssueStatsService', () => {
       ]);
     });
 
-    it('resolves a retired department ID through the frozen canonical ID name snapshot', async () => {
+    it('uses the active department name over the frozen snapshot', async () => {
       (prisma.quality_records.findMany as any).mockResolvedValue([
         {
           date: new Date('2024-01-15'),
@@ -791,10 +797,10 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
-      (
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
-      ).mockResolvedValue(
-        new Map([['a3a98d7b568511f1881c00163e37355f', '生产 OBU']]),
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([
+          ['a3a98d7b568511f1881c00163e37355f', 'Renamed Production OBU'],
+        ]),
       );
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
@@ -808,24 +814,14 @@ describe('inspectionIssueStatsService', () => {
       expect(result).toEqual([
         {
           id: 'a3a98d7b568511f1881c00163e37355f',
-          name: '生产 OBU',
+          name: 'Renamed Production OBU',
           resolutionStatus: 'RESOLVED',
           value: 1,
         },
       ]);
-      expect(
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds,
-      ).toHaveBeenCalledWith(
-        expect.objectContaining({
-          configKey: 'responsibleDepartment',
-          idLikeNameById: [
-            {
-              id: 'a3a98d7b568511f1881c00163e37355f',
-              rawName: 'dept-1769576623191',
-            },
-          ],
-        }),
-      );
+      expect(DeptService.resolveActiveNamesByIds).toHaveBeenCalledWith([
+        'a3a98d7b568511f1881c00163e37355f',
+      ]);
     });
 
     it('keeps an unresolvable department reference as invalidated master data', async () => {
@@ -849,9 +845,9 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
-      (
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
-      ).mockResolvedValue(new Map());
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map(),
+      );
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
         {
@@ -873,7 +869,7 @@ describe('inspectionIssueStatsService', () => {
       ]);
     });
 
-    it('merges the legacy department ID row with the canonical row', async () => {
+    it('keeps distinct active department IDs separate despite matching snapshots', async () => {
       (prisma.quality_records.findMany as any).mockResolvedValue([
         {
           date: new Date('2024-01-15'),
@@ -912,21 +908,11 @@ describe('inspectionIssueStatsService', () => {
           supplierName: '',
         },
       ]);
-      (
-        MasterDataGovernanceKernel.resolveCanonicalNamesByIds as any
-      ).mockImplementation(
-        (options: { canonicalIdById?: Map<string, string> }) => {
-          options.canonicalIdById?.set(
-            'a3a98d7b568511f1881c00163e37355f',
-            'dept-1769576623191',
-          );
-          return Promise.resolve(
-            new Map([
-              ['a3a98d7b568511f1881c00163e37355f', '生产 OBU'],
-              ['dept-1769576623191', '生产 OBU'],
-            ]),
-          );
-        },
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([
+          ['a3a98d7b568511f1881c00163e37355f', 'Legacy Production OBU'],
+          ['dept-1769576623191', 'Renamed Production OBU'],
+        ]),
       );
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
@@ -939,10 +925,16 @@ describe('inspectionIssueStatsService', () => {
 
       expect(result).toEqual([
         {
-          id: 'dept-1769576623191',
-          name: '生产 OBU',
+          id: 'a3a98d7b568511f1881c00163e37355f',
+          name: 'Legacy Production OBU',
           resolutionStatus: 'RESOLVED',
-          value: 2,
+          value: 1,
+        },
+        {
+          id: 'dept-1769576623191',
+          name: 'Renamed Production OBU',
+          resolutionStatus: 'RESOLVED',
+          value: 1,
         },
       ]);
     });

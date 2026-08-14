@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DeptService } from '~/modules/dept';
 import { InspectionRecordQueryService } from '~/modules/inspection/inspection-record-query.service';
 import prisma from '~/utils/prisma';
 import { resolveIncomingTypeNamesByIds } from '~/utils/process-resolver';
@@ -21,6 +22,13 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: vi.fn().mockReturnValue({ warn: vi.fn() }),
+}));
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    findActiveByNameContains: vi.fn().mockResolvedValue([]),
+    resolveActiveNamesByIds: vi.fn().mockResolvedValue(new Map()),
+  },
 }));
 
 vi.mock('~/utils/prisma-error', () => ({
@@ -96,7 +104,13 @@ describe('inspectionRecordQueryService', () => {
         ...baseInspection,
         process: { name: 'Welding' },
         reportDate: null,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: 'Old Welding BU',
+        responsibleDepartmentId: 'dept-welding',
       });
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([['dept-welding', 'Renamed Welding BU']]),
+      );
 
       const result = await InspectionRecordQueryService.findById('insp-1');
 
@@ -104,6 +118,7 @@ describe('inspectionRecordQueryService', () => {
       expect(result?.id).toBe('insp-1');
       expect(result?.processName).toBe('Welding');
       expect(result?.inspectionDate).toBe('2024-01-15');
+      expect(result?.team).toBe('Renamed Welding BU');
     });
 
     it('should query template when templateId exists', async () => {
@@ -235,6 +250,30 @@ describe('inspectionRecordQueryService', () => {
       });
 
       expect(result.items[0]?.team).toBe('Machining BU');
+    });
+
+    it('uses the current department name in exported process records', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([
+        {
+          ...baseInspection,
+          archiveTask: null,
+          process: { name: 'Machining' },
+          qualityRecords: [],
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartment: 'Old Machining BU',
+          responsibleDepartmentId: 'dept-machining',
+        },
+      ]);
+      (prisma.inspections.count as any).mockResolvedValue(1);
+      vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
+        new Map([['dept-machining', 'Renamed Machining BU']]),
+      );
+
+      const result = await InspectionRecordQueryService.findAll({
+        forExport: true,
+      });
+
+      expect(result.items[0]?.team).toBe('Renamed Machining BU');
     });
 
     it('fails closed for a legacy record linked to different internal departments', async () => {
@@ -436,6 +475,28 @@ describe('inspectionRecordQueryService', () => {
           }),
         }),
       );
+    });
+
+    it('filters process records by the current department name in the database', async () => {
+      (prisma.inspections.findMany as any).mockResolvedValue([]);
+      (prisma.inspections.count as any).mockResolvedValue(0);
+      vi.mocked(DeptService.findActiveByNameContains).mockResolvedValue([
+        { businessUnit: null, id: 'dept-welding', name: 'Renamed Welding BU' },
+      ]);
+
+      await InspectionRecordQueryService.findAll({ team: 'Renamed Welding' });
+
+      const where = (prisma.inspections.findMany as any).mock.calls[0][0].where;
+      expect(where.AND).toContainEqual(
+        expect.objectContaining({
+          OR: expect.arrayContaining([
+            expect.objectContaining({
+              responsibleDepartmentId: { in: ['dept-welding'] },
+            }),
+          ]),
+        }),
+      );
+      expect(prisma.inspections.count).toHaveBeenCalledWith({ where });
     });
 
     it('should locate a source record by ID without applying list filters', async () => {
