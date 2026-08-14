@@ -27,6 +27,30 @@
 
 ---
 
+### 2026-08-14 修复：进货报检供应商展示与责任契约
+
+**执行内容：**
+
+- 修复进货报检任务列表的供应商名称缺失：后端将已持久化的 canonical `supplierName` 投影到列表兼容 `team` 字段，与过程外协展示一致，不回写 `team` 或伪造 `teamId`。
+- Web、H5 和小程序的进货报检入口及关单表单仅保留供应商和外协单位；两者都隐藏责任部门，请求仅提交 `responsibilityType + supplierId`。
+- 后端创建与关单事务复用同一 canonical 部门解析服务：供应商责任通过独立系统设置解析“采购部”，外协责任解析“生产 OBU”。客户端伪造部门、配置缺失/失效/歧义、既有责任冲突继续 fail-closed。
+- 历史进货任务关闭时，顶层责任和 FAIL `linkedIssue` 都可省略部门 ID；服务端在同一事务内注入并投影最终 canonical 部门，避免再触发“报检任务责任事实不完整”。
+
+**验证结果：**
+
+- 后端全量 Vitest：`288/288` 文件、`2631/2631` 用例通过。
+- Web happy-dom Vitest：`65/65` 文件、`342/342` 用例通过。
+- WeApp Vitest：`10/10` 文件、`49/49` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** `b9b48555` `fix(@qgs/backend): canonicalize incoming responsibility`、`bec0103a` `fix(@qgs/web-antd): align incoming responsibility entry`、`a84b291f` `fix(@qgs/weapp): align incoming responsibility entry`。
+
+**遗留问题：**
+
+- 未运行前端 dev/build/start；真实登录页面、真实 MySQL 并发和生产数据关单未执行。
+
+---
+
 ### 2026-08-14 修复：进货与过程外协历史报检统一关单
 
 **执行内容：**
