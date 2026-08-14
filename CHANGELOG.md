@@ -27,6 +27,29 @@
 
 ---
 
+### 2026-08-14 修复：关单不合格表单与历史责任事实兼容
+
+**执行内容：**
+
+- 不合格编号开关改为中文展示；责任部门树节点补齐 `title/value`，回填展示名称、提交保持 canonical 部门 ID。
+- `PROCESS` 报检任务 FAIL 关单表单移除 `SUPPLIER` 责任类型，保留内部部门和外协单位；`INCOMING` 保留三类，后端同步拒绝 `PROCESS + SUPPLIER`。
+- 历史已派单任务的部分责任 identity 可由 FAIL 表单的显式、主数据验证 canonical IDs 在同一事务内补齐；旧名称快照刷新，类型、部门 ID 或供应商 ID 冲突继续拒绝，PASS 不猜测缺失 identity。
+- 关闭责任解析结果携带必填 `supplierCategory`，类别校验复用该解析事实，不再重复查询供应商。
+
+**验证结果：**
+
+- Web 定向 Vitest：`4/4` 文件、`26/26` 用例通过。
+- 后端定向 Vitest：`6/6` 文件、`76/76` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `abf51d0` `fix(@qgs/web-antd): align issue responsibility forms`、`47c7540` `fix(@qgs/backend): complete legacy close responsibility`。
+
+**遗留问题：**
+
+- 未启动本地服务，因此未在 `localhost:5173` 完成真实页面验收。
+
+---
+
 ### 2026-08-14 修复：不合格项表单责任部门回显与编号开关布局
 
 **执行内容：**
