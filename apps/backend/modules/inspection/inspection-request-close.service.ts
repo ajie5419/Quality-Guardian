@@ -1,4 +1,3 @@
-import type { Prisma } from '@prisma/client';
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
@@ -9,6 +8,7 @@ import {
   normalizeInspectionIssueResponsibilityType,
 } from '@qgs/shared';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
 
@@ -28,6 +28,7 @@ import {
   syncCloseIssueEffects,
 } from './inspection-request-close-effects.service';
 import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
+import { buildCloseLinkedIssueWhere } from './inspection-request-close-linked-issue.service';
 import { createCloseInspectionRecords } from './inspection-request-close-records.service';
 import {
   assertCloseLinkedIssueResponsibilityMatches,
@@ -42,21 +43,6 @@ import {
   validateCloseRequestBody,
 } from './inspection-request-close.schema';
 import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
-
-function buildLinkedIssueWhere(
-  request: { linkedIssueId?: null | string; linkedIssueNo?: null | string },
-  issueId?: null | string,
-): null | Prisma.quality_recordsWhereInput {
-  const ids = [
-    normalizeInspectionRequestText(issueId),
-    normalizeInspectionRequestText(request.linkedIssueId),
-  ].filter(Boolean);
-  const issueNo = normalizeInspectionRequestText(request.linkedIssueNo);
-  const OR: Prisma.quality_recordsWhereInput[] = [];
-  if (ids.length > 0) OR.push({ id: { in: [...new Set(ids)] } });
-  if (issueNo) OR.push({ nonConformanceNumber: issueNo });
-  return OR.length > 0 ? { isDeleted: false, OR } : null;
-}
 
 export function hydrateOutsourcingLinkedIssueResponsibility(options: {
   linkedIssue: Record<string, unknown>;
@@ -316,7 +302,7 @@ export const InspectionRequestCloseService = {
           }
         }
 
-        const linkedIssueWhere = buildLinkedIssueWhere(
+        const linkedIssueWhere = buildCloseLinkedIssueWhere(
           requestAtClose,
           issueRecord?.id,
         );
@@ -328,6 +314,15 @@ export const InspectionRequestCloseService = {
             data: { status: 'CLOSED' },
             where: { ...linkedIssueWhere, status: { not: 'CLOSED' } },
           });
+          const updatedLinkedIssueId =
+            issueRecord?.id || currentLink.linkedIssueId;
+          if (linkedIssueUpdate.count > 0 && updatedLinkedIssueId) {
+            await QualityLossIndexQueue.enqueue(
+              tx,
+              [{ source: 'INTERNAL', sourcePk: updatedLinkedIssueId }],
+              'inspection-request.closed-linked-issue',
+            );
+          }
           closedLinkedIssueCount = linkedIssueUpdate.count;
           linkedIssueStatus = 'CLOSED';
         }

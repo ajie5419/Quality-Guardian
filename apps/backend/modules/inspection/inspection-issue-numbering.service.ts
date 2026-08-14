@@ -1,3 +1,4 @@
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
@@ -9,15 +10,23 @@ export const InspectionIssueNumberingService = {
     userId: string,
     roles?: unknown,
   ): Promise<void> {
-    const result = await prisma.quality_records.updateMany({
-      where: applyInspectionIssueWriteOwnership(
-        { id, isDeleted: false },
-        { roles, userId },
-      ),
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-      },
+    const result = await prisma.$transaction(async (tx) => {
+      const result = await tx.quality_records.updateMany({
+        where: applyInspectionIssueWriteOwnership(
+          { id, isDeleted: false },
+          { roles, userId },
+        ),
+        data: {
+          isDeleted: true,
+          updatedAt: new Date(),
+        },
+      });
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'INTERNAL', sourcePk: id }],
+        'inspection-issue.deleted',
+      );
+      return result;
     });
     if (result.count === 0) {
       throw new BusinessError('NOT_FOUND', '记录不存在', 404);

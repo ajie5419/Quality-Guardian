@@ -1,6 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import prisma from '~/utils/prisma';
 
 import { InspectionReportStatisticsService } from './inspection-report-statistics.service';
@@ -15,7 +15,7 @@ export const InspectionReportingService = {
     return row?.id || null;
   },
   async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
-    const updated = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const current = await tx.quality_records.findUnique({
         where: { id: params.id },
         select: { supplierId: true },
@@ -32,9 +32,12 @@ export const InspectionReportingService = {
         [current?.supplierId, updated.supplierId],
         'inspection-issue.quality-loss-updated',
       );
-      return updated;
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'INTERNAL', sourcePk: updated.id }],
+        'inspection-issue.quality-loss-updated',
+      );
     });
-    await QualityLossIndexService.upsertFromInternal(updated);
   },
 
   async getQualityLossTrendRows(params: {

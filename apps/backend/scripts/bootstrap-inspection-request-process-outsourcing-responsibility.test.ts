@@ -1,9 +1,13 @@
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it, vi } from 'vitest';
 
 import { bootstrapProcessOutsourcingResponsibleDepartment } from './bootstrap-inspection-request-process-outsourcing-responsibility';
+import { retiredHistoricalReleaseMaintenanceTaskKeys } from './release-maintenance-manifest';
+
+const scriptsDirectory = dirname(fileURLToPath(import.meta.url));
 
 const { resolveConfiguredDepartment } = vi.hoisted(() => ({
   resolveConfiguredDepartment: vi.fn(),
@@ -34,18 +38,21 @@ describe('process outsourcing responsibility bootstrap', () => {
     });
   });
 
-  it('is a mandatory release-maintenance gate before request responsibility backfill', () => {
-    const maintenance = readFileSync(
-      resolve(process.cwd(), 'scripts/run-release-maintenance.sh'),
+  it('preserves bootstrap ordering in versioned release maintenance', () => {
+    const entrypoint = readFileSync(
+      resolve(scriptsDirectory, 'run-release-maintenance.ts'),
       'utf8',
     );
-    const bootstrapIndex = maintenance.indexOf(
-      'scripts/bootstrap-inspection-request-process-outsourcing-responsibility.ts',
+    const bootstrapIndex = retiredHistoricalReleaseMaintenanceTaskKeys.indexOf(
+      'inspection-request-process-outsourcing-responsibility-bootstrap',
     );
-    const requestBackfillIndex = maintenance.indexOf(
-      'scripts/backfill-inspection-request-responsibilities.ts',
-    );
+    const requestBackfillIndex =
+      retiredHistoricalReleaseMaintenanceTaskKeys.indexOf(
+        'inspection-request-responsibility-backfill',
+      );
 
+    expect(entrypoint).toContain('releaseMaintenanceManifest');
+    expect(entrypoint).toContain('runReleaseMaintenance');
     expect(bootstrapIndex).toBeGreaterThanOrEqual(0);
     expect(requestBackfillIndex).toBeGreaterThan(bootstrapIndex);
   });

@@ -53,7 +53,7 @@
 
 ## 写入门契约
 
-`QualityLossIndexService` 是 `quality_loss_index` 的**唯一写入门**。任何修改 4 个源表的代码路径都必须在主写入完成后调用对应的 `upsertFromXxx`：
+`QualityLossIndexService` 是 `quality_loss_index` 的**唯一写入门**。任何修改 4 个源表的代码路径都必须在源写入的同一事务内追加持久化 `quality_loss_index_jobs` 信号；worker 随后调用对应的 `upsertFromXxx`：
 
 | 源 | 写入门 | D2 准入条件 |
 | --- | --- | --- |
@@ -62,7 +62,7 @@
 | Commissioning (vehicle_commissioning_issues) | `upsertFromCommissioning(row)` | `row.isClaim OR row.lossAmount > 0` |
 | Manual (quality_losses) | `upsertFromManual(row)` | `row.amount > 0` |
 
-不满足准入条件时索引行会被 soft-delete（`isDeleted=true`）。源表软删时通过 `softDeleteSource / softDeleteSourceMany` 同步。
+不满足准入条件时 worker 会把索引行 soft-delete（`isDeleted=true`）。源表软删也通过同一持久化任务追平。
 
 **禁止**直接对 `quality_loss_index` 表写 SQL；任何聚合需求要么走源表写入门，要么明确扩展 `QualityLossIndexService`。
 
@@ -103,12 +103,16 @@
 
 ## 部署 checklist
 
-每次涉及本模块的部署：
+索引追平由 backend 内的常驻 worker 执行。worker 在启动时立即领取任务，并每 5 秒轮询；多实例通过租约 compare-and-set 安全并发。失败任务会记录错误并指数退避，过期租约可被后续 worker 回收。
 
-1. `pnpm -C apps/backend exec prisma migrate deploy` 应用 pending migration
-2. 重启后端进程（让 Prisma client 加载新 schema）
-3. 触发 `qms-quality-loss-backfill` 容器一次性同步索引表（deploy workflow 自动）
-4. 监控容器完成（数据量大时 1-2 分钟），完成后容器自动退出
+历史数据或人工对账只能使用独立、可审计的运维命令，不能加入 release maintenance：
+
+```bash
+pnpm --dir apps/backend maintenance:quality-loss-index:enqueue -- --apply
+pnpm --dir apps/backend maintenance:quality-loss-index:drain
+```
+
+enqueue 默认 dry-run，只追加任务，不直接重建索引；drain 只消费已持久化任务。
 
 ## 端到端冒烟（手测）
 

@@ -16,6 +16,9 @@ vi.mock('~/utils/prisma', () => {
     metric_refresh_jobs: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
     quality_classification_subcategories: {
       findFirst: vi.fn(),
     },
@@ -53,10 +56,7 @@ vi.mock('~/modules/welder/welder-score.service', () => ({
 }));
 
 vi.mock('~/modules/quality-loss', () => ({
-  QualityLossIndexService: {
-    softDeleteSourceMany: vi.fn(),
-    upsertFromInternalInTransaction: vi.fn(),
-  },
+  QualityLossIndexQueue: { enqueue: vi.fn() },
 }));
 
 vi.mock('~/modules/file-storage/import-report', () => ({

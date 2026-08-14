@@ -5,6 +5,9 @@ const tx = {
     findMany: vi.fn(),
     updateMany: vi.fn(),
   },
+  quality_loss_index_jobs: {
+    createMany: vi.fn().mockResolvedValue({ count: 1 }),
+  },
 };
 
 vi.mock('~/utils/prisma', () => ({

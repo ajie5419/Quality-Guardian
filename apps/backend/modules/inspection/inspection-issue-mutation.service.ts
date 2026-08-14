@@ -9,7 +9,7 @@ import {
   toImportErrorMessage,
 } from '~/modules/file-storage/import-report';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { WelderScoreService } from '~/modules/welder/welder-score.service';
@@ -188,9 +188,10 @@ export const InspectionIssueMutationService = {
         [current.supplierId, updated.supplierId],
         'inspection-issue.updated',
       );
-      await QualityLossIndexService.upsertFromInternalInTransaction(
-        updated,
+      await QualityLossIndexQueue.enqueue(
         tx,
+        [{ source: 'INTERNAL', sourcePk: updated.id }],
+        'inspection-issue.updated',
       );
       return { updateData };
     });
@@ -266,6 +267,11 @@ export const InspectionIssueMutationService = {
         existing.map((item) => item.supplierId),
         'inspection-issue.batch-deleted',
       );
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        existing.map((item) => ({ source: 'INTERNAL', sourcePk: item.id })),
+        'inspection-issue.batch-deleted',
+      );
       return result;
     });
     if (result.count > 0) {
@@ -275,7 +281,6 @@ export const InspectionIssueMutationService = {
         logger.error(error, 'welder-score-sync after batchDeleteIssues');
       }
     }
-    await QualityLossIndexService.softDeleteSourceMany('Internal', uniqueIds);
     await Promise.all(
       uniqueIds.map((id) =>
         FileStorageService.softDeleteReferences({
@@ -319,25 +324,24 @@ export const InspectionIssueMutationService = {
         );
         serialSeed++;
         try {
-          const saved = await prisma.$transaction(async (tx) => {
+          await prisma.$transaction(async (tx) => {
             const nonConformanceNumber = generateNcNumber
               ? await reserveInspectionIssueNcNumber(tx)
               : null;
             const saved = await tx.quality_records.create({
               data: { ...payload, nonConformanceNumber },
             });
-            await QualityLossIndexService.upsertFromInternalInTransaction(
-              saved,
-              tx,
-            );
             await MetricRefreshQueue.enqueueSupplierScores(
               tx,
               [saved.supplierId],
               'inspection-issue.imported',
             );
-            return saved;
+            await QualityLossIndexQueue.enqueue(
+              tx,
+              [{ source: 'INTERNAL', sourcePk: saved.id }],
+              'inspection-issue.imported',
+            );
           });
-          await QualityLossIndexService.upsertFromInternal(saved);
           successCount++;
         } catch (upsertError) {
           // On a serialNumber unique conflict, re-fetch the current max so the

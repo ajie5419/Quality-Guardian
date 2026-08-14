@@ -2,11 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import prisma from '~/utils/prisma';
 
+const mocks = vi.hoisted(() => ({ enqueue: vi.fn() }));
+
 vi.mock('~/utils/prisma', () => ({
   default: {
-    $transaction: vi.fn(async (operations: Promise<unknown>[]) =>
-      Promise.all(operations),
-    ),
+    $transaction: vi.fn(),
     quality_loss_index: {
       findMany: vi.fn(),
       updateMany: vi.fn(),
@@ -32,9 +32,16 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
   },
 }));
 
+vi.mock('./quality-loss-index-queue.service', () => ({
+  QualityLossIndexQueue: { enqueue: mocks.enqueue },
+}));
+
 describe('quality-loss-record-maintenance.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({ quality_losses: prisma.quality_losses }),
+    );
     vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([]);
     vi.mocked(prisma.quality_loss_index.updateMany).mockResolvedValue({
       count: 1,
@@ -56,6 +63,11 @@ describe('quality-loss-record-maintenance.service', () => {
       where: { id: 'ql-1', isDeleted: false },
       data: { isDeleted: true },
     });
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.objectContaining({ quality_losses: prisma.quality_losses }),
+      [{ source: 'MANUAL', sourcePk: 'ql-1' }],
+      'quality-loss.deleted',
+    );
   });
 
   it('should delete a record by lossId', async () => {
@@ -113,13 +125,11 @@ describe('quality-loss-record-maintenance.service', () => {
       },
       select: { createdBy: true, id: true, respDept: true },
     });
-    expect(prisma.quality_loss_index.updateMany).toHaveBeenCalledWith({
-      where: {
-        source: 'Manual',
-        sourcePk: 'cmrirra7i00lyng01jigslrpf',
-      },
-      data: { isDeleted: true, indexedAt: expect.any(Date) },
-    });
+    expect(mocks.enqueue).toHaveBeenCalledWith(
+      expect.anything(),
+      [{ source: 'MANUAL', sourcePk: 'cmrirra7i00lyng01jigslrpf' }],
+      'quality-loss.deleted',
+    );
   });
 
   it('should reject deletion of a source-derived index row', async () => {

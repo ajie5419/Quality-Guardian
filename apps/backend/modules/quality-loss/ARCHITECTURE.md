@@ -16,8 +16,8 @@
 
 - 路由层只处理认证、参数解析和响应映射；创建、更新、删除和数据权限逻辑在本模块 service 中。
 - `quality-loss-manual-context.ts` 通过 `work-order` 和 `planning` 模块公开入口解析手工录入上下文，不直接读取其他模块内部表。
-- 各源写入后调用 `QualityLossIndexService` 幂等 upsert；部署流程运行 `backfill-quality-loss-index.ts` 重建索引。
-- 发布维护先回填 `work_orders`、`inspections`、`quality_records`、`after_sales`、`quality_losses` 和 `vehicle_commissioning_issues` 的项目身份，以及四类损失源表的责任部门身份；随后由 `backfill-quality-loss-index.ts` 从源表重建 `quality_loss_index`，禁止直接修补物化索引。
+- 四类源写入在同一事务追加 `quality_loss_index_jobs` 信号；常驻 worker 使用租约、退避重试和幂等单记录重建追平 `quality_loss_index`。索引短暂不可用不得丢失已提交源事实。
+- 历史追平通过受控 enqueue 脚本追加任务，再由 worker 消费；不得把全量扫描或投影重建加入 release maintenance，也不得直接修补物化索引。
 - 历史手工记录无法可靠反推工单和部件，回填时保留空值，禁止根据损失类型猜测部件。
 - 部门图表按 `respDeptId` 聚合后再解析 canonical 名称。缺失 ID 和无效 ID 保持显式未解析状态，不回退名称归并。
 - 在线创建和编辑只接受 `responsibleDepartmentId`；后端在同一事务内根据启用部门重建 `respDeptId + respDept`。缺失 ID 时保留历史名称快照，无效 ID 拒绝写入。

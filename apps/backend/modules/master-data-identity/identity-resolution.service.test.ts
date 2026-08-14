@@ -89,6 +89,10 @@ describe('historical identity resolution service', () => {
     const { HistoricalIdentityResolutionService } = await import(
       './identity-resolution.service'
     );
+    tx.identity_projection_generation_pointer.upsert.mockResolvedValue({
+      activeGenerationId: 'generation-1',
+      key: 'historical-identity',
+    });
     tx.historical_identity_resolutions.findFirst
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce({

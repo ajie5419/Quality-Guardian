@@ -67,16 +67,28 @@ export const IdentityProjectionService = {
     decision: ProjectionDecision,
   ) {
     const control = await getOrCreateControl(client);
+    const generationId = control.activeGenerationId;
+    if (!generationId) {
+      // No active generation yet (fresh DB or bootstrap before the first
+      // publish). The decision is already persisted and the next staged
+      // rebuild scans all resolutions, so there is nothing to project now.
+      // Keep the CAS version bump so concurrent builds are still detected.
+      await client.identity_projection_generation_pointer.update({
+        where: { key: CONTROL_KEY },
+        data: { resolutionVersion: { increment: 1 } },
+      });
+      return null;
+    }
     const projection = await client.identity_resolution_projection.upsert({
       where: {
         generationId_entityType_entityId_fieldName: {
           entityId: decision.entityId,
           entityType: decision.entityType,
           fieldName: decision.fieldName,
-          generationId: control.activeGenerationId,
+          generationId,
         },
       },
-      create: toProjectionData(decision, control.activeGenerationId),
+      create: toProjectionData(decision, generationId),
       update: {
         effectiveCanonicalId: decision.canonicalId,
         projectionVersion: { increment: 1 },

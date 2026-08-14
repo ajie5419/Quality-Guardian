@@ -27,6 +27,29 @@
 
 ---
 
+### 2026-08-14 合并：报检责任、可选 NC 编号与发布维护
+
+**执行内容：**
+
+- 整合报检责任、可选不合格编号与原子关单变更，同时保留质量损失索引持久化队列和 versioned release-maintenance manifest/ledger。
+- 关闭已有或新建关联不合格项后，在同一事务内入队质量损失索引任务；删除两份依赖旧 `generateNextNcNumber` 的编号器测试。
+- 将历史外协责任 bootstrap 的发布维护断言迁移到 TypeScript manifest/ledger，并保留其位于报检责任回填前的历史顺序，不重新启用已退役任务。
+- 拆分关单关联不合格项查询，使 `inspection-request-close.service.ts` 保持在 500 行架构限制内。
+
+**验证结果：**
+
+- 根目录全量 Vitest：`406/406` 文件、`3379/3379` 用例通过。
+- 后端全量 Vitest：`292/292` 文件、`2656/2656` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+
+**commit:** 本次 merge commit。
+
+**遗留问题：**
+
+- 未启动前端 dev/build/start；未执行生产 migration、release maintenance 或部署。
+
+---
+
 ### 2026-08-14 修复：进货报检供应商展示与责任契约
 
 **执行内容：**
@@ -251,6 +274,39 @@
 
 - 定向 Vitest：`2/2` 文件、`10/10` 用例通过（详情抽屉 `3/3`、详情查询 `7/7`）。
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过；未运行前端 dev/build/start。
+## [0.25.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.13...qgs-v0.25.0) (2026-08-13)
+
+
+### Features
+
+* **@qgs/backend:** version release maintenance tasks ([8da5c1a](https://github.com/ajie5419/Quality-Guardian/commit/8da5c1a1b8d5eea53f0bb802b233ef682e1c6c73))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** persist quality loss index jobs ([d567fb6](https://github.com/ajie5419/Quality-Guardian/commit/d567fb657b19a5047d7545911a45d1f13df71bde))
+* **@qgs/backend:** remove redis from release maintenance ([22cc54e](https://github.com/ajie5419/Quality-Guardian/commit/22cc54e408b3cf5efe833c0da03392dfda6f8c6e))
+* **deploy:** block stale compose one-offs ([8f08c0d](https://github.com/ajie5419/Quality-Guardian/commit/8f08c0de5838110a2d487e955eac2d3aa65508ad))
+* **deploy:** bound release execution and rollback ([4fce2d1](https://github.com/ajie5419/Quality-Guardian/commit/4fce2d153d325961aa701614adf7a73fc53c55c0))
+* **deploy:** fail closed on release preflight ([f54859d](https://github.com/ajie5419/Quality-Guardian/commit/f54859d7074ba8121aacf86ada82dc8e662a17fc))
+* **deploy:** keep backend online during release preflight ([bbf17ff](https://github.com/ajie5419/Quality-Guardian/commit/bbf17ff37f8fcf3d52d3a00f5dc4579a6df39bb1))
+* **deploy:** make release maintenance versioned and bounded ([a0e2c2b](https://github.com/ajie5419/Quality-Guardian/commit/a0e2c2be5bdd7ea3634be7a974df8730e7ccab8c))
+* **deploy:** restore backend after failed compose switch ([acc6be4](https://github.com/ajie5419/Quality-Guardian/commit/acc6be43ff5cca335117570b63f3c35c12687618))
+
+### 2026-08-13 修复：release maintenance manifest 测试工作目录依赖
+
+**执行内容：**
+
+- 根因修复：`release-maintenance-manifest.test.ts` 曾以 `process.cwd()` 解析同目录的 runner。CI 从仓库根执行 `pnpm run test:unit` 时会错误指向根目录 `scripts/`，导致读取失败。
+- 测试改为从 `import.meta.url` 推导自身所在的 `apps/backend/scripts` 目录后解析 `run-release-maintenance.ts`，不再依赖调用工作目录。
+
+**验证结果：**
+
+- 根目录 `pnpm exec vitest run apps/backend/scripts/release-maintenance-manifest.test.ts` 与 `apps/backend` 目录 `pnpm exec vitest run scripts/release-maintenance-manifest.test.ts` 均通过（各 `1/1` 文件、`4/4` 用例）。
+- supplier identity 定向 Vitest 通过：`3/3` 文件、`50/50` 用例。
+- 后端全量 Vitest 通过：`285/285` 文件、`2596/2596` 用例。
+- 根目录全量 unit tests 通过：`393/393` 文件、`3268/3268` 用例。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
 
 **commit:** 本次独立提交。
 
@@ -280,6 +336,83 @@
 **遗留问题：**
 
 - 无。
+- 无；生产环境未受影响。
+
+---
+
+## [0.24.13](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.12...qgs-v0.24.13) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** keep sidecar rebuild out of release maintenance ([d55d1bd](https://github.com/ajie5419/Quality-Guardian/commit/d55d1bd3acb6f74951746e74c59078cdba9b4560))
+* **@qgs/backend:** keep sidecar rebuild out of release maintenance ([ee42531](https://github.com/ajie5419/Quality-Guardian/commit/ee425315865fac8f344ad9cd03fe3ef592c02696))
+
+### 2026-08-13 修复：发布前置阶段保持旧 backend 在线
+
+**执行内容：**
+
+- 根因修复：远端发布器不再在 Prisma migration 前停止 backend，也不再存在显式 `docker compose stop backend` 阶段。migration 与 release maintenance 使用新镜像 one-off 容器执行时，旧 backend 保持在线；仅在两项前置阶段完成后由 Compose 启动命令按新镜像重建服务。
+- 回滚保留 compose 配置恢复、有界超时和固定 one-off 容器清理。migration、maintenance 失败或超时时，不会对未切换的旧 backend 执行启动操作；切换命令前即记录 `backend_switch_started`，因此切换命令超时、失败或健康检查失败时，均会以旧 compose 配置再次启动 backend。
+- shell 行为测试锁定成功路径的 migration -> maintenance -> start services 顺序且无显式 backend stop；覆盖 migration failure、maintenance failure 与 maintenance timeout 均没有 backend stop/up，并覆盖 start-services failure 和健康检查失败均恢复旧 backend。
+
+**验证结果：**
+
+- `bash scripts/deploy/run-remote-release.test.sh` 通过，覆盖成功切换顺序、migration failure、maintenance failure、maintenance timeout、start-services failure、健康检查失败与 one-off preflight。
+- `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/run-remote-release.test.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:prisma-migration` 与 `rtk git diff --check` 均通过。
+- 生产发布未执行。
+
+**commits:** `bbf17ff3`（前置阶段保持旧 backend 在线）；本次移除显式 backend stop 的修正使用独立提交。
+
+**遗留问题：**
+
+- 生产环境仍须通过正式发布流程验证新旧镜像切换与健康检查失败回滚。单实例 Compose 重建会短暂中断连接，不得宣称零停机发布；migration 或 maintenance 失败时不得手动重启旧 backend。
+
+---
+
+### 2026-08-13 修复：质量损失索引持久化队列与发布可靠性闭环
+
+**执行内容：**
+
+- 根因修复：`quality_loss_index` 不再依赖每次发版启动异步全量 backfill。after-sales、inspection issue、vehicle commissioning 和 manual quality loss 四类来源均在各自事务内持久化 enqueue 索引任务，使源事实提交与待投影工作保持一致。
+- 新增独立索引 worker：每 5 秒轮询，任务领取使用 5 分钟 lease；失败可重试并持久化错误。历史索引任务通过支持 dry-run/apply 的 enqueue 工具创建，再由独立 drain 工具消费，保留可审计的运维路径。
+- 历史 enqueue、drain、投影重建和其他 remediation 均未接入同步 release maintenance；版本化 manifest/ledger、fail-closed preflight、固定 one-off 容器、有界阶段、清理与回滚继续只负责本版本声明的启动前置任务。
+
+**验证结果：**
+
+- 后端全量 Vitest：`285/285` 文件、`2596/2596` 用例通过。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、Prisma validate、migration checks、发布 shell 行为测试与 `rtk git diff --check` 均通过。
+- 生产环境未执行 Prisma migration、release maintenance、历史 enqueue dry-run/apply 或独立 drain。
+
+**commits:** `d567fb65`（持久化质量损失索引任务）、`4715c88c`（outbox 覆盖）；`4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）、`f54859d7`（preflight fail-closed）、`6cf0f3e1`（维护文档与镜像断言）、`22cc54e4`（维护链路移除 Redis）、`8f08c0de`（阻断陈旧 compose one-off）、`55062b80`（文档记录）。
+
+**遗留问题：**
+
+- 生产发布前仍须通过正式发布流程执行并核对 migration 与 release maintenance；历史索引修复须先运行 enqueue dry-run 审核，再在独立运维窗口 apply 和 drain，禁止重新接入同步发布。
+
+---
+
+### 2026-08-13 修复：版本化发布维护与有界发布执行
+
+**执行内容：**
+
+- 根因修复：废止“每次发布重跑永久 shell 清单”的模式。release maintenance 改为 versioned manifest + `release_maintenance_tasks` 持久化 ledger；常规发布仅执行本版本 manifest 声明且尚未完成的启动前置幂等数据任务。
+- 每项任务使用稳定 `taskKey`、递增 `revision` 与 SHA-256 checksum。完成记录跳过，失败或过期租约可重试，checksum 漂移 fail-closed；修改已完成任务必须新增 revision。
+- 明确禁止将历史 remediation、historical identity sidecar、投影重建、窗口/评分对账加入同步发布；这些工作必须独立审批和执行。
+- 远端发布器已采用固定 migration/maintenance 容器、preflight、阶段超时、失败清理和 compose 回滚。生产重试前须人工确认失败原因及数据库状态，并定向清理已确认的旧随机名残留。
+- Docker production image 增加对 release maintenance TypeScript 入口、manifest 和 runner 的存在性断言，避免 deploy 调用未随镜像发布的维护实现。
+
+**验证结果：**
+
+- 后端 release maintenance 定向 Vitest：`2/2` 文件、`9/9` 用例通过；远端发布 shell 行为测试通过（覆盖成功、migration 失败、maintenance 超时、健康检查失败、固定容器残留和 preflight 异常）。
+- `bash -n scripts/deploy/run-remote-release.sh scripts/deploy/one-click-oss.sh scripts/deploy/deploy-from-oss.sh` 与 `rtk git diff --check` 通过。
+- 生产 Prisma migration、maintenance 执行、超时清理和回滚演练尚未执行。
+
+**commits:** `4fce2d15`（有界发布与回滚）、`8da5c1a1`（版本化发布维护）；本文档与镜像断言提交见本次后续独立 commit。
+
+**遗留问题：**
+
+- 首次生产重试必须先人工检查现存随机名 one-off 容器、RDS 活动事务及 compose 回滚状态；禁止以删除 ledger、跳过 maintenance 或宽泛 Docker prune 方式绕过失败。
 
 ---
 
@@ -298,13 +431,94 @@
 - 后端全量 Vitest：`281/281` 文件、`2571/2571` 用例通过。
 - `pnpm -C apps/backend typecheck`、`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all` 与 `rtk git diff --check` 均通过。
 
-**commit:** `01ceaf44` fix(@qgs/backend): keep sidecar rebuild out of release maintenance
+**commit:** `ee425315` fix(@qgs/backend): keep sidecar rebuild out of release maintenance
 
 **遗留问题：**
 
 - 未推送、未执行生产发布；sidecar 如需首次初始化或全量重建，必须通过独立、受控的维护任务执行，不得重新接入常规发布。
 
 ---
+
+## [0.24.12](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.11...qgs-v0.24.12) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** raise sidecar bootstrap transaction timeout ([74c3b2e](https://github.com/ajie5419/Quality-Guardian/commit/74c3b2e9a80eb74b8aa1862f99e32898eb16afc0))
+* **@qgs/backend:** raise sidecar bootstrap transaction timeout ([629e77e](https://github.com/ajie5419/Quality-Guardian/commit/629e77e564af0deb476639d0ffc80977dac74789))
+
+## [0.24.11](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.10...qgs-v0.24.11) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** close connections when maintenance scripts fail ([5228950](https://github.com/ajie5419/Quality-Guardian/commit/522895095d4d9b450ff77c5d686533ef8bebfd55))
+* **@qgs/backend:** make identity projection maintenance resilient ([46fe2db](https://github.com/ajie5419/Quality-Guardian/commit/46fe2db75ed0d4ade42e32f4d7c932f1ba0b021a))
+* **@qgs/backend:** skip identity projection upsert without active generation ([de65ad1](https://github.com/ajie5419/Quality-Guardian/commit/de65ad160a66460942df37a6bd601a323f5b5063))
+
+## [0.24.10](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.9...qgs-v0.24.10) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** disconnect redis in issue responsibility remediation CLI ([58f9fc9](https://github.com/ajie5419/Quality-Guardian/commit/58f9fc9fda307c3785fa3642dc7310482aacc086))
+* **@qgs/backend:** disconnect redis in issue responsibility remediation CLI ([95b3eb9](https://github.com/ajie5419/Quality-Guardian/commit/95b3eb9fb44c9726864a2bc3b5ecc73f18c631cb))
+
+## [0.24.9](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.8...qgs-v0.24.9) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** log unresolved issue responsibility remediation samples ([2228631](https://github.com/ajie5419/Quality-Guardian/commit/222863184761d5d9fc0b5b747c4455dc7e82f471))
+* **@qgs/backend:** log unresolved issue responsibility remediation samples ([2053bed](https://github.com/ajie5419/Quality-Guardian/commit/2053bed19b334b90725c4c3144f9831d0ec43eaf))
+
+## [0.24.8](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.7...qgs-v0.24.8) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** make TEAM identity source remediation idempotent ([fae2d36](https://github.com/ajie5419/Quality-Guardian/commit/fae2d36bbe353aa10991308ebce46b964e892596))
+* **@qgs/backend:** make TEAM identity source remediation idempotent ([03d820c](https://github.com/ajie5419/Quality-Guardian/commit/03d820c9d3a77cba3a91a0e354942e2ebf0093c4))
+
+## [0.24.7](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.6...qgs-v0.24.7) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** align quality records to confirmed TEAM suppliers ([50b5ecc](https://github.com/ajie5419/Quality-Guardian/commit/50b5ecc6b06d3412d73fdba29887283aa88756d5))
+* **@qgs/backend:** align quality records to confirmed TEAM suppliers ([6322e8a](https://github.com/ajie5419/Quality-Guardian/commit/6322e8a4420c90285aa71342b7dae862c755fe42))
+
+## [0.24.6](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.5...qgs-v0.24.6) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** complete confirmed supplier outsourcing mode in maintenance ([5ec131c](https://github.com/ajie5419/Quality-Guardian/commit/5ec131cdc558a839e385c268945af2615bcdeff2))
+* **@qgs/backend:** complete confirmed supplier outsourcing mode in maintenance ([cda7ba6](https://github.com/ajie5419/Quality-Guardian/commit/cda7ba65fb00f920f3b9bc7875a666d8ec67ed54))
+
+## [0.24.5](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.4...qgs-v0.24.5) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** log confirmed TEAM link skip reasons in maintenance ([429f4ad](https://github.com/ajie5419/Quality-Guardian/commit/429f4ad094ce8ddc4450cdfe2fc274ec305c9566))
+* **@qgs/backend:** log confirmed TEAM link skip reasons in maintenance ([2c2d895](https://github.com/ajie5419/Quality-Guardian/commit/2c2d895627afcf1721e5e2eebfbd1a418475423a))
+
+## [0.24.4](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.3...qgs-v0.24.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** create confirmed TEAM supplier links in maintenance ([63ade2c](https://github.com/ajie5419/Quality-Guardian/commit/63ade2cb620555310e0fc644305f8049fffca609))
+* **@qgs/backend:** create confirmed TEAM supplier links in maintenance ([149e858](https://github.com/ajie5419/Quality-Guardian/commit/149e8583eb1f2fbd2d15edd6abf7d7fe67ab7ea2))
+
+## [0.24.3](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.2...qgs-v0.24.3) (2026-08-12)
+
+
+### Bug Fixes
+
+* **@qgs/backend:** run identity source remediation before the supplier gate ([f0bb8dc](https://github.com/ajie5419/Quality-Guardian/commit/f0bb8dc2dac906e667c773b85da89c46005bd393))
+* **@qgs/backend:** run identity source remediation before the supplier gate ([1f292ed](https://github.com/ajie5419/Quality-Guardian/commit/1f292ed4809440fc8f85b88bd3b99c335a983d50))
 
 ## [0.24.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.24.1...qgs-v0.24.2) (2026-08-12)
 

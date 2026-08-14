@@ -18,7 +18,7 @@ import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
-import { QualityLossIndexService } from '~/modules/quality-loss/quality-loss-index.service';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { resolveCanonicalClassificationName } from '~/utils/classification-resolver';
 import { parseResponsibleDepartments } from '~/utils/department-multi';
@@ -152,7 +152,7 @@ export const AfterSalesService = {
     const supplierChanged =
       updateData.supplierBrand !== undefined ||
       updateData.supplierBrandId !== undefined;
-    const updated = await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx) => {
       const current =
         costsChanged || supplierChanged
           ? await tx.after_sales.findUnique({
@@ -176,9 +176,12 @@ export const AfterSalesService = {
         [current?.supplierBrandId, updated.supplierBrandId],
         'after-sales.updated',
       );
-      return updated;
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'EXTERNAL', sourcePk: updated.id }],
+        'after-sales.updated',
+      );
     });
-    await QualityLossIndexService.upsertFromAfterSales(updated);
   },
 
   /**
@@ -454,6 +457,11 @@ export const AfterSalesService = {
         [deleted.supplierBrandId],
         'after-sales.deleted',
       );
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'EXTERNAL', sourcePk: deleted.id }],
+        'after-sales.deleted',
+      );
       return deleted;
     });
 
@@ -462,7 +470,6 @@ export const AfterSalesService = {
       bizType: 'after_sales',
     });
 
-    await QualityLossIndexService.softDeleteSource('External', id);
     // Record audit log
     await SystemLogService.auditLog('after-sales', 'delete', {
       userId,

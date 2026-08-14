@@ -19,6 +19,9 @@ vi.mock('~/utils/prisma', () => {
     metric_refresh_jobs: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    quality_loss_index_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
   };
   return {
     default: {
@@ -119,16 +122,21 @@ vi.mock('~/modules/after-sales/after-sales-status', () => ({
   }),
 }));
 
-vi.mock('@qgs/shared', () => ({
-  AUDIT_TEMPLATES: {
-    AFTER_SALES_SOFT_DELETE: '删除售后: {{id}}',
-    AFTER_SALES_UPDATE: '更新售后: {{id}}',
-  },
-  formatDate: vi.fn((d: any) =>
-    d ? new Date(d).toISOString().slice(0, 10) : '',
-  ),
-  tryParsePhotos: vi.fn(() => []),
-}));
+vi.mock('@qgs/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@qgs/shared')>();
+  return {
+    ...actual,
+    AUDIT_TEMPLATES: {
+      ...actual.AUDIT_TEMPLATES,
+      AFTER_SALES_SOFT_DELETE: '删除售后: {{id}}',
+      AFTER_SALES_UPDATE: '更新售后: {{id}}',
+    },
+    formatDate: vi.fn((d: any) =>
+      d ? new Date(d).toISOString().slice(0, 10) : '',
+    ),
+    tryParsePhotos: vi.fn(() => []),
+  };
+});
 
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {

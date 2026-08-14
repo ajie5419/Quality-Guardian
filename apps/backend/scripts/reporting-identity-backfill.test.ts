@@ -198,23 +198,18 @@ describe('reporting identity backfill', () => {
     );
   });
 
-  it('backfills source tables before the detached quality loss index rebuild', () => {
+  it('keeps historical identity backfill out of every release', () => {
     const cwd = process.cwd();
     const backendRoot =
       basename(cwd) === 'backend' && basename(dirname(cwd)) === 'apps'
         ? cwd
         : resolve(cwd, 'apps/backend');
-    const repositoryRoot = resolve(backendRoot, '../..');
     const wrapper = readFileSync(
       resolve(backendRoot, 'scripts/backfill-identity-relations.ts'),
       'utf8',
     );
     const maintenance = readFileSync(
       resolve(backendRoot, 'scripts/run-release-maintenance.sh'),
-      'utf8',
-    );
-    const deploy = readFileSync(
-      resolve(repositoryRoot, '.github/workflows/deploy.yml'),
       'utf8',
     );
 
@@ -226,8 +221,7 @@ describe('reporting identity backfill', () => {
       'backfillQualityLossSourceDepartmentIdentities()',
     );
     expect(wrapper).toContain('redis.disconnect()');
-    expect(maintenance).toContain('scripts/backfill-identity-relations.ts');
-    expect(deploy).toContain('scripts/backfill-quality-loss-index.ts');
+    expect(maintenance).not.toContain('scripts/backfill-identity-relations.ts');
     expect(wrapper).not.toContain('quality_loss_index');
   });
 });

@@ -2,7 +2,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { VEHICLE_COMMISSIONING_PERMISSION_CODES } from '@qgs/shared';
 import { FileStorageService } from '~/modules/file-storage';
-import { QualityLossIndexService } from '~/modules/quality-loss';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { RbacService } from '~/modules/rbac';
 import { SystemLogService } from '~/modules/system-log';
 import { BusinessError } from '~/utils/business-error';
@@ -28,21 +28,28 @@ export const VehicleCommissioningDeleteService = {
       throw new BusinessError('NOT_FOUND', '调试验收问题不存在', 404);
     }
 
-    const result = await prisma.vehicle_commissioning_issues.updateMany({
-      where: { id, isDeleted: false },
-      data: { isDeleted: true, updatedAt: new Date() },
+    const result = await prisma.$transaction(async (tx) => {
+      const result = await tx.vehicle_commissioning_issues.updateMany({
+        where: { id, isDeleted: false },
+        data: { isDeleted: true, updatedAt: new Date() },
+      });
+      if (result.count > 0) {
+        await QualityLossIndexQueue.enqueue(
+          tx,
+          [{ source: 'COMMISSIONING', sourcePk: id }],
+          'vehicle-commissioning.deleted',
+        );
+      }
+      return result;
     });
     if (result.count === 0) {
       throw new BusinessError('NOT_FOUND', '调试验收问题不存在', 404);
     }
 
-    await Promise.all([
-      FileStorageService.softDeleteReferences({
-        bizId: id,
-        bizType: 'vehicle_commissioning_issue',
-      }),
-      QualityLossIndexService.softDeleteSource('Commissioning', id),
-    ]);
+    await FileStorageService.softDeleteReferences({
+      bizId: id,
+      bizType: 'vehicle_commissioning_issue',
+    });
     await SystemLogService.auditLog('vehicle-commissioning', 'issueDelete', {
       detailsVariables: { issue: existing.description || id },
       targetId: id,

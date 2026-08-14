@@ -2,6 +2,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { Prisma } from '@prisma/client';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { BusinessError } from '~/utils/business-error';
 
 import {
@@ -73,10 +74,10 @@ export const InspectionIssueCreateService = {
         responsibilityType: responsibility.responsibilityType,
       },
     });
-    const { QualityLossIndexService } = await import('~/modules/quality-loss');
-    await QualityLossIndexService.upsertFromInternalInTransaction(
-      record,
+    await QualityLossIndexQueue.enqueue(
       options.tx,
+      [{ source: 'INTERNAL', sourcePk: record.id }],
+      'inspection-issue.created',
     );
     await MetricRefreshQueue.enqueueSupplierScores(
       options.tx,

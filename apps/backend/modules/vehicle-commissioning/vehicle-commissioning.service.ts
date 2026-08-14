@@ -8,7 +8,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 import { ISSUE_TRACKING_STATUS, safeNumber } from '@qgs/shared';
 import { nanoid } from 'nanoid';
 import { FileStorageService } from '~/modules/file-storage';
-import { QualityLossIndexService } from '~/modules/quality-loss';
+import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
@@ -37,17 +37,23 @@ export const VehicleCommissioningService = {
     amount?: number;
     id: string;
   }) {
-    const updated = await prisma.vehicle_commissioning_issues.update({
-      where: { id: params.id },
-      data: {
-        ...(params.amount === undefined ? {} : { lossAmount: params.amount }),
-        ...(params.actualClaim === undefined
-          ? {}
-          : { recoveredAmount: params.actualClaim }),
-        updatedAt: new Date(),
-      },
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.vehicle_commissioning_issues.update({
+        where: { id: params.id },
+        data: {
+          ...(params.amount === undefined ? {} : { lossAmount: params.amount }),
+          ...(params.actualClaim === undefined
+            ? {}
+            : { recoveredAmount: params.actualClaim }),
+          updatedAt: new Date(),
+        },
+      });
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'COMMISSIONING', sourcePk: updated.id }],
+        'vehicle-commissioning.quality-loss-updated',
+      );
     });
-    await QualityLossIndexService.upsertFromCommissioning(updated);
   },
 
   async getQualityLossTrendRows(params: {
@@ -218,28 +224,36 @@ export const VehicleCommissioningService = {
         responsibleDepartment: payload.responsibleDepartment || '调试组',
       },
     );
-    const row = await prisma.vehicle_commissioning_issues.create({
-      data: {
-        id: `DA-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`,
-        date: payload.date ? new Date(payload.date) : now,
-        status,
-        closedAt: status === ISSUE_TRACKING_STATUS.CLOSED ? now : null,
-        partName: payload.partName || '车辆总成',
-        description: payload.description || payload.title || '',
-        issuePhoto: normalizeVehicleCommissioningPhotos(payload.photos),
-        isClaim: Boolean(payload.isClaim),
-        lossAmount: safeNumber(payload.lossAmount),
-        recoveredAmount: safeNumber(payload.recoveredAmount),
-        claimStatus: payload.claimStatus || 'OPEN',
-        claimNotes: payload.claimNotes || null,
-        ...governedFields,
-        projectName: payload.projectName || '',
-        workOrderNumber: payload.workOrderNumber || null,
-        severity: payload.severity || 'minor',
-        solution: payload.solution || null,
-        createdBy: operatorUserId || null,
-        isDeleted: false,
-      },
+    const row = await prisma.$transaction(async (tx) => {
+      const row = await tx.vehicle_commissioning_issues.create({
+        data: {
+          id: `DA-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`,
+          date: payload.date ? new Date(payload.date) : now,
+          status,
+          closedAt: status === ISSUE_TRACKING_STATUS.CLOSED ? now : null,
+          partName: payload.partName || '车辆总成',
+          description: payload.description || payload.title || '',
+          issuePhoto: normalizeVehicleCommissioningPhotos(payload.photos),
+          isClaim: Boolean(payload.isClaim),
+          lossAmount: safeNumber(payload.lossAmount),
+          recoveredAmount: safeNumber(payload.recoveredAmount),
+          claimStatus: payload.claimStatus || 'OPEN',
+          claimNotes: payload.claimNotes || null,
+          ...governedFields,
+          projectName: payload.projectName || '',
+          workOrderNumber: payload.workOrderNumber || null,
+          severity: payload.severity || 'minor',
+          solution: payload.solution || null,
+          createdBy: operatorUserId || null,
+          isDeleted: false,
+        },
+      });
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'COMMISSIONING', sourcePk: row.id }],
+        'vehicle-commissioning.created',
+      );
+      return row;
     });
 
     if (operatorUserId) {
@@ -252,7 +266,6 @@ export const VehicleCommissioningService = {
       });
     }
 
-    await QualityLossIndexService.upsertFromCommissioning(row);
     return mapVehicleCommissioningIssueToDto(row);
   },
 
@@ -351,36 +364,46 @@ export const VehicleCommissioningService = {
         responsibleDepartment: payload.responsibleDepartment,
       },
     );
-    const row = await prisma.vehicle_commissioning_issues.update({
-      where: { id },
-      data: {
-        status,
-        closedAt,
-        description: payload.description,
-        partName: payload.partName,
-        projectName: payload.projectName,
-        ...governedFields,
-        severity: payload.severity,
-        solution: payload.solution,
-        issuePhoto:
-          payload.photos === undefined
-            ? undefined
-            : normalizeVehicleCommissioningPhotos(payload.photos),
-        isClaim:
-          payload.isClaim === undefined ? undefined : Boolean(payload.isClaim),
-        lossAmount:
-          payload.lossAmount === undefined
-            ? undefined
-            : safeNumber(payload.lossAmount),
-        recoveredAmount:
-          payload.recoveredAmount === undefined
-            ? undefined
-            : safeNumber(payload.recoveredAmount),
-        claimStatus: payload.claimStatus,
-        claimNotes: payload.claimNotes,
-        workOrderNumber: payload.workOrderNumber || undefined,
-        date: payload.date ? new Date(payload.date) : undefined,
-      },
+    const row = await prisma.$transaction(async (tx) => {
+      const row = await tx.vehicle_commissioning_issues.update({
+        where: { id },
+        data: {
+          status,
+          closedAt,
+          description: payload.description,
+          partName: payload.partName,
+          projectName: payload.projectName,
+          ...governedFields,
+          severity: payload.severity,
+          solution: payload.solution,
+          issuePhoto:
+            payload.photos === undefined
+              ? undefined
+              : normalizeVehicleCommissioningPhotos(payload.photos),
+          isClaim:
+            payload.isClaim === undefined
+              ? undefined
+              : Boolean(payload.isClaim),
+          lossAmount:
+            payload.lossAmount === undefined
+              ? undefined
+              : safeNumber(payload.lossAmount),
+          recoveredAmount:
+            payload.recoveredAmount === undefined
+              ? undefined
+              : safeNumber(payload.recoveredAmount),
+          claimStatus: payload.claimStatus,
+          claimNotes: payload.claimNotes,
+          workOrderNumber: payload.workOrderNumber || undefined,
+          date: payload.date ? new Date(payload.date) : undefined,
+        },
+      });
+      await QualityLossIndexQueue.enqueue(
+        tx,
+        [{ source: 'COMMISSIONING', sourcePk: row.id }],
+        'vehicle-commissioning.updated',
+      );
+      return row;
     });
 
     if (operatorUserId) {
@@ -394,7 +417,6 @@ export const VehicleCommissioningService = {
       });
     }
 
-    await QualityLossIndexService.upsertFromCommissioning(row);
     return mapVehicleCommissioningIssueToDto(row);
   },
   async updateIssueFromBody(
