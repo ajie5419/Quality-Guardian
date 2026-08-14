@@ -1,6 +1,14 @@
 import type { Prisma } from '@prisma/client';
+import type {
+  InspectionIssueResponsibilityType,
+  SupplierCategory,
+} from '@qgs/shared';
 
-import { normalizeInspectionIssueResponsibilityType } from '@qgs/shared';
+import {
+  getInspectionRequestResponsibilitySupplierCategory,
+  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  normalizeInspectionIssueResponsibilityType,
+} from '@qgs/shared';
 
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { normalizeInspectionRequestText } from './inspection-request';
@@ -27,20 +35,12 @@ type InspectionResponsibility = {
 };
 
 export type CanonicalCloseResponsibility = {
-  responsibilityType: string;
+  responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartment: string;
   responsibleDepartmentId: string;
   supplierId: null | string;
   supplierName: null | string;
 };
-
-function hasResponsibilityFact(request: Request) {
-  return Boolean(
-    normalizeInspectionRequestText(request.responsibilityType) ||
-      normalizeInspectionRequestText(request.responsibleDepartment) ||
-      normalizeInspectionRequestText(request.responsibleDepartmentId),
-  );
-}
 
 function hasCompleteResponsibilityFact(request: Omit<Request, 'id'>) {
   const type = normalizeInspectionIssueResponsibilityType(
@@ -62,6 +62,136 @@ function hasCompleteResponsibilityFact(request: Omit<Request, 'id'>) {
       );
 }
 
+function hasCompleteResponsibilityIdentity(request: Omit<Request, 'id'>) {
+  const type = normalizeInspectionIssueResponsibilityType(
+    request.responsibilityType,
+  );
+  if (
+    !type ||
+    !normalizeInspectionRequestText(request.responsibleDepartmentId)
+  ) {
+    return false;
+  }
+  return type === 'INTERNAL_DEPARTMENT'
+    ? !normalizeInspectionRequestText(request.supplierId)
+    : Boolean(normalizeInspectionRequestText(request.supplierId));
+}
+
+function assertCompatibleLegacyResponsibility(
+  request: Request,
+  responsibility: CanonicalCloseResponsibility,
+) {
+  const persistedType = normalizeInspectionRequestText(
+    request.responsibilityType,
+  );
+  const normalizedPersistedType =
+    normalizeInspectionIssueResponsibilityType(persistedType);
+  if (
+    persistedType &&
+    normalizedPersistedType !== responsibility.responsibilityType
+  ) {
+    failCloseRequest('VALIDATION', '报检任务存在冲突的责任类型事实');
+  }
+  for (const [persisted, expected, label] of [
+    [
+      request.responsibleDepartmentId,
+      responsibility.responsibleDepartmentId,
+      '责任部门 ID',
+    ],
+    [request.supplierId, responsibility.supplierId, '供应商 ID'],
+  ] as const) {
+    const actual = normalizeInspectionRequestText(persisted);
+    if (actual && actual !== (expected || '')) {
+      failCloseRequest('VALIDATION', `报检任务存在冲突的${label}责任事实`);
+    }
+  }
+}
+
+async function assertCloseResponsibilityCategoryPolicy(options: {
+  request: Request;
+  responsibility: CanonicalCloseResponsibility;
+  supplierCategory: null | SupplierCategory;
+}) {
+  if (
+    options.request.category === 'PROCESS' &&
+    options.responsibility.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+  ) {
+    failCloseRequest('VALIDATION', 'PROCESS 报检任务不能使用供应商责任类型');
+  }
+  const expectedSupplierCategory =
+    getInspectionRequestResponsibilitySupplierCategory(
+      options.responsibility.responsibilityType,
+    );
+  if (!expectedSupplierCategory) return;
+  if (options.supplierCategory !== expectedSupplierCategory) {
+    failCloseRequest('VALIDATION', '供应商类别与责任类型不匹配');
+  }
+}
+
+function hasCanonicalResponsibilitySnapshot(
+  request: Request,
+  responsibility: CanonicalCloseResponsibility,
+) {
+  return (
+    normalizeInspectionIssueResponsibilityType(request.responsibilityType) ===
+      responsibility.responsibilityType &&
+    normalizeInspectionRequestText(request.responsibleDepartment) ===
+      responsibility.responsibleDepartment &&
+    normalizeInspectionRequestText(request.responsibleDepartmentId) ===
+      responsibility.responsibleDepartmentId &&
+    (normalizeInspectionRequestText(request.supplierId) || null) ===
+      responsibility.supplierId &&
+    (normalizeInspectionRequestText(request.supplierName) || null) ===
+      responsibility.supplierName
+  );
+}
+
+async function persistCanonicalResponsibilitySnapshot(options: {
+  request: Request;
+  responsibility: CanonicalCloseResponsibility;
+  tx: Prisma.TransactionClient;
+}) {
+  if (
+    hasCanonicalResponsibilitySnapshot(options.request, options.responsibility)
+  ) {
+    return false;
+  }
+  const persisted = await options.tx.qms_inspection_requests.updateMany({
+    data: options.responsibility,
+    where: {
+      id: options.request.id,
+      isDeleted: false,
+      responsibilityType: options.request.responsibilityType ?? null,
+      responsibleDepartment: options.request.responsibleDepartment ?? null,
+      responsibleDepartmentId: options.request.responsibleDepartmentId ?? null,
+      supplierId: options.request.supplierId ?? null,
+      supplierName: options.request.supplierName ?? null,
+      // The selected internal department is validated against this TEAM.
+      // A concurrent TEAM change must therefore invalidate the same CAS write.
+      teamId: options.request.teamId ?? null,
+    },
+  });
+  if (persisted.count !== 1) {
+    failCloseRequest('CONFLICT', '报检任务责任事实已被并发修改，请刷新后重试');
+  }
+  return true;
+}
+
+function applyCanonicalResponsibility<T extends Request>(
+  request: T,
+  responsibility: CanonicalCloseResponsibility,
+) {
+  return {
+    ...request,
+    responsibilityType: responsibility.responsibilityType,
+    responsibleDepartment: responsibility.responsibleDepartment,
+    responsibleDepartmentId: responsibility.responsibleDepartmentId,
+    supplierId: responsibility.supplierId,
+    supplierName: responsibility.supplierName,
+  } as CanonicalCloseResponsibility & T;
+}
+
 /**
  * Closing is the boundary where one request responsibility becomes durable on
  * every generated inspection and its linked NC. Only the request may supply
@@ -73,10 +203,14 @@ export function requireCanonicalCloseResponsibility(
   if (!hasCompleteResponsibilityFact(request)) {
     failCloseRequest('VALIDATION', '报检任务责任事实不完整，不能关闭');
   }
+  const responsibilityType = normalizeInspectionIssueResponsibilityType(
+    request.responsibilityType,
+  );
+  if (!responsibilityType) {
+    failCloseRequest('VALIDATION', '报检任务责任类型无效，不能关闭');
+  }
   return {
-    responsibilityType: normalizeInspectionRequestText(
-      request.responsibilityType,
-    ),
+    responsibilityType,
     responsibleDepartment: normalizeInspectionRequestText(
       request.responsibleDepartment,
     ),
@@ -143,9 +277,10 @@ export function buildCloseInspectionResponsibilityWrite(options: {
 }
 
 /**
- * A legacy request has no responsibility triad at all. Its first FAIL close
- * may turn the submitted canonical IDs into the durable request fact, but a
- * PASS close cannot invent a fact and a partial fact is never overwritten.
+ * A historical request may contain a partial responsibility snapshot. Its
+ * first FAIL close can complete that snapshot only when every non-empty field
+ * agrees with the validated canonical issue responsibility; PASS never
+ * invents missing responsibility fields.
  */
 export async function resolveLegacyCloseRequestResponsibility<
   T extends Request,
@@ -154,11 +289,45 @@ export async function resolveLegacyCloseRequestResponsibility<
   request: T;
   tx: Prisma.TransactionClient;
 }) {
-  if (hasCompleteResponsibilityFact(options.request)) {
-    return { request: options.request, resolvedLegacy: false };
-  }
-  if (hasResponsibilityFact(options.request)) {
-    failCloseRequest('VALIDATION', '报检任务责任事实不完整，不能覆盖');
+  if (hasCompleteResponsibilityIdentity(options.request)) {
+    const resolved = await resolveInspectionIssueResponsibility(
+      {
+        responsibilityType: options.request.responsibilityType,
+        responsibleDepartmentId: options.request.responsibleDepartmentId,
+        supplierId: options.request.supplierId,
+      },
+      options.tx,
+    );
+    const responsibility: CanonicalCloseResponsibility = {
+      responsibilityType: resolved.responsibilityType,
+      responsibleDepartment: resolved.responsibleDepartment,
+      responsibleDepartmentId: resolved.responsibleDepartmentId,
+      supplierId: resolved.supplierId,
+      supplierName: resolved.supplierName,
+    };
+    await assertInspectionRequestResponsibilityPolicy({
+      client: options.tx,
+      responsibleDepartmentId: responsibility.responsibleDepartmentId,
+      responsibilityType: responsibility.responsibilityType,
+      teamId:
+        responsibility.responsibilityType === 'INTERNAL_DEPARTMENT'
+          ? options.request.teamId
+          : null,
+    });
+    await assertCloseResponsibilityCategoryPolicy({
+      request: options.request,
+      responsibility,
+      supplierCategory: resolved.supplierCategory,
+    });
+    const refreshed = await persistCanonicalResponsibilitySnapshot({
+      request: options.request,
+      responsibility,
+      tx: options.tx,
+    });
+    return {
+      request: applyCanonicalResponsibility(options.request, responsibility),
+      resolvedLegacy: refreshed,
+    };
   }
   if (!options.linkedIssue) {
     failCloseRequest('VALIDATION', '报检任务责任事实缺失，不能关闭');
@@ -176,53 +345,19 @@ export async function resolveLegacyCloseRequestResponsibility<
         ? options.request.teamId
         : null,
   });
-  const existingSupplierId = normalizeInspectionRequestText(
-    options.request.supplierId,
-  );
-  if (
-    existingSupplierId &&
-    existingSupplierId !== (responsibility.supplierId || '')
-  ) {
-    failCloseRequest('VALIDATION', '报检任务存在冲突的供应商责任事实');
-  }
-  const persisted = await options.tx.qms_inspection_requests.updateMany({
-    data: {
-      responsibilityType: responsibility.responsibilityType,
-      responsibleDepartment: responsibility.responsibleDepartment,
-      responsibleDepartmentId: responsibility.responsibleDepartmentId,
-      supplierId: responsibility.supplierId,
-      supplierName: responsibility.supplierName,
-    },
-    where: {
-      id: options.request.id,
-      isDeleted: false,
-      responsibilityType: null,
-      responsibleDepartment: null,
-      responsibleDepartmentId: null,
-      supplierId: options.request.supplierId ?? null,
-      // The selected internal department is validated against this TEAM.
-      // A concurrent TEAM change must therefore invalidate the same CAS write.
-      teamId: options.request.teamId ?? null,
-    },
+  await assertCloseResponsibilityCategoryPolicy({
+    request: options.request,
+    responsibility,
+    supplierCategory: responsibility.supplierCategory,
   });
-  if (persisted.count !== 1) {
-    failCloseRequest('CONFLICT', '报检任务责任事实已被并发修改，请刷新后重试');
-  }
+  assertCompatibleLegacyResponsibility(options.request, responsibility);
+  await persistCanonicalResponsibilitySnapshot({
+    request: options.request,
+    responsibility,
+    tx: options.tx,
+  });
   return {
-    request: {
-      ...options.request,
-      responsibilityType: responsibility.responsibilityType,
-      responsibleDepartment: responsibility.responsibleDepartment,
-      responsibleDepartmentId: responsibility.responsibleDepartmentId,
-      supplierId: responsibility.supplierId,
-      supplierName: responsibility.supplierName,
-    } as T & {
-      responsibilityType: string;
-      responsibleDepartment: string;
-      responsibleDepartmentId: string;
-      supplierId: null | string;
-      supplierName: null | string;
-    },
+    request: applyCanonicalResponsibility(options.request, responsibility),
     resolvedLegacy: true,
   };
 }

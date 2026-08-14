@@ -110,6 +110,7 @@ describe('inspectionRecordCreateService', () => {
       responsibleDepartment: 'Machining BU',
       responsibleDepartmentId: 'dept-machining',
       supplierId: null,
+      supplierCategory: null,
       supplierName: null,
     });
   });

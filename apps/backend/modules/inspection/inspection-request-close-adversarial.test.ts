@@ -215,6 +215,12 @@ function mockTransaction(updates: Record<string, unknown> = {}) {
   };
   return (prisma.$transaction as any).mockImplementation(async (cb: any) =>
     cb({
+      departments: {
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'dept-assembly',
+          name: 'Assembly',
+        }),
+      },
       inspections: {
         findFirst: vi.fn().mockResolvedValue({
           id: 'insp-9',
@@ -251,6 +257,12 @@ function makeTxMock(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
   return {
+    departments: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'dept-assembly',
+        name: 'Assembly',
+      }),
+    },
     inspections: {
       findFirst: vi.fn().mockResolvedValue({
         id: 'insp-9',

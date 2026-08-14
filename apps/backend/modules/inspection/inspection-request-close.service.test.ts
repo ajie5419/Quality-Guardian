@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DeptService } from '~/modules/dept';
 import { InspectionRequestCloseService } from '~/modules/inspection/inspection-request-close.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
+import { TeamIdentityService } from '~/modules/team';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -13,6 +15,19 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
     },
     $transaction: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/dept', () => ({
+  DeptService: {
+    findActiveById: vi.fn(),
+    findActiveByIdsOrNames: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/team', () => ({
+  TeamIdentityService: {
+    resolveActiveDepartmentSourceIdsByTeamIds: vi.fn(),
   },
 }));
 
@@ -125,6 +140,17 @@ const mockUserInfo = { id: 'user-1', username: 'admin' } as any;
 describe('inspectionRequestCloseService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(DeptService.findActiveById).mockResolvedValue({
+      businessUnit: null,
+      id: 'dept-welding',
+      name: 'Welding BU',
+    });
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { businessUnit: null, id: 'dept-welding', name: 'Welding BU' },
+    ]);
+    vi.mocked(
+      TeamIdentityService.resolveActiveDepartmentSourceIdsByTeamIds,
+    ).mockResolvedValue(new Map([['team-1', ['dept-welding']]]));
     vi.mocked(prisma.inspections.findMany).mockResolvedValue([
       {
         supplierId: 'supplier-1',

@@ -41,6 +41,7 @@ describe('resolveV2RequestResponsibility', () => {
       responsibleDepartment: 'Machining BU',
       responsibleDepartmentId: 'dept-machining',
       supplierId: null,
+      supplierCategory: null,
       supplierName: null,
     });
     resolveProcessOutsourcingResponsibleDepartmentId.mockResolvedValue(
@@ -81,6 +82,7 @@ describe('resolveV2RequestResponsibility', () => {
       responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
       responsibleDepartmentId: 'dept-production',
       supplierId: 'supplier-outsourcing',
+      supplierCategory: SUPPLIER_CATEGORY.OUTSOURCING,
       supplierName: 'Outsourcing Supplier',
     });
     vi.mocked(
@@ -115,6 +117,7 @@ describe('resolveV2RequestResponsibility', () => {
       responsibleDepartment: 'Quality Department',
       responsibleDepartmentId: 'dept-quality',
       supplierId: 'supplier-outsourcing',
+      supplierCategory: SUPPLIER_CATEGORY.OUTSOURCING,
       supplierName: 'Outsourcing Supplier',
     });
     vi.mocked(
@@ -153,6 +156,7 @@ describe('resolveV2RequestResponsibility', () => {
         responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
         responsibleDepartmentId: 'dept-production',
         supplierId: 'supplier-outsourcing',
+        supplierCategory: SUPPLIER_CATEGORY.OUTSOURCING,
         supplierName: 'Outsourcing Unit A',
       });
     vi.mocked(SupplierIdentityService.resolveSupplierById)
