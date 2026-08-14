@@ -24,12 +24,10 @@ describe('mobile inspection close responsibility payload', () => {
       'SUPPLIER',
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
     ],
@@ -64,9 +62,8 @@ describe('mobile inspection close responsibility payload', () => {
     ).toBeNull();
   });
 
-  it('keeps all types for incoming or uncategorized tasks and excludes supplier for process tasks', () => {
+  it('uses category-specific types while preserving uncategorized fallback', () => {
     expect(getInspectionResultResponsibilityTypes('INCOMING')).toEqual([
-      'INTERNAL_DEPARTMENT',
       'SUPPLIER',
       'OUTSOURCING_UNIT',
     ]);

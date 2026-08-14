@@ -1,7 +1,4 @@
-import {
-  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
-  resolveInspectionRequestResponsibilityDepartmentDefault,
-} from '@qgs/shared';
+import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 
 type RequestCreateResponsibilityType =
   (typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE)[keyof typeof INSPECTION_ISSUE_RESPONSIBILITY_TYPE];
@@ -21,11 +18,18 @@ export const REQUEST_CREATE_RESPONSIBILITY_LABELS = [
 export function getRequestCreateResponsibilityTypes(
   category: '' | 'INCOMING' | 'PROCESS',
 ) {
-  return category === 'PROCESS'
-    ? REQUEST_CREATE_RESPONSIBILITY_TYPES.filter(
-        (type) => type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
-      )
-    : REQUEST_CREATE_RESPONSIBILITY_TYPES;
+  if (category === 'PROCESS') {
+    return REQUEST_CREATE_RESPONSIBILITY_TYPES.filter(
+      (type) => type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+    );
+  }
+  if (category === 'INCOMING') {
+    return REQUEST_CREATE_RESPONSIBILITY_TYPES.filter(
+      (type) =>
+        type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+    );
+  }
+  return REQUEST_CREATE_RESPONSIBILITY_TYPES;
 }
 
 export function getRequestCreateResponsibilityLabels(
@@ -60,18 +64,11 @@ export function isCurrentResponsibilityOptionsRequest(input: {
   );
 }
 
-export function resolveRequestCreateResponsibilityDepartmentDefault(input: {
-  currentResponsibleDepartmentId: string;
-  departments: Array<{ label: string; value: string }>;
-  responsibilityType: RequestCreateResponsibilityType;
-}) {
-  return resolveInspectionRequestResponsibilityDepartmentDefault(input);
-}
-
-export function isRequestCreateOutsourcingResponsibility(
+export function isRequestCreateExternalResponsibility(
   responsibilityType: RequestCreateResponsibilityType,
 ) {
   return (
+    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER ||
     responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
   );
 }
@@ -81,7 +78,7 @@ export function buildRequestCreateResponsibilityPayload(input: {
   responsibleDepartmentId: string;
   supplierId: string;
 }) {
-  if (isRequestCreateOutsourcingResponsibility(input.responsibilityType)) {
+  if (isRequestCreateExternalResponsibility(input.responsibilityType)) {
     const supplierId = input.supplierId.trim();
     return supplierId
       ? { responsibilityType: input.responsibilityType, supplierId }
@@ -98,12 +95,5 @@ export function buildRequestCreateResponsibilityPayload(input: {
       responsibleDepartmentId,
     };
   }
-  const supplierId = input.supplierId.trim();
-  return supplierId
-    ? {
-        responsibilityType: input.responsibilityType,
-        responsibleDepartmentId,
-        supplierId,
-      }
-    : null;
+  return null;
 }

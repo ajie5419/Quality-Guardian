@@ -81,7 +81,7 @@ export function resolveLockedInspectionRequestIssueResponsibility(
 /**
  * A partial persisted fact must be completed explicitly, but its valid type
  * and canonical IDs remain useful form defaults. In particular, do not turn a
- * historical outsourcing task into an internal task just because the server
+ * historical external task into an internal task just because the server
  * has not yet persisted its responsibility department.
  */
 export function resolveEditableInspectionRequestIssueResponsibility(input: {
@@ -100,12 +100,11 @@ export function resolveEditableInspectionRequestIssueResponsibility(input: {
   ) {
     return null;
   }
-  const isOutsourcing =
-    responsibilityType ===
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
+  const isExternal =
+    isExternalInspectionIssueResponsibility(responsibilityType);
   return {
     responsibilityType,
-    responsibleDepartmentId: isOutsourcing
+    responsibleDepartmentId: isExternal
       ? ''
       : normalizeInspectionIssueCanonicalId(source.responsibleDepartmentId),
     supplierId: isExternalInspectionIssueResponsibility(responsibilityType)

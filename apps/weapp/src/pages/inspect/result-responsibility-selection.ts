@@ -14,11 +14,18 @@ const INSPECTION_RESULT_RESPONSIBILITY_TYPES = [
 export function getInspectionResultResponsibilityTypes(
   category?: 'INCOMING' | 'PROCESS',
 ) {
-  return category === 'PROCESS'
-    ? INSPECTION_RESULT_RESPONSIBILITY_TYPES.filter(
-        (type) => type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
-      )
-    : INSPECTION_RESULT_RESPONSIBILITY_TYPES;
+  if (category === 'PROCESS') {
+    return INSPECTION_RESULT_RESPONSIBILITY_TYPES.filter(
+      (type) => type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER,
+    );
+  }
+  if (category === 'INCOMING') {
+    return INSPECTION_RESULT_RESPONSIBILITY_TYPES.filter(
+      (type) =>
+        type !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT,
+    );
+  }
+  return INSPECTION_RESULT_RESPONSIBILITY_TYPES;
 }
 
 export function getInspectionResultResponsibilityLabels(
@@ -43,17 +50,10 @@ export function buildInspectionResultResponsibilityPayload(input: {
   const responsibilityType = input.responsibilityType;
   if (!responsibilityType) return null;
   const supplierId = input.supplierId.trim();
-  if (
-    responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-  ) {
+  if (isExternalInspectionIssueResponsibility(responsibilityType)) {
     return supplierId ? { responsibilityType, supplierId } : null;
   }
   const responsibleDepartmentId = input.responsibleDepartmentId.trim();
   if (!responsibleDepartmentId) return null;
-  if (!isExternalInspectionIssueResponsibility(responsibilityType)) {
-    return { responsibilityType, responsibleDepartmentId };
-  }
-  return supplierId
-    ? { responsibilityType, responsibleDepartmentId, supplierId }
-    : null;
+  return { responsibilityType, responsibleDepartmentId };
 }

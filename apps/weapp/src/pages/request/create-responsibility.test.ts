@@ -5,14 +5,13 @@ import {
   getRequestCreateResponsibilityLabels,
   getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
-  isRequestCreateOutsourcingResponsibility,
+  isRequestCreateExternalResponsibility,
   REQUEST_CREATE_RESPONSIBILITY_LABELS,
   REQUEST_CREATE_RESPONSIBILITY_TYPES,
-  resolveRequestCreateResponsibilityDepartmentDefault,
 } from './create-responsibility';
 
 describe('request create responsibility payload', () => {
-  it('removes supplier responsibility from PROCESS while preserving INCOMING choices', () => {
+  it('uses category-specific responsibility choices', () => {
     expect(getRequestCreateResponsibilityTypes('PROCESS')).toEqual([
       'INTERNAL_DEPARTMENT',
       'OUTSOURCING_UNIT',
@@ -22,49 +21,9 @@ describe('request create responsibility payload', () => {
       '外协单位',
     ]);
     expect(getRequestCreateResponsibilityTypes('INCOMING')).toEqual([
-      'INTERNAL_DEPARTMENT',
       'SUPPLIER',
       'OUTSOURCING_UNIT',
     ]);
-  });
-
-  it.each([
-    [
-      'SUPPLIER' as const,
-      [{ label: '采购部', value: 'dept-purchasing' }],
-      'dept-purchasing',
-    ],
-  ])(
-    'uses the shared canonical default for %s',
-    (responsibilityType, departments, expected) => {
-      expect(
-        resolveRequestCreateResponsibilityDepartmentDefault({
-          currentResponsibleDepartmentId: '',
-          departments,
-          responsibilityType,
-        }),
-      ).toBe(expected);
-    },
-  );
-
-  it('never defaults a department for outsourcing responsibility', () => {
-    expect(
-      resolveRequestCreateResponsibilityDepartmentDefault({
-        currentResponsibleDepartmentId: '',
-        departments: [{ label: '生产 OBU', value: 'dept-production' }],
-        responsibilityType: 'OUTSOURCING_UNIT',
-      }),
-    ).toBe('');
-  });
-
-  it('does not replace a manually selected department', () => {
-    expect(
-      resolveRequestCreateResponsibilityDepartmentDefault({
-        currentResponsibleDepartmentId: 'dept-manual',
-        departments: [{ label: '采购部', value: 'dept-purchasing' }],
-        responsibilityType: 'SUPPLIER',
-      }),
-    ).toBe('dept-manual');
   });
 
   it('keeps all three responsibility types available for both request routes', () => {
@@ -119,7 +78,6 @@ describe('request create responsibility payload', () => {
       },
       {
         responsibilityType: 'SUPPLIER',
-        responsibleDepartmentId: 'dept-purchasing',
         supplierId: 'supplier-a',
       },
     ],
@@ -153,20 +111,20 @@ describe('request create responsibility payload', () => {
     });
   });
 
-  it.each(['INCOMING', 'PROCESS'] as const)(
-    'submits %s outsourcing without a hidden department ID',
-    (_category) => {
+  it.each(['SUPPLIER', 'OUTSOURCING_UNIT'] as const)(
+    'submits %s without a hidden department ID',
+    (responsibilityType) => {
       expect(
         buildRequestCreateResponsibilityPayload({
-          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibilityType,
           responsibleDepartmentId: 'dept-stale',
           supplierId: 'supplier-outsourcing',
         }),
       ).toEqual({
-        responsibilityType: 'OUTSOURCING_UNIT',
+        responsibilityType,
         supplierId: 'supplier-outsourcing',
       });
-      expect(isRequestCreateOutsourcingResponsibility('OUTSOURCING_UNIT')).toBe(
+      expect(isRequestCreateExternalResponsibility(responsibilityType)).toBe(
         true,
       );
     },

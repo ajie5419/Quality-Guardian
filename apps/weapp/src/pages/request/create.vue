@@ -28,8 +28,7 @@ import {
   getRequestCreateResponsibilityLabels,
   getRequestCreateResponsibilityTypes,
   isCurrentResponsibilityOptionsRequest,
-  isRequestCreateOutsourcingResponsibility,
-  resolveRequestCreateResponsibilityDepartmentDefault,
+  isRequestCreateExternalResponsibility,
 } from './create-responsibility';
 
 interface WorkOrderItem {
@@ -175,9 +174,6 @@ const supplierLabels = computed(() =>
   supplierOptions.value.map((item) => item.label),
 );
 const isIncoming = computed(() => form.category === 'INCOMING');
-const isExternalResponsibility = computed(
-  () => form.responsibilityType !== 'INTERNAL_DEPARTMENT',
-);
 const selectedDepartmentLabel = computed(
   () =>
     departmentOptions.value.find(
@@ -198,8 +194,8 @@ const responsibilityTypeLabels = computed(() =>
 const responsibilityTypeIndex = computed(() =>
   Math.max(0, responsibilityTypes.value.indexOf(form.responsibilityType)),
 );
-const isOutsourcingResponsibility = computed(() =>
-  isRequestCreateOutsourcingResponsibility(form.responsibilityType),
+const isExternalResponsibility = computed(() =>
+  isRequestCreateExternalResponsibility(form.responsibilityType),
 );
 const responsibilityUnitLabel = computed(() =>
   form.responsibilityType === 'OUTSOURCING_UNIT' ? '外协单位' : '供应商',
@@ -258,13 +254,9 @@ async function loadResponsibilityOptions() {
     }
     departmentOptions.value = res.data.departments;
     supplierOptions.value = res.data.suppliers;
-    form.responsibleDepartmentId = isOutsourcingResponsibility.value
+    form.responsibleDepartmentId = isExternalResponsibility.value
       ? ''
-      : resolveRequestCreateResponsibilityDepartmentDefault({
-          currentResponsibleDepartmentId: form.responsibleDepartmentId,
-          departments: departmentOptions.value,
-          responsibilityType: requestedResponsibilityType,
-        });
+      : form.responsibleDepartmentId;
     departmentIndex.value = departmentOptions.value.findIndex(
       (item) => item.value === form.responsibleDepartmentId,
     );
@@ -372,7 +364,9 @@ function onProcessChange(e: { detail: { value: string } }) {
   incomingPartKeyword.value = '';
   syncMaterialInputMode();
   form.responsibilityType =
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
+    form.category === 'INCOMING'
+      ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+      : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
   resetResponsibilityIdentity();
   bomPartIndex.value = -1;
   void loadResponsibilityOptions();
@@ -526,7 +520,7 @@ function validate(): boolean {
     (componentRequired.value && !form.componentName);
   errors.reporter = !form.reporter.trim();
   errors.responsibility =
-    (!isOutsourcingResponsibility.value && !form.responsibleDepartmentId) ||
+    (!isExternalResponsibility.value && !form.responsibleDepartmentId) ||
     (isExternalResponsibility.value ? !form.supplierId : false);
   errors.attachments = form.attachments.length === 0;
   return (
@@ -773,7 +767,7 @@ async function handleSubmit() {
         </view>
 
         <view
-          v-if="!isOutsourcingResponsibility"
+          v-if="!isExternalResponsibility"
           class="form-item"
           :class="{ error: errors.responsibility }"
         >

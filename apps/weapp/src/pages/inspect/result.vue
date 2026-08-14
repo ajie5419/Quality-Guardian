@@ -129,11 +129,6 @@ const isExternalResponsibility = computed(() =>
     ? isExternalInspectionIssueResponsibility(responsibilityType.value)
     : false,
 );
-const isOutsourcingResponsibility = computed(
-  () =>
-    responsibilityType.value ===
-    INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT,
-);
 const legacyResponsibilityTypeLabels = computed(() =>
   getInspectionResultResponsibilityLabels(task.value?.category),
 );
@@ -212,15 +207,15 @@ async function fetchDetail() {
       responsibilityType.value =
         responsibility?.responsibilityType ||
         editableResponsibility?.responsibilityType ||
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
-      responsibleDepartmentId.value =
-        responsibilityType.value ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-          ? ''
-          : responsibility?.responsibleDepartmentId ||
-            editableResponsibility?.responsibleDepartmentId ||
-            task.value.responsibleDepartmentId ||
-            '';
+        (task.value.category === 'INCOMING'
+          ? INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
+          : INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT);
+      responsibleDepartmentId.value = isExternalResponsibility.value
+        ? ''
+        : responsibility?.responsibleDepartmentId ||
+          editableResponsibility?.responsibleDepartmentId ||
+          task.value.responsibleDepartmentId ||
+          '';
       supplierId.value =
         responsibility?.supplierId ||
         editableResponsibility?.supplierId ||
@@ -278,7 +273,7 @@ async function loadLegacyResponsibilityOptions() {
     }
     legacyDepartments.value = res.data.departments;
     legacySuppliers.value = res.data.suppliers;
-    if (isOutsourcingResponsibility.value) {
+    if (isExternalResponsibility.value) {
       responsibleDepartmentId.value = '';
     } else if (
       responsibleDepartmentId.value &&
@@ -417,7 +412,7 @@ function validateCloseResponsibility(): boolean {
     uni.showToast({ title: '请选择责任类型', icon: 'none' });
     return false;
   }
-  if (!isOutsourcingResponsibility.value && !responsibleDepartmentId.value) {
+  if (!isExternalResponsibility.value && !responsibleDepartmentId.value) {
     uni.showToast({ title: '请选择责任部门', icon: 'none' });
     return false;
   }
@@ -732,7 +727,7 @@ onLoad((options) => {
               </view>
             </picker>
           </view>
-          <view v-if="!isOutsourcingResponsibility" class="card">
+          <view v-if="!isExternalResponsibility" class="card">
             <view class="field-label required">责任部门</view>
             <picker
               :disabled="
@@ -848,7 +843,10 @@ onLoad((options) => {
           </picker>
         </view>
 
-        <view v-if="responsibilityLocked" class="card">
+        <view
+          v-if="responsibilityLocked && !isExternalResponsibility"
+          class="card"
+        >
           <view class="field-label required">责任部门</view>
           <view class="picker-val">
             <text>{{ task?.responsibleDepartment || '责任上下文加载中' }}</text>
