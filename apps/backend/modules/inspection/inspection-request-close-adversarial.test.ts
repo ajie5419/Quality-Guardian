@@ -47,6 +47,7 @@ vi.mock('~/modules/inspection/inspection-request-close.schema', async () => {
       const map: Record<string, number> = {
         VALIDATION: 400,
         BAD_REQUEST: 400,
+        CONFLICT: 409,
         NOT_FOUND: 404,
         FORBIDDEN: 403,
         INTERNAL: 500,

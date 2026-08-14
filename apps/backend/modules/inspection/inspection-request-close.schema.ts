@@ -14,51 +14,80 @@ import {
 const PREFIX_STATUS_MAP: Record<string, number> = {
   VALIDATION: 400,
   BAD_REQUEST: 400,
+  CONFLICT: 409,
   NOT_FOUND: 404,
   FORBIDDEN: 403,
   INTERNAL: 500,
 };
 
-const linkedIssueResponsibilitySchema = z
-  .object({
-    generateNcNumber: z.boolean({
-      required_error: '是否生成不合格编号不能为空',
-    }),
-    responsibilityType: z.preprocess(
-      (value) => normalizeInspectionIssueResponsibilityType(value) || value,
-      z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE),
-    ),
-    responsibleDepartmentId: z.preprocess(
-      (value) => value ?? '',
-      z.string().trim().min(1, '不合格项责任部门 ID 不能为空'),
-    ),
-    supplierId: z.string().trim().min(1).optional(),
-  })
-  .passthrough()
-  .superRefine((value, context) => {
-    if (
-      value.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
-      value.supplierId
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: '内部责任部门不能同时指定供应商 ID',
-        path: ['supplierId'],
-      });
-    }
-    if (
-      value.responsibilityType !==
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
-      !value.supplierId
-    ) {
-      context.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: '外部责任单位缺少 canonical 供应商 ID',
-        path: ['supplierId'],
-      });
-    }
-  });
+function buildCloseResponsibilitySchema(
+  messages: {
+    departmentIdRequired: string;
+    externalSupplierRequired: string;
+    internalSupplierForbidden: string;
+  },
+  requireGenerateNcNumber = false,
+) {
+  return z
+    .object({
+      ...(requireGenerateNcNumber
+        ? {
+            generateNcNumber: z.boolean({
+              required_error: '是否生成不合格编号不能为空',
+            }),
+          }
+        : {}),
+      responsibilityType: z.preprocess(
+        (value) => normalizeInspectionIssueResponsibilityType(value) || value,
+        z.nativeEnum(INSPECTION_ISSUE_RESPONSIBILITY_TYPE),
+      ),
+      responsibleDepartmentId: z.preprocess(
+        (value) => value ?? '',
+        z.string().trim().min(1, messages.departmentIdRequired),
+      ),
+      supplierId: z.string().trim().min(1).optional(),
+    })
+    .passthrough()
+    .superRefine((value, context) => {
+      if (
+        value.responsibilityType ===
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+        value.supplierId
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: messages.internalSupplierForbidden,
+          path: ['supplierId'],
+        });
+      }
+      if (
+        value.responsibilityType !==
+          INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
+        !value.supplierId
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: messages.externalSupplierRequired,
+          path: ['supplierId'],
+        });
+      }
+    });
+}
+
+const closeResponsibilitySchema = buildCloseResponsibilitySchema({
+  departmentIdRequired: '关闭责任部门 ID 不能为空',
+  externalSupplierRequired: '关闭外部责任单位缺少 canonical 供应商 ID',
+  internalSupplierForbidden: '关闭内部责任部门不能同时指定供应商 ID',
+});
+
+const linkedIssueResponsibilitySchema = buildCloseResponsibilitySchema(
+  {
+    departmentIdRequired: '不合格项责任部门 ID 不能为空',
+    externalSupplierRequired: '外部责任单位缺少 canonical 供应商 ID',
+    internalSupplierForbidden: '内部责任部门不能同时指定供应商 ID',
+  },
+  true,
+);
 
 export function failCloseRequest(prefix: string, message: string): never {
   const httpStatus = PREFIX_STATUS_MAP[prefix] ?? 400;
@@ -90,6 +119,17 @@ export function validateCloseRequestBody(body: Record<string, unknown>) {
   );
   if (result === 'PASS' && unqualifiedQuantity > 0)
     failCloseRequest('VALIDATION', '检验结果为合格时，不合格数量必须为 0');
+  if (body.responsibility !== undefined) {
+    const responsibilityResult = closeResponsibilitySchema.safeParse(
+      body.responsibility,
+    );
+    if (!responsibilityResult.success) {
+      failCloseRequest(
+        'VALIDATION',
+        responsibilityResult.error.issues[0]?.message || '关闭责任归属参数无效',
+      );
+    }
+  }
   if (result !== 'FAIL') return;
   if (unqualifiedQuantity <= 0)
     failCloseRequest('VALIDATION', '检验结果为不合格时，不合格数量必须大于 0');

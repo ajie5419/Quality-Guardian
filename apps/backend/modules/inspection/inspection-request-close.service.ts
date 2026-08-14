@@ -26,7 +26,10 @@ import {
 import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
 import { createCloseInspectionRecords } from './inspection-request-close-records.service';
 import {
+  assertCloseLinkedIssueResponsibilityMatches,
+  assertExistingCloseLinkedIssueResponsibilityMatches,
   buildCloseInspectionResponsibilityWrite,
+  requireCanonicalCloseResponsibility,
   resolveLegacyCloseRequestResponsibility,
 } from './inspection-request-close-responsibility.service';
 import {
@@ -96,6 +99,14 @@ export const InspectionRequestCloseService = {
     );
     const result = normalizeInspectionRequestText(body.result).toUpperCase();
     const linkedIssue = body.linkedIssue as Record<string, unknown> | undefined;
+    const responsibility =
+      body.responsibility && typeof body.responsibility === 'object'
+        ? (body.responsibility as Record<string, unknown>)
+        : undefined;
+    // FAIL clients released before the dedicated close responsibility field
+    // remain compatible. PASS never infers a missing request fact from issue data.
+    const closeResponsibility =
+      responsibility || (result === 'FAIL' ? linkedIssue : undefined);
     const totalQuantity = parseInspectionRequestQuantity(
       body.quantity,
       request.quantity || 1,
@@ -131,26 +142,43 @@ export const InspectionRequestCloseService = {
         if (guard.count === 0)
           failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
 
-        // The update guard above serializes concurrent closes. Read its current
-        // link afterwards so a second FAIL reuses the first transaction's issue.
+        // The state guard above locks this request row. Re-read every fact that
+        // influences responsibility validation so changes made before the lock
+        // cannot be validated against the stale outer request snapshot.
         const currentLink = await tx.qms_inspection_requests.findUnique({
           select: {
+            category: true,
             linkedIssueId: true,
             linkedIssueNo: true,
             linkedIssueStatus: true,
+            responsibilityType: true,
+            responsibleDepartment: true,
+            responsibleDepartmentId: true,
+            supplierId: true,
+            supplierName: true,
+            teamId: true,
           },
           where: { id },
         });
         if (!currentLink) failCloseRequest('NOT_FOUND', '报检任务不存在');
+        const requestAtClose = { ...request, ...currentLink };
 
         let inspectionId = explicitInspectionId;
         const responsibilityResolution =
           await resolveLegacyCloseRequestResponsibility({
-            linkedIssue: result === 'FAIL' ? linkedIssue : undefined,
-            request,
+            responsibility: closeResponsibility,
+            request: requestAtClose,
             tx,
           });
         const requestWithResponsibility = responsibilityResolution.request;
+        const canonicalCloseResponsibility =
+          requireCanonicalCloseResponsibility(requestWithResponsibility);
+        if (result === 'FAIL' && linkedIssue) {
+          assertCloseLinkedIssueResponsibilityMatches({
+            linkedIssue,
+            responsibility: canonicalCloseResponsibility,
+          });
+        }
         let inspectionLinks: CloseInspectionRecordLink[] = explicitInspectionId
           ? [
               {
@@ -231,6 +259,10 @@ export const InspectionRequestCloseService = {
                 '关联的不合格项不存在，不能重复创建',
               );
             }
+            assertExistingCloseLinkedIssueResponsibilityMatches({
+              issue: issueRecord,
+              responsibility: canonicalCloseResponsibility,
+            });
           } else if (linkedIssue) {
             const built = await buildCloseLinkedIssueCreateResult({
               body,
@@ -247,7 +279,7 @@ export const InspectionRequestCloseService = {
         }
 
         const linkedIssueWhere = buildLinkedIssueWhere(
-          { ...request, ...currentLink },
+          requestAtClose,
           issueRecord?.id,
         );
         let linkedIssueStatus =

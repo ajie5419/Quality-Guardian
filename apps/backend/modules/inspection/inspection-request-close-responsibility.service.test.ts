@@ -3,6 +3,7 @@ import type { Prisma } from '@prisma/client';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  assertCloseLinkedIssueResponsibilityMatches,
   buildCloseInspectionResponsibilityWrite,
   resolveLegacyCloseRequestResponsibility,
 } from './inspection-request-close-responsibility.service';
@@ -62,8 +63,8 @@ describe('legacy inspection request close responsibility', () => {
 
   it('persists a fully resolved legacy close responsibility with a CAS guard', async () => {
     const result = await resolveLegacyCloseRequestResponsibility({
-      linkedIssue,
-      request: baseRequest,
+      responsibility: linkedIssue,
+      request: { ...baseRequest, category: 'INCOMING' },
       tx,
     });
 
@@ -75,6 +76,7 @@ describe('legacy inspection request close responsibility', () => {
           responsibleDepartmentId: 'dept-assembly',
         }),
         where: expect.objectContaining({
+          category: 'INCOMING',
           isDeleted: false,
           responsibilityType: null,
           responsibleDepartment: null,
@@ -89,7 +91,7 @@ describe('legacy inspection request close responsibility', () => {
 
   it('completes a historical dispatched request with a compatible partial fact', async () => {
     const result = await resolveLegacyCloseRequestResponsibility({
-      linkedIssue,
+      responsibility: linkedIssue,
       request: {
         ...baseRequest,
         responsibilityType: 'INTERNAL_DEPARTMENT',
@@ -120,7 +122,7 @@ describe('legacy inspection request close responsibility', () => {
   it('rejects a partial fact that conflicts with the submitted canonical responsibility', async () => {
     await expect(
       resolveLegacyCloseRequestResponsibility({
-        linkedIssue,
+        responsibility: linkedIssue,
         request: {
           ...baseRequest,
           responsibleDepartmentId: 'dept-other',
@@ -131,9 +133,62 @@ describe('legacy inspection request close responsibility', () => {
     expect(updateMany).not.toHaveBeenCalled();
   });
 
-  it('blocks a PASS close when a legacy request has no responsibility fact', async () => {
+  it('completes a legacy responsibility for PASS from the top-level input', async () => {
+    const result = await resolveLegacyCloseRequestResponsibility({
+      responsibility: linkedIssue,
+      request: baseRequest,
+      tx,
+    });
+
+    expect(result).toMatchObject({
+      request: expect.objectContaining({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-assembly',
+      }),
+      resolvedLegacy: true,
+    });
+  });
+
+  it('blocks a close when a legacy request has no responsibility input', async () => {
     await expect(
       resolveLegacyCloseRequestResponsibility({ request: baseRequest, tx }),
+    ).rejects.toMatchObject({ code: 'VALIDATION' });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects a top-level override that conflicts with a complete request fact', async () => {
+    mocks.resolveResponsibility
+      .mockResolvedValueOnce({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: '机加部',
+        responsibleDepartmentId: 'dept-machining',
+        supplierId: null,
+        supplierCategory: null,
+        supplierName: null,
+      })
+      .mockResolvedValueOnce({
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartment: '装配部',
+        responsibleDepartmentId: 'dept-assembly',
+        supplierId: null,
+        supplierCategory: null,
+        supplierName: null,
+      });
+
+    await expect(
+      resolveLegacyCloseRequestResponsibility({
+        responsibility: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-machining',
+        },
+        request: {
+          ...baseRequest,
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartment: '装配部',
+          responsibleDepartmentId: 'dept-assembly',
+        },
+        tx,
+      }),
     ).rejects.toMatchObject({ code: 'VALIDATION' });
     expect(updateMany).not.toHaveBeenCalled();
   });
@@ -142,7 +197,7 @@ describe('legacy inspection request close responsibility', () => {
     updateMany.mockResolvedValueOnce({ count: 0 });
     await expect(
       resolveLegacyCloseRequestResponsibility({
-        linkedIssue,
+        responsibility: linkedIssue,
         request: baseRequest,
         tx,
       }),
@@ -161,7 +216,7 @@ describe('legacy inspection request close responsibility', () => {
     updateMany.mockResolvedValueOnce({ count: 0 });
     await expect(
       resolveLegacyCloseRequestResponsibility({
-        linkedIssue: {
+        responsibility: {
           responsibilityType: 'OUTSOURCING_UNIT',
           responsibleDepartmentId: 'dept-production',
           supplierId: 'supplier-before-close',
@@ -191,7 +246,7 @@ describe('legacy inspection request close responsibility', () => {
 
     await expect(
       resolveLegacyCloseRequestResponsibility({
-        linkedIssue: {
+        responsibility: {
           responsibilityType: 'SUPPLIER',
           responsibleDepartmentId: 'dept-purchase',
           supplierId: 'supplier-before-close',
@@ -201,6 +256,31 @@ describe('legacy inspection request close responsibility', () => {
       }),
     ).rejects.toMatchObject({ code: 'VALIDATION' });
     expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('does not apply PROCESS restrictions when a historical category is null', async () => {
+    mocks.resolveResponsibility.mockResolvedValueOnce({
+      responsibilityType: 'SUPPLIER',
+      responsibleDepartment: '采购部',
+      responsibleDepartmentId: 'dept-purchase',
+      supplierId: 'supplier-before-close',
+      supplierCategory: 'Supplier',
+      supplierName: 'Supplier A',
+    });
+
+    await expect(
+      resolveLegacyCloseRequestResponsibility({
+        responsibility: {
+          responsibilityType: 'SUPPLIER',
+          responsibleDepartmentId: 'dept-purchase',
+          supplierId: 'supplier-before-close',
+        },
+        request: { ...baseRequest, category: null },
+        tx,
+      }),
+    ).resolves.toMatchObject({
+      request: expect.objectContaining({ responsibilityType: 'SUPPLIER' }),
+    });
   });
 
   it('rejects a complete PROCESS supplier fact before a PASS close can reuse it', async () => {
@@ -272,7 +352,7 @@ describe('legacy inspection request close responsibility', () => {
 
     await expect(
       resolveLegacyCloseRequestResponsibility({
-        linkedIssue: {
+        responsibility: {
           responsibilityType: 'OUTSOURCING_UNIT',
           responsibleDepartmentId: 'dept-production',
           supplierId: 'supplier-before-close',
@@ -289,7 +369,7 @@ describe('legacy inspection request close responsibility', () => {
     updateMany.mockResolvedValueOnce({ count: 0 });
     await expect(
       resolveLegacyCloseRequestResponsibility({
-        linkedIssue,
+        responsibility: linkedIssue,
         request: baseRequest,
         tx,
       }),
@@ -299,6 +379,24 @@ describe('legacy inspection request close responsibility', () => {
         where: expect.objectContaining({ isDeleted: false }),
       }),
     );
+  });
+
+  it('rejects a FAIL issue whose responsibility differs from the close responsibility', () => {
+    expect(() =>
+      assertCloseLinkedIssueResponsibilityMatches({
+        linkedIssue: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-machining',
+        },
+        responsibility: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartment: '装配部',
+          responsibleDepartmentId: 'dept-assembly',
+          supplierId: null,
+          supplierName: null,
+        },
+      }),
+    ).toThrow('不合格项责任归属必须与关闭责任归属一致');
   });
 
   it('projects request snapshots to an inspection with no responsibility fact', () => {

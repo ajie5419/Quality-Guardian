@@ -4,6 +4,7 @@ import type {
   SupplierCategory,
 } from '@qgs/shared';
 
+import { inspection_category } from '@prisma/client';
 import {
   getInspectionRequestResponsibilitySupplierCategory,
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
@@ -33,6 +34,11 @@ type InspectionResponsibility = {
   supplierId?: null | string;
   supplierName?: null | string;
 };
+
+type ResponsibilityTuple = Pick<
+  InspectionResponsibility,
+  'responsibilityType' | 'responsibleDepartmentId' | 'supplierId'
+>;
 
 export type CanonicalCloseResponsibility = {
   responsibilityType: InspectionIssueResponsibilityType;
@@ -107,6 +113,54 @@ function assertCompatibleLegacyResponsibility(
   }
 }
 
+function assertCloseResponsibilityTupleMatches(options: {
+  actual: ResponsibilityTuple;
+  code: string;
+  message: string;
+  responsibility: CanonicalCloseResponsibility;
+}) {
+  const actualType = normalizeInspectionIssueResponsibilityType(
+    options.actual.responsibilityType,
+  );
+  const actualDepartmentId = normalizeInspectionRequestText(
+    options.actual.responsibleDepartmentId,
+  );
+  const actualSupplierId = normalizeInspectionRequestText(
+    options.actual.supplierId,
+  );
+  if (
+    actualType !== options.responsibility.responsibilityType ||
+    actualDepartmentId !== options.responsibility.responsibleDepartmentId ||
+    actualSupplierId !== (options.responsibility.supplierId || '')
+  ) {
+    failCloseRequest(options.code, options.message);
+  }
+}
+
+export function assertCloseLinkedIssueResponsibilityMatches(options: {
+  linkedIssue: ResponsibilityTuple;
+  responsibility: CanonicalCloseResponsibility;
+}) {
+  assertCloseResponsibilityTupleMatches({
+    actual: options.linkedIssue,
+    code: 'VALIDATION',
+    message: '不合格项责任归属必须与关闭责任归属一致',
+    responsibility: options.responsibility,
+  });
+}
+
+export function assertExistingCloseLinkedIssueResponsibilityMatches(options: {
+  issue: ResponsibilityTuple;
+  responsibility: CanonicalCloseResponsibility;
+}) {
+  assertCloseResponsibilityTupleMatches({
+    actual: options.issue,
+    code: 'CONFLICT',
+    message: '已关联不合格项责任事实与关闭责任归属不一致',
+    responsibility: options.responsibility,
+  });
+}
+
 async function assertCloseResponsibilityCategoryPolicy(options: {
   request: Request;
   responsibility: CanonicalCloseResponsibility;
@@ -147,6 +201,14 @@ function hasCanonicalResponsibilitySnapshot(
   );
 }
 
+function resolveRequestCategoryForCas(category: Request['category']) {
+  if (category === inspection_category.INCOMING)
+    return inspection_category.INCOMING;
+  if (category === inspection_category.PROCESS)
+    return inspection_category.PROCESS;
+  return null;
+}
+
 async function persistCanonicalResponsibilitySnapshot(options: {
   request: Request;
   responsibility: CanonicalCloseResponsibility;
@@ -160,6 +222,7 @@ async function persistCanonicalResponsibilitySnapshot(options: {
   const persisted = await options.tx.qms_inspection_requests.updateMany({
     data: options.responsibility,
     where: {
+      category: resolveRequestCategoryForCas(options.request.category),
       id: options.request.id,
       isDeleted: false,
       responsibilityType: options.request.responsibilityType ?? null,
@@ -277,18 +340,23 @@ export function buildCloseInspectionResponsibilityWrite(options: {
 }
 
 /**
- * A historical request may contain a partial responsibility snapshot. Its
- * first FAIL close can complete that snapshot only when every non-empty field
- * agrees with the validated canonical issue responsibility; PASS never
- * invents missing responsibility fields.
+ * A historical request may contain a partial responsibility snapshot. A close
+ * can complete it only from the separately submitted canonical responsibility;
+ * FAIL issue data never becomes the request responsibility source.
  */
 export async function resolveLegacyCloseRequestResponsibility<
   T extends Request,
 >(options: {
-  linkedIssue?: Record<string, unknown>;
   request: T;
+  responsibility?: Record<string, unknown>;
   tx: Prisma.TransactionClient;
 }) {
+  const submittedResponsibility = options.responsibility
+    ? await resolveInspectionIssueResponsibility(
+        options.responsibility,
+        options.tx,
+      )
+    : null;
   if (hasCompleteResponsibilityIdentity(options.request)) {
     const resolved = await resolveInspectionIssueResponsibility(
       {
@@ -319,6 +387,21 @@ export async function resolveLegacyCloseRequestResponsibility<
       responsibility,
       supplierCategory: resolved.supplierCategory,
     });
+    if (submittedResponsibility) {
+      assertCompatibleLegacyResponsibility(
+        options.request,
+        submittedResponsibility,
+      );
+      if (
+        submittedResponsibility.responsibilityType !==
+          responsibility.responsibilityType ||
+        submittedResponsibility.responsibleDepartmentId !==
+          responsibility.responsibleDepartmentId ||
+        submittedResponsibility.supplierId !== responsibility.supplierId
+      ) {
+        failCloseRequest('VALIDATION', '关闭责任归属与报检任务不一致');
+      }
+    }
     const refreshed = await persistCanonicalResponsibilitySnapshot({
       request: options.request,
       responsibility,
@@ -329,13 +412,10 @@ export async function resolveLegacyCloseRequestResponsibility<
       resolvedLegacy: refreshed,
     };
   }
-  if (!options.linkedIssue) {
+  if (!submittedResponsibility) {
     failCloseRequest('VALIDATION', '报检任务责任事实缺失，不能关闭');
   }
-  const responsibility = await resolveInspectionIssueResponsibility(
-    options.linkedIssue,
-    options.tx,
-  );
+  const responsibility = submittedResponsibility;
   await assertInspectionRequestResponsibilityPolicy({
     client: options.tx,
     responsibleDepartmentId: responsibility.responsibleDepartmentId,

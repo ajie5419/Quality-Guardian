@@ -56,6 +56,32 @@ describe('validateCloseRequestBody', () => {
     ).toThrow('检验记录不能为空');
   });
 
+  it('accepts a top-level canonical responsibility for PASS close', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        attachments: [{ name: 'record.pdf', url: '/uploads/record.pdf' }],
+        responsibility: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-assembly',
+        },
+        result: 'PASS',
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects an incomplete top-level external responsibility', () => {
+    expect(() =>
+      validateCloseRequestBody({
+        attachments: [{ name: 'record.pdf', url: '/uploads/record.pdf' }],
+        responsibility: {
+          responsibilityType: 'OUTSOURCING_UNIT',
+          responsibleDepartmentId: 'dept-production',
+        },
+        result: 'PASS',
+      }),
+    ).toThrow('关闭外部责任单位缺少 canonical 供应商 ID');
+  });
+
   it('rejects an unknown responsibility type', () => {
     expect(() =>
       validateCloseRequestBody({

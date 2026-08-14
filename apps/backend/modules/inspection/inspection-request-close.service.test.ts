@@ -38,6 +38,7 @@ vi.mock('~/modules/inspection/inspection-request-close.schema', async () => {
       const map: Record<string, number> = {
         VALIDATION: 400,
         BAD_REQUEST: 400,
+        CONFLICT: 409,
         NOT_FOUND: 404,
         FORBIDDEN: 403,
         INTERNAL: 500,
@@ -267,6 +268,165 @@ describe('inspectionRequestCloseService', () => {
     });
   });
 
+  it('backfills a historical responsibility from the top-level PASS input', async () => {
+    const historicalRequest = {
+      ...mockRequest,
+      responsibilityType: null,
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      supplierId: null,
+      supplierName: null,
+    };
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+      historicalRequest,
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: { findMany: vi.fn().mockResolvedValue([]) },
+        qms_inspection_request_inspections: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: null,
+            linkedIssueNo: null,
+            linkedIssueStatus: null,
+          }),
+          update: vi.fn().mockResolvedValue({
+            ...historicalRequest,
+            status: 'CLOSED',
+          }),
+          updateMany,
+        },
+        qms_task_dispatches: { updateMany: vi.fn() },
+      }),
+    );
+
+    await InspectionRequestCloseService.closeRequest(
+      {} as any,
+      'req-1',
+      {
+        attachments: [
+          { name: 'record.pdf', url: 'http://example.com/record.pdf' },
+        ],
+        responsibility: {
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-welding',
+        },
+        result: 'PASS',
+      },
+      mockUserInfo,
+    );
+
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibilityType: 'INTERNAL_DEPARTMENT',
+          responsibleDepartmentId: 'dept-welding',
+        }),
+      }),
+    );
+  });
+
+  it('propagates post-backfill failures so the enclosing transaction rolls back', async () => {
+    const historicalRequest = {
+      ...mockRequest,
+      responsibilityType: null,
+      responsibleDepartment: null,
+      responsibleDepartmentId: null,
+      supplierId: null,
+      supplierName: null,
+    };
+    const requestUpdate = vi.fn();
+    const { createCloseInspectionRecords } = await import(
+      '~/modules/inspection/inspection-request-close-records.service'
+    );
+    vi.mocked(createCloseInspectionRecords).mockRejectedValueOnce(
+      new Error('record write failed'),
+    );
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+      historicalRequest,
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: { findMany: vi.fn().mockResolvedValue([]) },
+        qms_inspection_request_inspections: { createMany: vi.fn() },
+        qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: null,
+            linkedIssueNo: null,
+            linkedIssueStatus: null,
+          }),
+          update: requestUpdate,
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_task_dispatches: { updateMany: vi.fn() },
+      }),
+    );
+
+    await expect(
+      InspectionRequestCloseService.closeRequest(
+        {} as any,
+        'req-1',
+        {
+          attachments: [
+            { name: 'record.pdf', url: 'http://example.com/record.pdf' },
+          ],
+          responsibility: {
+            responsibilityType: 'INTERNAL_DEPARTMENT',
+            responsibleDepartmentId: 'dept-welding',
+          },
+          result: 'PASS',
+        },
+        mockUserInfo,
+      ),
+    ).rejects.toThrow('record write failed');
+    expect(requestUpdate).not.toHaveBeenCalled();
+  });
+
+  it('revalidates responsibility against the transaction-locked TEAM snapshot', async () => {
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValueOnce([]);
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+      mockRequest,
+    );
+    const txCreateLinks = vi.fn();
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: { findMany: vi.fn().mockResolvedValue([]) },
+        qms_inspection_request_inspections: { createMany: txCreateLinks },
+        qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: null,
+            linkedIssueNo: null,
+            linkedIssueStatus: null,
+            teamId: 'team-changed-before-close',
+          }),
+          update: vi.fn(),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_task_dispatches: { updateMany: vi.fn() },
+      }),
+    );
+
+    await expect(
+      InspectionRequestCloseService.closeRequest(
+        {} as any,
+        'req-1',
+        {
+          attachments: [
+            { name: 'record.pdf', url: 'http://example.com/record.pdf' },
+          ],
+          result: 'PASS',
+        },
+        mockUserInfo,
+      ),
+    ).rejects.toMatchObject({
+      code: 'INSPECTION_REQUEST_RESPONSIBILITY_POLICY_MISMATCH',
+    });
+    expect(txCreateLinks).not.toHaveBeenCalled();
+  });
+
   it('projects request responsibility to an explicit inspection with no fact', async () => {
     const inspectionUpdate = vi.fn().mockResolvedValue({});
     (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
@@ -336,7 +496,10 @@ describe('inspectionRequestCloseService', () => {
     const existingIssue = {
       id: 'issue-existing',
       nonConformanceNumber: 'NC-26KJ-019',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-welding',
       status: 'OPEN',
+      supplierId: null,
     };
     (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue({
       ...mockRequest,
@@ -384,5 +547,54 @@ describe('inspectionRequestCloseService', () => {
     expect(
       createIssue.buildCloseLinkedIssueCreateResult,
     ).not.toHaveBeenCalled();
+  });
+
+  it('rejects a repeated FAIL when the persisted linked issue responsibility differs', async () => {
+    const existingIssue = {
+      id: 'issue-existing',
+      nonConformanceNumber: 'NC-26KJ-019',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-other',
+      status: 'OPEN',
+      supplierId: null,
+    };
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue({
+      ...mockRequest,
+      linkedIssueId: existingIssue.id,
+      linkedIssueNo: existingIssue.nonConformanceNumber,
+      linkedIssueStatus: existingIssue.status,
+    });
+    const requestUpdate = vi.fn();
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        inspections: { findMany: vi.fn().mockResolvedValue([]) },
+        quality_records: {
+          findFirst: vi.fn().mockResolvedValue(existingIssue),
+        },
+        qms_inspection_request_inspections: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: existingIssue.id,
+            linkedIssueNo: existingIssue.nonConformanceNumber,
+            linkedIssueStatus: existingIssue.status,
+          }),
+          update: requestUpdate,
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_task_dispatches: { updateMany: vi.fn() },
+      }),
+    );
+
+    await expect(
+      InspectionRequestCloseService.closeRequest(
+        {} as any,
+        'req-1',
+        { result: 'FAIL', unqualifiedQuantity: 1 },
+        mockUserInfo,
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(requestUpdate).not.toHaveBeenCalled();
   });
 });

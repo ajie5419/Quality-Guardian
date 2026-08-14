@@ -198,6 +198,12 @@ export interface DispatchInspectionRequestParams {
   priority?: number;
 }
 
+export interface CloseInspectionRequestResponsibility {
+  responsibilityType: InspectionIssueResponsibilityType;
+  responsibleDepartmentId: string;
+  supplierId?: string;
+}
+
 export interface CloseInspectionRequestParams {
   attachments?: InspectionRequestAttachment[];
   closeRemark?: string;
@@ -232,18 +238,24 @@ export interface CloseInspectionRequestParams {
     quantity?: number;
     reportDate?: string;
     reportedBy?: string;
-    responsibilityType: InspectionIssueResponsibilityType;
-    responsibleDepartmentId: string;
+    responsibilityType: CloseInspectionRequestResponsibility['responsibilityType'];
+    responsibleDepartmentId: CloseInspectionRequestResponsibility['responsibleDepartmentId'];
     responsibleWelder?: string;
     rootCause?: string;
     severity?: string;
     solution?: string;
     status?: string;
-    supplierId?: string;
+    supplierId?: CloseInspectionRequestResponsibility['supplierId'];
     unqualifiedQuantity?: number;
   };
   qualifiedQuantity?: number;
   quantity?: number;
+  /**
+   * Canonical responsibility selected while closing a historical request whose
+   * persisted responsibility fact is incomplete. It is independent of the
+   * FAIL-only linked issue payload.
+   */
+  responsibility?: CloseInspectionRequestResponsibility;
   result?: 'FAIL' | 'PASS';
   unqualifiedQuantity?: number;
 }
