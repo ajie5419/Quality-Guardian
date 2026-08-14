@@ -2,6 +2,7 @@
 
 ## 当前状态
 
+- 部门改名在线展示已收敛为 `responsibleDepartmentId`/`respDeptId` 的 active canonical read model：检验记录、不合格项、售后列表/详情/统计/图表、日报和周报均通过 `DeptService` 批量解析当前部门名，不批量改写持久化快照。责任部门筛选将 current-name 命中的 active IDs 与 legacy 快照条件在同一数据库谓词中执行，因此 count、分页和导出语义一致；无 ID 行保留快照，失效或软删 ID 明确保持 unresolved，不按名称猜测。Web 实际优先消费的 legacy 多值责任部门数组也会以当前名称替换主项，避免列表与详情回显旧名。后端定向 Vitest `10/10` 文件、`119/119` 用例及 `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`rtk git diff --check` 均通过；实现提交：`85e49d4`。未运行 dev/build/start，未推送或发布。
 - PROCESS 内部报检的业务“班组”已收敛为 canonical `responsibleDepartment`：Web/WeApp 入口不再展示或提交执行 TEAM，V2 后端拒绝 `team/teamId`。PROCESS 仅允许内部部门或外协单位；外协入口隐藏责任部门，创建事务从 shared 既有外协责任部门策略唯一解析活跃 canonical 部门，缺失/重名 fail-closed。请求 API 和检验记录 API 共用同一后端展示规则：PROCESS 内部显示责任部门，PROCESS 外协显示 canonical `supplierName`，外部/历史行仍返回真实 TEAM；绝不伪造 TEAM ID。关单事务以报检任务完整 R（责任类型、部门 ID/名称、供应商 ID/名称）为唯一事实，逐条投影新建多工单记录、空事实的显式关联记录和 FAIL 不合格项；partial/conflict fail-closed，PASS legacy 无 R 阻断。历史 inspection 自身缺失时仅在关联报检任务唯一同部门时兼容展示，冲突保持空。未运行 dev/build/start，未提交或发布。
 - 报检详情身份展示已按持久化类别分离：`INCOMING` 使用详情 API 已透传的 `supplierName` 显示“供应商”，缺失快照显示 `-`；`PROCESS + INTERNAL_DEPARTMENT` 显示责任部门这一业务班组，其他 PROCESS 记录保持真实 `team`。前端不再把供应商名称写入或回退到班组字段。
 - 报检入口责任部门默认值已在 Web 与 WeApp 统一：`OUTSOURCING_UNIT` 仅在完整选项中唯一精确匹配 canonical `生产 OBU` 时预选该部门，`SUPPLIER` 对 `采购部` 同理。共享纯函数保留同一责任类型的手动选择；空字段在选项未加载、零匹配或重名时保持未选并由提交校验 fail-closed，不硬编码部门 ID。

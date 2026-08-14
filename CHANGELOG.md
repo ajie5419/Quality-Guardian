@@ -27,6 +27,28 @@
 
 ---
 
+### 2026-08-14 修复：部门改名后的责任部门在线展示
+
+**执行内容：**
+
+- 新增 Dept 模块 active 部门的批量 ID→当前名称和当前名称→ID 查询；inspection、after-sales 和 report 仅经该公开服务访问，避免跨模块读 departments 与 N+1。
+- 检验记录和不合格项的列表、详情、导出、统计与责任部门筛选现以 active `responsibleDepartmentId` 的当前名称为准；PROCESS 历史关联报检兼容按 canonical ID 判定唯一性，冲突保持 unresolved。
+- 售后列表/详情、统计、动态图表以及日报、周报现以 active `respDeptId` 的当前名称为准。Web 优先渲染的 legacy 多值责任部门数组同步替换主项，避免详情和移动列表继续展示旧快照。
+- 名称筛选把 active 当前名称解析出的 ID 条件与 legacy 快照条件一并放进查询谓词，count、分页和导出共用同一数据库语义；无 ID 行保留快照，非空失效或软删 ID 不猜测名称并保留 unresolved 状态。持久化快照未作批量修改。
+
+**验证结果：**
+
+- 后端定向 Vitest：`10/10` 文件、`119/119` 用例通过，覆盖部门改名后的检验记录详情/导出/筛选、不合格项列表/详情/筛选/统计、售后列表/筛选/统计/图表和日报/周报。
+- `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 与 `rtk git diff --check` 均通过。
+
+**commit:** `85e49d4` `fix(project): resolve current responsibility department names`
+
+**遗留问题：**
+
+- 未运行 dev/build/start，未推送或发布。
+
+---
+
 ### 2026-08-13 修复：过程报检内部责任部门作为班组展示
 
 **执行内容：**
