@@ -25,6 +25,26 @@
 
 ## 执行记录
 
+### 2026-08-14 不合格项责任部门失效引用回填
+
+**执行内容：**
+- 调查：不合格项图表按责任部门统计大量显示"主数据已失效"——117 条记录的 `responsibleDepartmentId` 指向 14 个已被软删的占位部门行（cuid），占位行的 name 即真实部门的旧格式 ID（`dept-<timestamp>`），active 部门主数据以该 ID 存在
+- 映射：12/14 个占位部门可确定性映射到 active 部门（生产 OBU/采购部/结构 BU1/机加 BU/模具 BU/制造 SOBU/车辆 SOBU/模具 SOBU/机械所/技术部/组装 BU/结构 BU2-测试），2 个（秦皇岛弘旺/祥腾）无 active 匹配
+- 回填脚本 `remediate-quality-record-responsible-departments.ts`：dry-run 默认，`--apply` 落库；可映射记录回填 id+名称快照，不可映射写入 `unresolved_master_data_refs` 审计
+
+**验证结果：**
+- 本地测试库：117 条处理，115 回填、2 条审计（0 跳过）；图表统计复跑——失效桶从 117 条降为 2 条，生产 OBU 59 / 采购部 43 / 结构 BU1 32 等正常解析
+- `pnpm lint`、backend `tsc --noEmit` PASS
+
+**commit:** `359dd602` feat(@qgs/backend): remediate quality record responsible department references
+
+**遗留问题：**
+- 2 条记录（秦皇岛弘旺/祥腾设备安装）保持失效并已入治理审计，需人工确认真实部门后处置
+- 生产库需按运维流程 dry-run 审核后 `--apply`
+- "结构 BU2-测试"命名含"测试"，回填到它之前建议业务确认该部门是否在用
+
+---
+
 ### 2026-08-14 报检看板口径系统性修复（续）
 
 **执行内容：**
