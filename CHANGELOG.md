@@ -25,6 +25,29 @@
 
 ## 执行记录
 
+## [0.27.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.26.0...qgs-v0.27.0) (2026-08-15)
+
+
+### Features
+
+* **@qgs/backend:** add welder name/id dirty-data remediation script ([a2e53d7](https://github.com/ajie5419/Quality-Guardian/commit/a2e53d756122c3648078e9a1111ca9aaa568b565))
+* **@qgs/backend:** add welder score enqueue/drain maintenance tools ([3151c06](https://github.com/ajie5419/Quality-Guardian/commit/3151c06003ca80694208bd23a1ecad30ebd7f919))
+* **@qgs/backend:** add welder score refresh service and async worker ([31b53a3](https://github.com/ajie5419/Quality-Guardian/commit/31b53a3a3c76d8a849862672ce8028a2167b39e5))
+* **@qgs/backend:** add WELDER_SCORE metric refresh queue ([591d1a3](https://github.com/ajie5419/Quality-Guardian/commit/591d1a3e11c97cbeca3c19ebf0ee241950e7f608))
+* **@qgs/backend:** persist canonical responsibleWelderId on issue writes ([220b0d7](https://github.com/ajie5419/Quality-Guardian/commit/220b0d7014d2215ce26b9834cdcd51889d4fc0ca))
+* **@qgs/backend:** remediate quality record responsible department references ([359dd60](https://github.com/ajie5419/Quality-Guardian/commit/359dd602b1ef348f644334e2e61ace0e868673bf))
+* **@qgs/backend:** score refresh joins by responsibleWelderId with backfill ([9ee3775](https://github.com/ajie5419/Quality-Guardian/commit/9ee3775e396c09bc0be23096c7695c99342ad318))
+* **project:** use canonical welder ids in issue forms ([862cd67](https://github.com/ajie5419/Quality-Guardian/commit/862cd673c855528a6253040d6dbb2214a5e6dfc7))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** align inspector status completed count with CLOSED rule ([c006e8d](https://github.com/ajie5419/Quality-Guardian/commit/c006e8d16732efc23b0ed04cd58f74e2e2788689))
+* **@qgs/backend:** base reinspection stats on closed requests only ([3246a80](https://github.com/ajie5419/Quality-Guardian/commit/3246a806d4086697c91462ada48f18809206aeab))
+* **@qgs/backend:** mock welder id resolution in issue mutation tests ([419f4d4](https://github.com/ajie5419/Quality-Guardian/commit/419f4d453f66d70ab6ee330b9e2591875cfa3c30))
+* **@qgs/web-antd:** keep welder name text separate from canonical id in issue forms ([55d2448](https://github.com/ajie5419/Quality-Guardian/commit/55d2448198377380f174f7c9b2f50e6ba29793d0))
+* **project:** gate inspector candidate listing behind dispatch permission ([86f3834](https://github.com/ajie5419/Quality-Guardian/commit/86f38347faec1f658ded9e5971c2694bfdaa332c))
+
 ### 2026-08-14 派工候选检验员接口权限收紧（P1）
 
 **执行内容：**
