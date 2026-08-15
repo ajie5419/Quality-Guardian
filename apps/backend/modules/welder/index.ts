@@ -1,2 +1,2 @@
-export { WelderScoreService } from './welder-score.service';
+export { WelderScoreRefreshService } from './welder-score-refresh.service';
 export { WelderService } from './welder.service';

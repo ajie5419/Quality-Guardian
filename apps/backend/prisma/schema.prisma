@@ -788,6 +788,7 @@ model quality_records {
   defectType                              String?
   defectSubtype                           String?
   responsibleWelder                       String?
+  responsibleWelderId                     String?
   rootCause                               String?                               @db.Text
   rootCauseId                             String?
   severity                                String?
@@ -814,6 +815,8 @@ model quality_records {
   @@index([workOrderNumber])
   @@index([responsibleDepartment])
   @@index([responsibleDepartmentId])
+  @@index([responsibleWelder])
+  @@index([responsibleWelderId])
   @@index([responsibilityType])
   @@index([responsibleBU])
   @@index([supplierId])
@@ -2121,6 +2124,7 @@ enum supplier_identity_type {
 
 enum metric_refresh_type {
   SUPPLIER_SCORE
+  WELDER_SCORE
 }
 
 enum metric_refresh_status {

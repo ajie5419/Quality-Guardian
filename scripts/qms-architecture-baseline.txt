@@ -116,10 +116,8 @@ B-M1|apps/backend/modules/inspection/inspection-issue-mutation.service.ts|import
 B-M1|apps/backend/modules/inspection/inspection-issue-mutation.service.ts|import-~/modules/quality-loss/quality-loss-index.service|1
 B-M1|apps/backend/modules/inspection/inspection-issue-mutation.service.ts|import-~/modules/system-log/audit-log|1
 B-M1|apps/backend/modules/inspection/inspection-issue-mutation.service.ts|import-~/modules/system-log/system-log.service|1
-B-M1|apps/backend/modules/inspection/inspection-issue-mutation.service.ts|import-~/modules/welder/welder-score.service|1
 B-M1|apps/backend/modules/inspection/inspection-issue-numbering.service.ts|import-~/modules/file-storage/file-storage.service|1
 B-M1|apps/backend/modules/inspection/inspection-issue-numbering.service.ts|import-~/modules/system-log/system-log.service|1
-B-M1|apps/backend/modules/inspection/inspection-issue-numbering.service.ts|import-~/modules/welder/welder-score.service|1
 B-M1|apps/backend/modules/inspection/inspection-issue.ts|import-~/modules/quality-loss/quality-loss-status|1
 B-M1|apps/backend/modules/inspection/inspection-project-document-sync.service.ts|import-~/modules/file-storage/file-storage.service|1
 B-M1|apps/backend/modules/inspection/inspection-public-query.service.ts|import-~/modules/work-order/work-order-query|1

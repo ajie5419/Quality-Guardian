@@ -1,6 +1,5 @@
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 20;
-const DEFAULT_SCORE = 12;
 const MAX_PAGE_SIZE = 200;
 
 const WELDER_ID_ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
@@ -38,14 +37,6 @@ export function normalizeWelderString(value: unknown): string | undefined {
   }
 
   return normalized;
-}
-
-export function normalizeWelderScore(value: unknown): number {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) {
-    return DEFAULT_SCORE;
-  }
-  return Math.max(0, Math.min(DEFAULT_SCORE, Math.round(parsed)));
 }
 
 export function normalizeWelderDate(value: unknown): Date | null | undefined {
@@ -124,7 +115,6 @@ export function buildWelderCreateDataCore(input: Record<string, unknown>) {
     id: createWelderId(),
     isDeleted: false,
     name,
-    score: normalizeWelderScore(input.score),
     team,
     welderCode: normalizeWelderString(input.welderCode) ?? null,
   };
@@ -158,9 +148,6 @@ export function buildWelderUpdateDataCore(input: Record<string, unknown>) {
   if (input.certificationNo !== undefined) {
     updateData.certificationNo =
       normalizeWelderString(input.certificationNo) ?? null;
-  }
-  if (input.score !== undefined) {
-    updateData.score = normalizeWelderScore(input.score);
   }
 
   return updateData;

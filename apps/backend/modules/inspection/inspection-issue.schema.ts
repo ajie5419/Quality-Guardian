@@ -105,6 +105,7 @@ const issueFields = {
   ),
   responsibleDepartmentId: requiredText,
   responsibleWelder: shortText.optional(),
+  responsibleWelderId: shortText.optional(),
   rootCause: requiredLongText,
   severity: z.enum(['Critical', 'Major', 'Minor']),
   solution: requiredLongText,

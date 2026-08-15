@@ -253,6 +253,55 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     );
   });
 
+  it('counts only CLOSED tasks as completed in inspector status', async () => {
+    const unclosed = makeRequest({
+      id: 'r1',
+      inspectorId: 'inspector-1',
+      inspector: {
+        id: 'inspector-1',
+        realName: '张三',
+        username: 'zhangsan',
+      },
+      status: 'DISPATCHED',
+      inspectionResult: 'PASS',
+    });
+    const closed = makeRequest({
+      id: 'r2',
+      inspectorId: 'inspector-1',
+      inspector: {
+        id: 'inspector-1',
+        realName: '张三',
+        username: 'zhangsan',
+      },
+      closedAt: new Date('2026-06-01T12:00:00+08:00'),
+      status: 'CLOSED',
+      inspectionResult: 'PASS',
+    });
+    // periodRequests gets both rows; activeInspectorRequests (status-filtered
+    // query) only gets the dispatched one.
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([unclosed, closed] as never)
+      .mockResolvedValueOnce([unclosed] as never);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.users.findMany).mockResolvedValue([]);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    const row = result.inspectorStatus.find(
+      (item) => item.inspectorId === 'inspector-1',
+    );
+    // The unclosed PASS request must not count as completed even though it
+    // carries a result, keeping the status card consistent with the ranking.
+    expect(row).toMatchObject({
+      activeTaskCount: 1,
+      completedTaskCount: 1,
+      inspectorId: 'inspector-1',
+    });
+  });
+
   it('calculates reinspection rate by team for non-incoming only', async () => {
     const requests = [
       makeRequest({
@@ -314,6 +363,51 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       reinspectionRate: 50,
       supplierId: 'supplier-y',
       team: '供应商Y',
+    });
+  });
+
+  it('does not count in-flight FAIL requests in reinspection stats', async () => {
+    const requests = [
+      makeRequest({
+        id: 'r1',
+        processName: '过程检验',
+        status: 'INSPECTING',
+        team: '班组A',
+        inspectionResult: 'FAIL',
+        linkedIssueId: 'issue-1',
+      }),
+      makeRequest({
+        id: 'r2',
+        processName: '过程检验',
+        status: 'CLOSED',
+        team: '班组A',
+        inspectionResult: 'PASS',
+      }),
+      makeRequest({
+        id: 'r3',
+        processName: '过程检验',
+        status: 'DISPATCHED',
+        team: '班组A',
+        inspectionResult: 'PASS',
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    // Only the closed request counts as inspected; the in-flight FAIL and
+    // the dispatched-but-unclosed PASS requests stay out of both numerator
+    // and denominator.
+    expect(result.reinspectionRateByTeam).toHaveLength(1);
+    expect(result.reinspectionRateByTeam[0]).toMatchObject({
+      inspectedCount: 1,
+      reinspectionCount: 0,
+      reinspectionRate: 0,
+      submittedCount: 3,
+      team: '班组A',
     });
   });
 

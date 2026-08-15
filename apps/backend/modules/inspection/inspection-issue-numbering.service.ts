@@ -1,4 +1,5 @@
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
+import { WelderScoreRefreshService } from '~/modules/welder';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
@@ -26,25 +27,23 @@ export const InspectionIssueNumberingService = {
         [{ source: 'INTERNAL', sourcePk: id }],
         'inspection-issue.deleted',
       );
+      await WelderScoreRefreshService.enqueueFullRefresh(
+        tx,
+        'inspection-issue.deleted',
+      );
       return result;
     });
     if (result.count === 0) {
       throw new BusinessError('NOT_FOUND', '记录不存在', 404);
     }
-    const [
-      { FileStorageService },
-      { SystemLogService },
-      { WelderScoreService },
-    ] = await Promise.all([
+    const [{ FileStorageService }, { SystemLogService }] = await Promise.all([
       import('~/modules/file-storage'),
       import('~/modules/system-log'),
-      import('~/modules/welder'),
     ]);
     await FileStorageService.softDeleteReferences({
       bizId: id,
       bizType: 'inspection_issue',
     });
-    await WelderScoreService.syncFromInspectionIssues();
 
     // Record audit log
     await SystemLogService.auditLog('inspection', 'issueDelete', {

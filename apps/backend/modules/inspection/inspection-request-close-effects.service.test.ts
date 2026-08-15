@@ -28,8 +28,9 @@ vi.mock('~/modules/system-log', () => ({
 }));
 
 vi.mock('~/modules/welder', () => ({
-  WelderScoreService: {
-    syncFromInspectionIssues: vi.fn(),
+  WelderScoreRefreshService: {
+    enqueueForResponsibleText: vi.fn(),
+    enqueueFullRefresh: vi.fn(),
   },
 }));
 
@@ -140,7 +141,7 @@ describe('syncCloseIssueEffects', () => {
 
   it('should create audit log when issue is provided', async () => {
     const { SystemLogService } = await import('~/modules/system-log');
-    const { WelderScoreService } = await import('~/modules/welder');
+    const { WelderScoreRefreshService } = await import('~/modules/welder');
 
     await syncCloseIssueEffects({
       closedLinkedIssueCount: 0,
@@ -155,12 +156,12 @@ describe('syncCloseIssueEffects', () => {
     });
 
     expect(SystemLogService.auditLog).toHaveBeenCalled();
-    expect(WelderScoreService.syncFromInspectionIssues).toHaveBeenCalled();
+    expect(WelderScoreRefreshService.enqueueFullRefresh).toHaveBeenCalled();
   });
 
   it('should return early when no issue and closedLinkedIssueCount is 0', async () => {
     const { SystemLogService } = await import('~/modules/system-log');
-    const { WelderScoreService } = await import('~/modules/welder');
+    const { WelderScoreRefreshService } = await import('~/modules/welder');
 
     await syncCloseIssueEffects({
       closedLinkedIssueCount: 0,
@@ -170,6 +171,6 @@ describe('syncCloseIssueEffects', () => {
     });
 
     expect(SystemLogService.auditLog).not.toHaveBeenCalled();
-    expect(WelderScoreService.syncFromInspectionIssues).not.toHaveBeenCalled();
+    expect(WelderScoreRefreshService.enqueueFullRefresh).not.toHaveBeenCalled();
   });
 });

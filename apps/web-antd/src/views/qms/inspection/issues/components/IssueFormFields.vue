@@ -94,6 +94,7 @@ type IssueFormValues = Partial<{
   responsibilityType: InspectionIssueResponsibilityType;
   responsibleDepartmentId: string;
   responsibleWelder: string;
+  responsibleWelderId: string;
   rootCause: string;
   solution: string;
   supplierId: string;
@@ -101,7 +102,12 @@ type IssueFormValues = Partial<{
   workOrderNumber: string;
 }>;
 const formValues = ref<IssueFormValues>({});
-type WelderOption = { label: string; searchText: string; value: string };
+type WelderOption = {
+  label: string;
+  name: string;
+  searchText: string;
+  value: string;
+};
 const welderOptions = ref<WelderOption[]>([]);
 const welderLoading = ref(false);
 const {
@@ -487,6 +493,22 @@ onMounted(async () => {
             ),
         },
       },
+      {
+        fieldName: 'responsibleWelderId',
+        dependencies: {
+          triggerFields: [
+            'processName',
+            'defectCategoryId',
+            'defectSubcategoryId',
+          ],
+          show: (values: Record<string, unknown>) =>
+            isWeldingProcessName(values.processName) ||
+            isWeldingDefectSubcategory(
+              values.defectSubcategoryId,
+              classificationOptions.value,
+            ),
+        },
+      },
     ]);
   } catch (error) {
     handleApiError(error, 'Load Inspection Issue Classifications');
@@ -511,8 +533,9 @@ onMounted(async () => {
         }
         return {
           label: code ? `${name}（${code}）` : name,
+          name,
           searchText: `${name} ${code}`.trim().toLowerCase(),
-          value: code || name,
+          value: item.id,
         };
       })
       .filter(Boolean) as WelderOption[];
@@ -520,6 +543,31 @@ onMounted(async () => {
     welderLoading.value = false;
   }
 });
+
+function handleResponsibleWelderChange(value: unknown) {
+  const welderId = String(value || '').trim();
+  const option = welderOptions.value.find((item) => item.value === welderId);
+  formApi.setValues({
+    responsibleWelder: option?.name || '',
+    responsibleWelderId: welderId || '',
+  });
+}
+
+// Edit backfill: the persisted responsibleWelder is a legacy name snapshot.
+// Map it to the canonical option id (select value) without overwriting the
+// name text; unknown names stay as text and are resolved server-side.
+watch(
+  () => formValues.value.responsibleWelder,
+  (value) => {
+    const current = String(value || '').trim();
+    if (!current || welderOptions.value.length === 0) return;
+    if (welderOptions.value.some((item) => item.value === current)) return;
+    const byName = welderOptions.value.find((item) => item.name === current);
+    if (byName) {
+      formApi.setFieldValue('responsibleWelderId', byName.value);
+    }
+  },
+);
 
 function handleWorkOrderChange(
   val: unknown,
@@ -588,13 +636,18 @@ defineExpose({
         />
       </template>
 
-      <template #responsibleWelder="slotProps">
+      <template #responsibleWelder>
+        <div class="hidden"></div>
+      </template>
+
+      <template #responsibleWelderId="slotProps">
         <Select
           v-bind="slotProps"
           :loading="welderLoading"
           :options="welderOptions"
           allow-clear
           show-search
+          @change="handleResponsibleWelderChange"
           :filter-option="
             (input, option) =>
               String(option?.searchText || '')

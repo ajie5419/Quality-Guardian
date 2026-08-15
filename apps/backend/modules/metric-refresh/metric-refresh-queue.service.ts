@@ -57,6 +57,168 @@ function errorMessage(error: unknown) {
 }
 
 export const MetricRefreshQueue = {
+  async enqueueWelderScores(
+    client: MetricRefreshClient,
+    welderIds: Array<null | string | undefined>,
+    reason: string,
+  ) {
+    const entityIds = uniqueIds(welderIds);
+    if (entityIds.length === 0) return { enqueued: 0 };
+
+    const result = await client.metric_refresh_jobs.createMany({
+      data: entityIds.map((entityId) => ({
+        entityId,
+        metricType: metric_refresh_type.WELDER_SCORE,
+        reason,
+      })),
+    });
+    return { enqueued: result.count };
+  },
+
+  async claimWelderScoreJobs(
+    options: ClaimOptions,
+  ): Promise<ClaimedMetricRefreshJob[]> {
+    const now = options.now ?? new Date();
+    const leaseUntil = new Date(
+      now.getTime() + (options.leaseMs ?? DEFAULT_LEASE_MS),
+    );
+    const candidateWhere: Prisma.metric_refresh_jobsWhereInput = {
+      isDeleted: false,
+      metricType: metric_refresh_type.WELDER_SCORE,
+      OR: [
+        {
+          availableAt: { lte: now },
+          status: {
+            in: [metric_refresh_status.PENDING, metric_refresh_status.FAILED],
+          },
+        },
+        {
+          leaseUntil: { lte: now },
+          status: metric_refresh_status.PROCESSING,
+        },
+      ],
+    };
+    const candidates = await prisma.metric_refresh_jobs.findMany({
+      distinct: ['entityId'],
+      where: candidateWhere,
+      orderBy: [{ availableAt: 'asc' }, { createdAt: 'asc' }, { id: 'asc' }],
+      take: options.limit ?? DEFAULT_BATCH_SIZE,
+      select: {
+        attempts: true,
+        entityId: true,
+      },
+    });
+
+    const claimed: ClaimedMetricRefreshJob[] = [];
+    for (const candidate of candidates) {
+      // A metric job is a durable change signal. Claim every available signal
+      // for the same welder so one score refresh absorbs all prior writes.
+      const result = await prisma.metric_refresh_jobs.updateMany({
+        where: {
+          ...candidateWhere,
+          entityId: candidate.entityId,
+        },
+        data: {
+          attempts: { increment: 1 },
+          leaseOwner: options.workerId,
+          leaseUntil,
+          status: metric_refresh_status.PROCESSING,
+        },
+      });
+      if (result.count > 0) {
+        claimed.push({
+          attempts: candidate.attempts + 1,
+          entityId: candidate.entityId,
+          jobCount: result.count,
+        });
+      }
+    }
+    return claimed;
+  },
+
+  async completeWelderScoreJobs(entityIds: string[], workerId: string) {
+    const ids = uniqueIds(entityIds);
+    if (ids.length === 0) return { completed: 0 };
+    const result = await prisma.metric_refresh_jobs.updateMany({
+      where: {
+        entityId: { in: ids },
+        isDeleted: false,
+        metricType: metric_refresh_type.WELDER_SCORE,
+        leaseOwner: workerId,
+        status: metric_refresh_status.PROCESSING,
+      },
+      data: {
+        completedAt: new Date(),
+        lastError: null,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: metric_refresh_status.COMPLETED,
+      },
+    });
+    return { completed: result.count };
+  },
+
+  async failWelderScoreJobs(
+    jobs: ClaimedMetricRefreshJob[],
+    workerId: string,
+    error: unknown,
+    now = new Date(),
+  ) {
+    let failed = 0;
+    for (const job of jobs) {
+      const result = await prisma.metric_refresh_jobs.updateMany({
+        where: {
+          entityId: job.entityId,
+          isDeleted: false,
+          metricType: metric_refresh_type.WELDER_SCORE,
+          leaseOwner: workerId,
+          status: metric_refresh_status.PROCESSING,
+        },
+        data: {
+          availableAt: new Date(now.getTime() + retryDelay(job.attempts)),
+          lastError: errorMessage(error),
+          leaseOwner: null,
+          leaseUntil: null,
+          status: metric_refresh_status.FAILED,
+        },
+      });
+      failed += result.count;
+    }
+    return { failed };
+  },
+
+  async countOutstandingWelderScoreJobs() {
+    return prisma.metric_refresh_jobs.count({
+      where: {
+        isDeleted: false,
+        metricType: metric_refresh_type.WELDER_SCORE,
+        status: { not: metric_refresh_status.COMPLETED },
+      },
+    });
+  },
+
+  /**
+   * Release maintenance runs while application writes are stopped, so every
+   * outstanding lease can be reclaimed immediately instead of waiting for a
+   * crashed process lease or retry backoff to expire.
+   */
+  async resetOutstandingWelderScoreJobsForMaintenance(now = new Date()) {
+    const result = await prisma.metric_refresh_jobs.updateMany({
+      where: {
+        isDeleted: false,
+        metricType: metric_refresh_type.WELDER_SCORE,
+        status: { not: metric_refresh_status.COMPLETED },
+      },
+      data: {
+        availableAt: now,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: metric_refresh_status.PENDING,
+      },
+    });
+    return { reset: result.count };
+  },
+
   async enqueueSupplierScores(
     client: MetricRefreshClient,
     supplierIds: Array<null | string | undefined>,

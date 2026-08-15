@@ -25,6 +25,151 @@
 
 ## 执行记录
 
+### 2026-08-14 派工候选检验员接口权限收紧（P1）
+
+**执行内容：**
+- 报检派工候选此前经通用用户列表接口 `/api/system/user/list?roleName=QC` 拉取，任意登录用户可枚举全量用户列表
+- 新增专用端点 `GET /api/qms/inspection/requests/inspectors`：要求持有 `QMS:Inspection:Requests:Dispatch` 权限，仅返回 active QC 最小字段（id/realName/username）
+- 桌面端 `useInspectionRequestInspectorOptions` 与移动端 `Dispatch.vue` 改调新端点
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2666/2666` 用例 PASS（dispatch adversarial 11/12/13 覆盖权限拒绝/放行/空权限）
+- Web Vitest：`65/65` 文件、`343/343` 用例 PASS（composable 测试改 mock 新端点）
+- `pnpm lint`、`check:type`（3/3）PASS
+
+**commit:** `86f38347` fix(project): gate inspector candidate listing behind dispatch permission
+
+**遗留问题：**
+- 移动端与监督模块其他 `getAllUsers` 调用（supervision 拉全量用户）不在本次范围，如需同样收紧可后续 wave 处理
+
+---
+
+### 2026-08-14 不合格项责任部门失效引用回填
+
+**执行内容：**
+- 调查：不合格项图表按责任部门统计大量显示"主数据已失效"——117 条记录的 `responsibleDepartmentId` 指向 14 个已被软删的占位部门行（cuid），占位行的 name 即真实部门的旧格式 ID（`dept-<timestamp>`），active 部门主数据以该 ID 存在
+- 映射：12/14 个占位部门可确定性映射到 active 部门（生产 OBU/采购部/结构 BU1/机加 BU/模具 BU/制造 SOBU/车辆 SOBU/模具 SOBU/机械所/技术部/组装 BU/结构 BU2-测试），2 个（秦皇岛弘旺/祥腾）无 active 匹配
+- 回填脚本 `remediate-quality-record-responsible-departments.ts`：dry-run 默认，`--apply` 落库；可映射记录回填 id+名称快照，不可映射写入 `unresolved_master_data_refs` 审计
+
+**验证结果：**
+- 本地测试库：117 条处理，115 回填、2 条审计（0 跳过）；图表统计复跑——失效桶从 117 条降为 2 条，生产 OBU 59 / 采购部 43 / 结构 BU1 32 等正常解析
+- `pnpm lint`、backend `tsc --noEmit` PASS
+
+**commit:** `359dd602` feat(@qgs/backend): remediate quality record responsible department references
+
+**遗留问题：**
+- 2 条记录（秦皇岛弘旺/祥腾设备安装）保持失效并已入治理审计，需人工确认真实部门后处置
+- 生产库需按运维流程 dry-run 审核后 `--apply`
+- "结构 BU2-测试"命名含"测试"，回填到它之前建议业务确认该部门是否在用
+
+---
+
+### 2026-08-14 报检看板口径系统性修复（续）
+
+**执行内容：**
+- 全量审计看板统计口径：确认"申报系按提交时间、完成系按关闭时间"为业务语义（用户确认），修复唯一不一致点——检验员状态卡 `completedTaskCount` 此前只查 closedAt 不查 `status==='CLOSED'`，与检验员榜不一致，现统一为 CLOSED + closedAt 规则
+- 排查"PASS 未关单"26 条记录：`createdAt=submittedAt=updatedAt`、创建即带 `inspectionResult`、无关联检验记录——确认是导入的生产快照数据，非关单流程缺口；`inspectionResult` 唯一业务写入点在关单服务（写结果同时置 CLOSED），统计按"已关闭"口径正确
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2666/2666` 用例 PASS（含新增未关闭 PASS 不计入完成数回归测试）
+- `pnpm lint`、backend `tsc --noEmit` PASS
+
+**commit:** `c006e8d1` fix(@qgs/backend): align inspector status completed count with CLOSED rule
+
+**遗留问题：**
+- 导入快照中的"已检验未关闭"记录（全库约 114+ 条 DISPATCHED、98 条 SUBMITTED）如需在看板体现为完成，需单独数据治理（补关单），不改统计口径
+
+---
+
+### 2026-08-14 报检看板复检率口径修复
+
+**执行内容：**
+- 调查：班组/供应商复检率偏高的根因——旧判定把"未关闭的 FAIL 任务"同时计入复检分子分母，且漏掉"已检验未关闭的 PASS 任务"，分母系统性偏小（8 月本地数据：供应商 38%→23%、班组 35%→21%）
+- 修复：`inspection-request-stats.service.ts` 复检分母改为 `status === 'CLOSED'`，分子要求 CLOSED + 关联不合格项或 FAIL；未关闭任务不再干扰
+- 班组榜"过程 40 vs 班组合计 19"确认为字段口径差异（无 TEAM 走部门维度、外协走供应商维度），非计算 bug，暂不改
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2665/2665` 用例 PASS（含新增未关闭 FAIL 不计入回归测试）
+- `pnpm lint`、backend `tsc --noEmit` PASS
+- 本地库实测：修复后复检分母 = 已关闭数，未关闭 FAIL/已检验未关闭 PASS 均不再计入
+
+**commit:** `3246a806` fix(@qgs/backend): base reinspection stats on closed requests only
+
+**遗留问题：**
+- 8 月 26 条"PASS 但状态停在 SUBMITTED/DISPATCHED"的记录仍存在（关单流程缺口或数据问题），影响"完成数量"卡片口径，需业务侧确认
+
+---
+
+### 2026-08-14 焊工名称脏数据清理脚本
+
+**执行内容：**
+- 新增 `remediate-quality-record-responsible-welder-names.ts`：把 `quality_records.responsibleWelder` 中误存的 welderId/welderCode 恢复为焊工姓名（dry-run 默认，`--apply` 落库；已有冲突 responsibleWelderId 时仅修名称不覆盖 ID）
+
+**验证结果：**
+- 本地测试库：17 条修复（2 条按 id、15 条按 code），0 冲突，2 跳过；utf8mb4 核对名称正确、responsibleWelderId 关联正确
+- `pnpm lint`、backend `tsc --noEmit` PASS
+
+**commit:** `a2e53d75` feat(@qgs/backend): add welder name/id dirty-data remediation script
+
+**遗留问题：**
+- 生产库需按发布/运维流程执行 dry-run 审核后 `--apply`（见 commit 消息）
+
+---
+
+### 2026-08-14 焊工表单显示修复：名称文本与 canonical ID 分离
+
+**执行内容：**
+- 修复责任焊手表单把 welderId（如 `WEL-2026-XXXXXX`）覆盖到名称快照字段导致不合格项显示 ID 的问题：Select 改绑独立 `responsibleWelderId` 字段，`responsibleWelder` 保持隐藏文本字段存名称；编辑回填只映射 id 不重写名称
+- InspectionForm 的焊工 Select 同步改绑 `responsibleWelderId`
+- 补充 schema 契约回归测试（名称字段不是 Select、ID 字段是 Select）
+
+**验证结果：**
+- Web Vitest（--dom）：`65/65` 文件、`343/343` 用例 PASS
+- `pnpm lint`、`pnpm run check:type`（3/3 tasks）PASS
+
+**commit:** `55d24481` fix(@qgs/web-antd): keep welder name text separate from canonical id in issue forms
+
+**遗留问题：**
+- 已落库的 `responsibleWelder = welderId` 脏数据需人工核对清理（如有）
+
+---
+
+### 2026-08-14 焊工评分体系改造（Phase 0+1+2）
+
+**执行内容：**
+- Phase 0：`score` 纯派生，移除 shared/后端 schema/前端表单与导入的 score 写入（5 文件，删 56 行）
+- Phase 1a：`metric_refresh_type` 加 `WELDER_SCORE` migration + `MetricRefreshQueue` 6 个 welder 方法（enqueue/claim/complete/fail/count/reset）
+- Phase 1b：新增 `WelderScoreRefreshService`（增量 `refreshByWelderIds` + 全量 `refreshAll`）+ 5s 轮询 worker + nitro plugin；旧 `syncFromInspectionIssues` 删除
+- Phase 1c：inspection 5 处触发点（create/update/batchDelete/import/NC 删除 + 记录创建 + 报检关单）改事务内 enqueue；列表 GET 移除同步副作用；清理 2 条 B-M1 baseline 债务
+- Phase 1d：`enqueue-welder-score` / `drain-welder-score` 维护工具（独立运维，不接入 release maintenance）
+- Phase 2a：`quality_records.responsibleWelderId` migration + 写入解析落库（create/import/update 事务内解析）
+- Phase 2b：评分 join 优先 `responsibleWelderId`（文本兜底历史行）；`getWelderScoreStats` 支持 id/name 过滤；历史回填工具 dry-run/apply + unresolved 审计
+- Phase 2c：前端 issue 表单/检验记录焊工下拉 value 改为 canonical welder id（名称快照 + id 双写）；后端校验显式 id（fail-closed）
+- 相关文档：CHANGELOG 本条记录
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2664/2664` 用例 PASS
+- Web Vitest（--dom）：`65/65` 文件、`342/342` 用例 PASS
+- `pnpm lint`、`pnpm run check:type`（3/3 tasks）、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 均 PASS
+- migration 已在本地测试库应用（`20260814000000`、`20260814010000`）；`prisma generate` 已更新 client
+
+**commit:**
+- `609526db` refactor(project): make welder score a derived field, remove manual score writes
+- `591d1a3e` feat(@qgs/backend): add WELDER_SCORE metric refresh queue
+- `31b53a3a` feat(@qgs/backend): add welder score refresh service and async worker
+- `3690a946` refactor(@qgs/backend): enqueue welder score refresh instead of blocking sync
+- `3151c060` feat(@qgs/backend): add welder score enqueue/drain maintenance tools
+- `220b0d70` feat(@qgs/backend): persist canonical responsibleWelderId on issue writes
+- `9ee3775e` feat(@qgs/backend): score refresh joins by responsibleWelderId with backfill
+- `862cd673` feat(project): use canonical welder ids in issue forms
+- `419f4d45` fix(@qgs/backend): mock welder id resolution in issue mutation tests
+
+**遗留问题：**
+- 关单弹窗（CloseInspectionModal）、weapp 的 responsibleWelder 仍提交文本，由后端文本解析兜底落库，未传 ID（可后续 wave 收敛）
+- 历史数据回填需在真实库执行 `pnpm maintenance:welder-score:backfill-ids -- --apply` 与 `enqueue/drain`（本地测试库未执行生产数据）
+- migration 由 `prisma migrate diff` 生成（本仓库首个 migration 为增量补丁、历史无法从空库重放，标准 `migrate dev` shadow 机制不可用，已在 commit message 注明）
+- 未运行前端 dev/build/start、真实浏览器页面验收与生产发布
+
 ---
 
 ## [0.26.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.25.0...qgs-v0.26.0) (2026-08-14)

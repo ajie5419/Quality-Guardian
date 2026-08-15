@@ -368,4 +368,32 @@ describe('issue form fields responsibility contract', () => {
       ]),
     );
   });
+
+  it('keeps the welder name text separate from the canonical id select', () => {
+    mount(IssueFormFields, {
+      props: {
+        deptTreeData: [],
+        processOptions: [],
+        statusOptions: [],
+      },
+    });
+
+    const state = mockFormStates[mockFormStates.length - 1];
+    const welderNameField = state?.schema.find(
+      (field) => field.fieldName === 'responsibleWelder',
+    );
+    const welderIdField = state?.schema.find(
+      (field) => field.fieldName === 'responsibleWelderId',
+    );
+
+    // The name snapshot is a plain (hidden) text field, never a select whose
+    // value would leak the welder id into the display.
+    expect(welderNameField).toMatchObject({
+      component: 'Input',
+    });
+    expect(welderIdField).toMatchObject({
+      component: 'Select',
+      rules: 'selectRequired',
+    });
+  });
 });

@@ -11,7 +11,6 @@ import {
   DatePicker,
   Form,
   Input,
-  InputNumber,
   message,
   Modal,
   Select,
@@ -40,7 +39,6 @@ const formState = reactive({
   examDate: undefined as Dayjs | undefined,
   examPassed: false,
   name: '',
-  score: 12,
   team: '',
   teamId: '',
   welderCode: '',
@@ -57,7 +55,6 @@ function resetForm() {
   formState.examPassed = false;
   formState.employmentStatus = 'ON_DUTY';
   formState.certificationNo = '';
-  formState.score = 12;
 }
 
 function openCreateModal() {
@@ -80,7 +77,6 @@ function openEditModal(row: QmsWelderApi.WelderItem) {
   formState.examPassed = !!row.examPassed;
   formState.employmentStatus = row.employmentStatus || 'ON_DUTY';
   formState.certificationNo = row.certificationNo || '';
-  formState.score = row.score ?? 12;
   modalOpen.value = true;
 }
 
@@ -103,7 +99,6 @@ async function handleModalOk() {
         : null,
       examPassed: formState.examPassed,
       name: formState.name,
-      score: formState.score,
       team: formState.team,
       teamId: formState.teamId,
       welderCode: formState.welderCode || null,
@@ -200,14 +195,6 @@ defineExpose({
         name="certificationNo"
       >
         <Input v-model:value="formState.certificationNo" />
-      </Form.Item>
-      <Form.Item :label="t('qms.welder.score')" name="score">
-        <InputNumber
-          v-model:value="formState.score"
-          :min="0"
-          :max="12"
-          style="width: 100%"
-        />
       </Form.Item>
     </Form>
   </Modal>

@@ -12,7 +12,10 @@ vi.mock('~/modules/system-log', () => ({
   SystemLogService: { auditLog: vi.fn() },
 }));
 vi.mock('~/modules/welder', () => ({
-  WelderScoreService: { syncFromInspectionIssues: vi.fn() },
+  WelderScoreRefreshService: {
+    enqueueForResponsibleText: vi.fn(),
+    enqueueFullRefresh: vi.fn(),
+  },
 }));
 vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
 

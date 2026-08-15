@@ -6,7 +6,6 @@ const welderFields = {
   examDate: z.string().nullable().optional(),
   examPassed: z.boolean().optional(),
   name: z.string().trim().min(1),
-  score: z.number().min(0).max(12).optional(),
   team: z.string().trim().min(1),
   teamId: z.string().trim().min(1),
   welderCode: z.string().nullable().optional(),
