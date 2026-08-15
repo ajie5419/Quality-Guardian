@@ -233,4 +233,151 @@ describe('metric refresh queue', () => {
       },
     });
   });
+
+  it('appends unique welder jobs through the provided transaction client', async () => {
+    prismaMock.metric_refresh_jobs.createMany.mockResolvedValue({ count: 2 });
+
+    const result = await MetricRefreshQueue.enqueueWelderScores(
+      prismaMock,
+      ['welder-1', 'welder-1', '', 'welder-2'],
+      'issue.updated',
+    );
+
+    expect(result).toEqual({ enqueued: 2 });
+    expect(prismaMock.metric_refresh_jobs.createMany).toHaveBeenCalledWith({
+      data: [
+        {
+          entityId: 'welder-1',
+          metricType: 'WELDER_SCORE',
+          reason: 'issue.updated',
+        },
+        {
+          entityId: 'welder-2',
+          metricType: 'WELDER_SCORE',
+          reason: 'issue.updated',
+        },
+      ],
+    });
+  });
+
+  it('claims all available welder signals for one welder as a single refresh unit', async () => {
+    prismaMock.metric_refresh_jobs.findMany.mockResolvedValue([
+      {
+        attempts: 1,
+        entityId: 'welder-1',
+      },
+    ]);
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 5 });
+
+    const jobs = await MetricRefreshQueue.claimWelderScoreJobs({
+      workerId: 'worker-a',
+    });
+
+    expect(jobs).toEqual([{ attempts: 2, entityId: 'welder-1', jobCount: 5 }]);
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          entityId: 'welder-1',
+          metricType: 'WELDER_SCORE',
+        }),
+      }),
+    );
+  });
+
+  it('completes every leased welder signal for the refreshed welders', async () => {
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 4 });
+
+    const result = await MetricRefreshQueue.completeWelderScoreJobs(
+      ['welder-1', 'welder-1'],
+      'worker-a',
+    );
+
+    expect(result).toEqual({ completed: 4 });
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith({
+      where: {
+        entityId: { in: ['welder-1'] },
+        isDeleted: false,
+        leaseOwner: 'worker-a',
+        metricType: 'WELDER_SCORE',
+        status: 'PROCESSING',
+      },
+      data: {
+        completedAt: expect.any(Date),
+        lastError: null,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: 'COMPLETED',
+      },
+    });
+  });
+
+  it('counts outstanding welder score jobs', async () => {
+    prismaMock.metric_refresh_jobs.count.mockResolvedValue(2);
+
+    const result = await MetricRefreshQueue.countOutstandingWelderScoreJobs();
+
+    expect(result).toBe(2);
+    expect(prismaMock.metric_refresh_jobs.count).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        metricType: 'WELDER_SCORE',
+        status: { not: 'COMPLETED' },
+      },
+    });
+  });
+
+  it('reclaims every outstanding welder job during exclusive maintenance', async () => {
+    const now = new Date('2026-07-29T00:00:00.000Z');
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 3 });
+
+    const result =
+      await MetricRefreshQueue.resetOutstandingWelderScoreJobsForMaintenance(
+        now,
+      );
+
+    expect(result).toEqual({ reset: 3 });
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith({
+      where: {
+        isDeleted: false,
+        metricType: 'WELDER_SCORE',
+        status: { not: 'COMPLETED' },
+      },
+      data: {
+        availableAt: now,
+        leaseOwner: null,
+        leaseUntil: null,
+        status: 'PENDING',
+      },
+    });
+  });
+
+  it('returns failed welder jobs to the queue with a persisted retry time', async () => {
+    const now = new Date('2026-07-29T00:00:00.000Z');
+    prismaMock.metric_refresh_jobs.updateMany.mockResolvedValue({ count: 1 });
+
+    const result = await MetricRefreshQueue.failWelderScoreJobs(
+      [{ attempts: 2, entityId: 'welder-1', jobCount: 2 }],
+      'worker-a',
+      new Error('welder refresh failed'),
+      now,
+    );
+
+    expect(result).toEqual({ failed: 1 });
+    expect(prismaMock.metric_refresh_jobs.updateMany).toHaveBeenCalledWith({
+      where: {
+        entityId: 'welder-1',
+        isDeleted: false,
+        leaseOwner: 'worker-a',
+        metricType: 'WELDER_SCORE',
+        status: 'PROCESSING',
+      },
+      data: {
+        availableAt: new Date('2026-07-29T00:00:10.000Z'),
+        lastError: 'welder refresh failed',
+        leaseOwner: null,
+        leaseUntil: null,
+        status: 'FAILED',
+      },
+    });
+  });
 });

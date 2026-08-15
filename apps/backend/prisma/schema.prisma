@@ -2121,6 +2121,7 @@ enum supplier_identity_type {
 
 enum metric_refresh_type {
   SUPPLIER_SCORE
+  WELDER_SCORE
 }
 
 enum metric_refresh_status {
