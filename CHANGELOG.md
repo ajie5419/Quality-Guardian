@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-08-14 派工候选检验员接口权限收紧（P1）
+
+**执行内容：**
+- 报检派工候选此前经通用用户列表接口 `/api/system/user/list?roleName=QC` 拉取，任意登录用户可枚举全量用户列表
+- 新增专用端点 `GET /api/qms/inspection/requests/inspectors`：要求持有 `QMS:Inspection:Requests:Dispatch` 权限，仅返回 active QC 最小字段（id/realName/username）
+- 桌面端 `useInspectionRequestInspectorOptions` 与移动端 `Dispatch.vue` 改调新端点
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2666/2666` 用例 PASS（dispatch adversarial 11/12/13 覆盖权限拒绝/放行/空权限）
+- Web Vitest：`65/65` 文件、`343/343` 用例 PASS（composable 测试改 mock 新端点）
+- `pnpm lint`、`check:type`（3/3）PASS
+
+**commit:** `86f38347` fix(project): gate inspector candidate listing behind dispatch permission
+
+**遗留问题：**
+- 移动端与监督模块其他 `getAllUsers` 调用（supervision 拉全量用户）不在本次范围，如需同样收紧可后续 wave 处理
+
+---
+
 ### 2026-08-14 不合格项责任部门失效引用回填
 
 **执行内容：**
