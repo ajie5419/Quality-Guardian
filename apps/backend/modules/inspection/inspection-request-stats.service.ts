@@ -226,7 +226,14 @@ export const InspectionRequestStatsService = {
       );
     }
     for (const item of periodRequests) {
-      if (item.closedAt && item.closedAt >= start && item.closedAt < end) {
+      // Completed tasks follow the same CLOSED + closedAt-in-range rule as
+      // the inspector ranking so both surfaces stay consistent.
+      if (
+        item.closedAt &&
+        item.closedAt >= start &&
+        item.closedAt < end &&
+        item.status === 'CLOSED'
+      ) {
         const stat = getInspectorStatus(item);
         const taskMinutes = durationMinutes(
           item.dispatchedAt || item.submittedAt,

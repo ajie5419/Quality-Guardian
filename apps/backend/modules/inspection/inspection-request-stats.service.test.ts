@@ -253,6 +253,55 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     );
   });
 
+  it('counts only CLOSED tasks as completed in inspector status', async () => {
+    const unclosed = makeRequest({
+      id: 'r1',
+      inspectorId: 'inspector-1',
+      inspector: {
+        id: 'inspector-1',
+        realName: '张三',
+        username: 'zhangsan',
+      },
+      status: 'DISPATCHED',
+      inspectionResult: 'PASS',
+    });
+    const closed = makeRequest({
+      id: 'r2',
+      inspectorId: 'inspector-1',
+      inspector: {
+        id: 'inspector-1',
+        realName: '张三',
+        username: 'zhangsan',
+      },
+      closedAt: new Date('2026-06-01T12:00:00+08:00'),
+      status: 'CLOSED',
+      inspectionResult: 'PASS',
+    });
+    // periodRequests gets both rows; activeInspectorRequests (status-filtered
+    // query) only gets the dispatched one.
+    vi.mocked(prisma.qms_inspection_requests.findMany)
+      .mockResolvedValueOnce([unclosed, closed] as never)
+      .mockResolvedValueOnce([unclosed] as never);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.users.findMany).mockResolvedValue([]);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    const row = result.inspectorStatus.find(
+      (item) => item.inspectorId === 'inspector-1',
+    );
+    // The unclosed PASS request must not count as completed even though it
+    // carries a result, keeping the status card consistent with the ranking.
+    expect(row).toMatchObject({
+      activeTaskCount: 1,
+      completedTaskCount: 1,
+      inspectorId: 'inspector-1',
+    });
+  });
+
   it('calculates reinspection rate by team for non-incoming only', async () => {
     const requests = [
       makeRequest({
