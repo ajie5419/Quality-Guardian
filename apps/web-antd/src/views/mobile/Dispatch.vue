@@ -4,7 +4,6 @@ import type { InspectionRequest } from '@qgs/shared';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { QMS_ROLE_NAMES } from '@qgs/shared';
 import {
   Button,
   Descriptions,
@@ -20,9 +19,9 @@ import {
 
 import {
   dispatchInspectionRequest,
+  getInspectionInspectors,
   getInspectionRequest,
 } from '#/api/qms/inspection-request';
-import { getAllUsers } from '#/api/system/user';
 
 const route = useRoute();
 const router = useRouter();
@@ -44,15 +43,12 @@ const inspectorOptions = computed(() =>
 async function loadDetail() {
   loading.value = true;
   try {
-    const [detail, users] = await Promise.all([
+    const [detail, inspectorUsers] = await Promise.all([
       getInspectionRequest(requestId.value),
-      getAllUsers({
-        roleName: QMS_ROLE_NAMES.INSPECTOR,
-        status: 1,
-      }),
+      getInspectionInspectors(),
     ]);
     task.value = detail;
-    inspectors.value = users.map((user) => ({
+    inspectors.value = inspectorUsers.map((user) => ({
       id: user.id,
       label: user.realName || user.username,
     }));

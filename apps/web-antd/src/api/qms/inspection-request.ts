@@ -113,6 +113,18 @@ export async function getInspectionRequestStats() {
   );
 }
 
+export interface InspectionInspectorOption {
+  id: string;
+  realName: null | string;
+  username: string;
+}
+
+export async function getInspectionInspectors() {
+  return requestClient.get<InspectionInspectorOption[]>(
+    QMS_API.INSPECTION_INSPECTORS,
+  );
+}
+
 export async function getInspectionRequestStatsWithParams(params?: {
   endDate?: string;
   period?: 'halfYear' | 'month' | 'quarter' | 'year';
