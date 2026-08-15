@@ -7,6 +7,7 @@ import {
   resolveWelderSeverityDeduction,
 } from '@qgs/shared';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
 export const ALL_WELDERS_SENTINEL = '__ALL__';
@@ -214,6 +215,30 @@ export const WelderScoreRefreshService = {
         welderCandidates: welders,
       }) ?? null
     );
+  },
+
+  /**
+   * Resolve the responsible welder for a write. An explicit canonical id is
+   * validated against the welder table (fail-closed on missing/soft-deleted);
+   * otherwise the legacy text is resolved by unique match.
+   */
+  async resolveResponsibleWelderIdForWrite(
+    tx: Prisma.TransactionClient,
+    explicitId: unknown,
+    text: unknown,
+  ): Promise<null | string> {
+    const id = String(explicitId || '').trim();
+    if (id) {
+      const welder = await tx.welders.findUnique({
+        where: { id },
+        select: { id: true, isDeleted: true },
+      });
+      if (!welder || welder.isDeleted) {
+        throw new BusinessError('VALIDATION', '责任焊工无效', 400);
+      }
+      return id;
+    }
+    return this.resolveResponsibleWelderId(tx, text);
   },
 
   async enqueueFullRefresh(client: MetricRefreshClient, reason: string) {

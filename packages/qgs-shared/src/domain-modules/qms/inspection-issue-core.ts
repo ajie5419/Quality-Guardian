@@ -247,6 +247,9 @@ export function buildInspectionIssueCreateDataCore(
     responsibleWelder:
       normalizeOptionalInspectionIssueString(input.body.responsibleWelder) ??
       null,
+    responsibleWelderId:
+      normalizeOptionalInspectionIssueString(input.body.responsibleWelderId) ??
+      null,
     supplierName: supplierName ?? null,
     supplierId: supplierId ?? null,
     category:
@@ -284,6 +287,7 @@ export function buildInspectionIssueUpdateDataCore(
     'description',
     'responsibleDepartment',
     'responsibleWelder',
+    'responsibleWelderId',
     'supplierName',
     'supplierId',
     'rootCause',
@@ -339,6 +343,7 @@ export interface InspectionIssueUpsertPayloadItem {
   quantity?: unknown;
   responsibleDepartment?: unknown;
   responsibleWelder?: unknown;
+  responsibleWelderId?: unknown;
   status?: unknown;
   workOrderNumber?: unknown;
 }
@@ -372,6 +377,8 @@ export function buildInspectionIssueUpsertPayloadCore(
       '质量部',
     responsibleWelder:
       normalizeOptionalInspectionIssueString(item.responsibleWelder) ?? null,
+    responsibleWelderId:
+      normalizeOptionalInspectionIssueString(item.responsibleWelderId) ?? null,
     nonConformanceNumber: options.nonConformanceNumber,
     workOrderNumber:
       normalizeOptionalInspectionIssueString(item.workOrderNumber) ?? null,

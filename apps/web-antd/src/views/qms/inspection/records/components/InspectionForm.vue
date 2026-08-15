@@ -71,6 +71,7 @@ interface LinkedIssueDraft {
   reportDate: string;
   reportedBy: string;
   responsibleWelder: string;
+  responsibleWelderId: string;
   rootCause: string;
   solution: string;
   status: string;
@@ -113,6 +114,7 @@ const linkedIssueDraft = ref<LinkedIssueDraft>({
   reportDate: dayjs().format('YYYY-MM-DD'),
   reportedBy: '',
   responsibleWelder: '',
+  responsibleWelderId: '',
   rootCause: '',
   solution: '',
   status: 'OPEN',
@@ -159,7 +161,9 @@ const linkedIssueSupplierCategory = computed(() =>
 
 // Local reactive state for form values to ensure filtering logic is reactive
 const activeValues = ref<Record<string, unknown>>({});
-const welderOptions = ref<Array<{ label: string; value: string }>>([]);
+const welderOptions = ref<
+  Array<{ label: string; name: string; value: string }>
+>([]);
 const welderLoading = ref(false);
 const {
   options: processOptions,
@@ -199,15 +203,23 @@ async function loadWelderOptions() {
         const code = String(item.welderCode || '').trim();
         return {
           label: code ? `${name}（${code}）` : name,
-          value: name,
+          name,
+          value: item.id,
         };
       })
-      .filter(Boolean) as Array<{ label: string; value: string }>;
+      .filter(Boolean) as Array<{ label: string; name: string; value: string }>;
   } catch (error) {
     handleApiError(error, 'Load Welder Options');
   } finally {
     welderLoading.value = false;
   }
+}
+
+function handleWelderChange(value: unknown) {
+  const welderId = String(value || '').trim();
+  const option = welderOptions.value.find((item) => item.value === welderId);
+  linkedIssueDraft.value.responsibleWelder = option?.name || '';
+  linkedIssueDraft.value.responsibleWelderId = welderId;
 }
 
 async function loadInspectionProcessOptions() {
@@ -281,6 +293,7 @@ watch(
     linkedIssueDraft.value.processName = deriveIssueProcessName(values);
     if (!linkedIssueDraft.value.processName.includes('焊')) {
       linkedIssueDraft.value.responsibleWelder = '';
+      linkedIssueDraft.value.responsibleWelderId = '';
     }
     const totalQuantity = Math.max(1, Number(values.quantity) || 1);
     const defaultUnqualified =
@@ -443,6 +456,7 @@ watch(
       reportDate: String(activeValues.value.inspectionDate || '').slice(0, 10),
       reportedBy: String(activeValues.value.inspector || ''),
       responsibleWelder: '',
+      responsibleWelderId: '',
       rootCause: '',
       solution: '',
       status: 'OPEN',
@@ -710,6 +724,7 @@ defineExpose({
           show-search
           class="w-full"
           placeholder="请选择责任焊工"
+          @change="handleWelderChange"
         />
       </div>
       <div v-if="isLinkedIssueExternalResponsibility">

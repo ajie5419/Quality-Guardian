@@ -169,8 +169,9 @@ export const InspectionIssueMutationService = {
         tx,
       );
       const responsibleWelderId =
-        await WelderScoreRefreshService.resolveResponsibleWelderId(
+        await WelderScoreRefreshService.resolveResponsibleWelderIdForWrite(
           tx,
+          canonicalBody.responsibleWelderId ?? current.responsibleWelderId,
           canonicalBody.responsibleWelder ?? current.responsibleWelder,
         );
       const updated = await tx.quality_records.update({
@@ -331,8 +332,9 @@ export const InspectionIssueMutationService = {
               ? await reserveInspectionIssueNcNumber(tx)
               : null;
             const responsibleWelderId =
-              await WelderScoreRefreshService.resolveResponsibleWelderId(
+              await WelderScoreRefreshService.resolveResponsibleWelderIdForWrite(
                 tx,
+                payload.responsibleWelderId,
                 payload.responsibleWelder,
               );
             const saved = await tx.quality_records.create({

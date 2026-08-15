@@ -69,8 +69,9 @@ export const InspectionIssueCreateService = {
     );
     await assertWelderForWeldingDefect(body, options.tx);
     const responsibleWelderId =
-      await WelderScoreRefreshService.resolveResponsibleWelderId(
+      await WelderScoreRefreshService.resolveResponsibleWelderIdForWrite(
         options.tx,
+        body.responsibleWelderId,
         body.responsibleWelder,
       );
     const record = await options.tx.quality_records.create({
