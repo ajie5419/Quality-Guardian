@@ -25,6 +25,22 @@
 
 ## 执行记录
 
+### 2026-08-14 焊工名称脏数据清理脚本
+
+**执行内容：**
+- 新增 `remediate-quality-record-responsible-welder-names.ts`：把 `quality_records.responsibleWelder` 中误存的 welderId/welderCode 恢复为焊工姓名（dry-run 默认，`--apply` 落库；已有冲突 responsibleWelderId 时仅修名称不覆盖 ID）
+
+**验证结果：**
+- 本地测试库：17 条修复（2 条按 id、15 条按 code），0 冲突，2 跳过；utf8mb4 核对名称正确、responsibleWelderId 关联正确
+- `pnpm lint`、backend `tsc --noEmit` PASS
+
+**commit:** `a2e53d75` feat(@qgs/backend): add welder name/id dirty-data remediation script
+
+**遗留问题：**
+- 生产库需按发布/运维流程执行 dry-run 审核后 `--apply`（见 commit 消息）
+
+---
+
 ### 2026-08-14 焊工表单显示修复：名称文本与 canonical ID 分离
 
 **执行内容：**
