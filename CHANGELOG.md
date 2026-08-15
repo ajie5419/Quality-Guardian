@@ -25,6 +25,23 @@
 
 ## 执行记录
 
+### 2026-08-14 报检看板口径系统性修复（续）
+
+**执行内容：**
+- 全量审计看板统计口径：确认"申报系按提交时间、完成系按关闭时间"为业务语义（用户确认），修复唯一不一致点——检验员状态卡 `completedTaskCount` 此前只查 closedAt 不查 `status==='CLOSED'`，与检验员榜不一致，现统一为 CLOSED + closedAt 规则
+- 排查"PASS 未关单"26 条记录：`createdAt=submittedAt=updatedAt`、创建即带 `inspectionResult`、无关联检验记录——确认是导入的生产快照数据，非关单流程缺口；`inspectionResult` 唯一业务写入点在关单服务（写结果同时置 CLOSED），统计按"已关闭"口径正确
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2666/2666` 用例 PASS（含新增未关闭 PASS 不计入完成数回归测试）
+- `pnpm lint`、backend `tsc --noEmit` PASS
+
+**commit:** `c006e8d1` fix(@qgs/backend): align inspector status completed count with CLOSED rule
+
+**遗留问题：**
+- 导入快照中的"已检验未关闭"记录（全库约 114+ 条 DISPATCHED、98 条 SUBMITTED）如需在看板体现为完成，需单独数据治理（补关单），不改统计口径
+
+---
+
 ### 2026-08-14 报检看板复检率口径修复
 
 **执行内容：**
