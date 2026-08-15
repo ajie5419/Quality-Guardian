@@ -400,10 +400,26 @@ export const InspectionReportingService = {
     });
   },
 
-  async getWelderScoreStats() {
+  async getWelderScoreStats(welderNames?: string[]) {
+    const names =
+      welderNames && welderNames.length > 0
+        ? [
+            ...new Set(
+              welderNames
+                .map((name) => String(name || '').trim())
+                .filter(Boolean),
+            ),
+          ]
+        : undefined;
+    if (names && names.length === 0) {
+      return [];
+    }
     return prisma.quality_records.groupBy({
       by: ['responsibleWelder', 'severity'],
-      where: { isDeleted: false, responsibleWelder: { not: null } },
+      where: {
+        isDeleted: false,
+        responsibleWelder: { not: null, ...(names ? { in: names } : {}) },
+      },
       _count: { id: true },
     });
   },
