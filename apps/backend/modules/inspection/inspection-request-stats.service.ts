@@ -1,12 +1,13 @@
-import type { ReinspectionCounts } from './inspection-request-stats-identity';
-
 import { DeptService } from '~/modules/dept';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { TeamIdentityService } from '~/modules/team';
 import prisma from '~/utils/prisma';
 
 import {
-  addInspectionRequestStatsDays as addDays,
+  createInspectionRequestStatsAccumulator,
+  isInspectorUser,
+} from './inspection-request-stats-accumulator';
+import {
   inspectionRequestDurationMinutes as durationMinutes,
   formatInspectionRequestStatsDate as formatShanghaiDate,
   resolveInspectionRequestStatsRange as resolveStatsRange,
@@ -25,12 +26,6 @@ import {
   UNRESOLVED_TEAM_NAME,
 } from './inspection-request-stats-identity';
 import { buildInspectionRequestDepartmentStats } from './inspection-request-stats-responsibility';
-
-const INSPECTION_EXECUTION_CODES = new Set(['QMS:Inspection:Requests:Close']);
-
-function hasInspectionExecutionCode(codes: string[]) {
-  return codes.some((code) => INSPECTION_EXECUTION_CODES.has(code));
-}
 
 export const InspectionRequestStatsService = {
   async getRequestStats(query: {
@@ -173,23 +168,6 @@ export const InspectionRequestStatsService = {
       status: 'IDLE' as const,
       totalTaskMinutes: 0,
     });
-    const collectRolePermissionCodes = (role?: {
-      rbac_role_permissions?: Array<{
-        permission?: null | { code?: null | string };
-      }>;
-    }) =>
-      role
-        ? (role.rbac_role_permissions || [])
-            .map((item) => item.permission?.code || '')
-            .filter(Boolean)
-        : [];
-    const isInspectorUser = (user: (typeof activeUsers)[number]) =>
-      [
-        user.roles,
-        ...user.rbac_user_roles.map((link) => link.role).filter(Boolean),
-      ].some((role) =>
-        hasInspectionExecutionCode(collectRolePermissionCodes(role)),
-      );
     for (const user of activeUsers.filter((item) => isInspectorUser(item)))
       inspectorStatusMap.set(
         user.id,
@@ -257,48 +235,27 @@ export const InspectionRequestStatsService = {
         }
         return a.status === 'BUSY' ? -1 : 1;
       });
-    const teamMap = new Map<string, number>();
-    const departmentMap = new Map<string, number>();
-    const supplierMap = new Map<string, number>();
-    const inspectorMap = new Map<string, number>();
-    const historyTeamMap = new Map<string, number>();
-    const historyDepartmentMap = new Map<string, number>();
-    const teamReinspectionMap = new Map<string, ReinspectionCounts>();
-    const departmentReinspectionMap = new Map<string, ReinspectionCounts>();
-    const supplierReinspectionMap = new Map<string, ReinspectionCounts>();
-    const historyInspectorMap = new Map<
-      string,
-      {
-        averageTaskMinutes: number;
-        completedTaskCount: number;
-        totalTaskMinutes: number;
-      }
-    >();
-    const dailyTrendMap = new Map<
-      string,
-      { closedCount: number; date: string; submittedCount: number }
-    >();
-    let todayClosedCount = 0;
-    let todaySubmittedCount = 0;
-    let todaySubmittedIncomingCount = 0;
-    let todaySubmittedProcessCount = 0;
-    let todayClosedIncomingCount = 0;
-    let todayClosedProcessCount = 0;
-    for (
-      let cursor = new Date(start);
-      cursor < end;
-      cursor = addDays(cursor, 1)
-    ) {
-      const date = formatShanghaiDate(cursor);
-      dailyTrendMap.set(date, { closedCount: 0, date, submittedCount: 0 });
-    }
+    const {
+      counters,
+      dailyTrendMap,
+      departmentMap,
+      departmentReinspectionMap,
+      historyDepartmentMap,
+      historyInspectorMap,
+      historyTeamMap,
+      inspectorMap,
+      supplierMap,
+      supplierReinspectionMap,
+      teamMap,
+      teamReinspectionMap,
+    } = createInspectionRequestStatsAccumulator(start, end);
     for (const item of periodRequests) {
       if (
         item.submittedAt >= start &&
         item.submittedAt < end &&
         item.status !== 'CANCELLED'
       ) {
-        todaySubmittedCount += 1;
+        counters.todaySubmittedCount += 1;
         const date = formatShanghaiDate(item.submittedAt);
         const daily = dailyTrendMap.get(date);
         if (daily) daily.submittedCount += 1;
@@ -309,9 +266,9 @@ export const InspectionRequestStatsService = {
         const usesSupplierIdentity = isExternalResponsibility || isIncoming;
         const isInternalProcess = !isIncoming && !isExternalResponsibility;
         if (isIncoming) {
-          todaySubmittedIncomingCount += 1;
+          counters.todaySubmittedIncomingCount += 1;
         } else {
-          todaySubmittedProcessCount += 1;
+          counters.todaySubmittedProcessCount += 1;
         }
         const supplierIdentityKey =
           normalizeIdentityId(item.supplierId) || UNRESOLVED_IDENTITY_KEY;
@@ -384,12 +341,12 @@ export const InspectionRequestStatsService = {
         item.closedAt < end &&
         item.status === 'CLOSED'
       ) {
-        todayClosedCount += 1;
+        counters.todayClosedCount += 1;
         const closedIsIncoming = isIncomingInspectionRequest(item);
         if (closedIsIncoming) {
-          todayClosedIncomingCount += 1;
+          counters.todayClosedIncomingCount += 1;
         } else {
-          todayClosedProcessCount += 1;
+          counters.todayClosedProcessCount += 1;
         }
         const date = formatShanghaiDate(item.closedAt);
         const daily = dailyTrendMap.get(date);
@@ -494,12 +451,12 @@ export const InspectionRequestStatsService = {
         team: name,
         teamId: id,
       })),
-      todayClosedCount,
-      todayClosedIncomingCount,
-      todayClosedProcessCount,
-      todaySubmittedCount,
-      todaySubmittedIncomingCount,
-      todaySubmittedProcessCount,
+      todayClosedCount: counters.todayClosedCount,
+      todayClosedIncomingCount: counters.todayClosedIncomingCount,
+      todayClosedProcessCount: counters.todayClosedProcessCount,
+      todaySubmittedCount: counters.todaySubmittedCount,
+      todaySubmittedIncomingCount: counters.todaySubmittedIncomingCount,
+      todaySubmittedProcessCount: counters.todaySubmittedProcessCount,
     };
   },
 };
