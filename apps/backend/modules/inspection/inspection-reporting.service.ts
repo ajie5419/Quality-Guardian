@@ -400,26 +400,48 @@ export const InspectionReportingService = {
     });
   },
 
-  async getWelderScoreStats(welderNames?: string[]) {
-    const names =
-      welderNames && welderNames.length > 0
-        ? [
-            ...new Set(
-              welderNames
-                .map((name) => String(name || '').trim())
-                .filter(Boolean),
-            ),
-          ]
-        : undefined;
-    if (names && names.length === 0) {
-      return [];
+  async getWelderScoreStats(options?: {
+    welderIds?: string[];
+    welderNames?: string[];
+  }) {
+    const welderIds = [
+      ...new Set(
+        (options?.welderIds ?? [])
+          .map((id) => String(id || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const welderNames = [
+      ...new Set(
+        (options?.welderNames ?? [])
+          .map((name) => String(name || '').trim())
+          .filter(Boolean),
+      ),
+    ];
+    const idFilter = welderIds.length > 0;
+    const nameFilter = welderNames.length > 0;
+    if (!idFilter && !nameFilter) {
+      return prisma.quality_records.groupBy({
+        by: ['responsibleWelderId', 'responsibleWelder', 'severity'],
+        where: { isDeleted: false },
+        _count: { id: true },
+      });
+    }
+    const orFilters: Prisma.quality_recordsWhereInput[] = [];
+    if (idFilter) {
+      orFilters.push({ responsibleWelderId: { in: welderIds } });
+    }
+    if (nameFilter) {
+      // Historical rows without a canonical id fall back to exact name
+      // matching; ambiguous names are ignored by the resolver later.
+      orFilters.push({
+        responsibleWelderId: null,
+        responsibleWelder: { in: welderNames },
+      });
     }
     return prisma.quality_records.groupBy({
-      by: ['responsibleWelder', 'severity'],
-      where: {
-        isDeleted: false,
-        responsibleWelder: { not: null, ...(names ? { in: names } : {}) },
-      },
+      by: ['responsibleWelderId', 'responsibleWelder', 'severity'],
+      where: { isDeleted: false, OR: orFilters },
       _count: { id: true },
     });
   },

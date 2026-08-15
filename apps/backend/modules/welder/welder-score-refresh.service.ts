@@ -27,7 +27,8 @@ interface WelderCandidate {
 }
 
 interface WelderScoreStat {
-  responsibleWelder: string;
+  responsibleWelder: null | string;
+  responsibleWelderId: null | string;
   severity: string;
   _count: { id: number };
 }
@@ -54,13 +55,19 @@ async function applyDeductions(
   welders: WelderCandidate[],
   stats: WelderScoreStat[],
 ): Promise<WelderScoreSyncSummary> {
+  const welderIdSet = new Set(welders.map((welder) => welder.id));
   const deductionByWelder = new Map<string, number>();
   let matchedIssueCount = 0;
   for (const stat of stats) {
-    const welderId = resolveWelderIdByResponsibleText({
-      responsibleWelder: stat.responsibleWelder,
-      welderCandidates: welders,
-    });
+    // Canonical id wins; legacy rows without an id fall back to unique text
+    // matching so ambiguous names are never credited.
+    const welderId =
+      stat.responsibleWelderId && welderIdSet.has(stat.responsibleWelderId)
+        ? stat.responsibleWelderId
+        : resolveWelderIdByResponsibleText({
+            responsibleWelder: stat.responsibleWelder,
+            welderCandidates: welders,
+          });
     if (!welderId) continue;
     const count = stat._count.id;
     matchedIssueCount += count;
@@ -116,7 +123,10 @@ export const WelderScoreRefreshService = {
           .filter(Boolean),
       ),
     ];
-    const stats = await InspectionService.getWelderScoreStats(names);
+    const stats = await InspectionService.getWelderScoreStats({
+      welderIds: ids,
+      welderNames: names,
+    });
     return applyDeductions(welders, stats);
   },
 

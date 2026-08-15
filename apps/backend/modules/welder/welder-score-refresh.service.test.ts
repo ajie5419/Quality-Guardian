@@ -57,8 +57,18 @@ describe('welder score refresh service', () => {
       { id: 'w2', name: 'Bob', score: 12, welderCode: 'W-002' },
     ] as never);
     vi.mocked(InspectionService.getWelderScoreStats).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'critical', _count: { id: 1 } },
-      { responsibleWelder: 'Unknown', severity: 'minor', _count: { id: 1 } },
+      {
+        responsibleWelder: 'Alice',
+        responsibleWelderId: 'w1',
+        severity: 'critical',
+        _count: { id: 1 },
+      },
+      {
+        responsibleWelder: 'Unknown',
+        responsibleWelderId: null,
+        severity: 'minor',
+        _count: { id: 1 },
+      },
     ] as never);
     vi.mocked(prisma.welders.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
@@ -72,12 +82,10 @@ describe('welder score refresh service', () => {
       where: { id: { in: ['w1', 'w2'] }, isDeleted: false },
       select: { id: true, name: true, score: true, welderCode: true },
     });
-    expect(InspectionService.getWelderScoreStats).toHaveBeenCalledWith([
-      'Alice',
-      'W-001',
-      'Bob',
-      'W-002',
-    ]);
+    expect(InspectionService.getWelderScoreStats).toHaveBeenCalledWith({
+      welderIds: ['w1', 'w2'],
+      welderNames: ['Alice', 'W-001', 'Bob', 'W-002'],
+    });
     expect(result).toEqual({
       deductionIssueCount: 2,
       matchedIssueCount: 1,
@@ -97,7 +105,12 @@ describe('welder score refresh service', () => {
       { id: 'w1', name: 'Alice', score: 8, welderCode: 'W-001' },
     ] as never);
     vi.mocked(InspectionService.getWelderScoreStats).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'major', _count: { id: 2 } },
+      {
+        responsibleWelder: 'Alice',
+        responsibleWelderId: 'w1',
+        severity: 'major',
+        _count: { id: 2 },
+      },
     ] as never);
 
     const result = await WelderScoreRefreshService.refreshByWelderIds(['w1']);
@@ -116,7 +129,12 @@ describe('welder score refresh service', () => {
       { id: 'w1', name: 'Alice', score: 12, welderCode: 'W-001' },
     ] as never);
     vi.mocked(InspectionService.getWelderScoreStats).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'minor', _count: { id: 3 } },
+      {
+        responsibleWelder: 'Alice',
+        responsibleWelderId: 'w1',
+        severity: 'minor',
+        _count: { id: 3 },
+      },
     ] as never);
     vi.mocked(prisma.welders.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
@@ -138,7 +156,12 @@ describe('welder score refresh service', () => {
   it('returns a zero-update summary when no welders exist in a full refresh', async () => {
     vi.mocked(prisma.welders.findMany).mockResolvedValue([] as never);
     vi.mocked(InspectionService.getWelderScoreStats).mockResolvedValue([
-      { responsibleWelder: 'Alice', severity: 'minor', _count: { id: 1 } },
+      {
+        responsibleWelder: 'Alice',
+        responsibleWelderId: null,
+        severity: 'minor',
+        _count: { id: 1 },
+      },
     ] as never);
 
     const result = await WelderScoreRefreshService.refreshAll();

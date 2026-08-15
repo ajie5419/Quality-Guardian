@@ -38,6 +38,7 @@
     "maintenance:quality-loss-index:drain": "tsx scripts/drain-quality-loss-index.ts",
     "maintenance:welder-score:enqueue": "tsx scripts/enqueue-welder-score.ts",
     "maintenance:welder-score:drain": "tsx scripts/drain-welder-score.ts",
+    "maintenance:welder-score:backfill-ids": "tsx scripts/backfill-quality-record-responsible-welder-ids.ts",
     "maintenance:backfill-thumbnails": "tsx scripts/backfill-missing-thumbnails.ts",
     "maintenance:release": "tsx scripts/run-release-maintenance.ts"
   },
