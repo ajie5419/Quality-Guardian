@@ -717,7 +717,7 @@ defineExpose({
       <div v-if="linkedIssueDraft.processName.includes('焊')">
         <div class="mb-1 text-gray-600">责任焊工</div>
         <Select
-          v-model:value="linkedIssueDraft.responsibleWelder"
+          v-model:value="linkedIssueDraft.responsibleWelderId"
           :loading="welderLoading"
           :options="welderOptions"
           allow-clear

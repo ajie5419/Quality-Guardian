@@ -493,6 +493,22 @@ onMounted(async () => {
             ),
         },
       },
+      {
+        fieldName: 'responsibleWelderId',
+        dependencies: {
+          triggerFields: [
+            'processName',
+            'defectCategoryId',
+            'defectSubcategoryId',
+          ],
+          show: (values: Record<string, unknown>) =>
+            isWeldingProcessName(values.processName) ||
+            isWeldingDefectSubcategory(
+              values.defectSubcategoryId,
+              classificationOptions.value,
+            ),
+        },
+      },
     ]);
   } catch (error) {
     handleApiError(error, 'Load Inspection Issue Classifications');
@@ -537,9 +553,9 @@ function handleResponsibleWelderChange(value: unknown) {
   });
 }
 
-// Edit backfill: the persisted value is a legacy name snapshot, so map it to
-// the canonical option when a unique match exists; unknown names stay as
-// text and are resolved (or audited) server-side.
+// Edit backfill: the persisted responsibleWelder is a legacy name snapshot.
+// Map it to the canonical option id (select value) without overwriting the
+// name text; unknown names stay as text and are resolved server-side.
 watch(
   () => formValues.value.responsibleWelder,
   (value) => {
@@ -548,7 +564,6 @@ watch(
     if (welderOptions.value.some((item) => item.value === current)) return;
     const byName = welderOptions.value.find((item) => item.name === current);
     if (byName) {
-      formApi.setFieldValue('responsibleWelder', byName.value);
       formApi.setFieldValue('responsibleWelderId', byName.value);
     }
   },
@@ -621,7 +636,11 @@ defineExpose({
         />
       </template>
 
-      <template #responsibleWelder="slotProps">
+      <template #responsibleWelder>
+        <div class="hidden"></div>
+      </template>
+
+      <template #responsibleWelderId="slotProps">
         <Select
           v-bind="slotProps"
           :loading="welderLoading"

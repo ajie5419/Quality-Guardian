@@ -217,6 +217,17 @@ export function getIssueFormSchema(
     {
       fieldName: 'responsibleWelder',
       label: t('qms.inspection.issues.responsibleWelder'),
+      component: 'Input',
+      componentProps: { hidden: true },
+      dependencies: {
+        triggerFields: ['processName'],
+        show: (values: Record<string, unknown>) =>
+          isWeldingProcessName(values.processName),
+      },
+    },
+    {
+      fieldName: 'responsibleWelderId',
+      label: t('qms.inspection.issues.responsibleWelder'),
       component: 'Select',
       rules: 'selectRequired',
       componentProps: {
