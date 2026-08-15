@@ -25,6 +25,24 @@
 
 ## 执行记录
 
+### 2026-08-14 焊工表单显示修复：名称文本与 canonical ID 分离
+
+**执行内容：**
+- 修复责任焊手表单把 welderId（如 `WEL-2026-XXXXXX`）覆盖到名称快照字段导致不合格项显示 ID 的问题：Select 改绑独立 `responsibleWelderId` 字段，`responsibleWelder` 保持隐藏文本字段存名称；编辑回填只映射 id 不重写名称
+- InspectionForm 的焊工 Select 同步改绑 `responsibleWelderId`
+- 补充 schema 契约回归测试（名称字段不是 Select、ID 字段是 Select）
+
+**验证结果：**
+- Web Vitest（--dom）：`65/65` 文件、`343/343` 用例 PASS
+- `pnpm lint`、`pnpm run check:type`（3/3 tasks）PASS
+
+**commit:** `55d24481` fix(@qgs/web-antd): keep welder name text separate from canonical id in issue forms
+
+**遗留问题：**
+- 已落库的 `responsibleWelder = welderId` 脏数据需人工核对清理（如有）
+
+---
+
 ### 2026-08-14 焊工评分体系改造（Phase 0+1+2）
 
 **执行内容：**
