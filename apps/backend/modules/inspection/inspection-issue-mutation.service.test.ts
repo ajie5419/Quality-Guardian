@@ -55,6 +55,7 @@ vi.mock('~/modules/welder', () => ({
     enqueueForResponsibleText: vi.fn(),
     enqueueFullRefresh: vi.fn(),
     resolveResponsibleWelderId: vi.fn().mockResolvedValue(null),
+    resolveResponsibleWelderIdForWrite: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -161,6 +162,9 @@ describe('inspectionIssueMutationService', () => {
     vi.mocked(WelderScoreRefreshService.enqueueFullRefresh).mockResolvedValue({
       enqueued: 0,
     } as never);
+    vi.mocked(
+      WelderScoreRefreshService.resolveResponsibleWelderIdForWrite,
+    ).mockResolvedValue(null);
     (prisma.quality_records.findMany as any).mockResolvedValue([]);
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
@@ -676,6 +680,7 @@ describe('inspectionIssueMutationService', () => {
           responsibilityType: true,
           responsibleDepartmentId: true,
           responsibleWelder: true,
+          responsibleWelderId: true,
           supplierId: true,
           supplierName: true,
         },

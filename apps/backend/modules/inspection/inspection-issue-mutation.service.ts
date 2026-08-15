@@ -124,6 +124,7 @@ export const InspectionIssueMutationService = {
           responsibilityType: true,
           responsibleDepartmentId: true,
           responsibleWelder: true,
+          responsibleWelderId: true,
           supplierId: true,
           supplierName: true,
         },
