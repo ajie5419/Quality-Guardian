@@ -14,12 +14,6 @@ function toBoolean(value: unknown) {
   );
 }
 
-function toNumber(value: unknown, fallback: number) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return parsed;
-}
-
 function normalizeImportKey(value: unknown) {
   return String(value ?? '')
     .replaceAll(/\s+/g, '')
@@ -113,7 +107,6 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     '考试通过',
     'passed',
   ]);
-  const scoreValue = pickImportValue(row, ['score', '积分', '评分']);
 
   const name = String(
     nameValue ??
@@ -143,7 +136,6 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     examDate: String(examDateValue ?? '').trim(),
     examPassed: toBoolean(examPassedValue ?? ''),
     name,
-    score: toNumber(scoreValue ?? 12, 12),
     team,
     welderCode,
     welding_method,

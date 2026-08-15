@@ -21,7 +21,6 @@ import {
   Drawer,
   Form,
   Input,
-  InputNumber,
   message,
   Modal,
   Row,
@@ -89,7 +88,6 @@ const formState = reactive({
   examDate: undefined as Dayjs | undefined,
   examPassed: false,
   name: '',
-  score: 12,
   team: '',
   teamId: '',
   welderCode: '',
@@ -373,7 +371,6 @@ function resetForm() {
   formState.examPassed = false;
   formState.employmentStatus = 'ON_DUTY';
   formState.certificationNo = '';
-  formState.score = 12;
 }
 
 function openCreateModal() {
@@ -395,7 +392,6 @@ function openEditModal(row: QmsWelderApi.WelderItem) {
   formState.examPassed = !!row.examPassed;
   formState.employmentStatus = row.employmentStatus || 'ON_DUTY';
   formState.certificationNo = row.certificationNo || '';
-  formState.score = row.score ?? 12;
   modalOpen.value = true;
 }
 
@@ -432,12 +428,6 @@ function toBoolean(value: unknown) {
     text === '是' ||
     text === '通过'
   );
-}
-
-function toNumber(value: unknown, fallback: number) {
-  const parsed = Number(value);
-  if (!Number.isFinite(parsed)) return fallback;
-  return parsed;
 }
 
 function normalizeImportKey(value: unknown) {
@@ -527,7 +517,6 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     '考试通过',
     'passed',
   ]);
-  const scoreValue = pickImportValue(row, ['score', '积分', '评分']);
 
   const name = String(
     nameValue ??
@@ -556,7 +545,6 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     examDate: String(examDateValue ?? '').trim(),
     examPassed: toBoolean(examPassedValue ?? ''),
     name,
-    score: toNumber(scoreValue ?? 12, 12),
     team,
     welderCode,
   };
@@ -699,7 +687,6 @@ async function handleModalOk() {
         : null,
       examPassed: formState.examPassed,
       name: formState.name,
-      score: formState.score,
       team: formState.team,
       teamId: formState.teamId,
       welderCode: formState.welderCode || null,
@@ -1063,14 +1050,6 @@ const [Grid, gridApi] = useVbenVxeGrid({
         name="certificationNo"
       >
         <Input v-model:value="formState.certificationNo" />
-      </Form.Item>
-      <Form.Item :label="t('qms.welder.score')" name="score">
-        <InputNumber
-          v-model:value="formState.score"
-          :min="0"
-          :max="12"
-          style="width: 100%"
-        />
       </Form.Item>
     </Form>
   </Modal>
