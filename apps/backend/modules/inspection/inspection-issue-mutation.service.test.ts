@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionIssueCreateService } from '~/modules/inspection/inspection-issue-create.service';
 import { InspectionIssueMutationService } from '~/modules/inspection/inspection-issue-mutation.service';
+import { WelderScoreRefreshService } from '~/modules/welder';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => {
@@ -49,9 +50,10 @@ vi.mock('~/modules/system-log/audit-log', () => ({
   recordBusinessAuditLog: vi.fn(),
 }));
 
-vi.mock('~/modules/welder/welder-score.service', () => ({
-  WelderScoreService: {
-    syncFromInspectionIssues: vi.fn(),
+vi.mock('~/modules/welder', () => ({
+  WelderScoreRefreshService: {
+    enqueueForResponsibleText: vi.fn(),
+    enqueueFullRefresh: vi.fn(),
   },
 }));
 
@@ -152,6 +154,12 @@ describe('inspectionIssueMutationService', () => {
       const record = await tx.quality_records.create({ data: {} as never });
       return { ncNumber: record.nonConformanceNumber, record };
     });
+    vi.mocked(
+      WelderScoreRefreshService.enqueueForResponsibleText,
+    ).mockResolvedValue({ enqueued: 0 } as never);
+    vi.mocked(WelderScoreRefreshService.enqueueFullRefresh).mockResolvedValue({
+      enqueued: 0,
+    } as never);
     (prisma.quality_records.findMany as any).mockResolvedValue([]);
     (prisma.quality_records.findUnique as any).mockResolvedValue(null);
   });
@@ -261,9 +269,7 @@ describe('inspectionIssueMutationService', () => {
     });
 
     it('should sync welder scores after creation', async () => {
-      const { WelderScoreService } = await import(
-        '~/modules/welder/welder-score.service'
-      );
+      const { WelderScoreRefreshService } = await import('~/modules/welder');
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       (prisma.quality_records.create as any).mockResolvedValue({
         id: 'ISS-2026-003',
@@ -273,37 +279,14 @@ describe('inspectionIssueMutationService', () => {
 
       await InspectionIssueMutationService.createIssue(mockUser, {});
 
-      expect(WelderScoreService.syncFromInspectionIssues).toHaveBeenCalled();
+      // Score enqueue happens inside createInTransaction (mocked here), so the
+      // mutation service itself must not enqueue a second time.
+      expect(
+        WelderScoreRefreshService.enqueueForResponsibleText,
+      ).not.toHaveBeenCalled();
     });
 
-    it('should resolve successfully and log error when welder sync throws in createIssue', async () => {
-      const { WelderScoreService } = await import(
-        '~/modules/welder/welder-score.service'
-      );
-      const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
-      (prisma.quality_records.create as any).mockResolvedValue({
-        id: 'ISS-2026-004',
-        nonConformanceNumber: 'NC-26KJ-004',
-        partName: 'Part',
-      });
-      const syncError = new Error('welder service unavailable');
-      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
-        syncError,
-      );
-
-      const result = await InspectionIssueMutationService.createIssue(
-        mockUser,
-        {},
-      );
-
-      expect(result.ncNumber).toBe('NC-26KJ-004');
-      expect(mockLoggerFns.error).toHaveBeenCalledWith(
-        syncError,
-        'welder-score-sync after createIssue',
-      );
-    });
-
-    it('retries on P2002 serialNumber conflict and succeeds on second attempt', async () => {
+    it('should retry on P2002 serialNumber conflict and succeed on second attempt', async () => {
       const { InspectionIssueCreateService } = await import(
         '~/modules/inspection/inspection-issue-create.service'
       );
@@ -643,28 +626,25 @@ describe('inspectionIssueMutationService', () => {
       ).not.toHaveBeenCalled();
     });
 
-    it('should resolve successfully and log error when welder sync throws in updateIssue', async () => {
-      const { WelderScoreService } = await import(
-        '~/modules/welder/welder-score.service'
-      );
+    it('should enqueue a welder score refresh inside the update transaction', async () => {
+      const { WelderScoreRefreshService } = await import('~/modules/welder');
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       (prisma.quality_records.update as any).mockResolvedValue({
         id: 'rec-5',
         partName: 'Updated',
+        responsibleWelder: 'Alice',
       });
-      const syncError = new Error('welder sync failed');
-      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
-        syncError,
+
+      await InspectionIssueMutationService.updateIssue(
+        mockUser,
+        'rec-5',
+        {},
+        null,
       );
 
-      await expect(
-        InspectionIssueMutationService.updateIssue(mockUser, 'rec-5', {}, null),
-      ).resolves.toBeUndefined();
-
-      expect(mockLoggerFns.error).toHaveBeenCalledWith(
-        syncError,
-        'welder-score-sync after updateIssue',
-      );
+      expect(
+        WelderScoreRefreshService.enqueueForResponsibleText,
+      ).toHaveBeenCalled();
     });
 
     it('allows an admin to update a record created by another user', async () => {
@@ -744,13 +724,16 @@ describe('inspectionIssueMutationService', () => {
       expect(FileStorageService.softDeleteReferences).toHaveBeenCalledTimes(2);
     });
 
-    it('should sync welder scores only when records are deleted', async () => {
-      const { WelderScoreService } = await import(
-        '~/modules/welder/welder-score.service'
-      );
+    it('should enqueue a welder score refresh inside the delete transaction', async () => {
+      const { WelderScoreRefreshService } = await import('~/modules/welder');
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       (prisma.quality_records.findMany as any).mockResolvedValue([
-        { createdBy: 'user-1', id: 'rec-3', supplierName: null },
+        {
+          createdBy: 'user-1',
+          id: 'rec-3',
+          responsibleWelder: 'Alice',
+          supplierName: null,
+        },
       ]);
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 0,
@@ -763,8 +746,8 @@ describe('inspectionIssueMutationService', () => {
       );
 
       expect(
-        WelderScoreService.syncFromInspectionIssues,
-      ).not.toHaveBeenCalled();
+        WelderScoreRefreshService.enqueueForResponsibleText,
+      ).toHaveBeenCalled();
     });
 
     it('should record audit log', async () => {
@@ -794,33 +777,30 @@ describe('inspectionIssueMutationService', () => {
       );
     });
 
-    it('should resolve successfully and log error when welder sync throws in batchDeleteIssues', async () => {
-      const { WelderScoreService } = await import(
-        '~/modules/welder/welder-score.service'
-      );
+    it('should reject the batch when the welder enqueue fails inside the transaction', async () => {
+      const { WelderScoreRefreshService } = await import('~/modules/welder');
       const mockUser = { id: 'user-1', username: 'admin', roles: [] } as any;
       (prisma.quality_records.findMany as any).mockResolvedValue([
-        { createdBy: 'user-1', id: 'rec-10', supplierName: null },
+        {
+          createdBy: 'user-1',
+          id: 'rec-10',
+          responsibleWelder: 'Alice',
+          supplierName: null,
+        },
       ]);
       (prisma.quality_records.updateMany as any).mockResolvedValue({
         count: 1,
       });
-      const syncError = new Error('welder batch sync failed');
-      vi.mocked(WelderScoreService.syncFromInspectionIssues).mockRejectedValue(
-        syncError,
-      );
+      const enqueueError = new Error('welder batch enqueue failed');
+      vi.mocked(
+        WelderScoreRefreshService.enqueueForResponsibleText,
+      ).mockRejectedValue(enqueueError);
 
-      const result = await InspectionIssueMutationService.batchDeleteIssues(
-        {} as any,
-        mockUser,
-        ['rec-10'],
-      );
-
-      expect(result).toBe(1);
-      expect(mockLoggerFns.error).toHaveBeenCalledWith(
-        syncError,
-        'welder-score-sync after batchDeleteIssues',
-      );
+      await expect(
+        InspectionIssueMutationService.batchDeleteIssues({} as any, mockUser, [
+          'rec-10',
+        ]),
+      ).rejects.toBe(enqueueError);
     });
 
     it('rejects the whole batch when any record belongs to another user', async () => {

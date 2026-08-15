@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { WelderScoreRefreshService } from '~/modules/welder/welder-score-refresh.service';
 import { WelderService } from '~/modules/welder/welder.service';
 import prisma from '~/utils/prisma';
 import { resolveTeamIdForWrite } from '~/utils/team-resolver';
@@ -218,7 +218,7 @@ describe('welderService', () => {
     vi.mocked(prisma.welders.update).mockResolvedValue({} as never);
     vi.mocked(prisma.$transaction).mockResolvedValue([] as never);
 
-    const result = await WelderScoreService.syncFromInspectionIssues();
+    const result = await WelderScoreRefreshService.refreshAll();
 
     expect(result).toEqual({
       deductionIssueCount: 2,
@@ -241,7 +241,7 @@ describe('welderService', () => {
       { responsibleWelder: 'Alice', severity: 'major', _count: { id: 1 } },
     ] as never);
 
-    const result = await WelderScoreService.syncFromInspectionIssues();
+    const result = await WelderScoreRefreshService.refreshAll();
 
     expect(result).toEqual({
       deductionIssueCount: 1,

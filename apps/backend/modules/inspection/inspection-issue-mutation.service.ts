@@ -12,7 +12,7 @@ import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { WelderScoreService } from '~/modules/welder/welder-score.service';
+import { WelderScoreRefreshService } from '~/modules/welder';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -93,11 +93,6 @@ export const InspectionIssueMutationService = {
       });
     } catch (error) {
       logger.error(error, 'inspection-issue audit after create');
-    }
-    try {
-      await WelderScoreService.syncFromInspectionIssues();
-    } catch (error) {
-      logger.error(error, 'welder-score-sync after createIssue');
     }
     return { ...newRecord.record, ncNumber: newRecord.ncNumber };
   },
@@ -193,6 +188,11 @@ export const InspectionIssueMutationService = {
         [{ source: 'INTERNAL', sourcePk: updated.id }],
         'inspection-issue.updated',
       );
+      await WelderScoreRefreshService.enqueueForResponsibleText(
+        tx,
+        [updated.responsibleWelder],
+        'inspection-issue.updated',
+      );
       return { updateData };
     });
     if (body.photos !== undefined) {
@@ -212,11 +212,6 @@ export const InspectionIssueMutationService = {
         partName: updateData.partName || '未修改名称',
       },
     });
-    try {
-      await WelderScoreService.syncFromInspectionIssues();
-    } catch (error) {
-      logger.error(error, 'welder-score-sync after updateIssue');
-    }
   },
 
   async batchDeleteIssues(
@@ -235,6 +230,7 @@ export const InspectionIssueMutationService = {
         select: {
           createdBy: true,
           id: true,
+          responsibleWelder: true,
           supplierId: true,
         },
       });
@@ -272,23 +268,23 @@ export const InspectionIssueMutationService = {
         existing.map((item) => ({ source: 'INTERNAL', sourcePk: item.id })),
         'inspection-issue.batch-deleted',
       );
+      await WelderScoreRefreshService.enqueueForResponsibleText(
+        tx,
+        existing.map((item) => item.responsibleWelder),
+        'inspection-issue.batch-deleted',
+      );
       return result;
     });
     if (result.count > 0) {
-      try {
-        await WelderScoreService.syncFromInspectionIssues();
-      } catch (error) {
-        logger.error(error, 'welder-score-sync after batchDeleteIssues');
-      }
+      await Promise.all(
+        uniqueIds.map((id) =>
+          FileStorageService.softDeleteReferences({
+            bizId: id,
+            bizType: 'inspection_issue',
+          }),
+        ),
+      );
     }
-    await Promise.all(
-      uniqueIds.map((id) =>
-        FileStorageService.softDeleteReferences({
-          bizId: id,
-          bizType: 'inspection_issue',
-        }),
-      ),
-    );
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'DELETE',
@@ -341,6 +337,11 @@ export const InspectionIssueMutationService = {
               [{ source: 'INTERNAL', sourcePk: saved.id }],
               'inspection-issue.imported',
             );
+            await WelderScoreRefreshService.enqueueForResponsibleText(
+              tx,
+              [saved.responsibleWelder],
+              'inspection-issue.imported',
+            );
           });
           successCount++;
         } catch (upsertError) {
@@ -364,13 +365,6 @@ export const InspectionIssueMutationService = {
             row: index + 1,
           }),
         );
-      }
-    }
-    if (successCount > 0) {
-      try {
-        await WelderScoreService.syncFromInspectionIssues();
-      } catch (error) {
-        logger.error(error, 'welder-score-sync after importIssues');
       }
     }
     await recordBusinessAuditLog(event, {

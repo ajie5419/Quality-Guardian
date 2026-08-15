@@ -1,8 +1,11 @@
+import type { MetricRefreshClient } from '~/modules/metric-refresh';
+
 import {
   clampWelderScore,
   resolveWelderIdByResponsibleText,
   resolveWelderSeverityDeduction,
 } from '@qgs/shared';
+import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import prisma from '~/utils/prisma';
 
 export const ALL_WELDERS_SENTINEL = '__ALL__';
@@ -134,5 +137,55 @@ export const WelderScoreRefreshService = {
       };
     }
     return applyDeductions(welders, stats);
+  },
+
+  /**
+   * Enqueue a score refresh for the welders referenced by responsible-welder
+   * text. Unresolvable or empty references fall back to a full refresh so
+   * scoring can never silently stall on an ambiguous name. Must be called
+   * inside the source transaction so a failed enqueue rolls the write back.
+   */
+  async enqueueForResponsibleText(
+    client: MetricRefreshClient,
+    texts: Array<null | string | undefined>,
+    reason: string,
+  ) {
+    const uniqueTexts = [
+      ...new Set(
+        texts.map((text) => String(text || '').trim()).filter(Boolean),
+      ),
+    ];
+    if (uniqueTexts.length === 0) return { enqueued: 0 };
+
+    const welders = await prisma.welders.findMany({
+      where: { isDeleted: false },
+      select: { id: true, name: true, welderCode: true },
+    });
+    const welderIds = new Set<string>();
+    let unresolved = false;
+    for (const text of uniqueTexts) {
+      const welderId = resolveWelderIdByResponsibleText({
+        responsibleWelder: text,
+        welderCandidates: welders,
+      });
+      if (welderId) {
+        welderIds.add(welderId);
+      } else {
+        unresolved = true;
+      }
+    }
+    const entityIds = [...welderIds];
+    if (unresolved || entityIds.length === 0) {
+      entityIds.push(ALL_WELDERS_SENTINEL);
+    }
+    return MetricRefreshQueue.enqueueWelderScores(client, entityIds, reason);
+  },
+
+  async enqueueFullRefresh(client: MetricRefreshClient, reason: string) {
+    return MetricRefreshQueue.enqueueWelderScores(
+      client,
+      [ALL_WELDERS_SENTINEL],
+      reason,
+    );
   },
 };

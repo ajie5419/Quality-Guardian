@@ -2,8 +2,9 @@ import type { UserSession } from '~/utils/jwt-utils';
 
 import { FileStorageService } from '~/modules/file-storage';
 import { SystemLogService } from '~/modules/system-log';
-import { WelderScoreService } from '~/modules/welder';
+import { WelderScoreRefreshService } from '~/modules/welder';
 import { logApiError } from '~/utils/api-logger';
+import prisma from '~/utils/prisma';
 
 export async function runInspectionRecordPostCommitTask(
   label: string,
@@ -39,7 +40,10 @@ export async function syncLinkedIssuePostCommitEffects(options: {
       },
     }),
   );
-  await runInspectionRecordPostCommitTask('welder-score-sync', () =>
-    WelderScoreService.syncFromInspectionIssues(),
+  await runInspectionRecordPostCommitTask('welder-score-enqueue', () =>
+    WelderScoreRefreshService.enqueueFullRefresh(
+      prisma,
+      'inspection-record.created',
+    ),
   );
 }

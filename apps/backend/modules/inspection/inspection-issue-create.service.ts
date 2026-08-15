@@ -3,6 +3,7 @@ import type { UserSession } from '~/utils/jwt-utils';
 import { Prisma } from '@prisma/client';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
+import { WelderScoreRefreshService } from '~/modules/welder';
 import { BusinessError } from '~/utils/business-error';
 
 import {
@@ -82,6 +83,11 @@ export const InspectionIssueCreateService = {
     await MetricRefreshQueue.enqueueSupplierScores(
       options.tx,
       [record.supplierId],
+      'inspection-issue.created',
+    );
+    await WelderScoreRefreshService.enqueueForResponsibleText(
+      options.tx,
+      [record.responsibleWelder],
       'inspection-issue.created',
     );
     return { ncNumber, record };
