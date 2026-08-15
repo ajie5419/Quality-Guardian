@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type { MetricRefreshClient } from '~/modules/metric-refresh';
 
 import {
@@ -179,6 +180,30 @@ export const WelderScoreRefreshService = {
       entityIds.push(ALL_WELDERS_SENTINEL);
     }
     return MetricRefreshQueue.enqueueWelderScores(client, entityIds, reason);
+  },
+
+  /**
+   * Resolve a single responsible-welder text to its canonical welder id using
+   * the same unique-match rules as score refresh. Returns undefined when the
+   * text is empty or ambiguous so callers keep the legacy text snapshot and
+   * let governance flag the unresolved reference.
+   */
+  async resolveResponsibleWelderId(
+    tx: Prisma.TransactionClient,
+    text: unknown,
+  ): Promise<null | string> {
+    const normalized = String(text || '').trim();
+    if (!normalized) return null;
+    const welders = await tx.welders.findMany({
+      where: { isDeleted: false },
+      select: { id: true, name: true, welderCode: true },
+    });
+    return (
+      resolveWelderIdByResponsibleText({
+        responsibleWelder: normalized,
+        welderCandidates: welders,
+      }) ?? null
+    );
   },
 
   async enqueueFullRefresh(client: MetricRefreshClient, reason: string) {

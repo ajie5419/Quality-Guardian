@@ -150,4 +150,36 @@ describe('welder score refresh service', () => {
     });
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it('resolves a unique responsible welder text to its canonical id', async () => {
+    vi.mocked(prisma.welders.findMany).mockResolvedValue([
+      { id: 'w1', name: 'Alice', welderCode: 'W-001' },
+      { id: 'w2', name: 'Bob', welderCode: 'W-002' },
+    ] as never);
+
+    const result = await WelderScoreRefreshService.resolveResponsibleWelderId(
+      prisma,
+      'Alice',
+    );
+
+    expect(result).toBe('w1');
+  });
+
+  it('returns null for empty or ambiguous responsible welder text', async () => {
+    vi.mocked(prisma.welders.findMany).mockResolvedValue([
+      { id: 'w1', name: 'Alice', welderCode: 'W-001' },
+      { id: 'w2', name: 'Alice', welderCode: 'W-002' },
+    ] as never);
+
+    const emptyResult =
+      await WelderScoreRefreshService.resolveResponsibleWelderId(prisma, '  ');
+    const ambiguousResult =
+      await WelderScoreRefreshService.resolveResponsibleWelderId(
+        prisma,
+        'Alice',
+      );
+
+    expect(emptyResult).toBeNull();
+    expect(ambiguousResult).toBeNull();
+  });
 });

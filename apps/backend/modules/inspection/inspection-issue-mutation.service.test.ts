@@ -54,6 +54,7 @@ vi.mock('~/modules/welder', () => ({
   WelderScoreRefreshService: {
     enqueueForResponsibleText: vi.fn(),
     enqueueFullRefresh: vi.fn(),
+    resolveResponsibleWelderId: vi.fn().mockResolvedValue(null),
   },
 }));
 
@@ -413,7 +414,7 @@ describe('inspectionIssueMutationService', () => {
           id: 'rec-1',
           isDeleted: false,
         },
-        data: { partName: 'Updated' },
+        data: { partName: 'Updated', responsibleWelderId: null },
       });
       expect(SystemLogService.auditLog).toHaveBeenCalled();
     });
@@ -681,7 +682,7 @@ describe('inspectionIssueMutationService', () => {
       });
       expect(prisma.quality_records.update).toHaveBeenCalledWith({
         where: { id: 'rec-other', isDeleted: false },
-        data: { partName: 'Updated' },
+        data: { partName: 'Updated', responsibleWelderId: null },
       });
     });
   });
@@ -889,7 +890,11 @@ describe('inspectionIssueMutationService', () => {
         InspectionIssueAccessService.ensurePermission,
       ).toHaveBeenCalledWith(mockUser, 'QMS:Inspection:Issues:Create');
       expect(prisma.quality_records.create).toHaveBeenCalledWith({
-        data: { nonConformanceNumber: null, partName: 'Part' },
+        data: {
+          nonConformanceNumber: null,
+          partName: 'Part',
+          responsibleWelderId: null,
+        },
       });
     });
 

@@ -168,6 +168,11 @@ export const InspectionIssueMutationService = {
         },
         tx,
       );
+      const responsibleWelderId =
+        await WelderScoreRefreshService.resolveResponsibleWelderId(
+          tx,
+          canonicalBody.responsibleWelder ?? current.responsibleWelder,
+        );
       const updated = await tx.quality_records.update({
         where: ownershipWhere,
         data: responsibility
@@ -175,8 +180,9 @@ export const InspectionIssueMutationService = {
               ...updateData,
               responsibleDepartmentId: responsibility.responsibleDepartmentId,
               responsibilityType: responsibility.responsibilityType,
+              responsibleWelderId,
             }
-          : updateData,
+          : { ...updateData, responsibleWelderId },
       });
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
@@ -324,8 +330,17 @@ export const InspectionIssueMutationService = {
             const nonConformanceNumber = generateNcNumber
               ? await reserveInspectionIssueNcNumber(tx)
               : null;
+            const responsibleWelderId =
+              await WelderScoreRefreshService.resolveResponsibleWelderId(
+                tx,
+                payload.responsibleWelder,
+              );
             const saved = await tx.quality_records.create({
-              data: { ...payload, nonConformanceNumber },
+              data: {
+                ...payload,
+                nonConformanceNumber,
+                responsibleWelderId,
+              },
             });
             await MetricRefreshQueue.enqueueSupplierScores(
               tx,
