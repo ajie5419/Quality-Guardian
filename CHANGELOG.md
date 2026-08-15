@@ -25,6 +25,42 @@
 
 ## 执行记录
 
+### 2026-08-14 焊工评分体系改造（Phase 0+1+2）
+
+**执行内容：**
+- Phase 0：`score` 纯派生，移除 shared/后端 schema/前端表单与导入的 score 写入（5 文件，删 56 行）
+- Phase 1a：`metric_refresh_type` 加 `WELDER_SCORE` migration + `MetricRefreshQueue` 6 个 welder 方法（enqueue/claim/complete/fail/count/reset）
+- Phase 1b：新增 `WelderScoreRefreshService`（增量 `refreshByWelderIds` + 全量 `refreshAll`）+ 5s 轮询 worker + nitro plugin；旧 `syncFromInspectionIssues` 删除
+- Phase 1c：inspection 5 处触发点（create/update/batchDelete/import/NC 删除 + 记录创建 + 报检关单）改事务内 enqueue；列表 GET 移除同步副作用；清理 2 条 B-M1 baseline 债务
+- Phase 1d：`enqueue-welder-score` / `drain-welder-score` 维护工具（独立运维，不接入 release maintenance）
+- Phase 2a：`quality_records.responsibleWelderId` migration + 写入解析落库（create/import/update 事务内解析）
+- Phase 2b：评分 join 优先 `responsibleWelderId`（文本兜底历史行）；`getWelderScoreStats` 支持 id/name 过滤；历史回填工具 dry-run/apply + unresolved 审计
+- Phase 2c：前端 issue 表单/检验记录焊工下拉 value 改为 canonical welder id（名称快照 + id 双写）；后端校验显式 id（fail-closed）
+- 相关文档：CHANGELOG 本条记录
+
+**验证结果：**
+- 后端 Vitest：`293/293` 文件、`2664/2664` 用例 PASS
+- Web Vitest（--dom）：`65/65` 文件、`342/342` 用例 PASS
+- `pnpm lint`、`pnpm run check:type`（3/3 tasks）、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 均 PASS
+- migration 已在本地测试库应用（`20260814000000`、`20260814010000`）；`prisma generate` 已更新 client
+
+**commit:**
+- `609526db` refactor(project): make welder score a derived field, remove manual score writes
+- `591d1a3e` feat(@qgs/backend): add WELDER_SCORE metric refresh queue
+- `31b53a3a` feat(@qgs/backend): add welder score refresh service and async worker
+- `3690a946` refactor(@qgs/backend): enqueue welder score refresh instead of blocking sync
+- `3151c060` feat(@qgs/backend): add welder score enqueue/drain maintenance tools
+- `220b0d70` feat(@qgs/backend): persist canonical responsibleWelderId on issue writes
+- `9ee3775e` feat(@qgs/backend): score refresh joins by responsibleWelderId with backfill
+- `862cd673` feat(project): use canonical welder ids in issue forms
+- `419f4d45` fix(@qgs/backend): mock welder id resolution in issue mutation tests
+
+**遗留问题：**
+- 关单弹窗（CloseInspectionModal）、weapp 的 responsibleWelder 仍提交文本，由后端文本解析兜底落库，未传 ID（可后续 wave 收敛）
+- 历史数据回填需在真实库执行 `pnpm maintenance:welder-score:backfill-ids -- --apply` 与 `enqueue/drain`（本地测试库未执行生产数据）
+- migration 由 `prisma migrate diff` 生成（本仓库首个 migration 为增量补丁、历史无法从空库重放，标准 `migrate dev` shadow 机制不可用，已在 commit message 注明）
+- 未运行前端 dev/build/start、真实浏览器页面验收与生产发布
+
 ---
 
 ## [0.26.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.25.0...qgs-v0.26.0) (2026-08-14)
