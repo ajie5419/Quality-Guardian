@@ -346,10 +346,16 @@ export const InspectionRequestStatsService = {
         const reinspectionKey = usesSupplierIdentity
           ? supplierIdentityKey
           : departmentIdentityKey;
+        // Reinspection is measured against closed requests only: in-flight
+        // FAIL records (status not CLOSED) never count as inspected or
+        // reinspected before the inspection flow completes, and requests
+        // already inspected but not yet closed stay out of the denominator.
+        const hasClosed = item.status === 'CLOSED';
         const hasReinspection =
-          Boolean(item.linkedIssueId || item.linkedIssueNo) ||
-          item.inspectionResult === 'FAIL';
-        const hasInspectionResult = item.status === 'CLOSED' || hasReinspection;
+          hasClosed &&
+          (Boolean(item.linkedIssueId || item.linkedIssueNo) ||
+            item.inspectionResult === 'FAIL');
+        const hasInspectionResult = hasClosed;
         incrementReinspectionCounts(
           reinspectionMap,
           reinspectionKey,

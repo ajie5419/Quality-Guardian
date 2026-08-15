@@ -317,6 +317,51 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     });
   });
 
+  it('does not count in-flight FAIL requests in reinspection stats', async () => {
+    const requests = [
+      makeRequest({
+        id: 'r1',
+        processName: '过程检验',
+        status: 'INSPECTING',
+        team: '班组A',
+        inspectionResult: 'FAIL',
+        linkedIssueId: 'issue-1',
+      }),
+      makeRequest({
+        id: 'r2',
+        processName: '过程检验',
+        status: 'CLOSED',
+        team: '班组A',
+        inspectionResult: 'PASS',
+      }),
+      makeRequest({
+        id: 'r3',
+        processName: '过程检验',
+        status: 'DISPATCHED',
+        team: '班组A',
+        inspectionResult: 'PASS',
+      }),
+    ];
+    setupMocks(requests);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    // Only the closed request counts as inspected; the in-flight FAIL and
+    // the dispatched-but-unclosed PASS requests stay out of both numerator
+    // and denominator.
+    expect(result.reinspectionRateByTeam).toHaveLength(1);
+    expect(result.reinspectionRateByTeam[0]).toMatchObject({
+      inspectedCount: 1,
+      reinspectionCount: 0,
+      reinspectionRate: 0,
+      submittedCount: 3,
+      team: '班组A',
+    });
+  });
+
   it('non-incoming records do not appear in bySupplier', async () => {
     const requests = [
       makeRequest({ id: 'r1', processName: '过程检验', team: '班组A' }),
