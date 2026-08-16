@@ -85,6 +85,7 @@ Rules:
   B-TEST2: backend test files must have a sibling source file (orphan tests forbidden)
   B-TEST3: tests importing ~/utils/prisma must also vi.mock it
   B-AUTH1: write endpoints (post/put/delete/patch) must declare authorization (authorizeWrite/requireSystemAdmin) unless public
+  B-AUTH2: frontend permission codes must be declared (shared enum or module menu authCode)
 
 Modes:
   --changed  Check changed files only, including committed diff, staged changes,
@@ -412,6 +413,18 @@ check_b_auth1() {
     fi
   done
 }
+check_b_auth2() {
+  # Frontend permission codes must be declared; runs only in --all mode
+  # (repo-wide scan) because it needs the full source tree.
+  [[ "$SCOPE" != "all" ]] && return 0
+  local out=''
+  out="$("$NODE_BIN" "$ROOT_DIR/scripts/check-permission-code-declarations.mjs" 2>&1)"
+  local code=$?
+  if (( code != 0 )); then
+    report_violation "B-AUTH2" "scripts/check-permission-code-declarations.mjs:1" "$(echo "$out" | head -1)"
+  fi
+}
+
 check_b_r1() {
   (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-R1" "API files must not import Prisma directly." "import[[:space:]].*from[[:space:]]+['\"](~/?|/)?utils/prisma['\"]|from[[:space:]]+['\"]prisma['\"]|import[[:space:]]+prisma" "${API_TS_TARGETS[@]}"
@@ -695,6 +708,7 @@ check_b_test1
 check_b_test2
 check_b_test3
 check_b_auth1
+check_b_auth2
 
 echo
 if (( violations > 0 )); then

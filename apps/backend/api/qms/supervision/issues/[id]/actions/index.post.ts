@@ -1,4 +1,4 @@
-import { SUPERVISION_PERMISSION_CODES as SPC } from '@qgs/shared';
+import { SUPERVISION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
@@ -17,7 +17,7 @@ const createIssueActionBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const u = await authorizeWrite(event, SPC.EDIT);
+  const u = await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT);
   const uid = String(u.id);
   const id = getRouterParam(event, 'id');
   if (!id) return badRequestResponse(event, '无效监造问题ID');

@@ -8,7 +8,11 @@ import type {
   InspectionMaterialRequestRejectInput,
 } from './inspection-material-request.schema';
 
-import { isSystemAdmin, TASK_DISPATCH_STATUS } from '@qgs/shared';
+import {
+  INSPECTION_MATERIAL_PERMISSION_CODES,
+  isSystemAdmin,
+  TASK_DISPATCH_STATUS,
+} from '@qgs/shared';
 import { PartMasterService } from '~/modules/part-master';
 import { RbacService } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log';
@@ -24,11 +28,7 @@ import {
 } from './inspection-request';
 import { publishInspectionRequestCreated } from './inspection-request-events';
 
-export const INSPECTION_MATERIAL_PERMISSION_CODES = {
-  APPROVE: 'QMS:Inspection:MaterialRequests:Approve',
-  LIST: 'QMS:Inspection:MaterialRequests:List',
-  REJECT: 'QMS:Inspection:MaterialRequests:Reject',
-} as const;
+export { INSPECTION_MATERIAL_PERMISSION_CODES };
 
 async function assertPermission(
   user: UserSession,

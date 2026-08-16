@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：权限门禁 B-AUTH2（前端码必须声明）+ 声明有效性检查
+
+**执行内容：**
+- 新增 scripts/check-permission-code-declarations.mjs：校验前端引用的权限码必须有声明（shared 枚举或 module 菜单 authCode）、后端 authorizeWrite 引用的枚举必须存在于 shared（含嵌套 PERMISSION_CODES 与别名处理）
+- 挂入 check-qms-architecture.sh 新规则 B-AUTH2（--all 模式）；负向验证：前端假码被拦截（EXIT 1）、恢复后全绿
+- 修复检查暴露的问题：QMS:Inspection:Records:Export 补枚举+records 菜单按钮；INSPECTION_MATERIAL_PERMISSION_CODES 从模块内迁至 @qgs/shared（模块 re-export 兼容）；supervision actions 端点 import 别名 SPC 改回全名
+- 同步菜单 + 一致性回填（Records:Export 已在权限表，仅补声明）
+
+**验证结果：**
+- B-AUTH2 全绿（前端码 45 个全部有声明）；typecheck/lint/qms-arch 0 violations/docs-drift PASSED；rbac 测试 254/254
+
+**遗留问题：**
+- ⑥⑦ 完成；其余 1-5 项继续
+
 ### 2026-08-16 阶段：修复售后导出按钮权限缺失（前端按钮码缺口）
 
 **问题**：售后反馈页面无导出按钮。根因：QMS:AfterSales:Export 码自始未被声明（菜单按钮无、权限表无、角色未分配），前端按钮按码显隐 → 普通用户永远不可见（仅管理员兜底）。

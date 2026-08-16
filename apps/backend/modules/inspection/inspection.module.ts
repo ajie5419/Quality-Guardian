@@ -158,6 +158,12 @@ export const inspectionModule: ModuleDeclaration = {
           title: '新增',
         },
         {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.EXPORT,
+          name: 'QMSInspectionRecordsExport',
+          order: 2,
+          title: '导出',
+        },
+        {
           authCode: INSPECTION_RECORD_PERMISSION_CODES.EDIT,
           name: 'QMSInspectionRecordsEdit',
           order: 2,

@@ -98,3 +98,12 @@ export const INSPECTION_REQUEST_PERMISSION_CODES = {
   DELETE: 'QMS:Inspection:Requests:Delete',
   DISPATCH: 'QMS:Inspection:Requests:Dispatch',
 } as const;
+
+/**
+ * Permission codes for inspection material requests (backend-enforced).
+ */
+export const INSPECTION_MATERIAL_PERMISSION_CODES = {
+  APPROVE: 'QMS:Inspection:MaterialRequests:Approve',
+  LIST: 'QMS:Inspection:MaterialRequests:List',
+  REJECT: 'QMS:Inspection:MaterialRequests:Reject',
+} as const;

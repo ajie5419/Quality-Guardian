@@ -6,6 +6,7 @@ export const INSPECTION_RECORD_PERMISSION_CODES = {
   CREATE: 'QMS:Inspection:Records:Create',
   DELETE: 'QMS:Inspection:Records:Delete',
   EDIT: 'QMS:Inspection:Records:Edit',
+  EXPORT: 'QMS:Inspection:Records:Export',
   IMPORT: 'QMS:Inspection:Records:Import',
   LIST: 'QMS:Inspection:Records:List',
   VIEW: 'QMS:Inspection:Records:View',
