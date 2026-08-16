@@ -27,6 +27,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-16 统一授权框架 Phase 2d：迁移策划全系 26 个写端点（BOM/DFMEA/ITP/检验表单/项目文档），B-AUTH1 基线 96→70。
 - 2026-08-16 统一授权框架 Phase 2c：迁移售后/供应商/质量损失/工单 23 个写端点，B-AUTH1 基线 119→96。
 - 2026-08-16 统一授权框架 Phase 2：迁移计量/知识库/焊工 21 个写端点（authorizeWrite 声明 + @qgs/shared 权限码枚举），B-AUTH1 基线 140→119。验证：全量 2693 用例、lint/typecheck/qms-arch/docs-drift 全绿。
 - 2026-08-16 上传文件类型可配置化：新增 modules/file-storage/upload-policy.ts（上传白名单三级策略：images / images+pdf / images+pdf+office（含 Word/Excel）；默认文档档兼容知识库/表单模板等附件场景，SVG/HTML/宏文档等一律拒绝，脏配置 fail-closed）；file-storage.service 上传流入口按服务端扩展名校验，MIME 不再信任客户端；upload.service 端点将 BusinessError 转标准 400 响应；重建 @qgs/shared dist（ErrorCode 首次真正进入构建产物）；系统设置页（报检与检验设置）新增"上传文件类型"下拉框（仅管理员可改，即时生效）；修复存量 error-code.ts prettier 格式。验证：file-storage 测试 34/34、后端全量 295 文件/2685 用例通过、qms-arch --all 0 violations、eslint/prettier 0 error、typecheck 通过。

@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：统一授权框架 Phase 2d（策划全系迁移）
+
+**执行内容：**
+- PERMISSION_CODES 扩展：PLANNING 补 INSPECTION_FORM（4 码）、PROJECT_DOCS（5 码）；重建 dist
+- 迁移 26 个写端点：BOM 7（含项目）、DFMEA 6（含项目）、ITP 7（含项目/导入）、检验表单 3、项目文档 3——全部为"内联转发"模式，统一改为块函数 + authorizeWrite（修复批量生成产生的逗号残留）
+- B-AUTH1 baseline 清理：96 → 70（释放 26 条）
+
+**验证结果：**
+- planning 测试 20/20；qms-arch 0 violations
+
+**遗留问题：**
+- 剩余 70 个写端点（报表/工作台/派发/车辆/AI/监造/系统设置等）
+- 监造（supervision）无历史权限码，需新码+回填
+
 ### 2026-08-16 阶段：统一授权框架 Phase 2c（售后/供应商/质量损失/工单迁移）
 
 **执行内容：**

@@ -55,6 +55,19 @@ export const PERMISSION_CODES = {
         DELETE: 'QMS:Planning:ITP:Delete',
         EXPORT: 'QMS:Planning:ITP:Export',
       },
+      INSPECTION_FORM: {
+        LIST: 'QMS:Planning:InspectionForm:List',
+        CREATE: 'QMS:Planning:InspectionForm:Create',
+        EDIT: 'QMS:Planning:InspectionForm:Edit',
+        DELETE: 'QMS:Planning:InspectionForm:Delete',
+      },
+      PROJECT_DOCS: {
+        LIST: 'QMS:Planning:ProjectDocs:List',
+        CREATE: 'QMS:Planning:ProjectDocs:Create',
+        EDIT: 'QMS:Planning:ProjectDocs:Edit',
+        DELETE: 'QMS:Planning:ProjectDocs:Delete',
+        DOWNLOAD: 'QMS:Planning:ProjectDocs:Download',
+      },
     },
     SUPPLIER: {
       LIST: 'QMS:Supplier:List',
