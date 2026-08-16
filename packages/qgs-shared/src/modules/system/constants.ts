@@ -14,14 +14,6 @@ export const PERMISSION_CODES = {
       CREATE: 'QMS:AfterSales:Create',
       DELETE: 'QMS:AfterSales:Delete',
       EDIT: 'QMS:AfterSales:Edit',
-      EXPORT: 'QMS:AfterSales:Export',
-    },
-    INSPECTION: {
-      EXPORT: 'QMS:Inspection:Export',
-      EDIT: 'QMS:Inspection:Edit',
-      DELETE: 'QMS:Inspection:Delete',
-      LIST: 'QMS:Inspection:List',
-      CREATE: 'QMS:Inspection:Create',
     },
     WORK_ORDER: {
       LIST: 'QMS:WorkOrder:List',

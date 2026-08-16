@@ -25,6 +25,23 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：权限码一致性三类遗留处置
+
+**执行内容：**
+- 🔴 审计发现第二个回归：QMS:WorkOrder:Import 被 authorizeWrite 引用但权限表/菜单均无 → 工单导入非管理员被锁；升级 backfill-permission-consistency.ts 为"菜单码 + shared 枚举码"双源合并，本地执行补齐（1 码 + 7 条分配）
+- 🟡 MENU_* 占位孤儿码 7 个：新增 cleanup-menu-placeholder-codes.ts 软删 + 解除 5 条角色关联，本地执行
+- 🟡 死码 6 个（QMS:Inspection:List/Create/Edit/Delete/Export、QMS:AfterSales:Export）：确认无业务引用后从 PERMISSION_CODES 删除；重建 dist
+- 🟡 Supervision 菜单按钮声明补全（Create/Edit/Delete 3 按钮，supervision.module.ts），启动同步后界面可分配
+- ⏳ Ai/Reports/ITP 12 码菜单按钮：涉及前端导航/既有菜单 merge，待业务决策（行动清单记录）
+- docs/permission-consistency-report.md 更新处置结果
+
+**验证结果：**
+- 门禁全绿（lint/typecheck/qms-arch 0 violations/docs-drift）；本地 DB：权限表 197-6 死码未入表+7 占位软删 = 净 190 active + WorkOrder:Import 补齐
+
+**遗留问题：**
+- Ai/Reports/ITP 菜单按钮补全（业务决策）
+- 生产部署 4 个回填/清理脚本（幂等）
+
 ### 2026-08-16 阶段：权限码数据一致性盘点与修复
 
 **执行内容：**

@@ -2,6 +2,21 @@ import process from 'node:process';
 
 import { createId } from '@paralleldrive/cuid2';
 import { PrismaClient } from '@prisma/client';
+import {
+  AI_GENERATION_PERMISSION_CODES,
+  DASHBOARD_PERMISSION_CODES,
+  INSPECTION_ISSUE_PERMISSION_CODES,
+  INSPECTION_RECORD_PERMISSION_CODES,
+  INSPECTION_REQUEST_PERMISSION_CODES,
+  KNOWLEDGE_PERMISSION_CODES,
+  METROLOGY_PERMISSION_CODES,
+  PERMISSION_CODES,
+  REPORTS_PERMISSION_CODES,
+  SUPERVISION_PERMISSION_CODES,
+  TASK_DISPATCH_PERMISSION_CODES,
+  VEHICLE_COMMISSIONING_WRITE_CODES,
+  WELDER_PERMISSION_CODES,
+} from '@qgs/shared';
 import { createModuleLogger } from '~/utils/logger';
 
 /**
@@ -26,8 +41,37 @@ async function main() {
     select: { authCode: true },
     where: { isDeleted: false, status: 1, authCode: { not: null } },
   });
+  function flattenCodes(value: unknown, out: string[] = []) {
+    if (typeof value === 'string') {
+      out.push(value);
+      return out;
+    }
+    if (value && typeof value === 'object') {
+      for (const child of Object.values(value)) flattenCodes(child, out);
+    }
+    return out;
+  }
+
+  const enumCodes = flattenCodes([
+    PERMISSION_CODES,
+    INSPECTION_ISSUE_PERMISSION_CODES,
+    INSPECTION_RECORD_PERMISSION_CODES,
+    INSPECTION_REQUEST_PERMISSION_CODES,
+    METROLOGY_PERMISSION_CODES,
+    KNOWLEDGE_PERMISSION_CODES,
+    WELDER_PERMISSION_CODES,
+    REPORTS_PERMISSION_CODES,
+    TASK_DISPATCH_PERMISSION_CODES,
+    VEHICLE_COMMISSIONING_WRITE_CODES,
+    AI_GENERATION_PERMISSION_CODES,
+    DASHBOARD_PERMISSION_CODES,
+    SUPERVISION_PERMISSION_CODES,
+  ]);
   const declared = [
-    ...new Set(menuCodes.map((row) => String(row.authCode)).filter(Boolean)),
+    ...new Set([
+      ...enumCodes,
+      ...menuCodes.map((row) => String(row.authCode)).filter(Boolean),
+    ]),
   ];
 
   const existing = await prisma.rbac_permissions.findMany({

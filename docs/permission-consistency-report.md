@@ -35,14 +35,16 @@ QMS:Inspection:List/Create/Edit/Delete/Export、QMS:AfterSales:Export、QMS:Insp
 
 ---
 
-## 二、建议动作
+## 二、处置结果（2026-08-16 已完成）
 
-| 优先级 | 动作 | 说明 |
+| 项 | 处置 | 证据 |
 | --- | --- | --- |
-| P0 | ✅ 已做：菜单码全量同步权限表（backfill-permission-consistency.ts） | 修复物料审批回归 + 全部码可分配 |
-| P1 | 菜单按钮声明补全（Ai/Reports/Supervision/ITP 12 码） | 让新码可在界面分配；ITP 码命名需业务确认 |
-| P2 | 清理 MENU\_\* 占位孤儿码（7 个） | 软删 + 解除角色关联 |
-| P2 | 死码处置（8 个） | 保留或按字典规范清理 |
+| 🔴 菜单有码、权限表无（20 个） | ✅ backfill-permission-consistency.ts（升级版：菜单码 + shared 枚举码双源合并） | 20 码 + 140 条分配；QC 审批 ✅ |
+| 🔴 WorkOrder:Import（枚举引用但表/菜单均无） | ✅ 升级版脚本补齐 | 1 码 + 7 条分配；工单导入回归修复 |
+| 🟡 MENU\_\* 占位孤儿码（7 个） | ✅ cleanup-menu-placeholder-codes.ts 软删 | 7 码软删 + 5 条关联解除 |
+| 🟡 死码（6 个：QMS:Inspection:\*/AfterSales:Export） | ✅ 从 PERMISSION_CODES 删除 | 无业务引用确认 |
+| 🟡 Supervision 3 按钮 | ✅ supervision.module.ts 补按钮声明 | 启动同步后界面可分配 |
+| 🟡 Ai/Reports/ITP 12 码菜单按钮 | ⏳ 待业务决策（涉及前端导航/既有菜单 merge） | 见行动清单待办 |
 
 ## 三、验证快照（修复后）
 
