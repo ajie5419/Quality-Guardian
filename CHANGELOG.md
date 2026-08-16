@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：token 吊销与账号状态即时校验（④）
+
+**执行内容：**
+- access token 有效期 7d → 4h（前端已有 401 自动刷新机制，refresh token 30d 不变，无体验影响）
+- 认证中间件 3.auth.ts 异步化：验证 token 后实时校验用户状态（users.status === ACTIVE），禁用/删除账号 1 分钟内失去全部 API 访问权（60s 内存缓存，clearAccountStatusCache 导出）
+- 新增中间件单测 5 例（公开路径跳过/无效 token 拒绝/禁用账号拒绝/活跃放行/状态缓存）；dictionary 集成测试适配 async 中间件；rbac 缓存测试并入主测试文件（B-TEST2 合规）
+
+**验证结果：**
+- 全量测试 2701/2701；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- 60s 账号状态缓存陈旧窗口（可接受）；④ 完成，其余 1-3 继续
+
 ### 2026-08-16 阶段：权限码查询缓存（⑤）
 
 **执行内容：**

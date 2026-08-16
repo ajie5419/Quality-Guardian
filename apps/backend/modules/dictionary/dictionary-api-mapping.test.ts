@@ -214,8 +214,13 @@ describe('dictionary api mapping', () => {
   it('rejects protected routes when auth middleware cannot verify a user', async () => {
     const mod = await import('~/middleware/3.auth');
     mockVerifyAccessToken.mockReturnValue(null);
+    mockGetRequestURL.mockReturnValue({ pathname: '/api/protected' } as never);
 
-    const res = mod.default({ context: {}, method: 'GET' } as any);
+    const res = await mod.default({
+      context: {},
+      method: 'GET',
+      node: { req: {} },
+    } as never);
 
     expect(mockVerifyAccessToken).toHaveBeenCalledWith(expect.anything());
     expect(mockUnAuthorizedResponse).toHaveBeenCalledWith(expect.anything());
