@@ -1,4 +1,6 @@
+import { WELDER_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
+import { authorizeWrite } from '~/modules/rbac';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -8,6 +10,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, WELDER_PERMISSION_CODES.DELETE);
   const id = getRequiredRouterParam(event, 'id', '缺少焊工ID');
   if (typeof id !== 'string') {
     return id;

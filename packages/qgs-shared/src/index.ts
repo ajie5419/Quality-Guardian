@@ -21,12 +21,12 @@ export * from './domain-modules/qms/inspection-request';
 export * from './domain-modules/qms/issue-tracking-status';
 export * from './domain-modules/qms/itp';
 export * from './domain-modules/qms/knowledge';
-
 export * from './domain-modules/qms/knowledge-category';
+
 export * from './domain-modules/qms/metrology-status';
 export * from './domain-modules/qms/param-validation';
-
 export * from './domain-modules/qms/pass-rate-core';
+
 export * from './domain-modules/qms/pass-rate-process';
 export * from './domain-modules/qms/planning-project';
 export * from './domain-modules/qms/prisma-error';
@@ -53,6 +53,7 @@ export * from './domain-modules/qms/work-order';
 export * from './domain-modules/qms/work-order-requirement-attachments';
 export * from './domain-modules/qms/work-order-requirement-summary';
 export * from './domain-modules/qms/work-order-status';
+export * from './domain-modules/qms/write-permission-codes';
 export * from './enums';
 export * from './modules/qms/after-sales';
 export * from './modules/qms/constants';

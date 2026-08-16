@@ -1,6 +1,8 @@
+import { KNOWLEDGE_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import {
   isPrismaNotFoundError,
@@ -17,6 +19,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const updateKnowledgeCategorySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, KNOWLEDGE_PERMISSION_CODES.EDIT);
   const id = getRequiredRouterParam(event, 'id', '缺少分类ID');
   if (typeof id !== 'string') {
     return id;

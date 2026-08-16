@@ -1,6 +1,8 @@
+import { METROLOGY_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { MetrologyService } from '~/modules/metrology/metrology.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -13,6 +15,7 @@ import {
 const batchDeleteSchema = z.object({ ids: z.array(z.string()).min(1) });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.DELETE);
   const userinfo = getCurrentUser(event);
 
   try {

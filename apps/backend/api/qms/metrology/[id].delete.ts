@@ -1,5 +1,7 @@
+import { METROLOGY_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
 import { MetrologyService } from '~/modules/metrology/metrology.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -12,6 +14,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.DELETE);
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', '缺少计量器具ID');

@@ -1,6 +1,8 @@
+import { KNOWLEDGE_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { KnowledgeRouteService } from '~/modules/knowledge/knowledge-route.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 import {
@@ -12,6 +14,7 @@ import {
 const createKnowledgeCategorySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, KNOWLEDGE_PERMISSION_CODES.CREATE);
   try {
     const body = createKnowledgeCategorySchema.parse(await readBody(event));
     const newCategory = await KnowledgeRouteService.upsertCategory(body);

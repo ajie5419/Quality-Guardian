@@ -1,6 +1,8 @@
+import { METROLOGY_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -12,6 +14,7 @@ import {
 const borrowSchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.BORROW_CREATE);
   const userinfo = getCurrentUser(event);
 
   try {

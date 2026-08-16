@@ -25,6 +25,21 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：统一授权框架 Phase 2（计量/知识库/焊工迁移）
+
+**执行内容：**
+- @qgs/shared 新增 write-permission-codes.ts：METROLOGY_PERMISSION_CODES（11 码，含借还/检定计划子域）、KNOWLEDGE_PERMISSION_CODES、WELDER_PERMISSION_CODES（值对齐历史 rbac_permissions 码）；重建 dist
+- 迁移 21 个写端点：计量 11 个（台账 CRUD/导入/借还/检定计划 CRUD+导入）、知识库 6 个（条目/分类 CRUD）、焊工 4 个（CRUD/导入）——均加 authorizeWrite 声明（薄转发文件包装、内联文件插入、defineValidatedHandler 文件适配）
+- B-AUTH1 baseline 清理：140 → 119（释放已迁移 21 条，修完即删基线）
+
+**验证结果：**
+- metrology/knowledge/welder 测试 249/249；全量 296 文件/2693 用例通过；typecheck 通过；lint 全绿；qms-arch --all 0 violations；docs-drift PASSED
+- 本地库验证：历史 rbac_permissions 已含全部所需码（150+ 码），角色分配已就绪，无需回填
+
+**遗留问题：**
+- 剩余约 119 个写端点待迁移（售后/供应商/质量损失/策划全系/工单/报表/监造/派发/车辆/工作台/AI 等，下批继续）
+- 监造（supervision）等模块无历史权限码，迁移时需新码 + 回填
+
 ### 2026-08-16 阶段：统一授权框架实施（Phase 1 + 示范迁移）
 
 **执行内容：**

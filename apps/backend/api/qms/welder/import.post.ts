@@ -1,5 +1,7 @@
+import { WELDER_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
 import { parseNonEmptyArray } from '~/utils/request-validation';
@@ -14,6 +16,7 @@ const bodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, WELDER_PERMISSION_CODES.IMPORT);
   try {
     const body = bodySchema.parse(await readBody(event));
     const items = parseNonEmptyArray<Record<string, unknown>>(body.items);
