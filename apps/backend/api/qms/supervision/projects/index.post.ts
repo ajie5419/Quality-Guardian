@@ -1,5 +1,7 @@
+import { SUPERVISION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
@@ -14,6 +16,7 @@ const createProjectBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.CREATE);
   try {
     const body = createProjectBodySchema.parse(await readBody(event));
     if (!String(body.projectName || '').trim()) {

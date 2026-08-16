@@ -78,3 +78,22 @@ export const AI_GENERATION_PERMISSION_CODES = {
 export const DASHBOARD_PERMISSION_CODES = {
   CHART_EDIT: 'QMS:Dashboard:ChartEdit',
 } as const;
+
+/**
+ * Permission codes for quality supervision (backend-enforced).
+ */
+export const SUPERVISION_PERMISSION_CODES = {
+  CREATE: 'QMS:Supervision:Create',
+  DELETE: 'QMS:Supervision:Delete',
+  EDIT: 'QMS:Supervision:Edit',
+} as const;
+
+/**
+ * Permission codes for inspection requests (backend-enforced).
+ */
+export const INSPECTION_REQUEST_PERMISSION_CODES = {
+  CLOSE: 'QMS:Inspection:Requests:Close',
+  CREATE: 'QMS:Inspection:Requests:Create',
+  DELETE: 'QMS:Inspection:Requests:Delete',
+  DISPATCH: 'QMS:Inspection:Requests:Dispatch',
+} as const;

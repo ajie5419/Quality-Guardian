@@ -1,9 +1,10 @@
+import { SUPERVISION_PERMISSION_CODES as SPC } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
-import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -16,17 +17,13 @@ const createIssueActionBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = getCurrentUser(event);
-
+  const u = await authorizeWrite(event, SPC.EDIT);
+  const uid = String(u.id);
   const id = getRouterParam(event, 'id');
   if (!id) return badRequestResponse(event, '无效监造问题ID');
   try {
     const body = createIssueActionBodySchema.parse(await readBody(event));
-    const data = await SupervisionService.createIssueAction(
-      id,
-      body,
-      String(userinfo.id),
-    );
+    const data = await SupervisionService.createIssueAction(id, body, uid);
     try {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: Array.isArray(body.attachments) ? body.attachments : [],
@@ -36,6 +33,7 @@ export default defineEventHandler(async (event) => {
       });
     } catch (error) {
       if (!isPrismaSchemaMismatchError(error)) throw error;
+      logApiError('supervision-attachment-registration', error);
     }
     return useResponseSuccess(data);
   } catch (error) {

@@ -5,14 +5,18 @@ import {
   qualityClassificationIdSchema,
   QualityClassificationService,
 } from '~/modules/quality-classification';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
+  const adminCheck = requireSystemAdmin(event, getCurrentUser(event));
+  if (adminCheck) return adminCheck;
   try {
     await assertQualityClassificationPermission(
       event,

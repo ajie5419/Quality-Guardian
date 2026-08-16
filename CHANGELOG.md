@@ -25,6 +25,22 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：统一授权框架 Phase 2f（系统设置/监造/收尾——B-AUTH1 基线清零）
+
+**执行内容：**
+- 系统设置类 22 个写端点：薄转发包装 requireSystemAdmin（7 个：字典增改、菜单编辑、角色数据范围、设置写入 3 个含 2 个原本无校验的开关接口）、内联插入（4 个）+ 已有 assertPermission 风格自动合规（8 个，门禁正则扩展为 authorizeWrite/requireSystemAdmin/assert*Permission/ensurePermission）
+- 监造 supervision 15 个写端点：新增 SUPERVISION_PERMISSION_CODES（Create/Edit/Delete）+ authorizeWrite 迁移 + 回填脚本 backfill-supervision-permissions.ts（本地执行：3 码 + 21 条角色分配）
+- 收尾 14 个：报检任务 5（现成 Requests 码）、归档任务 1、文件管理 2、供应商身份链接 3、主数据改名/AI 设置测试/手动故障率 3（requireSystemAdmin）
+- 豁免 4 类：登录态上传端点（qms/upload）、客户端日志上报、用户个人偏好（自服务操作）——门禁豁免列表
+- **B-AUTH1 基线清零：全部 189 个写端点均有授权声明或豁免**
+
+**验证结果：**
+- 全量 2693/2693；typecheck/lint/qms-arch 0 violations/docs-drift 全绿
+
+**遗留问题：**
+- 读端点授权（读接口的数据范围）属 Phase 4（数据范围启用）范畴，未在本期
+- 权限码数据一致性盘点（rbac_permissions vs 菜单 authCode）仍待做
+
 ### 2026-08-16 阶段：统一授权框架 Phase 2e（报表/派发/车辆/AI/工作台迁移）
 
 **执行内容：**

@@ -2,6 +2,7 @@ import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -15,6 +16,8 @@ const bodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
+  const adminCheck = requireSystemAdmin(event, getCurrentUser(event));
+  if (adminCheck) return adminCheck;
   const userinfo = getCurrentUser(event);
 
   try {

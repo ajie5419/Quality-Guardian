@@ -1,4 +1,6 @@
+import { SUPERVISION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupervisionPlanTaskService } from '~/modules/supervision/supervision-plan-task.service';
 import { createPlanTaskSchema } from '~/modules/supervision/supervision.schema';
 import { logApiError } from '~/utils/api-logger';
@@ -9,6 +11,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.CREATE);
   const projectId = getRouterParam(event, 'id');
   if (!projectId) return badRequestResponse(event, '监造项目不能为空');
 

@@ -397,11 +397,11 @@ check_b_auth1() {
     esac
     repo_path="$(to_repo_path "$file")"
     case "$repo_path" in
-      apps/backend/api/qms/public/*|apps/backend/api/auth/*|apps/backend/api/uploads/*|apps/backend/api/telegram/*|apps/backend/api/webhook/*|apps/backend/api/upload.ts)
+      apps/backend/api/qms/public/*|apps/backend/api/auth/*|apps/backend/api/uploads/*|apps/backend/api/telegram/*|apps/backend/api/webhook/*|apps/backend/api/upload.ts|apps/backend/api/qms/upload.post.ts|apps/backend/api/system/log/client.post.ts|apps/backend/api/user/preferences/*)
         continue
         ;;
     esac
-    if ! grep -qE 'authorizeWrite|requireSystemAdmin' "$file"; then
+    if ! grep -qE 'authorizeWrite|requireSystemAdmin|assert[A-Z][A-Za-z]*Permission|ensurePermission' "$file"; then
       baseline_limit=""
       if baseline_limit="$(baseline_line_limit "B-AUTH1" "$repo_path")" && (( baseline_limit >= 1 )); then
         echo -e "${YELLOW}Baseline B-AUTH1:${NC} $repo_path (write endpoint without auth declaration)"
