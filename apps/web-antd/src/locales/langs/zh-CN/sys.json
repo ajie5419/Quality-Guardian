@@ -83,7 +83,13 @@
     "rebuildProjectionTitle": "重建合格率投影",
     "projectionRebuildConfirm": "在完整的新代次发布前，报表将继续使用原有统计方式。",
     "projectionRebuildQueued": "合格率投影重建任务已提交",
-    "projectionRebuildQueueFailed": "提交合格率投影重建任务失败"
+    "projectionRebuildQueueFailed": "提交合格率投影重建任务失败",
+    "uploadSettings": "上传设置",
+    "uploadTypeLabel": "允许上传的文件类型",
+    "uploadTypeDesc": "控制所有上传入口（含匿名报检上传）允许的文件格式。SVG、HTML、宏文档等可携带脚本的格式始终禁止，修改后即时生效。",
+    "uploadTypeImages": "仅图片（jpg / jpeg / png / webp）",
+    "uploadTypeImagesPdf": "图片 + PDF",
+    "uploadTypeImagesPdfOffice": "图片 + PDF + Word/Excel（推荐）"
   },
   "qualityClassification": {
     "title": "质量分类设置",

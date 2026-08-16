@@ -83,6 +83,38 @@ describe('upload service handler', () => {
     expect(result).toEqual(expect.objectContaining({ _error: true }));
   });
 
+  it('resumes the file stream when upload fails so the request terminates', async () => {
+    (FileStorageService.uploadFileStream as any).mockRejectedValue(
+      new Error('boom'),
+    );
+    (getOptionalCurrentUser as any).mockReturnValue(null);
+
+    const mockFile = {
+      on: vi.fn(),
+      resume: vi.fn(),
+      destroy: vi.fn(),
+    };
+    const event = {
+      node: {
+        req: {
+          headers: { 'content-type': 'multipart/form-data; boundary=----test' },
+          pipe: vi.fn(),
+        },
+        res: { setHeader: vi.fn() },
+      },
+    } as any;
+
+    (event.node.req.pipe as any).mockImplementation((busboy: any) => {
+      busboy._emit('file', 'file', mockFile, 'evil.html', null, 'text/html');
+      busboy._emit('finish');
+    });
+
+    const result = await uploadHandler(event);
+
+    expect(mockFile.resume).toHaveBeenCalled();
+    expect(result).toEqual(expect.objectContaining({ _error: true }));
+  });
+
   it('calls uploadFileStream with correct parameters on file upload', async () => {
     (FileStorageService.uploadFileStream as any).mockResolvedValue({
       id: 'file-1',

@@ -23,6 +23,7 @@ import { useImageCompress } from '#/composables/useImageCompress';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
   applyUploadResponse,
+  getUploadResponse,
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
@@ -210,7 +211,9 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
       message.warning('自检记录上传完成，但未返回有效地址');
     }
   } else if (info.file.status === 'error') {
-    message.error(`${info.file.name} 上传失败`);
+    const response = getUploadResponse(info.file);
+    const reason = response?.message || '上传失败';
+    message.error(`${info.file.name} ${reason}`);
   }
 
   attachmentFileList.value = [...info.fileList];

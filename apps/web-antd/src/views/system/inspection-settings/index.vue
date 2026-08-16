@@ -42,6 +42,10 @@ import {
   rebuildPassRateProjectionApi,
   updatePassRateProjectionEnabledApi,
 } from '#/api/system/pass-rate-projection';
+import {
+  getSystemSettingApi,
+  saveSystemSettingApi,
+} from '#/api/system/preference';
 
 type ProcessCategory = InspectionSettingsApi.ProcessCategory;
 type ProcessItem = InspectionSettingsApi.ProcessItem;
@@ -64,6 +68,47 @@ const savingProjection = ref(false);
 const rebuildingProjection = ref(false);
 const manualCreateEnabled = ref(true);
 const incomingMaterialFreeInputEnabled = ref(false);
+const uploadAllowedExtensions = ref<
+  'images' | 'images+pdf' | 'images+pdf+office'
+>('images+pdf+office');
+const savingUploadSetting = ref(false);
+
+const UPLOAD_ALLOWED_EXTENSIONS_KEY = 'UPLOAD_ALLOWED_EXTENSIONS';
+
+async function loadUploadTypeSetting() {
+  try {
+    const value = await getSystemSettingApi(UPLOAD_ALLOWED_EXTENSIONS_KEY);
+    uploadAllowedExtensions.value =
+      value === 'images' ||
+      value === 'images+pdf' ||
+      value === 'images+pdf+office'
+        ? value
+        : 'images+pdf+office';
+  } catch {
+    // Fail closed to the default documents tier.
+    uploadAllowedExtensions.value = 'images+pdf+office';
+  }
+}
+
+async function handleUploadTypeChange(
+  value: 'images' | 'images+pdf' | 'images+pdf+office',
+) {
+  const previous = uploadAllowedExtensions.value;
+  savingUploadSetting.value = true;
+  try {
+    await saveSystemSettingApi(
+      UPLOAD_ALLOWED_EXTENSIONS_KEY,
+      value,
+      'Allowed upload file types: images | images+pdf | images+pdf+office',
+    );
+    message.success(t('common.saveSuccess'));
+  } catch {
+    uploadAllowedExtensions.value = previous;
+    message.error(t('common.saveFailed'));
+  } finally {
+    savingUploadSetting.value = false;
+  }
+}
 const processRows = ref<ProcessItem[]>([]);
 const processProcessIds = ref(new Set<string>());
 const incomingProcessIds = ref(new Set<string>());
@@ -145,6 +190,7 @@ async function loadSettings() {
     incomingMaterialFreeInputEnabled.value =
       materialInputSetting.incomingMaterialFreeInputEnabled;
     processRows.value = processes;
+    await loadUploadTypeSetting();
     processProcessIds.value = new Set(
       processes
         .filter((item) => item.categories.includes('PROCESS'))
@@ -518,6 +564,44 @@ onMounted(loadSettings);
             @change="(checked) => handleMaterialInputToggle(checked as boolean)"
           />
         </div>
+      </section>
+
+      <section class="border-border border-b pb-6">
+        <h2 class="mb-4 text-base font-semibold">
+          {{ t('sys.inspectionSettings.uploadSettings') }}
+        </h2>
+        <div class="flex items-center justify-between gap-4">
+          <span>{{ t('sys.inspectionSettings.uploadTypeLabel') }}</span>
+          <Select
+            v-model:value="uploadAllowedExtensions"
+            class="w-64"
+            :disabled="!canEdit || savingUploadSetting"
+            :loading="savingUploadSetting"
+            :options="[
+              {
+                label: t('sys.inspectionSettings.uploadTypeImages'),
+                value: 'images',
+              },
+              {
+                label: t('sys.inspectionSettings.uploadTypeImagesPdf'),
+                value: 'images+pdf',
+              },
+              {
+                label: t('sys.inspectionSettings.uploadTypeImagesPdfOffice'),
+                value: 'images+pdf+office',
+              },
+            ]"
+            @change="
+              (value) =>
+                handleUploadTypeChange(
+                  value as 'images' | 'images+pdf' | 'images+pdf+office',
+                )
+            "
+          />
+        </div>
+        <p class="text-muted-foreground mt-1 text-sm">
+          {{ t('sys.inspectionSettings.uploadTypeDesc') }}
+        </p>
       </section>
 
       <section>

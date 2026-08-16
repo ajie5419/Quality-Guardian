@@ -3,7 +3,14 @@ import { Readable } from 'node:stream';
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { SystemService } from '~/modules/system';
 import prisma from '~/utils/prisma';
+
+vi.mock('~/modules/system', () => ({
+  SystemService: {
+    getSettingValue: vi.fn(),
+  },
+}));
 
 const uploadStream = vi.fn();
 const download = vi.fn();
@@ -54,6 +61,7 @@ describe('fileStorageService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+    vi.mocked(SystemService.getSettingValue).mockResolvedValue(null);
   });
 
   it('detects image filenames by extension', () => {
@@ -303,21 +311,21 @@ describe('fileStorageService', () => {
 
   it('uploads stream through storage strategy and persists normalized asset payload', async () => {
     uploadStream.mockResolvedValue({
-      objectKey: 'uploads/doc.pdf',
+      objectKey: 'uploads/photo.png',
       sha256: 'hash',
       size: 3,
       storageProvider: 'LOCAL',
-      storedName: 'doc.pdf',
-      url: '/uploads/doc.pdf',
+      storedName: 'photo.png',
+      url: '/uploads/photo.png',
     });
     vi.mocked(prisma.file_assets.create).mockResolvedValue({
       id: 'file-1',
-      legacyUrl: '/uploads/doc.pdf',
-      url: '/uploads/doc.pdf',
+      legacyUrl: '/uploads/photo.png',
+      url: '/uploads/photo.png',
     } as never);
 
     const result = await FileStorageService.uploadFileStream({
-      filename: 'doc.pdf',
+      filename: 'photo.png',
       mimeType: null,
       stream: Readable.from(Buffer.from('abc')),
       uploadedBy: 7,
@@ -325,23 +333,23 @@ describe('fileStorageService', () => {
 
     expect(uploadStream).toHaveBeenCalledWith(
       expect.objectContaining({
-        mimeType: 'application/pdf',
+        mimeType: 'image/png',
         stream: expect.any(Readable),
       }),
     );
     expect(prisma.file_assets.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        mimeType: 'application/pdf',
-        originalName: 'doc.pdf',
+        mimeType: 'image/png',
+        originalName: 'photo.png',
         uploadedBy: '7',
-        url: '/uploads/doc.pdf',
+        url: '/uploads/photo.png',
       }),
     });
     expect(result).toEqual(
       expect.objectContaining({
         id: 'file-1',
-        legacyUrl: '/uploads/doc.pdf',
-        url: '/uploads/doc.pdf',
+        legacyUrl: '/uploads/photo.png',
+        url: '/uploads/photo.png',
       }),
     );
   });
@@ -441,6 +449,183 @@ describe('fileStorageService', () => {
     await expect(
       FileStorageService.uploadFile({ data: Buffer.alloc(0) }),
     ).rejects.toThrow('upload file payload is empty');
+    expect(uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported extensions under the default images policy', async () => {
+    await expect(
+      FileStorageService.uploadFileStream({
+        filename: 'evil.html',
+        mimeType: 'text/html',
+        stream: Readable.from(Buffer.from('<script>')),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', httpStatus: 400 });
+    expect(uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('rejects svg even when the policy allows pdf', async () => {
+    vi.mocked(SystemService.getSettingValue).mockResolvedValue('images+pdf');
+    await expect(
+      FileStorageService.uploadFileStream({
+        filename: 'logo.svg',
+        mimeType: 'image/svg+xml',
+        stream: Readable.from(Buffer.from('<svg></svg>')),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('accepts pdf only when the policy is images+pdf', async () => {
+    vi.mocked(SystemService.getSettingValue).mockResolvedValue('images+pdf');
+    uploadStream.mockResolvedValue({
+      objectKey: 'uploads/doc.pdf',
+      sha256: 'hash',
+      size: 3,
+      storageProvider: 'LOCAL',
+      storedName: 'doc.pdf',
+      url: '/uploads/doc.pdf',
+    });
+    vi.mocked(prisma.file_assets.create).mockResolvedValue({
+      id: 'file-1',
+      legacyUrl: '/uploads/doc.pdf',
+      url: '/uploads/doc.pdf',
+    } as never);
+
+    const result = await FileStorageService.uploadFileStream({
+      filename: 'doc.pdf',
+      mimeType: 'application/pdf',
+      stream: Readable.from(Buffer.from('abc')),
+      uploadedBy: 7,
+    });
+
+    expect(uploadStream).toHaveBeenCalledWith(
+      expect.objectContaining({ mimeType: 'application/pdf' }),
+    );
+    expect(result).toEqual(
+      expect.objectContaining({
+        id: 'file-1',
+        url: '/uploads/doc.pdf',
+      }),
+    );
+  });
+
+  it('ignores a client MIME spoof for a non-allowed extension', async () => {
+    await expect(
+      FileStorageService.uploadFileStream({
+        filename: 'evil.html',
+        mimeType: 'image/png',
+        stream: Readable.from(Buffer.from('x')),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('accepts an extension-less upload when the MIME type is allowed', async () => {
+    uploadStream.mockResolvedValue({
+      objectKey: 'uploads/photo.png',
+      sha256: 'hash',
+      size: 1,
+      storageProvider: 'LOCAL',
+      storedName: 'photo.png',
+      url: '/uploads/photo.png',
+    });
+    vi.mocked(prisma.file_assets.create).mockResolvedValue({
+      id: 'file-1',
+      url: '/uploads/photo.png',
+    } as never);
+
+    const result = await FileStorageService.uploadFileStream({
+      filename: 'photo',
+      mimeType: 'image/png',
+      stream: Readable.from(Buffer.from('x')),
+    });
+
+    expect(uploadStream).toHaveBeenCalledWith(
+      expect.objectContaining({ mimeType: 'image/png' }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: 'file-1' }));
+  });
+
+  it('falls back to the default documents policy on an unparsable setting value', async () => {
+    vi.mocked(SystemService.getSettingValue).mockResolvedValue('garbage');
+    uploadStream.mockResolvedValue({
+      objectKey: 'uploads/report.pdf',
+      sha256: 'hash',
+      size: 1,
+      storageProvider: 'LOCAL',
+      storedName: 'report.pdf',
+      url: '/uploads/report.pdf',
+    });
+    vi.mocked(prisma.file_assets.create).mockResolvedValue({
+      id: 'file-1',
+      url: '/uploads/report.pdf',
+    } as never);
+
+    const result = await FileStorageService.uploadFileStream({
+      filename: 'report.pdf',
+      mimeType: 'application/pdf',
+      stream: Readable.from(Buffer.from('x')),
+    });
+
+    expect(result).toEqual(expect.objectContaining({ id: 'file-1' }));
+    await expect(
+      FileStorageService.uploadFileStream({
+        filename: 'evil.html',
+        mimeType: 'text/html',
+        stream: Readable.from(Buffer.from('x')),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('accepts office documents under the default documents policy', async () => {
+    uploadStream.mockResolvedValue({
+      objectKey: 'uploads/annex.docx',
+      sha256: 'hash',
+      size: 1,
+      storageProvider: 'LOCAL',
+      storedName: 'annex.docx',
+      url: '/uploads/annex.docx',
+    });
+    vi.mocked(prisma.file_assets.create).mockResolvedValue({
+      id: 'file-1',
+      url: '/uploads/annex.docx',
+    } as never);
+
+    const result = await FileStorageService.uploadFileStream({
+      filename: 'annex.docx',
+      mimeType: null,
+      stream: Readable.from(Buffer.from('x')),
+    });
+
+    expect(uploadStream).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }),
+    );
+    expect(result).toEqual(expect.objectContaining({ id: 'file-1' }));
+  });
+
+  it('rejects pdf under the strict images policy', async () => {
+    vi.mocked(SystemService.getSettingValue).mockResolvedValue('images');
+    await expect(
+      FileStorageService.uploadFileStream({
+        filename: 'doc.pdf',
+        mimeType: 'application/pdf',
+        stream: Readable.from(Buffer.from('x')),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(uploadStream).not.toHaveBeenCalled();
+  });
+
+  it('rejects svg under the default documents policy', async () => {
+    await expect(
+      FileStorageService.uploadFileStream({
+        filename: 'logo.svg',
+        mimeType: 'image/svg+xml',
+        stream: Readable.from(Buffer.from('<svg></svg>')),
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(uploadStream).not.toHaveBeenCalled();
   });
 });

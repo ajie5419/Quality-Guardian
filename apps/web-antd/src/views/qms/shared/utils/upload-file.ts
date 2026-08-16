@@ -12,6 +12,7 @@ export interface QmsUploadResponseData {
 export interface QmsUploadResponse {
   code?: number;
   data?: QmsUploadResponseData;
+  message?: string;
 }
 
 export function getUploadResponse(file: { response?: unknown }) {
