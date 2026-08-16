@@ -86,6 +86,7 @@ export const SUPERVISION_PERMISSION_CODES = {
   CREATE: 'QMS:Supervision:Create',
   DELETE: 'QMS:Supervision:Delete',
   EDIT: 'QMS:Supervision:Edit',
+  LIST: 'QMS:Supervision:List',
 } as const;
 
 /**

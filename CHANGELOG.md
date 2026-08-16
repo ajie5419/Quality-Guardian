@@ -25,6 +25,21 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：权限码数据一致性盘点与修复
+
+**执行内容：**
+- 三方盘点（rbac_permissions 177 码 vs menus.authCode 172 码 vs 代码枚举 103 值）：发现 4 类差异，产出 docs/permission-consistency-report.md
+- 🔴 修复真实回归：菜单有码但权限表无行的 20 个码中，物料审批 3 码被 authorizeWrite 引用 → 非管理员审批全 403；新增 backfill-permission-consistency.ts（菜单码全量同步权限表 + 全角色分配），本地执行：20 码 + 140 条角色分配；验证 QC 审批 ✅、越权删除仍 ❌
+- @qgs/shared 补 SUPERVISION_PERMISSION_CODES.LIST（菜单声明引用但枚举缺失）；重建 dist
+- 另发现：MENU_* 占位孤儿码 7 个（建议清理）、新业务码 12 个未同步菜单按钮（界面不可分配）、死码 8 个
+
+**验证结果：**
+- 门禁全绿（lint/typecheck/qms-arch 0 violations/docs-drift）；全量测试 2693 不受影响（授权演示脚本验证）
+
+**遗留问题：**
+- P1：Ai/Reports/Supervision/ITP 12 码的菜单按钮声明补全（ITP 码命名需业务确认）
+- P2：MENU_* 占位码清理、死码处置
+
 ### 2026-08-16 阶段：统一授权框架 Phase 2f（系统设置/监造/收尾——B-AUTH1 基线清零）
 
 **执行内容：**
