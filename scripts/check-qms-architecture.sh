@@ -8,6 +8,18 @@ ROOT_DIR="${QMS_ARCH_ROOT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 QMS_VIEWS_DIR="$ROOT_DIR/apps/web-antd/src/views/qms"
 BACKEND_DIR="$ROOT_DIR/apps/backend"
 SOURCE_RULE_CHECKER="$SCRIPT_DIR/check-qms-source-rules.mjs"
+
+# Locate node: PATH first, then common install roots (macOS / Linux).
+NODE_BIN="$(command -v node 2>/dev/null || true)"
+if [[ -z "$NODE_BIN" ]]; then
+  for candidate in /usr/local/bin/node /opt/homebrew/bin/node "$HOME/.local/share/pnpm/node"; do
+    if [[ -x "$candidate" ]]; then NODE_BIN="$candidate"; break; fi
+  done
+fi
+if [[ -z "$NODE_BIN" ]]; then
+  echo "error: node not found" >&2
+  exit 1
+fi
 MAX_INDEX_LINES=500
 BASELINE_FILE="${QMS_ARCH_BASELINE:-$ROOT_DIR/scripts/qms-architecture-baseline.txt}"
 SCOPE="${QMS_ARCH_SCOPE:-changed}"
@@ -38,6 +50,7 @@ Usage: check-qms-architecture.sh [--changed|--all]
 
 Rules:
   R1: no direct requestClient usage under apps/web-antd/src/views/qms
+  R2: no bare axios/fetch usage under apps/web-antd/src/views/qms
   R3: index.vue must not exceed the line threshold
   B-D1: backend legacy architecture directories must not exist
   B-R1: api/ files must not import prisma directly
@@ -55,6 +68,8 @@ Rules:
   B-M2: conditions must not branch on Chinese string literals
   B-E1: empty catch blocks are forbidden
   B-E2: catch blocks must record errors with an approved logger
+  B-EC: BusinessError codes must be members of the shared ErrorCode dictionary
+  B-GF: newly added cross-table name columns must be registered as governed fields
   B-ID1: selector value keys must use canonical IDs, not names
   B-ID2: supplier-related change events must pair identity names with IDs
   B-ID3: controlled supplier writes must pair supplierName with supplierId
@@ -294,6 +309,35 @@ check_r1() {
   grep_rule "R1" "Do not call requestClient directly from qms views." '\brequestClient[[:space:]]*\.' "${QMS_VIEW_TARGETS[@]}"
 }
 
+# R2: qms views must not use bare axios/fetch — go through #/api wrappers
+# (useRequest / request.ts) so auth, error handling and response shape stay
+# centralized. Historical bare usage is grandfathered via baseline (R2 lines).
+check_r2() {
+  (( ${#QMS_VIEW_TARGETS[@]} == 0 )) && return 0
+  local file=''
+  local repo_path=''
+  local line_no=''
+  local match_line=''
+  local seen=''
+
+  # Collect raw hits; each is "file:line:content".
+  while IFS= read -r hit; do
+    [[ -n "$hit" ]] || continue
+    file="${hit%%:*}"
+    rest="${hit#*:}"
+    line_no="${rest%%:*}"
+    repo_path="$(to_repo_path "$file")"
+
+    # baseline R2|path|line — grandfather specific historical lines.
+    if awk -F'|' -v p="$repo_path" -v l="$line_no" '$1=="R2" && $2==p && $3==l {found=1} END{exit !found}' "$BASELINE_FILE"; then
+      echo -e "${YELLOW}Baseline R2:${NC} $repo_path:$line_no (grandfathered)"
+      baseline_hits=$((baseline_hits + 1))
+      continue
+    fi
+    report_violation "R2" "$repo_path:$line_no" "Bare axios/fetch in qms views; use the #/api wrapper instead."
+  done < <(grep -nHE "(from[[:space:]]+['\"]axios['\"])|(axios\.(get|post|put|delete|patch))|\bfetch\(" "${QMS_VIEW_TARGETS[@]}" || true)
+}
+
 check_r3() {
   local index_file=''
   local lines=''
@@ -426,7 +470,7 @@ check_backend_source_rules() {
   if (( ${#REPO_IDENTITY_TARGETS[@]} > 0 )); then
     printf '%s\n' "${REPO_IDENTITY_TARGETS[@]}" >"$identity_files_file"
   fi
-  if ! node "$SOURCE_RULE_CHECKER" \
+  if ! "$NODE_BIN" "$SOURCE_RULE_CHECKER" \
     --root "$ROOT_DIR" \
     --baseline "$BASELINE_FILE" \
     --files-from "$files_file" \
@@ -501,6 +545,44 @@ check_b_map1() {
   done <"$changed_file"
 }
 
+# B-GF: newly added cross-table name columns must be registered in
+# master-data-fields.ts (the governed-fields registry). Only NEW columns are
+# checked (incremental), so legacy ungoverned columns are not flagged.
+# Ambiguous generic columns (name/category/type) and identity tables are
+# excluded; run the python helper and report its findings.
+check_b_gf() {
+  local helper="$SCRIPT_DIR/check-governed-fields.py"
+  [[ -f "$helper" ]] || return 0
+
+  local py_bin="$(command -v python3 || echo /usr/bin/python3)"
+  [[ -x "$py_bin" ]] || return 0
+
+  # Only meaningful in --changed mode (need a base ref to diff schema columns).
+  [[ "$SCOPE" == "all" ]] && return 0
+
+  local base_ref=''
+  base_ref="$(resolve_base_ref || true)"
+  if [[ -z "$base_ref" ]]; then
+    return 0
+  fi
+
+  # Diff the schema between base ref and working tree; feed the added column
+  # lines to the helper, which cross-checks against the governance registry.
+  local added_schema=''
+  added_schema="$(git -C "$ROOT_DIR" diff "$base_ref" -- apps/backend/prisma/schema.prisma | grep -E '^\+' | grep -v '^+++' || true)"
+
+  [[ -n "$added_schema" ]] || return 0
+
+  local output=''
+  output="$(printf '%s\n' "$added_schema" | "$py_bin" "$helper" --root "$ROOT_DIR" 2>/dev/null || true)"
+  if [[ -n "$output" ]]; then
+    while IFS='|' read -r rule location message; do
+      [[ -n "$rule" && -n "$location" ]] || continue
+      report_violation "$rule" "$location" "$message"
+    done <<<"$output"
+  fi
+}
+
 # B-TEST1: backend test files must not live in centralized __tests__/tests/test directories.
 check_b_test1() {
   (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
@@ -562,6 +644,7 @@ echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} module
 echo
 
 check_r1
+check_r2
 check_r3
 check_b_d1
 check_b_r1
@@ -575,6 +658,7 @@ check_backend_source_rules
 check_b_sec1
 check_b_id7
 check_b_map1
+check_b_gf
 check_b_test1
 check_b_test2
 check_b_test3

@@ -60,6 +60,19 @@ const MASTER_DATA_FIELDS_FILE = 'apps/backend/utils/master-data-fields.ts';
 const MAP_KEY_METHODS = new Set(['get', 'has', 'set']);
 const AMBIGUOUS_GOVERNED_NAME_FIELDS = new Set(['category', 'name', 'type']);
 
+// Declared error codes (must stay in sync with @qgs/shared ErrorCode enum).
+const DECLARED_ERROR_CODES = new Set([
+  'VALIDATION',
+  'NOT_FOUND',
+  'FORBIDDEN',
+  'UNAUTHORIZED',
+  'CONFLICT',
+  'BAD_REQUEST',
+  'DUPLICATE',
+  'BUSINESS',
+  'INTERNAL',
+]);
+
 function parseArguments(argv) {
   const options = {
     baseline: '',
@@ -615,6 +628,30 @@ function analyzeFile(rootDir, filePath) {
           'Catch blocks must record the error with an approved logger.',
           'catch-without-error-log',
         );
+      }
+    }
+
+    // B-EC: BusinessError codes must come from the shared ErrorCode dictionary.
+    // Ad-hoc string codes invent new vocabulary that the frontend cannot grade.
+    if (ts.isNewExpression(node) && node.expression) {
+      const callee = ts.isPropertyAccessExpression(node.expression)
+        ? node.expression.name.text
+        : node.expression.getText(sourceFile);
+      if (callee === 'BusinessError' && node.arguments?.length) {
+        const firstArg = node.arguments[0];
+        if (
+          firstArg &&
+          (ts.isStringLiteral(firstArg) ||
+            ts.isNoSubstitutionTemplateLiteral(firstArg)) &&
+          !DECLARED_ERROR_CODES.has(firstArg.text)
+        ) {
+          addFinding(
+            'B-EC',
+            firstArg,
+            'BusinessError code must be a member of the shared ErrorCode dictionary (add new codes to @qgs/shared ErrorCode first).',
+            `error-code-${firstArg.text}`,
+          );
+        }
       }
     }
 
