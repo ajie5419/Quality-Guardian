@@ -84,6 +84,7 @@ Rules:
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories
   B-TEST2: backend test files must have a sibling source file (orphan tests forbidden)
   B-TEST3: tests importing ~/utils/prisma must also vi.mock it
+  B-AUTH1: write endpoints (post/put/delete/patch) must declare authorization (authorizeWrite/requireSystemAdmin) unless public
 
 Modes:
   --changed  Check changed files only, including committed diff, staged changes,
@@ -380,6 +381,37 @@ check_b_d1() {
   done
 }
 
+check_b_auth1() {
+  # Write endpoints must call authorizeWrite (or requireSystemAdmin).
+  # Public, auth, upload, telegram and webhook routes are exempt.
+  local file=''
+  local repo_path=''
+  local base_name=''
+
+  (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
+  for file in "${API_TS_TARGETS[@]}"; do
+    base_name="$(basename "$file")"
+    case "$base_name" in
+      *.post.ts|*.put.ts|*.delete.ts|*.patch.ts) ;;
+      *) continue ;;
+    esac
+    repo_path="$(to_repo_path "$file")"
+    case "$repo_path" in
+      apps/backend/api/qms/public/*|apps/backend/api/auth/*|apps/backend/api/uploads/*|apps/backend/api/telegram/*|apps/backend/api/webhook/*|apps/backend/api/upload.ts)
+        continue
+        ;;
+    esac
+    if ! grep -qE 'authorizeWrite|requireSystemAdmin' "$file"; then
+      baseline_limit=""
+      if baseline_limit="$(baseline_line_limit "B-AUTH1" "$repo_path")" && (( baseline_limit >= 1 )); then
+        echo -e "${YELLOW}Baseline B-AUTH1:${NC} $repo_path (write endpoint without auth declaration)"
+        baseline_hits=$((baseline_hits + 1))
+      else
+        report_violation "B-AUTH1" "$repo_path:1" "Write endpoint must declare authorization (authorizeWrite/requireSystemAdmin) or be public."
+      fi
+    fi
+  done
+}
 check_b_r1() {
   (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
   grep_rule "B-R1" "API files must not import Prisma directly." "import[[:space:]].*from[[:space:]]+['\"](~/?|/)?utils/prisma['\"]|from[[:space:]]+['\"]prisma['\"]|import[[:space:]]+prisma" "${API_TS_TARGETS[@]}"
@@ -662,6 +694,7 @@ check_b_gf
 check_b_test1
 check_b_test2
 check_b_test3
+check_b_auth1
 
 echo
 if (( violations > 0 )); then

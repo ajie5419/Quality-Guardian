@@ -1,3 +1,16 @@
+/**
+ * Permission codes for inspection records (backend-enforced via
+ * authorizeWrite; menu buttons mirror these codes).
+ */
+export const INSPECTION_RECORD_PERMISSION_CODES = {
+  CREATE: 'QMS:Inspection:Records:Create',
+  DELETE: 'QMS:Inspection:Records:Delete',
+  EDIT: 'QMS:Inspection:Records:Edit',
+  IMPORT: 'QMS:Inspection:Records:Import',
+  LIST: 'QMS:Inspection:Records:List',
+  VIEW: 'QMS:Inspection:Records:View',
+} as const;
+
 const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;

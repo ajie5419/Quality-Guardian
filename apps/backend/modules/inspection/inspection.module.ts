@@ -3,6 +3,7 @@ import type { ModuleDeclaration } from '~/utils/module-types';
 import {
   AUDIT_TEMPLATES,
   INSPECTION_ISSUE_PERMISSION_CODES,
+  INSPECTION_RECORD_PERMISSION_CODES,
 } from '@qgs/shared';
 
 export const inspectionModule: ModuleDeclaration = {
@@ -87,6 +88,46 @@ export const inspectionModule: ModuleDeclaration = {
           name: 'QMSInspectionMaterialRequestsReject',
           order: 2,
           title: '驳回',
+        },
+      ],
+    },
+    {
+      key: 'inspection-records',
+      parentPath: '/qms/inspection',
+      path: '/qms/inspection/records',
+      name: 'QMSInspectionRecords',
+      component: 'qms/inspection/records/index',
+      authCode: INSPECTION_RECORD_PERMISSION_CODES.LIST,
+      order: 4,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:document',
+        title: '检验记录',
+      },
+      buttons: [
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.CREATE,
+          name: 'QMSInspectionRecordsCreate',
+          order: 1,
+          title: '新增',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.EDIT,
+          name: 'QMSInspectionRecordsEdit',
+          order: 2,
+          title: '编辑',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.DELETE,
+          name: 'QMSInspectionRecordsDelete',
+          order: 3,
+          title: '删除',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.IMPORT,
+          name: 'QMSInspectionRecordsImport',
+          order: 4,
+          title: '导入',
         },
       ],
     },
