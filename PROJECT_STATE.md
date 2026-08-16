@@ -6,10 +6,10 @@
 
 <!-- docs:sync-start -->
 
-- 最后同步时间: 2026-08-16 11:34
+- 最后同步时间: 2026-08-16 16:49
 - 版本: 0.27.0
 - 后端模块数: 33
-- 模块 TS 文件数: 670
+- 模块 TS 文件数: 671
 - 后端测试文件数: 295
 <!-- docs:sync-end -->
 
@@ -27,6 +27,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-16 上传文件类型可配置化：新增 modules/file-storage/upload-policy.ts（上传白名单三级策略：images / images+pdf / images+pdf+office（含 Word/Excel）；默认文档档兼容知识库/表单模板等附件场景，SVG/HTML/宏文档等一律拒绝，脏配置 fail-closed）；file-storage.service 上传流入口按服务端扩展名校验，MIME 不再信任客户端；upload.service 端点将 BusinessError 转标准 400 响应；重建 @qgs/shared dist（ErrorCode 首次真正进入构建产物）；系统设置页（报检与检验设置）新增"上传文件类型"下拉框（仅管理员可改，即时生效）；修复存量 error-code.ts prettier 格式。验证：file-storage 测试 34/34、后端全量 295 文件/2685 用例通过、qms-arch --all 0 violations、eslint/prettier 0 error、typecheck 通过。
 - 2026-08-16 定时任务框架（方案 A）实现：新增 modules/scheduler/（cron 表达式解析 + 任务注册表 + 调度执行器）、plugins/cron-scheduler.ts（60s 轮询 + lastRunAt CAS 防重）、cron_jobs 表迁移（20260816120000_add_cron_jobs）；3 个首批任务：metrology.due-reminder（每日 8:00 计量 30 天内到期提醒）、inspection.nc-overdue（每日 9:00 超 7 天未关闭 NC 催办）、supplier.monthly-snapshot（每月 1 日 2:00 全量评分快照）。验证：scheduler 测试 13/13、相关模块回归 108 文件/1186 用例、qms-arch --all 0 violations、docs drift PASSED。设计文档 docs/scheduler-design.md。
 - 2026-08-16 知识库四层载体分工成文：PROJECT_GUIDE.md 新增第 11 节（docs 正文 / AGENTS 注入 / skill 按需 / 门禁强制 的执行性分层与放置规则）；qg-project 技能同步索引。验证：docs drift PASSED。
 - 2026-08-16 数据契约自动化落地：@qgs/shared 新增 ErrorCode 枚举（9 code + ERROR_UX_LEVEL + isErrorCode）；架构门禁新增 B-EC（BusinessError 错误码白名单，存量 170 处入 baseline）、B-GF（新增跨表 name 字段治理登记，增量检查）、R2（views/qms 禁裸 axios/fetch，存量已 baseline）；新增 scripts/where-field.mjs（六层字段影响面扫描，pnpm run where:field）。验证：check:qms-arch --all PASSED（0 违规）、docs drift PASSED、三项门禁模拟新增违规均正确拦截。
@@ -59,6 +60,7 @@
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造供应商画像的 7 月 8 日数据
 - [ ] 治理售后反馈部门、检验归档、BOM 项目和文档项目剩余的 18 条缺失身份
 - [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
+- [x] 上传文件类型可配置化（匿名上传白名单收紧，默认纯图片，可切图片+PDF）
 - [ ] 其他待办详见 PROGRESS.md 待办段
 
 ---

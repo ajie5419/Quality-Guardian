@@ -25,6 +25,48 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：修复上传拒绝时请求挂起（转圈无提示）
+
+**问题：** 上传被白名单拒绝时前端一直转圈、无提示。根因：upload.service.ts 中 uploadFileStream 在读取文件流之前先做白名单校验，校验失败抛错后 file 流无人消费，busboy 因背压停止读取请求体，once(busboy, 'finish') 永不触发，请求挂起。
+
+**执行内容：**
+- upload.service.ts：uploadFileStream 失败分支增加 file.resume()，消费残留流让 busboy 完成，请求正常返回 400（businessErrorResponse）
+- 前端报检入口页：上传 error 分支展示后端返回的具体原因（"不支持的文件类型，仅允许：..."），不再只显示笼统"上传失败"；upload-file.ts 的 QmsUploadResponse 增加 message 字段
+- 测试：upload.service.test.ts 新增用例"上传失败时 resume 文件流，请求正常终止"
+
+**验证结果：**
+- file-storage 模块 35/35 通过（含新增用例）
+
+### 2026-08-16 阶段：上传文件类型可配置化（匿名上传白名单收紧）
+
+**执行内容：**
+- 新增 modules/file-storage/upload-policy.ts：上传格式三级策略（白名单 allowlist 为安全控制，SVG/HTML/宏文档等可携带脚本的格式任何档位均排除）。设置 key UPLOAD_ALLOWED_EXTENSIONS，值 images（jpg/jpeg/png/webp）、images+pdf、images+pdf+office（+doc/docx/xls/xlsx）；默认文档档（实施中发现 KnowledgeEditModal 明确支持 Word/Excel 等附件，默认值从"仅图片"修正为文档档以免上线即回归），解析失败 fail-closed。扩展名判定以服务端解析为准，客户端 MIME 仅作为无扩展名时的兜底推断，不再直接信任
+- file-storage.service.ts：uploadFileStream 入口在生成存储名之前做白名单校验（assertAllowedUploadExtension），拒绝时抛 BusinessError(BAD_REQUEST)；删除 getMimeType（原优先取客户端 MIME）
+- upload.service.ts：catch 中识别 BusinessError 并转标准 400 响应（businessErrorResponse），三个上传端点（/api/upload、/api/qms/upload、/api/qms/public/upload）共用同一服务，全部生效
+- 重建 packages/qgs-shared dist：ErrorCode 枚举首次真正进入构建产物（此前数据契约新增的 enums/error-code.ts 从未被 build，运行期 import 会崩）
+- 前端 views/system/inspection-settings/index.vue 新增"上传设置"区块：下拉框（仅图片 / 图片+PDF / 图片+PDF+Word/Excel 三档），仅管理员可改，复用现有系统设置读写接口与权限；zh-CN/en-US sys.json 同步新增 6 个 i18n key
+- 测试：file-storage.service.test.ts 新增 9 个白名单用例（拒 html/svg、images+pdf 放行 pdf、images 拒 pdf、默认档放行 docx、客户端 MIME 谎报无效、无扩展名按 MIME 兜底、脏配置回退默认档）；原"上传 doc.pdf"用例改为默认策略下上传 png
+
+**验证结果：**
+- file-storage 模块测试 34/34 通过（3 文件）；后端全量 295 文件 / 2688 用例全部通过
+- 全仓 pnpm run check:type（turbo 3 任务）通过；pnpm lint 全绿（prettier + eslint）
+- pnpm run check:qms-arch:all：0 violations；bash scripts/check-docs-drift.sh：PASSED（模块 TS 文件数 671 已同步）
+
+**顺带修复（存量债，非本需求引入）：**
+- 8-16 定时任务框架提交（scheduler 模块）从未通过全量 lint：11 个文件 prettier 格式债 + 8 个文件 42 处 eslint 违规（node:test 风格测试、import/unicorn/perfectionist 排序等），导致 CI lint 门禁持续红色。本次一并修复：prettier --write + eslint --fix + 手工修正 eslint 自动修复引入的缺失 import（cron-job.service.test.ts 补 it）与 scripts/where-field.mjs 两处不可自动修复项；门禁脚本 check-qms-source-rules.mjs 仅 Set 成员排序（语义不变，qms-arch 全量重跑 0 violations 验证）
+- 修复 packages/qgs-shared/src/enums/error-code.ts 存量 prettier 格式
+
+**遗留问题：**
+- 白名单为固定三级预设（images / images+pdf / images+pdf+office）；若未来需要其他格式（图纸、压缩包等），需单独评审后扩展
+- 未做"未引用文件自动清理/配额"（用户确认暂不处理）
+- 部署注意：@qgs/shared 的 dist 已重建（ErrorCode 首次进入构建产物）；部署/CI 构建时需执行 shared 包 build（postinstall 已含 stub，正常流程会自动触发）
+
+### 2026-08-16 阶段：修复 validate-json.js 硬编码路径
+
+**执行内容：**
+- apps/web-antd/src/locales/validate-json.js 重写：原脚本硬编码了其他机器/目录的绝对路径（/Users/zhaoxiaojie/Downloads/main/...）且只检查 2 个语言文件，在任何环境都无法真正工作
+- 改为基于脚本自身位置（import.meta.url）解析 langs 目录，覆盖全部 8 个语言文件；新增 zh-CN/en-US 文件集合与翻译 key 一致性校验（防止中英文缺词），失败时退出码 1
+- 验证：正常 8/8 JSON 合法 + 4 对 key parity 全过（qms.json 821 keys、sys.json 147 keys 中英完全对齐）；负向注入缺失 key 正确 FAIL（exit 1）；还原后全绿；eslint + prettier 通过
 ### 2026-08-16 阶段：定时任务框架实现（方案 A）
 
 **执行内容：**
