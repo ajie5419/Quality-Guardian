@@ -25,6 +25,15 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：权限系统深入摸底（越权删改问题）
+
+**执行内容：**
+- 全量扫描 342 个 API 端点 + 33 个模块的权限保护现状，产出 docs/permission-audit-report.md：189 写端点中约 140 个仅登录零校验；52 个权限码仅 4 个业务点被后端消费；18 个模块 service 层零校验关键词；dataScope 默认关闭且只覆盖读路径；根因（RBAC 定位为前端菜单权限、无新增端点权限声明门禁、五套校验实现并存）
+- 更新 docs/audit-action-plan.md 第 1 项：代码摸底完成，剩生产 audit_logs 日志核查
+
+**验证结果：**
+- 扫描脚本统计 + 人工抽读关键 service（metrology deleteById 等）双重确认
+
 ### 2026-08-16 阶段：产出审计行动清单 docs/audit-action-plan.md
 
 **执行内容：**
