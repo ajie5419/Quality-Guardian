@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：权限码查询缓存（⑤）
+
+**执行内容：**
+- rbac-role.service 的 getUserPermissionCodes 加 60s 内存 TTL 缓存（写请求从 2-3 次 DB 查询降到 1 次）
+- 权限变更点失效：persistRolePermissions（所有角色权限写入统一入口）与 softDeleteRole 清缓存；clearPermissionCodesCache 从 rbac index 导出
+- 新增缓存行为单测 3 例（TTL 内命中、过期重查、变更失效）；既有 rbac 测试补 beforeEach 清缓存
+
+**验证结果：**
+- rbac 测试 257/257；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- 多实例部署缓存最多 60s 陈旧（可接受权衡）；⑤ 完成，其余 1-4 继续
+
 ### 2026-08-16 阶段：权限门禁 B-AUTH2（前端码必须声明）+ 声明有效性检查
 
 **执行内容：**

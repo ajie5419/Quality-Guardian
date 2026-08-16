@@ -5,6 +5,7 @@ import { redis } from '~/utils/redis';
 
 import { RbacMenuService } from './rbac-menu.service';
 import {
+  clearPermissionCodesCache,
   parseStringArrayJson,
   RbacRoleService,
   uniqueNonEmpty,
@@ -83,6 +84,7 @@ vi.mock('@paralleldrive/cuid2', () => ({
 const mockPrisma = vi.mocked(prisma) as any;
 
 beforeEach(() => {
+  clearPermissionCodesCache();
   mockPrisma.menus.findMany.mockResolvedValue(
     [
       'perm:a',
@@ -160,6 +162,7 @@ describe('parseStringArrayJson', () => {
 
 describe('rbacRoleService.listRoles', () => {
   beforeEach(() => {
+    clearPermissionCodesCache();
     vi.clearAllMocks();
     mockPrisma.roles.count.mockResolvedValue(0);
     mockPrisma.roles.findMany.mockResolvedValue([]);

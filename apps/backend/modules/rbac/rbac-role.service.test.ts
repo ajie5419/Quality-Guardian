@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RbacRoleService } from '~/modules/rbac/rbac-role.service';
+import {
+  clearPermissionCodesCache,
+  RbacRoleService,
+} from '~/modules/rbac/rbac-role.service';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -67,6 +70,7 @@ vi.mock('@paralleldrive/cuid2', () => ({
 
 describe('rbacRoleService', () => {
   beforeEach(() => {
+    clearPermissionCodesCache();
     vi.clearAllMocks();
     vi.mocked(prisma.menus.findMany).mockResolvedValue([
       {
