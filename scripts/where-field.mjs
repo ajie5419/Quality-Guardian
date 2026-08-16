@@ -14,25 +14,34 @@
  *
  * Output groups matches by layer and counts them; prints file paths.
  */
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 
 const [fieldArg, , rootArg] = process.argv.slice(2);
 if (!fieldArg) {
-  console.error('usage: node scripts/where-field.mjs <fieldName> [--root <dir>]');
+  console.error(
+    'usage: node scripts/where-field.mjs <fieldName> [--root <dir>]',
+  );
   process.exit(1);
 }
 
-const root = rootArg === '--root' ? process.argv[5] || process.cwd() : process.cwd();
+const root =
+  rootArg === '--root' ? process.argv[5] || process.cwd() : process.cwd();
 const field = fieldArg;
 const variants = new Set([field]);
 // snake_case form of a camelCase field (auditCompanyName -> audit_company_name)
-const snake = field.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
+const snake = field.replaceAll(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 if (snake !== field.toLowerCase()) variants.add(snake);
 variants.add(field.toLowerCase());
 
-const FILE_PATTERNS = /\.(ts|tsx|vue|prisma)$/u;
-const SKIP_DIRS = new Set(['node_modules', 'dist', '.git', '.turbo', 'coverage']);
+const FILE_PATTERNS = /\.(?:ts|tsx|vue|prisma)$/u;
+const SKIP_DIRS = new Set([
+  '.git',
+  '.turbo',
+  'coverage',
+  'dist',
+  'node_modules',
+]);
 
 function walk(dir, out) {
   let entries;
@@ -82,7 +91,7 @@ function scan(relDirs, label) {
     } catch {
       continue;
     }
-    const count = text.split('\n').filter(matches).length;
+    const count = text.split('\n').filter((line) => matches(line)).length;
     if (count > 0) hits.push({ path: path.relative(root, f), count });
   }
   hits.sort((a, b) => b.count - a.count);
@@ -97,12 +106,25 @@ function scan(relDirs, label) {
   return hits.length;
 }
 
-console.log(`Field impact lookup: "${field}" (variants: ${[...variants].join(', ')})\nroot: ${root}`);
+console.log(
+  `Field impact lookup: "${field}" (variants: ${[...variants].join(', ')})\nroot: ${root}`,
+);
 
 let total = 0;
-total += scan(['apps/backend/utils'], '1. Governance registry (master-data-fields)');
+total += scan(
+  ['apps/backend/utils'],
+  '1. Governance registry (master-data-fields)',
+);
 total += scan(['apps/backend/prisma'], '2. Prisma schema');
-total += scan(['apps/backend/modules', 'apps/backend/api', 'apps/backend/middleware', 'apps/backend/utils'], '3. Backend source');
+total += scan(
+  [
+    'apps/backend/modules',
+    'apps/backend/api',
+    'apps/backend/middleware',
+    'apps/backend/utils',
+  ],
+  '3. Backend source',
+);
 total += scan(['packages/qgs-shared/src'], '4. Shared DTO / enums');
 total += scan(['apps/web-antd/src'], '5. Frontend (web-antd)');
 total += scan(['apps/weapp/src'], '6. WeApp');

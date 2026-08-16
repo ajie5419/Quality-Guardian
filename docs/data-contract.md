@@ -1,7 +1,6 @@
 # 数据契约规范（Data Contract）
 
-> 本文件是 Quality Guardian **数据层约束的权威文档**：字段治理、错误码、命名规则、前端数据消费、字段影响面。任何 AI 或人改数据相关代码前必须读本文件。
-> 状态：本文件为**规范成文**阶段；标注「待自动化」的条目将由架构门禁/脚本逐步强制执行（见文末路线图）。
+> 本文件是 Quality Guardian **数据层约束的权威文档**：字段治理、错误码、命名规则、前端数据消费、字段影响面。任何 AI 或人改数据相关代码前必须读本文件。状态：本文件为**规范成文**阶段；标注「待自动化」的条目将由架构门禁/脚本逐步强制执行（见文末路线图）。
 
 ---
 
@@ -91,13 +90,13 @@
 ```typescript
 // @qgs/shared —— 错误码字典（待建）
 export const ErrorCode = {
-  VALIDATION: 'VALIDATION',       // 参数校验失败 → 表单级提示
-  NOT_FOUND: 'NOT_FOUND',         // 资源不存在 → 404 语义
-  FORBIDDEN: 'FORBIDDEN',         // 无权限 → 403 语义
-  UNAUTHORIZED: 'UNAUTHORIZED',   // 未登录/过期 → 跳登录
-  CONFLICT: 'CONFLICT',           // 状态冲突/并发 → 刷新后重试
-  BUSINESS: 'BUSINESS',           // 通用业务错误 → warning 提示
-  INTERNAL: 'INTERNAL',           // 内部错误 → error 提示 + 记录
+  VALIDATION: 'VALIDATION', // 参数校验失败 → 表单级提示
+  NOT_FOUND: 'NOT_FOUND', // 资源不存在 → 404 语义
+  FORBIDDEN: 'FORBIDDEN', // 无权限 → 403 语义
+  UNAUTHORIZED: 'UNAUTHORIZED', // 未登录/过期 → 跳登录
+  CONFLICT: 'CONFLICT', // 状态冲突/并发 → 刷新后重试
+  BUSINESS: 'BUSINESS', // 通用业务错误 → warning 提示
+  INTERNAL: 'INTERNAL', // 内部错误 → error 提示 + 记录
 } as const;
 ```
 

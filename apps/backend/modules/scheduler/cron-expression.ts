@@ -50,7 +50,7 @@ export function parseCronField(
     }
     const value = Number.parseInt(part, 10);
     if (!Number.isFinite(value)) {
-      throw new Error(`invalid cron value "${part}"`);
+      throw new TypeError(`invalid cron value "${part}"`);
     }
     values.add(value);
   }
@@ -84,10 +84,7 @@ function fieldMatches(spec: CronFieldSpec, value: number): boolean {
 /**
  * Whether the given date matches the expression (minute-level precision).
  */
-export function matchesCronExpression(
-  expression: string,
-  date: Date,
-): boolean {
+export function matchesCronExpression(expression: string, date: Date): boolean {
   const specs = parseCronExpression(expression);
   return (
     fieldMatches(specs[0], date.getMinutes()) &&

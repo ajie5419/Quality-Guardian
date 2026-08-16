@@ -13,7 +13,9 @@ const DUE_WINDOW_DAYS = 30;
  */
 async function runDueReminder() {
   const now = new Date();
-  const horizon = new Date(now.getTime() + DUE_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+  const horizon = new Date(
+    now.getTime() + DUE_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  );
 
   const dueInstruments = await prisma.measuring_instruments.findMany({
     where: {
@@ -35,23 +37,18 @@ async function runDueReminder() {
     return;
   }
 
-  const lines = dueInstruments
-    .slice(0, 30)
-    .map((instrument) => {
-      const dueDate = instrument.validUntil
-        ? instrument.validUntil.toISOString().slice(0, 10)
-        : '?';
-      const expired = instrument.validUntil && instrument.validUntil < now;
-      const flag = expired ? '⚠️ 已过期' : '⏳ 即将到期';
-      return `${flag} ${instrument.instrumentCode} ${instrument.instrumentName}（${instrument.usingUnit ?? '-'}）截止 ${dueDate}`;
-    });
+  const lines = dueInstruments.slice(0, 30).map((instrument) => {
+    const dueDate = instrument.validUntil
+      ? instrument.validUntil.toISOString().slice(0, 10)
+      : '?';
+    const expired = instrument.validUntil && instrument.validUntil < now;
+    const flag = expired ? '⚠️ 已过期' : '⏳ 即将到期';
+    return `${flag} ${instrument.instrumentCode} ${instrument.instrumentName}（${instrument.usingUnit ?? '-'}）截止 ${dueDate}`;
+  });
 
   const summary = `【计量器具检定提醒】\n${DUE_WINDOW_DAYS} 天内到期/已过期 ${dueInstruments.length} 件：\n${lines.join('\n')}`;
   await sendMessage(summary.slice(0, 4000));
-  logger.info(
-    { count: dueInstruments.length },
-    'metrology due reminder sent',
-  );
+  logger.info({ count: dueInstruments.length }, 'metrology due reminder sent');
 }
 
 export function registerMetrologyDueReminder(): void {

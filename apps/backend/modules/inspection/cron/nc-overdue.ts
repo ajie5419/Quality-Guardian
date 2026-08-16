@@ -16,9 +16,7 @@ const OPEN_STATUSES: quality_records_status[] = ['OPEN', 'IN_PROGRESS'];
  * Notifies the configured Telegram chat.
  */
 async function runNcOverdue() {
-  const cutoff = new Date(
-    Date.now() - OVERDUE_DAYS * 24 * 60 * 60 * 1000,
-  );
+  const cutoff = new Date(Date.now() - OVERDUE_DAYS * 24 * 60 * 60 * 1000);
 
   const overdue = await prisma.quality_records.findMany({
     where: {
@@ -42,13 +40,11 @@ async function runNcOverdue() {
     return;
   }
 
-  const lines = overdue
-    .slice(0, 30)
-    .map((record) => {
-      const created = record.createdAt.toISOString().slice(0, 10);
-      const dept = record.responsibleDepartment || '-';
-      return `${record.nonConformanceNumber}（${record.workOrderNumber ?? '-'}）责任:${dept} 创建 ${created}`;
-    });
+  const lines = overdue.slice(0, 30).map((record) => {
+    const created = record.createdAt.toISOString().slice(0, 10);
+    const dept = record.responsibleDepartment || '-';
+    return `${record.nonConformanceNumber}（${record.workOrderNumber ?? '-'}）责任:${dept} 创建 ${created}`;
+  });
 
   const summary = `【不合格项超时催办】\n超过 ${OVERDUE_DAYS} 天未关闭 ${overdue.length} 项：\n${lines.join('\n')}`;
   await sendMessage(summary.slice(0, 4000));

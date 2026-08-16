@@ -62,15 +62,15 @@ const AMBIGUOUS_GOVERNED_NAME_FIELDS = new Set(['category', 'name', 'type']);
 
 // Declared error codes (must stay in sync with @qgs/shared ErrorCode enum).
 const DECLARED_ERROR_CODES = new Set([
-  'VALIDATION',
-  'NOT_FOUND',
-  'FORBIDDEN',
-  'UNAUTHORIZED',
-  'CONFLICT',
   'BAD_REQUEST',
-  'DUPLICATE',
   'BUSINESS',
+  'CONFLICT',
+  'DUPLICATE',
+  'FORBIDDEN',
   'INTERNAL',
+  'NOT_FOUND',
+  'UNAUTHORIZED',
+  'VALIDATION',
 ]);
 
 function parseArguments(argv) {

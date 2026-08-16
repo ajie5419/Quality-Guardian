@@ -1,7 +1,6 @@
 # 统一定时任务框架设计（Cron Scheduler Framework）
 
-> 状态：✅ 已实现（2026-08-16）。本设计文档为 `modules/scheduler/` 的权威依据。
-> 相关：`docs/PROJECT_GUIDE.md`、`docs/data-contract.md`（字段治理/错误码规则同样适用本模块）。
+> 状态：✅ 已实现（2026-08-16）。本设计文档为 `modules/scheduler/` 的权威依据。相关：`docs/PROJECT_GUIDE.md`、`docs/data-contract.md`（字段治理/错误码规则同样适用本模块）。
 
 ## 1. 目标与背景
 
@@ -69,6 +68,7 @@ model cron_jobs {
 采用标准 5 段 cron：`分 时 日 月 周`（`0 8 * * *` = 每天 8:00）。
 
 支持的语法（轻量实现，覆盖本项目需求）：
+
 - 数字：`0 8 * * *`
 - 通配：`*`（任意）
 - 列表：`1,15`（分钟列表）
@@ -94,10 +94,10 @@ model cron_jobs {
 ```typescript
 // scheduler-registry.ts
 interface CronJobDefinition {
-  key: string;          // 全局唯一，如 'metrology.due-reminder'
-  cronExpr: string;     // '0 8 * * *'
+  key: string; // 全局唯一，如 'metrology.due-reminder'
+  cronExpr: string; // '0 8 * * *'
   description?: string;
-  handler: () => Promise<void>;   // 同步执行（适合轻量扫描）
+  handler: () => Promise<void>; // 同步执行（适合轻量扫描）
 }
 
 export function registerCronJob(def: CronJobDefinition): void;

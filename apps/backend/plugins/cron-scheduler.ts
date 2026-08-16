@@ -1,9 +1,9 @@
 import process from 'node:process';
 
-import { registerMetrologyDueReminder } from '~/modules/metrology/cron/due-reminder';
 import { registerNcOverdueReminder } from '~/modules/inspection/cron/nc-overdue';
-import { registerSupplierMonthlySnapshot } from '~/modules/supplier/cron/monthly-snapshot';
+import { registerMetrologyDueReminder } from '~/modules/metrology/cron/due-reminder';
 import { runSchedulerTick, syncCronJobDefinitions } from '~/modules/scheduler';
+import { registerSupplierMonthlySnapshot } from '~/modules/supplier/cron/monthly-snapshot';
 import { createModuleLogger } from '~/utils/logger';
 
 const logger = createModuleLogger('CronScheduler');

@@ -1,5 +1,7 @@
-import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import prisma from '~/utils/prisma';
 
+import { runSchedulerTick, syncCronJobDefinitions } from './cron-job.service';
 import { clearCronJobRegistry, registerCronJob } from './scheduler-registry';
 
 vi.mock('~/utils/prisma', () => ({
@@ -22,13 +24,6 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-import prisma from '~/utils/prisma';
-
-import {
-  runSchedulerTick,
-  syncCronJobDefinitions,
-} from './cron-job.service';
-
 const mockedPrisma = vi.mocked(prisma, true);
 
 describe('scheduler cron-job.service', () => {
@@ -41,7 +36,7 @@ describe('scheduler cron-job.service', () => {
     clearCronJobRegistry();
   });
 
-  test('syncCronJobDefinitions creates rows for registered jobs', async () => {
+  it('syncCronJobDefinitions creates rows for registered jobs', async () => {
     registerCronJob({
       key: 'demo.job',
       cronExpr: '0 8 * * *',
@@ -59,7 +54,7 @@ describe('scheduler cron-job.service', () => {
     );
   });
 
-  test('syncCronJobDefinitions updates existing row', async () => {
+  it('syncCronJobDefinitions updates existing row', async () => {
     registerCronJob({
       key: 'demo.job',
       cronExpr: '0 9 * * *',
@@ -77,7 +72,7 @@ describe('scheduler cron-job.service', () => {
     );
   });
 
-  test('tick runs due matching job and records ok', async () => {
+  it('tick runs due matching job and records ok', async () => {
     const handler = vi.fn(async () => undefined);
     registerCronJob({
       key: 'demo.tick',
@@ -112,7 +107,7 @@ describe('scheduler cron-job.service', () => {
     );
   });
 
-  test('tick skips non-matching job', async () => {
+  it('tick skips non-matching job', async () => {
     const handler = vi.fn(async () => undefined);
     registerCronJob({
       key: 'demo.skip',
@@ -141,7 +136,7 @@ describe('scheduler cron-job.service', () => {
     expect(mockedPrisma.cron_jobs.updateMany).not.toHaveBeenCalled();
   });
 
-  test('tick skips already-run-this-minute job (CAS count 0)', async () => {
+  it('tick skips already-run-this-minute job (CAS count 0)', async () => {
     const handler = vi.fn(async () => undefined);
     registerCronJob({
       key: 'demo.cas',
@@ -170,7 +165,7 @@ describe('scheduler cron-job.service', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  test('tick records handler failure as error', async () => {
+  it('tick records handler failure as error', async () => {
     const handler = vi.fn(async () => {
       throw new Error('boom');
     });

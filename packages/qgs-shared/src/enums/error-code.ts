@@ -30,8 +30,7 @@ export const ErrorCode = {
   INTERNAL: 'INTERNAL',
 } as const;
 
-export type ErrorCodeValue =
-  (typeof ErrorCode)[keyof typeof ErrorCode];
+export type ErrorCodeValue = (typeof ErrorCode)[keyof typeof ErrorCode];
 
 /** Map a code to the frontend UX bucket. */
 export const ERROR_UX_LEVEL = {
@@ -46,8 +45,7 @@ export const ERROR_UX_LEVEL = {
   INTERNAL: 'error',
 } as const satisfies Record<ErrorCodeValue, 'error' | 'warning'>;
 
-export type ErrorUxLevel =
-  (typeof ERROR_UX_LEVEL)[keyof typeof ERROR_UX_LEVEL];
+export type ErrorUxLevel = (typeof ERROR_UX_LEVEL)[keyof typeof ERROR_UX_LEVEL];
 
 /** Check whether a value is a declared error code. */
 export function isErrorCode(value: unknown): value is ErrorCodeValue {

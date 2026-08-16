@@ -1,8 +1,10 @@
+import type { CronJobDefinition } from './scheduler-registry';
+
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 import { matchesCronExpression, parseCronExpression } from './cron-expression';
-import { listCronJobs, type CronJobDefinition } from './scheduler-registry';
+import { listCronJobs } from './scheduler-registry';
 
 const logger = createModuleLogger('Scheduler');
 
@@ -29,29 +31,24 @@ export async function syncCronJobDefinitions(): Promise<void> {
       where: { jobKey: definition.key, isDeleted: false },
       select: { id: true },
     });
-    if (existing) {
-      await prisma.cron_jobs.update({
-        where: { id: existing.id },
-        data: {
-          cronExpr: definition.cronExpr,
-          description: definition.description ?? null,
-          enabled: true,
-        },
-      });
-    } else {
-      await prisma.cron_jobs.create({
-        data: {
-          jobKey: definition.key,
-          cronExpr: definition.cronExpr,
-          description: definition.description ?? null,
-        },
-      });
-    }
+    await (existing
+      ? prisma.cron_jobs.update({
+          where: { id: existing.id },
+          data: {
+            cronExpr: definition.cronExpr,
+            description: definition.description ?? null,
+            enabled: true,
+          },
+        })
+      : prisma.cron_jobs.create({
+          data: {
+            jobKey: definition.key,
+            cronExpr: definition.cronExpr,
+            description: definition.description ?? null,
+          },
+        }));
   }
-  logger.info(
-    { jobCount: definitions.length },
-    'cron job definitions synced',
-  );
+  logger.info({ jobCount: definitions.length }, 'cron job definitions synced');
 }
 
 /**
@@ -70,7 +67,7 @@ export async function runSchedulerTick(now = new Date()): Promise<number> {
         OR: [
           { lastRunAt: null },
           // lastRunAt strictly before the current minute
-          { lastRunAt: { lt: new Date(now.getTime() - 60000) } },
+          { lastRunAt: { lt: new Date(now.getTime() - 60_000) } },
         ],
       },
       select: {
@@ -106,18 +103,19 @@ export async function runSchedulerTick(now = new Date()): Promise<number> {
           isDeleted: false,
           OR: [
             { lastRunAt: null },
-            { lastRunAt: { lt: new Date(now.getTime() - 60000) } },
+            { lastRunAt: { lt: new Date(now.getTime() - 60_000) } },
           ],
         },
         data: { lastRunAt: now },
       });
       if (claimed.count === 0) continue;
 
-      const definition = listCronJobs().find(
-        (item) => item.key === job.jobKey,
-      );
+      const definition = listCronJobs().find((item) => item.key === job.jobKey);
       if (!definition) {
-        logger.warn({ jobKey: job.jobKey }, 'cron job has no registered handler');
+        logger.warn(
+          { jobKey: job.jobKey },
+          'cron job has no registered handler',
+        );
         await markJobError(
           job.id,
           job.jobKey,
