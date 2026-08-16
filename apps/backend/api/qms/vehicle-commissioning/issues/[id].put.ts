@@ -1,5 +1,7 @@
+import { VEHICLE_COMMISSIONING_WRITE_CODES } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -12,6 +14,7 @@ import {
 const bodySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, VEHICLE_COMMISSIONING_WRITE_CODES.EDIT);
   const userinfo = getCurrentUser(event);
 
   const id = getRouterParam(event, 'id');

@@ -38,3 +38,43 @@ export const WELDER_PERMISSION_CODES = {
   LIST: 'QMS:Welder:List',
   VIEW: 'QMS:Welder:View',
 } as const;
+
+/**
+ * Permission codes for quality reports (backend-enforced).
+ */
+export const REPORTS_PERMISSION_CODES = {
+  CREATE: 'QMS:Reports:Create',
+  DELETE: 'QMS:Reports:Delete',
+  EDIT: 'QMS:Reports:Edit',
+} as const;
+
+/**
+ * Permission codes for ITP task dispatch (backend-enforced).
+ */
+export const TASK_DISPATCH_PERMISSION_CODES = {
+  CREATE: 'QMS:TaskDispatch:Create',
+  UPDATE: 'QMS:TaskDispatch:Update',
+} as const;
+
+/**
+ * Permission codes for vehicle commissioning (backend-enforced).
+ */
+export const VEHICLE_COMMISSIONING_WRITE_CODES = {
+  CREATE: 'QMS:VehicleCommissioning:Create',
+  DELETE: 'QMS:VehicleCommissioning:Delete',
+  EDIT: 'QMS:VehicleCommissioning:Edit',
+} as const;
+
+/**
+ * Permission codes for AI-assisted generation endpoints (backend-enforced).
+ */
+export const AI_GENERATION_PERMISSION_CODES = {
+  GENERATE: 'QMS:Ai:Generate',
+} as const;
+
+/**
+ * Permission codes for dashboard target configuration (backend-enforced).
+ */
+export const DASHBOARD_PERMISSION_CODES = {
+  CHART_EDIT: 'QMS:Dashboard:ChartEdit',
+} as const;

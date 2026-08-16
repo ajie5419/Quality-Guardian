@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：统一授权框架 Phase 2e（报表/派发/车辆/AI/工作台迁移）
+
+**执行内容：**
+- @qgs/shared 新增 5 组权限码枚举：REPORTS（Create/Edit/Delete）、TASK_DISPATCH（Create/Update）、VEHICLE_COMMISSIONING_WRITE（Create/Edit/Delete）、AI_GENERATION（Generate）、DASHBOARD（ChartEdit）；重建 dist
+- 迁移 16 个写端点：报表 4（增删改/日报）、任务派发 2（状态/创建）、车辆验收 4（问题增删改/日报）、看板目标 1、AI 生成 5——含薄转发包装与块函数插入（修复一次批量生成的位置错位，git 恢复后重做）
+- 回填脚本 apps/backend/scripts/backfill-phase2e-permissions.ts（9 个新码 upsert + 全 ACTIVE 角色分配）；本地库已执行：9 码插入 + 63 条角色分配
+- B-AUTH1 baseline 清理：70 → 54（释放 16 条）
+
+**验证结果：**
+- 模块测试 184/184；全量 2693/2693；typecheck/lint/qms-arch 0 violations/docs-drift 全绿
+
+**遗留问题：**
+- 剩余 54 个写端点（系统设置类/监造/其余）；监造（supervision）无历史权限码，需新码+回填
+
 ### 2026-08-16 阶段：统一授权框架 Phase 2d（策划全系迁移）
 
 **执行内容：**

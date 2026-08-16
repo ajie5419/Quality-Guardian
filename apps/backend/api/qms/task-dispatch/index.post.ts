@@ -1,5 +1,7 @@
+import { TASK_DISPATCH_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import {
   getTaskDispatchErrorMessage,
   TaskDispatchService,
@@ -21,6 +23,7 @@ const bodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, TASK_DISPATCH_PERMISSION_CODES.CREATE);
   const userinfo = getCurrentUser(event);
 
   const body = bodySchema.parse(await readBody(event));
