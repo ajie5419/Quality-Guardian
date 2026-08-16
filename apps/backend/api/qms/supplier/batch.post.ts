@@ -1,5 +1,7 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
@@ -14,6 +16,7 @@ import {
 const batchUpsertBodySchema = z.object({ items: z.unknown() });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.SUPPLIER.CREATE);
   const userinfo = getCurrentUser(event);
 
   try {
@@ -33,11 +36,7 @@ export default defineEventHandler(async (event) => {
       targetId: 'batch-upsert',
       detailsTemplate:
         '批量导入供应商/外协单位: 成功 {{success}} 条，跳过 {{skipped}} 条，失败 {{errors}} 条',
-      detailsVariables: {
-        errors: results.errors,
-        skipped: results.skipped,
-        success: results.success,
-      },
+      detailsVariables: results,
     });
 
     return useResponseSuccess(results);

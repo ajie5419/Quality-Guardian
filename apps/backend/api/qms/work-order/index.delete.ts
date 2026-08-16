@@ -1,4 +1,6 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
+import { authorizeWrite } from '~/modules/rbac';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -13,6 +15,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.DELETE);
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredQueryParam(event, 'id', '缺少工单号');

@@ -1,6 +1,8 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import {
   badRequestResponse,
@@ -11,6 +13,7 @@ import {
 const batchDeleteSchema = z.object({ ids: z.array(z.string()).min(1) });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.AFTER_SALES.DELETE);
   try {
     const parsed = batchDeleteSchema.safeParse(await readBody(event));
     if (!parsed.success)

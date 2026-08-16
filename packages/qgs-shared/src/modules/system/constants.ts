@@ -4,14 +4,17 @@
 export const PERMISSION_CODES = {
   QMS: {
     LOSS_ANALYSIS: {
-      EXPORT: 'QMS:LossAnalysis:Export',
-      EDIT: 'QMS:LossAnalysis:Edit',
+      CREATE: 'QMS:LossAnalysis:Create',
       DELETE: 'QMS:LossAnalysis:Delete',
+      EDIT: 'QMS:LossAnalysis:Edit',
+      EXPORT: 'QMS:LossAnalysis:Export',
+      IMPORT: 'QMS:LossAnalysis:Import',
     },
     AFTER_SALES: {
-      EXPORT: 'QMS:AfterSales:Export',
-      EDIT: 'QMS:AfterSales:Edit',
+      CREATE: 'QMS:AfterSales:Create',
       DELETE: 'QMS:AfterSales:Delete',
+      EDIT: 'QMS:AfterSales:Edit',
+      EXPORT: 'QMS:AfterSales:Export',
     },
     INSPECTION: {
       EXPORT: 'QMS:Inspection:Export',

@@ -1,4 +1,6 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
@@ -12,6 +14,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.SUPPLIER.DELETE);
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', '缺少供应商ID');

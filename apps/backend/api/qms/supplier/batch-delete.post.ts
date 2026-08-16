@@ -1,5 +1,7 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
@@ -14,6 +16,7 @@ import {
 const batchDeleteBodySchema = z.object({ ids: z.unknown() });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.SUPPLIER.DELETE);
   const userinfo = getCurrentUser(event);
 
   try {

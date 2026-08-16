@@ -1,4 +1,6 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { getRouterParam } from 'h3';
+import { authorizeWrite } from '~/modules/rbac';
 import { workOrderRequirementMutationBodySchema } from '~/modules/work-order/work-order-requirement.schema';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
@@ -14,6 +16,7 @@ import {
 export default defineValidatedHandler(
   workOrderRequirementMutationBodySchema,
   async (event, body) => {
+    await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.EDIT);
     const userinfo = getCurrentUser(event);
 
     const id = String(getRouterParam(event, 'id') || '').trim();

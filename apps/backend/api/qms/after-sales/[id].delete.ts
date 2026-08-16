@@ -1,5 +1,7 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
@@ -11,6 +13,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.AFTER_SALES.DELETE);
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', 'Missing ID');

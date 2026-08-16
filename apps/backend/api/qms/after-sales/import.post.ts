@@ -1,6 +1,8 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import {
@@ -14,6 +16,7 @@ const importSchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.AFTER_SALES.CREATE);
   try {
     const userinfo = getCurrentUser(event);
     const body = importSchema.safeParse(await readBody(event));

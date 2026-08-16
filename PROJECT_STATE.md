@@ -27,6 +27,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-16 统一授权框架 Phase 2c：迁移售后/供应商/质量损失/工单 23 个写端点，B-AUTH1 基线 119→96。
 - 2026-08-16 统一授权框架 Phase 2：迁移计量/知识库/焊工 21 个写端点（authorizeWrite 声明 + @qgs/shared 权限码枚举），B-AUTH1 基线 140→119。验证：全量 2693 用例、lint/typecheck/qms-arch/docs-drift 全绿。
 - 2026-08-16 上传文件类型可配置化：新增 modules/file-storage/upload-policy.ts（上传白名单三级策略：images / images+pdf / images+pdf+office（含 Word/Excel）；默认文档档兼容知识库/表单模板等附件场景，SVG/HTML/宏文档等一律拒绝，脏配置 fail-closed）；file-storage.service 上传流入口按服务端扩展名校验，MIME 不再信任客户端；upload.service 端点将 BusinessError 转标准 400 响应；重建 @qgs/shared dist（ErrorCode 首次真正进入构建产物）；系统设置页（报检与检验设置）新增"上传文件类型"下拉框（仅管理员可改，即时生效）；修复存量 error-code.ts prettier 格式。验证：file-storage 测试 34/34、后端全量 295 文件/2685 用例通过、qms-arch --all 0 violations、eslint/prettier 0 error、typecheck 通过。
 - 2026-08-16 定时任务框架（方案 A）实现：新增 modules/scheduler/（cron 表达式解析 + 任务注册表 + 调度执行器）、plugins/cron-scheduler.ts（60s 轮询 + lastRunAt CAS 防重）、cron_jobs 表迁移（20260816120000_add_cron_jobs）；3 个首批任务：metrology.due-reminder（每日 8:00 计量 30 天内到期提醒）、inspection.nc-overdue（每日 9:00 超 7 天未关闭 NC 催办）、supplier.monthly-snapshot（每月 1 日 2:00 全量评分快照）。验证：scheduler 测试 13/13、相关模块回归 108 文件/1186 用例、qms-arch --all 0 violations、docs drift PASSED。设计文档 docs/scheduler-design.md。

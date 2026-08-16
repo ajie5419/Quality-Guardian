@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：统一授权框架 Phase 2c（售后/供应商/质量损失/工单迁移）
+
+**执行内容：**
+- PERMISSION_CODES 扩展：LOSS_ANALYSIS 补 CREATE/IMPORT、AFTER_SALES 补 CREATE（对齐历史 rbac_permissions 码）；重建 dist
+- 迁移 23 个写端点：售后 5、供应商 6、质量损失 4、工单 8（含 requirements 子域）——薄转发包装 4、内联插入 13、defineValidatedHandler 适配 6
+- B-AUTH1 baseline 清理：119 → 96（释放 23 条）
+
+**验证结果：**
+- 四模块测试 527/527；门禁全绿（待全量确认）
+
+**遗留问题：**
+- 剩余 96 个写端点（策划全系/报表/监造/派发/车辆/工作台/AI 等）
+- 监造（supervision）无历史权限码，需新码+回填
+
 ### 2026-08-16 阶段：统一授权框架 Phase 2（计量/知识库/焊工迁移）
 
 **执行内容：**
