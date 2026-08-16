@@ -25,6 +25,25 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：统一授权框架实施（Phase 1 + 示范迁移）
+
+**执行内容：**
+- 授权服务：modules/rbac/rbac-authorize.service.ts（authorizeWrite：登录态检查 + RbacService 权限码校验，无码抛 BusinessError FORBIDDEN 403 / UNAUTHORIZED 401；super 经现有菜单码合并机制豁免），rbac/index.ts 导出 + 单元测试 4 例
+- @qgs/shared 新增 INSPECTION_RECORD_PERMISSION_CODES（CREATE/EDIT/DELETE/IMPORT/LIST/VIEW）；重建 dist
+- 门禁 B-AUTH1（check-qms-architecture.sh）：写端点（post/put/delete/patch）必须含 authorizeWrite/requireSystemAdmin，public/auth/uploads/telegram/webhook 豁免；存量 140 个写端点入 baseline，新增未声明即拦截
+- 示范迁移 13 个写端点：检验记录 5 个（create/update/delete/batch-delete/import）、不合格品项 6 个（delete/update/assign-nc/batch-delete/import/create）、物料审批 2 个（approve/reject）；检验记录菜单 + 按钮 authCode 声明（inspection.module.ts）
+- 回填脚本 apps/backend/scripts/backfill-inspection-record-permissions.ts（rbac_permissions upsert + 全 ACTIVE 角色分配，零回归；业务收紧走角色管理界面）
+- 文档：需求单 Phase 1 标记完成、行动清单第 2 项更新
+
+**验证结果：**
+- rbac/file-storage 测试 289/289 通过；qms-arch --all 0 violations（B-AUTH1 生效 + baseline 匹配）
+- 待 typecheck/lint/全量测试结果补记
+
+**遗留问题：**
+- Phase 2 其余模块迁移待继续（计量/策划/监造/焊工/知识库/售后/供应商/工单等）
+- 部署前置：运行 backfill 脚本 + 角色权限配置调整（业务决策）
+- 权限码数据一致性盘点（rbac_permissions vs 菜单 authCode）待做
+
 ### 2026-08-16 阶段：产出统一授权框架需求单
 
 **执行内容：**
