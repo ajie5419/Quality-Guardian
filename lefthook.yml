@@ -80,6 +80,8 @@ pre-push:
       run: pnpm run check:type
     qms-arch:
       run: pnpm run check:qms-arch
+    docs-drift:
+      run: pnpm run check:docs-drift
 
 post-merge:
   files: git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD

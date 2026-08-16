@@ -34,8 +34,10 @@
 - 测试状态: 本轮后端全仓 Vitest `267/267` 文件、`2461/2461` 用例通过；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch` 和 `pnpm run check:qms-arch:all` 均通过。前端未运行 dev/build/start。
 - Lint: 通过（0 error，0 warning）
 - Typecheck: 0 error（3/3 workspace tasks；weapp 自身脚本为项目既有 skip）
-- 模块 TS 文件数: 617（含测试）
-- 当前版本: `0.24.0`
+- 模块 TS 文件数: 660（含测试；2026-08-16 实测）
+- 当前版本: `0.27.0`
+
+> 📌 本文件的版本/基线数字已由 `PROJECT_STATE.md`（自动同步）取代，此处仅作历史记录。实时状态以 `PROJECT_STATE.md` 为准。
 
 ## 已完成
 
@@ -138,8 +140,10 @@ apps/backend/
 
 ## 基线数据（用于异常检测）
 
-- 模块 TS 文件数: 581（含测试）
+> 📌 以下基线为历史快照，**已被 `PROJECT_STATE.md` 硬数据段取代**（由 `pnpm run docs:sync` 自动实测）。实时基线请读 `PROJECT_STATE.md`；如需更新此处历史值请先跑 `pnpm run docs:sync` 对照。
+
+- 模块 TS 文件数: 660（含测试；2026-08-16 实测，与 PROJECT_STATE 一致）
 - utils TS 文件数: 42
-- 后端测试文件数: 246
+- 后端测试文件数: 293（2026-08-16 实测）
 - 导出入口基线: 约 610；已完成 343，剩余 267
 - 顶层目录: api/ middleware/ modules/ prisma/ routes/ utils/

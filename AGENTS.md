@@ -1,11 +1,21 @@
 # AGENTS.md — Quality Guardian
 
+## 交接规矩（任何 AI 开工前必读）
+
+1. **先读项目档案** `docs/PROJECT_GUIDE.md`（规范唯一权威：能做什么/不能做什么/应该怎么做/文档地图）。
+2. **再读状态日报** `PROJECT_STATE.md`（当前版本、进度、最近变更、待办；硬数据段由 `pnpm run docs:sync` 自动生成）。
+3. 动手改代码前，如该模块有 `ARCHITECTURE.md` 先读它。
+4. 本文件与 `CLAUDE.md`、`qg-project` 技能**不维护规范正文副本**，只做索引；与 `docs/PROJECT_GUIDE.md` 冲突时以档案为准，并同步修正。
+5. 完成工作后：更新 `PROJECT_STATE.md`（进度/最近变更/待办）→ 追加 `CHANGELOG.md` → 按需更新 `code_map.md` → 跑门禁（含 `pnpm run check:docs-drift`）。
+
 ## 会话启动必读
 
 开始任何任务前，先读以下文件获取上下文：
 
-1. `CONSTRAINTS.md` — 硬约束（禁止/必须）
-2. `PROGRESS.md` — 当前工作状态与下一步
+1. `docs/PROJECT_GUIDE.md` — 项目档案（规范唯一权威）
+2. `PROJECT_STATE.md` — 当前状态日报（版本/进度/待办）
+3. `CONSTRAINTS.md` — 硬约束（禁止/必须）
+4. `code_map.md` — 业务模块地图
 
 改动某个模块时，先读该模块的 `ARCHITECTURE.md`（如果存在）。
 
@@ -85,20 +95,23 @@ pnpm dev
 1. **包管理器**：只用 pnpm，禁止 npm/yarn
 2. **数据库变更**：必须通过 Prisma migration，禁止手动改表
 3. **密钥安全**：禁止读取/输出/硬编码 `.env`、私钥、token
-4. **提交前门禁**：`pnpm lint && pnpm run check:type && pnpm run check:qms-arch` 必须通过
+4. **提交前门禁**：`pnpm lint && pnpm run check:type && pnpm run check:qms-arch && pnpm run check:docs-drift` 必须通过
 5. **utils/ 职责**：只放通用基础设施（prisma、logger、response、auth），业务逻辑放 modules/
 6. **modules/ 自包含**：每个模块目录包含自己的 service、工具函数、类型，不依赖其他模块的内部文件
 7. **语言规范**：代码、注释、commit message 用英文；对话和文档用中文
 
 ## 详细文档
 
+- [项目档案](docs/PROJECT_GUIDE.md) — 规范唯一权威（能做什么/不能做什么/应该怎么做）⭐
+- [状态日报](PROJECT_STATE.md) — 当前版本、进度、最近变更、待办 ⭐
 - [架构设计](docs/architecture.md) — 后端目标架构与模块化方案
 - [API 设计规范](docs/api-conventions.md) — 添加新端点时必读
 - [数据库文档](docs/database.md) — Schema 设计、Migration 规范、命名约定
 - [测试标准](docs/testing.md) — 测试分层、覆盖要求、编写规范
 - [发布工作流](docs/release-workflow.md) — 功能 PR、release-please、tag 与生产部署流程
 - [硬约束](CONSTRAINTS.md) — 禁止/必须的明确规则
-- [项目进度](PROGRESS.md) — 当前工作状态与下一步
+- [业务模块地图](code_map.md) — 模块/路由/视图索引
+- [项目进度](PROGRESS.md) — 历史进度记录
 - [执行记录](CHANGELOG.md) — 每次重构执行的结果记录
 
 ## 执行规范

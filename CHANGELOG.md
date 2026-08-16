@@ -25,6 +25,141 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：定时任务框架实现（方案 A）
+
+**执行内容：**
+- 新增 `modules/scheduler/`：cron-expression.ts（5 段 cron 解析/匹配，纯函数）、scheduler-registry.ts（任务注册表）、cron-job.service.ts（定义落库 + 到点触发 + lastRunAt CAS 防重 + lastStatus/lastError 记录）、scheduler.module.ts；注册进 module-loader
+- 新增 `plugins/cron-scheduler.ts`：启动时注册 3 个业务任务 + sync 定义 + 60s 轮询 tick（unref）
+- 新增表 `cron_jobs`（migration `20260816120000_add_cron_jobs`，经 prisma migrate diff 生成增量 SQL + migrate deploy 应用；注：本地 shadow DB 重放历史链失败，因初始基线迁移缺失，采用增量迁移方案）
+- 3 个首批任务：metrology.due-reminder（每日 8:00 计量 30 天内到期 Telegram 提醒）、inspection.nc-overdue（每日 9:00 超 7 天未关闭 NC 催办）、supplier.monthly-snapshot（每月 1 日 2:00 全量评分快照）
+- 文档：docs/scheduler-design.md（设计 + 任务登记）、code_map.md 新增 scheduler 模块、scheduler/ARCHITECTURE.md
+
+**验证结果：**
+- scheduler 单元测试 13/13（cron 解析 7 + 调度器 6：触发/跳过/CAS 防重/失败记录）
+- 相关模块回归：108 测试文件 / 1186 用例全部通过（metrology/inspection/supplier 无回归）
+- `QMS_ARCH_SCOPE=all bash scripts/check-qms-architecture.sh`: 0 violations
+- `bash scripts/check-docs-drift.sh`: PASSED（33 模块已同步）
+- 未启动真实后端进程验证 plugin 轮询（待生产/本地运行验证）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 本地开发库的 shadow-database 迁移重放受历史基线缺失影响，新迁移采用增量方式；如需完整 shadow 支持需补齐历史基线（不建议动历史迁移）
+- 生产环境需观察 cron-scheduler 启动日志与 cron_jobs 落库
+
+### 2026-08-16 阶段：知识库四层载体分工成文
+
+**执行内容：**
+- `docs/PROJECT_GUIDE.md` 新增第 11 节「知识库四层载体分工」：docs 正文（被动）→ AGENTS 注入（中）→ skill 按需（强）→ 门禁强制（最强）的执行性分层表，以及新规则落地的放置规则与边界判断
+- `qg-project` 技能同步该分工的索引式说明（不复制正文，遵守"正文进 docs、指令进 AGENTS/Skill、红线进门禁"原则）
+
+**验证结果：**
+- `bash scripts/check-docs-drift.sh`: PASSED
+- 未运行 lint/typecheck（纯文档变更）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无
+
+### 2026-08-16 阶段：数据契约自动化落地
+
+**执行内容：**
+- `@qgs/shared` 新增 `src/enums/error-code.ts`：`ErrorCode`（9 个 code）+ `ERROR_UX_LEVEL`（前端分级）+ `isErrorCode`；挂入 enums/index
+- 架构门禁新增 3 条规则：
+  - `B-EC`（check-qms-source-rules.mjs）：BusinessError 错误码必须是共享枚举成员；存量 170 处自由字符串入 baseline，新增自由字符串拦截
+  - `B-GF`（scripts/check-governed-fields.py）：新增 schema 列复用治理字段到未登记表 / 全新跨表 name 字段 → 拦截（增量检查，零存量误伤）
+  - `R2`（check-qms-architecture.sh）：views/qms 禁裸 axios/fetch；存量 1 处入 baseline，新增拦截
+- 新增 `scripts/where-field.mjs`：字段影响面六层扫描（治理登记/schema/后端/shared/web-antd/WeApp），挂入 `pnpm run where:field`
+- `check-qms-architecture.sh` 增加 node 探测（沙箱/用户环境通用）
+- docs/data-contract.md 路线图更新为已落地状态
+
+**验证结果：**
+- `QMS_ARCH_SCOPE=all bash scripts/check-qms-architecture.sh`: 0 violations PASSED
+- `bash scripts/check-docs-drift.sh`: PASSED
+- 三项门禁模拟新增违规均正确拦截（B-EC 新错误码 / B-GF 新表复用治理字段 / R2 新裸 axios）
+- 未运行 lint/typecheck（脚本与枚举变更，@qgs/shared 枚举已用 tsc 转译验证）
+
+**commit:** 待提交
+
+**遗留问题：**
+- P2 命名规则自动化检测待做（文档约束已先行）
+
+### 2026-08-16 阶段：数据契约规范成文
+
+**执行内容：**
+- 新增 `docs/data-contract.md`（数据契约规范单一事实源）：字段治理登记流程与元数据标准、错误码字典（ErrorCode 枚举契约）、字段命名规则、前端数据消费约束、字段影响面 checklist，以及 P0-P2 自动化路线图
+- `CONSTRAINTS.md` 追加「数据契约规范」15 条硬约束（字段治理登记/错误码字典/命名/前端/影响面）
+- `docs/PROJECT_GUIDE.md` 红线新增第 14 条（数据契约四铁律）+ 文档地图收录 `docs/data-contract.md`
+
+**验证结果：**
+- `bash scripts/check-docs-drift.sh`: PASSED
+- 未运行 lint/typecheck（纯文档变更，不涉及业务代码）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 自动化项待落地：ErrorCode 枚举、BusinessError 错误码门禁、跨表字段登记门禁、where:field 脚本、前端约束门禁
+
+### 2026-08-16 阶段：文档知识库防漂移体系 + 文档补齐
+
+**执行内容：**
+- 新增 `docs/PROJECT_GUIDE.md`（项目档案，规范唯一权威：架构/能做什么/红线/工作流/文档地图）
+- 新增 `PROJECT_STATE.md`（状态日报：硬数据段由 `scripts/sync-project-state.sh` 自动实测生成）
+- 新增 `scripts/sync-project-state.sh`（`pnpm run docs:sync`）与 `scripts/check-docs-drift.sh`（`pnpm run check:docs-drift`：D1 版本/基线漂移、D2 模块缺 code_map、D3 引用消失模块、D4 ARCHITECTURE 缺失提示）
+- `check:docs-drift` 挂入 `pnpm check` 与 lefthook pre-push
+- `AGENTS.md` 增加"交接规矩"（新 AI 开工必读档案+日报）与文档链接；`qg-project` 技能改为索引式（不再维护规范正文副本）
+- 为 16 个缺失模块新建 ARCHITECTURE.md（ai/dashboard/data-scope/dept/dictionary/file-storage/knowledge/planning/rbac/report/system/system-log/task-dispatch/user/welder/work-order-requirement），32/32 模块全部具备
+- `docs/architecture.md` 顶部标注为历史方案，加"历史 vs 当前"对照表，指向 PROJECT_GUIDE
+- `PROGRESS.md` 版本号修正 0.24.0→0.27.0；基线数据改为实测并标注被 PROJECT_STATE 取代
+- `code_map.md` 补充缺失的 `master-data-governance` 模块条目
+
+**验证结果：**
+- `bash scripts/check-docs-drift.sh`: PASSED（0 违规、0 提示）
+- `bash scripts/sync-project-state.sh`: v0.27.0 / 32 modules / 660 TS / 293 tests
+- 未运行 lint/typecheck（本次为纯文档+脚本变更，不涉及业务代码）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无（文档治理闭环完成）
+
+### 2026-08-15 阶段：inspection 统计服务行数门禁修复
+
+**执行内容：**
+- `inspection-request-stats.service.ts` 505 行超出模块 500 行上限（[B-S1]），pre-push 门禁拒绝推送 main（当时 22 个待推提交）
+- 新建 `inspection-request-stats-accumulator.ts`（101 行）：提取统计累加器初始化（11 个 Map、6 个计数器、日趋势播种）与检验员判定辅助函数；计数器改为可变对象字段，行为零变更
+- 服务文件降至 462 行
+
+**验证结果：**
+- check:qms-arch: 0 violations / 通过
+- check:type: 3/3 通过
+- vitest（inspection-request-stats / inspection-route）: 33/33 通过
+
+**commit:** c55fcdb3
+
+---
+
+### 2026-08-15 全项目代码审计（只读）
+
+**执行内容：**
+- 全量只读审查：32 个后端模块、342 个 API 路由、5 个 middleware、44 个 utils、82 个 Prisma model、前端 apps/web-antd（193 vue + 267 ts）、apps/weapp、packages/qgs-shared
+- 8 个并行子代理分组深审（inspection / 质量评分域 / 售后报表AI域 / 计量监督域 / 策划生产域 / 平台管理域 / 基础设施层 / 前端与共享包），主代理独立复核全部严重级结论
+- 独立验证：后端 Vitest `293/293` 文件、`2666/2666` 用例 PASS；根目录 `pnpm test:unit`（happy-dom）`407/407` 文件、`3390/3390` 用例 PASS；`pnpm run check:type` 3/3 PASS；`check-qms-architecture.sh --all` exit 0（仅 inspection-request-stats.service.ts 505 行 1 条活跃违规）
+
+**关键发现（详见评审报告，未做任何代码变更）：**
+- P0 安全：ai/generate-itp 路径穿越（任意文件读取+外泄 LLM）；ai/match-cases 跨组织质检数据泄露；user 列表泄露 bcrypt 哈希；AI apiKey 明文无鉴权回读；软删/禁用用户仍可登录；登录无防爆破；DATA_SCOPE_V2 默认 false；metrology 公共借用 fail-open；supplier 写路径无数据权限
+- P1 硬约束：~43 个 handler 下沉 modules 架空 api 薄层；弱 zod 52 处；after-sales 全表加载+内存分页；work-order/supplier 导出静默截断（pageSize 钳 100）；request-dedupe 先于 auth 执行；data-scope 前缀歧义；BusinessError 迁移未完成
+- 模块评分区间 2.0（ai）～ 4.5（part-master/process-master）；前端整体 74/100（B）
+
+**遗留问题：**
+- 未修复任何代码；P0/P1 问题清单与修复优先级已交付，待后续 wave 按评审报告处理
+- 架构 baseline 267 行冻结债务（B-E2 57 / B-M1 140 / B-M2 37 等）未清理
+
+**commit:** （未提交，仅文档追加）
+
+---
+
 ## [0.27.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.26.0...qgs-v0.27.0) (2026-08-15)
 
 
