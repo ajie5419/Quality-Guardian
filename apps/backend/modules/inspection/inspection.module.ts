@@ -92,6 +92,52 @@ export const inspectionModule: ModuleDeclaration = {
       ],
     },
     {
+      key: 'outsourcing',
+      parentPath: '/qms',
+      path: '/qms/outsourcing',
+      name: 'QMSOutsourcing',
+      component: 'qms/outsourcing/index',
+      authCode: 'QMS:Outsourcing:List',
+      order: 21,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:delivery',
+        title: '外协管理',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Outsourcing:Create',
+          name: 'QMSOutsourcingCreate',
+          order: 1,
+          title: '新增',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Edit',
+          name: 'QMSOutsourcingEdit',
+          order: 2,
+          title: '编辑',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Delete',
+          name: 'QMSOutsourcingDelete',
+          order: 3,
+          title: '删除',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Export',
+          name: 'QMSOutsourcingExport',
+          order: 4,
+          title: '导出',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Import',
+          name: 'QMSOutsourcingImport',
+          order: 5,
+          title: '导入',
+        },
+      ],
+    },
+    {
       key: 'inspection-records',
       parentPath: '/qms/inspection',
       path: '/qms/inspection/records',

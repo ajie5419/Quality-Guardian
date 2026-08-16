@@ -25,6 +25,21 @@
 
 ## 执行记录
 
+### 2026-08-16 阶段：修复售后导出按钮权限缺失（前端按钮码缺口）
+
+**问题**：售后反馈页面无导出按钮。根因：QMS:AfterSales:Export 码自始未被声明（菜单按钮无、权限表无、角色未分配），前端按钮按码显隐 → 普通用户永远不可见（仅管理员兜底）。
+
+**执行内容：**
+- 全量排查前端 45 个按钮权限码 vs 权限表，定位 3 组真实缺口：AfterSales:Export、Outsourcing:Export/Import、Planning:ProjectDocs:Export
+- after-sales.module.ts 补菜单+8 按钮声明（含 Export/Settle/Chart*）；inspection.module.ts 补 outsourcing 菜单+5 按钮；planning.module.ts 补 project-docs 菜单+5 按钮（此前这两个菜单仅有 DB seed 无代码声明）
+- 本地执行菜单同步（ensureModuleMenus）→ 4 个新码进菜单表 → backfill-permission-consistency.ts 补齐权限表 + 全角色分配（4 码 + 28 条）
+
+**验证结果**：
+- 4 码菜单/权限表就绪；全量测试通过；lint/typecheck/qms-arch 0 violations
+
+**遗留问题**：
+- 前端按钮码缺口清零；其余 useQmsPermissions 前缀为拼接模式非缺口
+
 ### 2026-08-16 阶段：权限码一致性三类遗留处置
 
 **执行内容：**
