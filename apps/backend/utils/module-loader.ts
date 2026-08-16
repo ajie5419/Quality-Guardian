@@ -27,6 +27,7 @@ import { qualityClassificationModule } from '~/modules/quality-classification/qu
 import { qualityLossModule } from '~/modules/quality-loss/quality-loss.module';
 import { rbacModule } from '~/modules/rbac/rbac.module';
 import { reportModule } from '~/modules/report/report.module';
+import { schedulerModule } from '~/modules/scheduler/scheduler.module';
 import { supervisionModule } from '~/modules/supervision/supervision.module';
 import { supplierIdentityModule } from '~/modules/supplier-identity/supplier-identity.module';
 import { supplierModule } from '~/modules/supplier/supplier.module';
@@ -62,6 +63,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   qualityLossModule,
   rbacModule,
   reportModule,
+  schedulerModule,
   supervisionModule,
   supplierModule,
   supplierIdentityModule,

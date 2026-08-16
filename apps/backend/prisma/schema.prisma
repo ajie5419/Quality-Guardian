@@ -2284,6 +2284,24 @@ enum quality_plans_planStatus {
   ARCHIVED
 }
 
+// @module scheduler
+model cron_jobs {
+  id          String    @id @default(cuid())
+  jobKey      String
+  cronExpr    String
+  description String?
+  enabled     Boolean   @default(true)
+  lastRunAt   DateTime?
+  lastStatus  String?
+  lastError   String?   @db.Text
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([jobKey, isDeleted])
+  @@index([enabled, isDeleted])
+}
+
 enum users_status {
   ACTIVE
   INACTIVE
