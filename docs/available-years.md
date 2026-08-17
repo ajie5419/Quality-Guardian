@@ -56,6 +56,30 @@ useAvailableYears(scopes?: string[])  // 传 scopes 按模块取，不传取全�
 
 > 说明：质量策划（planning：BOM/DFMEA/ITP/项目文档）无业务日期列（仅 createdAt/updatedAt），暂不注册年份来源；如业务需要按年份管理，先为相关表补充业务日期字段再注册。
 
+## 2.4 新模块接入指南（三步）
+
+任何模块需要按年份查询时：
+
+```ts
+// 第 1 步：注册表加一行（apps/backend/modules/data-lifecycle/available-years.service.ts）
+YEAR_SOURCES = [
+  // ...现有来源
+  { scope: 'my-module', table: 'my_table', column: '业务日期列' },
+]
+
+// 第 2 步：前端页面接 hook（传自己的 scope）
+const { years } = useAvailableYears(['my-module']);
+
+// 第 3 步：查询接口用 year 参数（业务日期年份语义）
+// 完成——接口、缓存、容错、归档追溯全部自动生效
+```
+
+**要求**：
+
+1. `column` 必须是**业务日期列**（记录所述年份），且表有 `isDeleted` 字段（年份查询含归档数据）
+2. 表无业务日期列（仅 createdAt）时，**先补业务日期字段**再注册（如质量策划 planning 当前状态）
+3. 禁止在页面里硬编码年份数组；禁止另写年份查询接口（一律走 `/qms/common/years`）
+
 ## 3. 年份语义统一约定
 
 1. `year` 参数统一 = **业务日期年份**（记录所述年份，非创建年份）
