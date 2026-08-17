@@ -157,6 +157,8 @@ model after_sales {
   linkedEngineeringId    String?
   createdAt              DateTime                              @default(now())
   updatedAt              DateTime                              @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   version                Int                                   @default(1)
   isDeleted              Boolean                               @default(false)
   workOrderNumber        String
@@ -1562,6 +1564,8 @@ model measuring_instruments {
   isDeleted        Boolean                       @default(false)
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   calibrationPlans metrology_calibration_plans[]
   borrowRecords    metrology_borrow_records[]
 
@@ -1693,6 +1697,8 @@ model work_orders {
   status                         work_orders_status                   @default(OPEN)
   createdAt                      DateTime                             @default(now())
   updatedAt                      DateTime                             @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   version                        Int                                  @default(1)
   isDeleted                      Boolean                              @default(false)
   effectiveTime                  DateTime?
@@ -1935,6 +1941,8 @@ model quality_losses {
   isDeleted       Boolean      @default(false)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   createdBy       String?
   work_order      work_orders? @relation(fields: [workOrderNumber], references: [workOrderNumber], onDelete: SetNull, onUpdate: Cascade)
 

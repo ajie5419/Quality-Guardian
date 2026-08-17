@@ -1,5 +1,9 @@
 export {
-  ARCHIVE_TABLES,
+  clearAvailableYearsCache,
+  getAvailableYears,
+} from './available-years.service';
+export {
+  ARCHIVE_SOURCES,
   runLifecycleArchive,
 } from './data-lifecycle-archive.service';
 export {
@@ -12,4 +16,3 @@ export type {
   RetentionAction,
   RetentionRuleInput,
 } from './data-retention-rule.service';
-export { clearAvailableYearsCache, getAvailableYears } from './available-years.service';

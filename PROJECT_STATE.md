@@ -5,7 +5,7 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 14:00
+- 最后同步时间: 2026-08-17 15:30
 - 版本: 0.27.0
 - 后端模块数: 34
 - 模块 TS 文件数: 687
@@ -86,7 +86,7 @@
 - [x] **指标治理阶段4（2026-08-17 完成，判断修正）**：拆 inspection-reporting.service.ts——3 个跨域函数（getSupplierScoringData/getWelderScoreStats/getWorkOrderAggregateInspections）经数据源核查实为检验域数据（inspections/quality_records），按模块自包含原则留在 inspection 模块，拆至新文件 inspection-score-data.service.ts（报表中心 428→287 行）；InspectionCoreService spread 合并保持转发面不变，消费者零改动；metrics-registry 实现点同步
 - [x] **数据生命周期 P1（2026-08-17 完成）**：审计日志自动清理——system-log.audit-cleanup cron（每日 03:00）删除超 90 天 audit_logs/login_logs（分批 ID 列表防锁）；真实库干跑 1556+511 条超期
 - [x] **数据生命周期 P2（2026-08-17 完成）**：data_retention_rules 表 + 9 条默认规则幂等种子（业务 3650 天 ARCHIVE×6/审计 90 DELETE/快照 730 DELETE/临时 30 PURGE）；启动时 ensureDefaultRetentionRules
-- [x] **数据生命周期 P3（2026-08-17 完成）**：归档框架——3 业务表加 archivedAt/retainUntil；创建链路回填 retainUntil（不合格记录界面+导入）；daily-archive cron（每日 02:00）ARCHIVE 打标记 + 快照超期清理；**年份查询/统计不过滤归档（追溯场景，docs §3.5 决策）**；列表页含归档开关待归档真触发时再做
+- [x] **数据生命周期 P3（2026-08-17 完成，方案 B 全覆盖）**：归档框架——**7 类业务表全覆盖**（含后补 4 类字段：计量/售后/质量损失/工单）+ **兜底推算**（无标签存量按 createdAt+规则天数自动到期，真实库验证 270 条老工单自动归档/近期数据跳过）；创建链路回填保留（显式优先）；daily-archive cron；快照超期清理；年份查询不过滤归档（§3.5）
 - [ ] **数据生命周期 P4**：OSS 冷存储规则 —— **2026-08-17 业务决策：暂缓**（当前存储 6.79GB ≈ 0.8 元/月，转冷仅省 0.6 元/月；且内网免流量费；触发条件：存储量 100GB+ 或账单有感知时，控制台配生命周期规则 5 分钟即可）
 - [ ] **数据生命周期 P5**：到期评估界面（到期前 90 天预警 + 续留/销毁/导出三选一 + 未决策自动续留 1 年）
 - [x] **可用年份统一服务（2026-08-17 完成）**：docs/available-years.md + YEAR_SOURCES 注册表（7 数据源，含归档）+ /qms/common/years?scopes 接口 + 60s 缓存；前端 useAvailableYears 泛化（scopes/缓存/容错），检验记录页硬编码 [2024,2025,2026] 替换为动态，售后/不合格项/工单传各自 scope（修正数据源错）；真实库验证 2026/2025/2024 合并 ✓

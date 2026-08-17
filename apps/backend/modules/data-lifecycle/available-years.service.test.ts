@@ -1,10 +1,10 @@
-import { describe, expect, it, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import prisma from '~/utils/prisma';
 
 import {
   clearAvailableYearsCache,
   getAvailableYears,
 } from './available-years.service';
-import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {

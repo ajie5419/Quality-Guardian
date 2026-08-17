@@ -34,6 +34,12 @@
 - 单表超 500 万行后再评估：分区表（按月 DROP PARTITION）或独立归档表
 - 新增字段：archivedAt（DateTime?）、retainUntil（DateTime?）
 
+### 3.1b 归档覆盖（2026-08-17 方案 B：7/7 全覆盖 + 存量兜底）
+
+- 7 类业务表全覆盖：quality_records / inspections / qms_inspection_requests / measuring_instruments / after_sales / quality_losses / work_orders（后 4 类 2026-08-17 补字段）
+- **兜底推算**：retainUntil 为空的历史数据，按 createdAt + 规则天数自动推算到期（无需逐表回填标签；创建链路显式回填保留，显式优先）
+- 真实库验证：270 条无标签老工单自动归档 ✓，近期数据正确跳过 ✓
+
 ### 3.2 执行：cron 队列化（复用现有 scheduler + quality_loss_index_jobs 模式）
 
 ```
