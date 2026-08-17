@@ -86,7 +86,7 @@
 - [x] **指标治理阶段4（2026-08-17 完成，判断修正）**：拆 inspection-reporting.service.ts——3 个跨域函数（getSupplierScoringData/getWelderScoreStats/getWorkOrderAggregateInspections）经数据源核查实为检验域数据（inspections/quality_records），按模块自包含原则留在 inspection 模块，拆至新文件 inspection-score-data.service.ts（报表中心 428→287 行）；InspectionCoreService spread 合并保持转发面不变，消费者零改动；metrics-registry 实现点同步
 - [ ] **数据生命周期 P1**：审计日志自动清理（audit_logs/login_logs 3 个月到期删，cron 每日，复用 scheduler）——止血（当前无限增长）
 - [ ] **数据生命周期 P2**：保留期登记表 data_retention_rules（10 年主口径/审计 3 个月/快照 1-2 年/临时 30 天）
-- [x] **数据生命周期 P3（2026-08-17 完成）**：归档框架——quality_records/inspections/qms_inspection_requests 加 archivedAt/retainUntil；daily-archive cron（每日 02:00）ARCHIVE 打标记 + 快照超期清理（quality_loss_index/supplier_score_snapshots 按规则 730 天）；data_lifecycle_jobs 队列表预留；真实库验证通过（打标记 ✓ 快照清理 ✓）；查询筛选界面待归档真触发时再做
+- [x] **数据生命周期 P3（2026-08-17 完成）**：归档框架——3 业务表加 archivedAt/retainUntil；创建链路回填 retainUntil（不合格记录界面+导入）；daily-archive cron（每日 02:00）ARCHIVE 打标记 + 快照超期清理；**年份查询/统计不过滤归档（追溯场景，docs §3.5 决策）**；列表页含归档开关待归档真触发时再做
 - [ ] **数据生命周期 P4**：OSS 冷存储规则（按需，文件不删只转冷）
 - [ ] **数据生命周期 P5**：到期评估界面（到期前 90 天预警 + 续留/销毁/导出三选一 + 未决策自动续留 1 年）
 - [ ] 其他待办详见 PROGRESS.md 待办段
