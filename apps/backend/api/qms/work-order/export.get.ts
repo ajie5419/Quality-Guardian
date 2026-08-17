@@ -1,4 +1,6 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -12,6 +14,7 @@ import {
 const querySchema = z.object({}).passthrough();
 
 export default defineValidatedHandler(querySchema, async (event, query) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.EXPORT);
   const userinfo = getCurrentUser(event);
 
   try {

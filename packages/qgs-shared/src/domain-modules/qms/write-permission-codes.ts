@@ -12,6 +12,7 @@ export const METROLOGY_PERMISSION_CODES = {
   CREATE: 'QMS:Metrology:Create',
   DELETE: 'QMS:Metrology:Delete',
   EDIT: 'QMS:Metrology:Edit',
+  EXPORT: 'QMS:Metrology:Export',
   IMPORT: 'QMS:Metrology:Import',
   LIST: 'QMS:Metrology:List',
 } as const;
@@ -63,6 +64,7 @@ export const VEHICLE_COMMISSIONING_WRITE_CODES = {
   CREATE: 'QMS:VehicleCommissioning:Create',
   DELETE: 'QMS:VehicleCommissioning:Delete',
   EDIT: 'QMS:VehicleCommissioning:Edit',
+  EXPORT: 'QMS:VehicleCommissioning:Export',
 } as const;
 
 /**

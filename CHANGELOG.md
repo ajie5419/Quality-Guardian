@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：导出类读接口授权（①）
+
+**执行内容：**
+- 6 个数据导出 GET 接口纳入权限码校验：检验记录导出（Records:Export）、计量导出（Metrology:Export）、质量损失导出（LossAnalysis:Export）、供应商导出（Supplier:Export）、工单导出（WorkOrder:Export）、车辆问题导出（VehicleCommissioning:Export）
+- @qgs/shared 补 METROLOGY.EXPORT、VEHICLE_COMMISSIONING.EXPORT 码；一致性回填（VehicleCommissioning:Export 新码 + 7 角色分配）
+- 车辆导出因 50 行限制下沉为模块 service（vehicle-commissioning-issues-export.get.service.ts，api 层薄转发）——顺带符合"api 薄层"架构
+
+**验证结果：**
+- 全量测试 2701/2701；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- 一般列表/统计读接口仍仅登录（数据可见性属 ② Phase 4 范围）；① 完成，其余 3-2 继续
+
 ### 2026-08-16 阶段：token 吊销与账号状态即时校验（④）
 
 **执行内容：**
