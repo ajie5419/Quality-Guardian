@@ -5,11 +5,11 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 11:50
+- 最后同步时间: 2026-08-17 13:16
 - 版本: 0.27.0
 - 后端模块数: 34
-- 模块 TS 文件数: 682
-- 后端测试文件数: 299
+- 模块 TS 文件数: 685
+- 后端测试文件数: 300
 <!-- docs:sync-end -->
 
 ## 当前进度
@@ -29,6 +29,7 @@
 - 2026-08-17 指标治理阶段4 落地（收官）：拆 inspection-reporting.service.ts（428→287 行）——3 个跨域函数经数据源核查实为检验域数据，拆至 inspection-score-data.service.ts，转发面与消费者零改动；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段3 落地：检验员在办量排行收敛——inspection 新增 getInspectorActiveTaskCounts（独立文件），user.service 动态 import 调用统一出口（顶层 import 会触发 inspection→user 模块加载循环）；quality-loss-trend 经核实为工作台在用（非死端点）保留；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段2 落地：质量损失三源聚合收敛——getTrendData 改查 quality_loss_index 物化表（四源口径写入时统一 isClaim||amount>0），删除 3 模块 12 个同构直查函数 + 转发链（此前仅 getTrendData 消费）；metrics-registry 42→41（M-D07 并入 M-B03）；全量 2686 用例通过，qms-arch 0 violations。
+- 2026-08-17 数据生命周期 P1-P3 落地：审计日志 90 天清理 cron（P1）、保留期规则表 9 条幂等种子（P2）、归档框架（P3：3 业务表归档字段 + daily-archive 任务 + 快照超期清理）；真实库验证全过；全量 2693 用例。
 - 2026-08-17 数据生命周期设计成文：docs/data-lifecycle.md——业务口径 10 年保留、审计日志 3 个月、历史只读、到期人工三选一（续留/销毁/导出，未决策自动续留 1 年）；归档选型打标记不拆表；存量数据分批干跑；P1-P5 入待办。
 - 2026-08-17 指标治理真实验证（本地库 quality_guard_local_test）：三源口径抽查 100% 一致（External 54→19、Internal 236→2、Commissioning 53→0）；getTrendData 真实执行暴露并修复 SQL 参数化 bug（SELECT 表达式误入 ${} 被当参数绑定 → 全 0，改用 Prisma.sql 片段）；修复后 1月 13380/2月 230012.24/3月 31775 与模拟 SQL 一致；getAllLosses 分页 21 条、在办 8 人正常。
 - 2026-08-17 指标治理阶段0-1 落地：指标字典成文（docs/metrics-registry.md + utils/metrics-registry.ts，42 指标 7 族，58 聚合点登记 + 24 豁免点）；门禁 B-MF 挂入 check:qms-arch（新增聚合必须登记 + 文档/代码 ID 一致性校验），存量零 baseline，测试 13/13 全绿。
@@ -85,7 +86,7 @@
 - [x] **指标治理阶段4（2026-08-17 完成，判断修正）**：拆 inspection-reporting.service.ts——3 个跨域函数（getSupplierScoringData/getWelderScoreStats/getWorkOrderAggregateInspections）经数据源核查实为检验域数据（inspections/quality_records），按模块自包含原则留在 inspection 模块，拆至新文件 inspection-score-data.service.ts（报表中心 428→287 行）；InspectionCoreService spread 合并保持转发面不变，消费者零改动；metrics-registry 实现点同步
 - [ ] **数据生命周期 P1**：审计日志自动清理（audit_logs/login_logs 3 个月到期删，cron 每日，复用 scheduler）——止血（当前无限增长）
 - [ ] **数据生命周期 P2**：保留期登记表 data_retention_rules（10 年主口径/审计 3 个月/快照 1-2 年/临时 30 天）
-- [ ] **数据生命周期 P3**：归档框架——大表加 archivedAt/retainUntil + daily-archive cron 任务（队列化可重试）+ 列表页含归档筛选（历史只读）
+- [x] **数据生命周期 P3（2026-08-17 完成）**：归档框架——quality_records/inspections/qms_inspection_requests 加 archivedAt/retainUntil；daily-archive cron（每日 02:00）ARCHIVE 打标记 + 快照超期清理（quality_loss_index/supplier_score_snapshots 按规则 730 天）；data_lifecycle_jobs 队列表预留；真实库验证通过（打标记 ✓ 快照清理 ✓）；查询筛选界面待归档真触发时再做
 - [ ] **数据生命周期 P4**：OSS 冷存储规则（按需，文件不删只转冷）
 - [ ] **数据生命周期 P5**：到期评估界面（到期前 90 天预警 + 续留/销毁/导出三选一 + 未决策自动续留 1 年）
 - [ ] 其他待办详见 PROGRESS.md 待办段

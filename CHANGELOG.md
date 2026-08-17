@@ -23,7 +23,33 @@
 
 ---
 
-## 执行记录
+### 2026-08-17 阶段：数据生命周期 P3（归档框架）
+
+**执行内容：**
+- schema：quality_records/inspections/qms_inspection_requests 加 archivedAt/retainUntil；data_lifecycle_jobs 队列表（预留）；手写迁移 + migrate deploy
+- data-lifecycle-archive.service.ts：ARCHIVE 打标记（retainUntil 到期）三业务表；DELETE 快照清理（quality_loss_index/supplier_score_snapshots 按规则 730 天 cutoff）
+- cron：data-lifecycle.daily-archive 每日 02:00 注册
+- 测试 2 例；真实库验证：过期记录打标记 ✓、800 天前快照删除 ✓（21→20）
+
+**验证结果：**
+- 全量 300 文件/2693 用例；qms-arch 0 violations；tsc/eslint 全绿
+
+**遗留问题：**
+- 查询筛选界面待归档真实触发时再做；retainUntil 存量回填待上线仪式；P4/P5 待做
+
+### 2026-08-17 阶段：数据生命周期 P1+P2（审计日志清理 + 保留期规则）
+
+**执行内容：**
+- P1：system-log.audit-cleanup cron（每日 03:00）删除超 90 天审计/登录日志（分批 ID 列表防锁）；真实库干跑 1556+511 条超期
+- P2：data_retention_rules 表 + 9 条默认规则幂等种子（业务 3650 天 ARCHIVE×6/审计 90 DELETE/快照 730 DELETE/临时 30 PURGE）；新模块 data-lifecycle；启动时 ensureDefaultRetentionRules
+- 迁移：手写两轮（建表 + enabled→isEnabled，B-N1 正确拦截新表 enabled 与 cron_jobs 撞 baseline）；本地 shadow 库历史迁移重建失败（inspections 无建表迁移的既有技术债）→ migrate diff + deploy 绕行
+- 测试 5 例（种子幂等/缺省补齐/清理分批/空表跳过/注册定义）
+
+**验证结果：**
+- 全量 299 文件/2691 用例；qms-arch 0 violations；真实库种子幂等验证
+
+**遗留问题：**
+- P3-P5 待做
 
 ### 2026-08-17 阶段：数据生命周期设计成文
 

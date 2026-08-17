@@ -1,4 +1,8 @@
 export {
+  ARCHIVE_TABLES,
+  runLifecycleArchive,
+} from './data-lifecycle-archive.service';
+export {
   DataRetentionRuleService,
   DEFAULT_RETENTION_RULES,
   ensureDefaultRetentionRules,

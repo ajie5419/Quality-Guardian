@@ -1,6 +1,7 @@
 import process from 'node:process';
 
 import { ensureDefaultRetentionRules } from '~/modules/data-lifecycle';
+import { registerLifecycleArchive } from '~/modules/data-lifecycle/cron/daily-archive';
 import { registerNcOverdueReminder } from '~/modules/inspection/cron/nc-overdue';
 import { registerMetrologyDueReminder } from '~/modules/metrology/cron/due-reminder';
 import { runSchedulerTick, syncCronJobDefinitions } from '~/modules/scheduler';
@@ -23,6 +24,7 @@ export function startCronScheduler() {
   registerNcOverdueReminder();
   registerSupplierMonthlySnapshot();
   registerAuditLogCleanup();
+  registerLifecycleArchive();
 
   // Data lifecycle: idempotent retention-rule seed (P2).
   void ensureDefaultRetentionRules().catch((error: unknown) => {
