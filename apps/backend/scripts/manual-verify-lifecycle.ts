@@ -11,10 +11,18 @@ const logger = createModuleLogger('ManualLifecycleVerify');
 
 async function dryRun(now: Date) {
   console.log('==== 干跑：统计将归档/清理的数据（不动数据） ====');
-  for (const table of ['quality_records', 'inspections', 'qms_inspection_requests']) {
+  for (const table of [
+    'quality_records',
+    'inspections',
+    'qms_inspection_requests',
+  ]) {
     const client = (prisma as any)[table];
     const due = await client.count({
-      where: { archivedAt: null, retainUntil: { not: null, lt: now }, isDeleted: false },
+      where: {
+        archivedAt: null,
+        retainUntil: { not: null, lt: now },
+        isDeleted: false,
+      },
     });
     const marked = await client.count({ where: { archivedAt: { not: null } } });
     console.log(`  ${table}: 到期未归档 ${due} 条, 已归档 ${marked} 条`);
@@ -23,7 +31,9 @@ async function dryRun(now: Date) {
     where: { dataClass: 'snapshot' },
     select: { retentionDays: true },
   });
-  const cutoff = new Date(now.getTime() - (rule?.retentionDays ?? 730) * 24 * 60 * 60 * 1000);
+  const cutoff = new Date(
+    now.getTime() - (rule?.retentionDays ?? 730) * 24 * 60 * 60 * 1000,
+  );
   for (const entry of [
     { table: 'quality_loss_index', dateColumn: 'indexedAt' },
     { table: 'supplier_score_snapshots', dateColumn: 'createdAt' },
@@ -32,7 +42,9 @@ async function dryRun(now: Date) {
     const expired = await client.count({
       where: { [entry.dateColumn]: { lt: cutoff }, isDeleted: false },
     });
-    console.log(`  ${entry.table}: 超期(${cutoff.toISOString().slice(0, 10)} 前) ${expired} 条`);
+    console.log(
+      `  ${entry.table}: 超期(${cutoff.toISOString().slice(0, 10)} 前) ${expired} 条`,
+    );
   }
   console.log('（干跑完成，未改动任何数据）');
 }
@@ -40,7 +52,9 @@ async function dryRun(now: Date) {
 async function demo(now: Date) {
   console.log('==== 演示：构造 → 执行 → 验证 → 还原 ====');
   // 1. 构造一条 retainUntil 已过期的检验记录
-  const sample = await prisma.quality_records.findFirst({ where: { isDeleted: false } });
+  const sample = await prisma.quality_records.findFirst({
+    where: { isDeleted: false },
+  });
   if (!sample) {
     console.log('无可用检验记录，跳过演示');
     return;
@@ -53,12 +67,18 @@ async function demo(now: Date) {
 
   // 2. 执行归档
   const result = await runLifecycleArchive(now);
-  console.log(`  ② 归档执行结果: archived=${result.archived} deletedSnapshots=${result.deletedSnapshots}`);
+  console.log(
+    `  ② 归档执行结果: archived=${result.archived} deletedSnapshots=${result.deletedSnapshots}`,
+  );
 
   // 3. 验证打标记
-  const row = await prisma.quality_records.findUnique({ where: { id: sample.id } });
+  const row = await prisma.quality_records.findUnique({
+    where: { id: sample.id },
+  });
   const ok = row?.archivedAt !== null && row?.archivedAt !== undefined;
-  console.log(`  ③ 验证归档标记: ${ok ? 'PASS ✓' : 'FAIL ✗'}（archivedAt=${row?.archivedAt?.toISOString() ?? 'null'}）`);
+  console.log(
+    `  ③ 验证归档标记: ${ok ? 'PASS ✓' : 'FAIL ✗'}（archivedAt=${row?.archivedAt?.toISOString() ?? 'null'}）`,
+  );
 
   // 4. 还原（恢复测试数据原状）
   await prisma.quality_records.update({
@@ -70,20 +90,22 @@ async function demo(now: Date) {
 }
 
 async function main() {
-  const args = process.argv.slice(2);
+  const args = new Set(process.argv.slice(2));
   const now = new Date();
   console.log('数据生命周期归档验证 — 当前时间:', now.toISOString());
-  if (args.includes('--dry-run')) {
+  if (args.has('--dry-run')) {
     await dryRun(now);
     return;
   }
-  if (args.includes('--demo')) {
+  if (args.has('--demo')) {
     await demo(now);
     return;
   }
   console.log('==== 真实执行（等同 cron data-lifecycle.daily-archive） ====');
   const result = await runLifecycleArchive(now);
-  console.log(`结果: 归档 ${result.archived} 条, 清理快照 ${result.deletedSnapshots} 条`);
+  console.log(
+    `结果: 归档 ${result.archived} 条, 清理快照 ${result.deletedSnapshots} 条`,
+  );
 }
 
 main()
