@@ -20,15 +20,20 @@ export const YEAR_SOURCES: YearSource[] = [
   { scope: 'after-sales', table: 'after_sales', column: 'occurDate' },
   { scope: 'work-order', table: 'work_orders', column: 'deliveryDate' },
   { scope: 'quality-loss', table: 'quality_loss_index', column: 'occurDate' },
-  { scope: 'metrology-plan', table: 'metrology_calibration_plans', column: 'planYear' },
-  { scope: 'vehicle-commissioning', table: 'vehicle_commissioning_issues', column: 'date' },
+  {
+    scope: 'metrology-plan',
+    table: 'metrology_calibration_plans',
+    column: 'planYear',
+  },
+  {
+    scope: 'vehicle-commissioning',
+    table: 'vehicle_commissioning_issues',
+    column: 'date',
+  },
 ];
 
 const CACHE_TTL_MS = 60 * 1000;
-const cache = new Map<
-  string,
-  { expiresAt: number; years: number[] }
->();
+const cache = new Map<string, { expiresAt: number; years: number[] }>();
 
 /**
  * 系统可用年份（降序去重）。
@@ -54,17 +59,13 @@ export async function getAvailableYears(
       try {
         // 表名/列名来自注册表常量（非用户输入）；字符串拼接避免模板字符串与
         // queryRawUnsafe 组合（B-SEC1 门禁）。
-        const sql =
-          'SELECT DISTINCT YEAR(`' +
-          source.column +
-          '`) as year FROM `' +
-          source.table +
-          '` WHERE isDeleted = false AND `' +
-          source.column +
-          '` IS NOT NULL';
-        const rows = await prisma.$queryRawUnsafe<
-          Array<{ year: bigint | number }>
-        >(sql);
+        const sql = `SELECT DISTINCT YEAR(\`${
+          source.column
+        }\`) as year FROM \`${source.table}\` WHERE isDeleted = false AND \`${
+          source.column
+        }\` IS NOT NULL`;
+        const rows =
+          await prisma.$queryRawUnsafe<Array<{ year: bigint | number }>>(sql);
         return rows.map((row) => Number(row.year)).filter((year) => year > 0);
       } catch (error) {
         logger.error(
