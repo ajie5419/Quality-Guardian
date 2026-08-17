@@ -72,6 +72,11 @@
 - [ ] 治理售后反馈部门、检验归档、BOM 项目和文档项目剩余的 18 条缺失身份
 - [x] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制（2026-08-17 核实：event-bus.ts 已删，MetricRefreshQueue 持久化队列 + Redis pub/sub 跨实例广播）
 - [x] 上传文件类型可配置化（匿名上传白名单收紧，默认纯图片，可切图片+PDF）
+- [ ] **指标治理阶段0（2026-08-17 立项）**：指标字典基线——docs/metrics-registry.md 文档登记 + apps/backend/utils/metrics-registry.ts 代码版登记表（首批约 25 指标 7 族：合格率/质量损失/售后/检验/供应商/工作台/其他），同步登记 51 处聚合点，文档与代码版一致性校验
+- [ ] **指标治理阶段1（依赖 0）**：门禁 B-MF——scripts/check-metric-registration.mjs，新增聚合（groupBy/aggregate/含聚合的 $queryRaw）必须登记指标，挂入 check:qms-arch，存量登记后零 baseline
+- [ ] **指标治理阶段2（依赖 0，⚠️需业务确认口径）**：收敛质量损失三源聚合——getLossRecordsForAggregation/countLossRecordsForAggregation/getQualityLossTrendRows 三模块同构实现（检验 quality_records lossAmount>0 / 售后 after_sales 无过滤 / 车辆 isClaim OR lossAmount>0）收敛为 quality-loss 统一出口 + 数据源适配；**待确认统一口径（建议 lossAmount>0 OR isClaim=true）**
+- [ ] **指标治理阶段3（依赖 0）**：排行收敛（user.service:136 workload 改调 inspection-request-stats 排行出口）+ 删除 quality-loss-trend 死端点（api/薄转发/service/前端 constants 常量，已确认前端与小程序无调用）
+- [ ] **指标治理阶段4（依赖 2、3）**：拆 inspection-reporting.service.ts 上帝文件（494 行跨 8 域）——getSupplierScoringData→supplier、getWelderScoreStats→welder、getWorkOrderAggregateInspections→work-order，检验域内聚合保留，跨模块走 index.ts
 - [ ] 其他待办详见 PROGRESS.md 待办段
 
 ---
