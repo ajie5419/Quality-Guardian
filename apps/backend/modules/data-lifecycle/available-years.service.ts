@@ -67,7 +67,7 @@ export async function getAvailableYears(
         >(sql);
         return rows.map((row) => Number(row.year)).filter((year) => year > 0);
       } catch (error) {
-        logger.warn(
+        logger.error(
           { err: error, source: source.table },
           'available years source failed',
         );
