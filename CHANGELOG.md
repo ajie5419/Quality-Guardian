@@ -35,7 +35,7 @@
 **验证结果：**
 - vitest 6/6；tsc 干净；eslint 干净（--fix 后）；qms-arch 0 violations；docs drift PASSED
 
-**commit:** 待补
+**commit:** `cabea7de` feat(scripts): process responsible department backfill tool
 
 **遗留问题：**
 - 生产部署时核对部门路径后运行（默认映射按用户规则：外购件/原材料→制造SOBU采购部、机加成品件-外协/辅材→生产履约部）
