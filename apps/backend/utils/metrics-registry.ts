@@ -46,6 +46,12 @@ export interface MetricRegistration {
   consumers: string;
   /** Data freshness. */
   freshness: MetricFreshness;
+  /**
+   * Known aggregation implementation points as `modules/.../file.ts#functionName`
+   * (paths relative to apps/backend). Gate B-MF allows aggregations listed here
+   * or in EXEMPT_AGGREGATION_POINTS; anything else is a new unregistered metric.
+   */
+  implementationPoints: string[];
 }
 
 export const METRIC_REGISTRY: MetricRegistration[] = [
@@ -61,6 +67,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'GET /qms/pass-rate-trend；报表汇总 report-summary',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/report/pass-rate.ts#getLegacyInspectionPassRateSummaryByRange',
+    ],
   },
   {
     id: 'M-A02',
@@ -74,6 +83,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'pass-rate.ts getNetPassRateSummaryByRange(source=issue)',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-A03',
@@ -86,6 +96,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'pass-rate-trend；报表汇总',
     freshness: 'projected',
+    implementationPoints: [
+      'modules/report/pass-rate-projection-query.service.ts#getProjectedPassRateSummaryByRange',
+    ],
   },
   {
     id: 'M-A04',
@@ -99,6 +112,10 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'GET /qms/pass-rate-trend',
     freshness: 'projected',
+    implementationPoints: [
+      'modules/report/pass-rate-projection-query.service.ts#getProjectedPassRateDrillDownByRange',
+      'modules/inspection/inspection-reporting.service.ts#getSupplierScoringData',
+    ],
   },
   {
     id: 'M-A05',
@@ -111,6 +128,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'pass-rate.ts',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/report/pass-rate-issue-summary.service.ts#getIssuePassRateSummaryByRange',
+    ],
   },
   {
     id: 'M-A06',
@@ -122,6 +142,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'GET /system/pass-rate-projection/status',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/report/pass-rate-projection-query.service.ts#getPassRateProjectionFreshness',
+    ],
   },
   {
     id: 'M-A07',
@@ -133,6 +156,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: '报表中心',
     freshness: 'real-time',
+    implementationPoints: [],
   },
 
   // ---- B. 质量损失族（quality-loss 模块，三源） ----
@@ -148,6 +172,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: 'GET /qms/quality-loss/dashboard',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/quality-loss/quality-loss-reporting.service.ts#getStatsForDashboard',
+    ],
   },
   {
     id: 'M-B02',
@@ -159,6 +186,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: 'GET /qms/reports/summary（internalLoss = 检验 + manualLoss）',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/quality-loss/quality-loss-reporting.service.ts#getReportPeriodMetrics',
+    ],
   },
   {
     id: 'M-B03',
@@ -172,6 +202,12 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: 'GET /qms/quality-loss/charts',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/quality-loss/quality-loss.service.ts#getTrendData',
+      'modules/after-sales/after-sales-integration.service.ts#getQualityLossTrendRows',
+      'modules/vehicle-commissioning/vehicle-commissioning.service.ts#getQualityLossTrendRows',
+      'modules/inspection/inspection-reporting.service.ts#getQualityLossTrendRows',
+    ],
   },
   {
     id: 'M-B04',
@@ -183,6 +219,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: 'GET /qms/quality-loss/charts（钻取）',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-B05',
@@ -196,6 +233,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: '质量损失列表/导出',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-B06',
@@ -207,6 +245,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: 'GET /qms/quality-loss/dashboard',
     freshness: 'real-time',
+    implementationPoints: [],
   },
 
   // ---- C. 售后族（after-sales 模块） ----
@@ -222,6 +261,10 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'after-sales',
     consumers: 'GET /qms/after-sales/stats',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/after-sales/after-sales-analytics.service.ts#getStats',
+      'modules/after-sales/after-sales-integration.service.ts#getStatsForDashboard',
+    ],
   },
   {
     id: 'M-C02',
@@ -233,6 +276,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'after-sales',
     consumers: 'GET /qms/after-sales/stats',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-C03',
@@ -244,6 +288,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'after-sales',
     consumers: 'GET /qms/after-sales/stats',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-C04',
@@ -255,6 +300,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'after-sales',
     consumers: 'GET /qms/after-sales/stats',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-C05',
@@ -267,6 +313,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'after-sales',
     consumers: 'GET /qms/after-sales/chart-aggregate',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/after-sales/after-sales-chart-aggregation.service.ts#getChartAggregation',
+    ],
   },
   {
     id: 'M-C06',
@@ -279,6 +328,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'after-sales',
     consumers: 'GET /qms/reports/summary（externalLoss = netLoss）',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/after-sales/after-sales-integration.service.ts#getReportPeriodMetrics',
+    ],
   },
 
   // ---- D. 检验族（inspection 模块） ----
@@ -294,6 +346,11 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'inspection',
     consumers: '检验报告统计页（经 inspection-reporting 编排）',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-report-statistics.service.ts#getDefectDistribution',
+      'modules/inspection/inspection-report-statistics.service.ts#getTopRiskProjects',
+      'modules/inspection/inspection-report-statistics.service.ts#getSupplierPerformance',
+    ],
   },
   {
     id: 'M-D02',
@@ -306,6 +363,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'inspection',
     consumers: 'GET /qms/inspection/issues/stats',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-issue-stats.service.ts#getIssueStats',
+    ],
   },
   {
     id: 'M-D03',
@@ -318,6 +378,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'inspection',
     consumers: 'GET /qms/inspection/issues/chart-aggregate',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-issue-stats.service.ts#buildIssueTrendData',
+    ],
   },
   {
     id: 'M-D04',
@@ -331,6 +394,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     consumers:
       'GET /qms/inspection/requests/stats；用户管理在办量（阶段 3 收敛）',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-D05',
@@ -342,6 +406,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'inspection',
     consumers: 'GET /qms/dashboard',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-D06',
@@ -354,6 +419,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'inspection',
     consumers: 'GET /qms/reports/summary（internalLoss 组成）',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-reporting.service.ts#getReportPeriodMetrics',
+    ],
   },
   {
     id: 'M-D07',
@@ -366,6 +434,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'inspection',
     consumers: 'quality-loss 趋势合并',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-reporting.service.ts#getQualityLossTrendRows',
+    ],
   },
 
   // ---- E. 供应商族（supplier 模块） ----
@@ -382,6 +453,10 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'supplier',
     consumers: '供应商列表评分列；月度快照 cron',
     freshness: 'projected',
+    implementationPoints: [
+      'modules/after-sales/after-sales-integration.service.ts#getSupplierScoringData',
+      'modules/inspection/inspection-request-history.service.ts#getSupplierHistoryProjects',
+    ],
   },
   {
     id: 'M-E02',
@@ -393,6 +468,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'supplier',
     consumers: '月度快照留存',
     freshness: 'monthly',
+    implementationPoints: [],
   },
   {
     id: 'M-E03',
@@ -404,6 +480,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'supplier',
     consumers: '供应商列表',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/supplier/supplier.service.ts#buildSupplierGlobalStats',
+    ],
   },
 
   // ---- F. 工作台族（dashboard） ----
@@ -420,6 +499,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'dashboard',
     consumers: 'GET /qms/dashboard（5 个页面复用）',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-F02',
@@ -431,6 +511,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'dashboard',
     consumers: 'GET /qms/dashboard',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-F03',
@@ -443,6 +524,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'dashboard',
     consumers: 'GET /qms/dashboard',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-reporting.service.ts#getStatsForDashboard',
+    ],
   },
   {
     id: 'M-F04',
@@ -454,6 +538,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'dashboard',
     consumers: 'GET /qms/dashboard/targets',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-F05',
@@ -465,6 +550,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'work-order',
     consumers: 'GET /qms/workspace/work-order-aggregate',
     freshness: 'real-time',
+    implementationPoints: [],
   },
 
   // ---- G. 其他族 ----
@@ -479,6 +565,10 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'welder',
     consumers: '焊工评分页面/工作台',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/inspection/inspection-reporting.service.ts#getWelderScoreStats',
+      'modules/welder/welder.service.ts#findAll',
+    ],
   },
   {
     id: 'M-G02',
@@ -490,6 +580,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'work-order',
     consumers: 'GET /qms/work-order/stats',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/work-order/work-order.service.ts#getStatsForDashboard',
+    ],
   },
   {
     id: 'M-G03',
@@ -501,6 +594,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'task-dispatch',
     consumers: 'GET /qms/task-dispatch/stats',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-G04',
@@ -512,6 +606,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'file-storage',
     consumers: 'GET /files/stats',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/file-storage/file-asset-query.ts#getFileStorageStats',
+    ],
   },
   {
     id: 'M-G05',
@@ -524,6 +621,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'vehicle-commissioning',
     consumers: '车辆日报列表/详情',
     freshness: 'daily',
+    implementationPoints: [
+      'modules/vehicle-commissioning/vehicle-commissioning.service.ts#getStatsForDashboard',
+    ],
   },
   {
     id: 'M-G06',
@@ -536,6 +636,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'supervision',
     consumers: '监造项目详情页',
     freshness: 'real-time',
+    implementationPoints: [
+      'modules/supervision/supervision-project.service.ts#listProjects',
+    ],
   },
   {
     id: 'M-G07',
@@ -549,6 +652,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'planning',
     consumers: 'GET /qms/planning/dfmea/projects/[id]/stats',
     freshness: 'real-time',
+    implementationPoints: [],
   },
   {
     id: 'M-G08',
@@ -562,7 +666,38 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'user',
     consumers: '用户管理列表（在办量列）',
     freshness: 'real-time',
+    implementationPoints: ['modules/user/user.service.ts#findAll'],
   },
+];
+
+// Non-metric aggregations that gate B-MF must not flag (sequence/serial
+// generation, row locks, reconciliation internals, governance tooling,
+// ops monitoring). Format: `modules/.../file.ts#functionName`.
+export const EXEMPT_AGGREGATION_POINTS: string[] = [
+  'modules/after-sales/after-sales-id.ts#getNextAfterSalesSerialNumber',
+  'modules/inspection/inspection-issue.ts#getNextInspectionIssueSerialNumber',
+  'modules/inspection/inspection-issue-nc-number.service.ts#reserveInspectionIssueNcNumber',
+  'modules/supervision/supervision-plan-task.service.ts#createTask',
+  'modules/report/pass-rate-shadow-reconciliation.service.ts#run',
+  'modules/supplier-identity/supplier-identity.service.ts#lockTeamForMutation',
+  'modules/team/team-identity-merge-state.ts#lockTeams',
+  'modules/system/system-monitoring.service.ts#getDatabaseMetrics',
+  'utils/canonical-master-data.ts#auditInvalidCanonicalIds',
+  'utils/canonical-master-data.ts#auditMissingCanonicalIds',
+  'utils/canonical-master-data.ts#auditOrphans',
+  'utils/canonical-master-data.ts#backfillTargetCanonicalIds',
+  'utils/canonical-master-data.ts#countCanonicalRows',
+  'utils/canonical-master-data.ts#fetchSourceValues',
+  'utils/canonical-master-data.ts#getSinglePrimaryKeyColumn',
+  'utils/canonical-master-data.ts#getTableColumnSet',
+  'utils/canonical-master-data.ts#listCanonicalOptions',
+  'utils/canonical-master-data.ts#readCanonicalNameById',
+  'utils/canonical-master-data.ts#readCanonicalNamesByIds',
+  'utils/canonical-master-data.ts#readDistinctMissingCanonicalIdTargetNames',
+  'utils/canonical-master-data.ts#readDistinctTargetNames',
+  'utils/canonical-master-data.ts#resolveCanonicalIdByName',
+  'utils/canonical-master-data.ts#resolveCanonicalIdsByNames',
+  'utils/canonical-master-data.ts#resolveCanonicalRefs',
 ];
 
 export const METRIC_REGISTRY_BY_ID = new Map(

@@ -556,4 +556,66 @@ model naming_legacy {
       rmSync(rootDir, { force: true, recursive: true });
     }
   });
+
+  it('enforces metric registration for new aggregations', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/bad/bad-metric.service.ts': `
+import prisma from '~/utils/prisma';
+
+export const BadMetricService = {
+  async getNewMetric() {
+    return prisma.quality_records.groupBy({
+      by: ['defectCategoryId'],
+      _count: { id: true },
+    });
+  },
+};
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-MF]');
+      expect(result.output).toContain('getNewMetric');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('allows registered and exempt metric aggregation points', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/good/good-metric.service.ts': `
+import prisma from '~/utils/prisma';
+
+export const GoodMetricService = {
+  async getKnownMetric() {
+    return prisma.quality_records.groupBy({
+      by: ['defectCategoryId'],
+      _count: { id: true },
+    });
+  },
+};
+`,
+      'apps/backend/utils/metrics-registry.ts': `
+export const METRIC_REGISTRY: Array<{ id: string }> = [{ id: 'M-Z01' }];
+export const EXEMPT_AGGREGATION_POINTS: string[] = [
+  'modules/good/good-metric.service.ts#getKnownMetric',
+];
+`,
+      'docs/metrics-registry.md': `
+| ID | key |
+| --- | --- |
+| M-Z01 | knownMetric |
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(0);
+      expect(result.output).toContain('QMS architecture check passed.');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
 });

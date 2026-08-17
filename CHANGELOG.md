@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：指标治理阶段0-1（字典 + B-MF 门禁）
+
+**执行内容：**
+- 阶段0：docs/metrics-registry.md（指标字典：42 指标 7 族，含业务定义/口径/来源表/负责模块/消费/时效）+ apps/backend/utils/metrics-registry.ts（代码版登记表，METRIC_REGISTRY + EXEMPT_AGGREGATION_POINTS）；文档与代码版 ID 一致性 42/42；58 个聚合点全部登记（含质量损失三源、排行等），24 个豁免点（序号生成/行锁/对账/主数据治理工具/运维监控）
+- 阶段1：scripts/check-metric-registration.mjs（B-MF 门禁）：扫描 modules/utils 新增聚合（groupBy/aggregate/含 SUM/COUNT/GROUP BY 的 $queryRaw）→ 必须登记为指标实现点或豁免点，否则拦截；另校验文档↔代码 ID 一致性；挂入 check-qms-architecture.sh（--all 全量 / --changed 变更文件）；存量零 baseline；测试 2 例（拦截/放行）
+- 顺带修复：DSH 传输层对 `$'`（bash ANSI-C quoting）序列截断——bash 门禁函数改写避开（grep 去行尾 $ 锚点、while 用默认 IFS）；git ls-files 无匹配时 pipefail 退出问题（|| true 兜底）
+
+**验证结果：**
+- scripts 测试 13/13；check:qms-arch --all 0 violations（含 B-MF）；eslint/prettier 全绿；docs drift PASSED
+
+**遗留问题：**
+- 阶段2（质量损失三源收敛，口径已确认 lossAmount>0 OR isClaim=true）、阶段3（排行收敛+死端点）、阶段4（拆上帝文件）待做
+
 ### 2026-08-17 阶段：待办核实——EventEmitter 替换项闭环
 
 **执行内容：**

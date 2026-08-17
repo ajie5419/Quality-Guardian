@@ -89,6 +89,7 @@ Rules:
   B-N1: Boolean scalar fields must be prefixed with is/has
   B-N2: DateTime scalar fields must end with At or a documented semantic-time name
   B-N3: scalar field names must be camelCase (no underscores)
+  B-MF: new aggregations (groupBy/aggregate/aggregate raw SQL) must be registered in docs/metrics-registry.md
 
 Modes:
   --changed  Check changed files only, including committed diff, staged changes,
@@ -666,6 +667,39 @@ check_b_field_naming() {
   done <"$output_file"
 }
 
+# B-MF: metric registration gate (docs/metrics-registry.md + utils/metrics-registry.ts).
+# New aggregation sites (groupBy / aggregate / aggregate raw SQL) in modules/ and
+# utils/ must be registered as a metric implementation point or exempt entry;
+# doc/code id parity is verified by the helper as well.
+check_b_mf() {
+  local helper="$SCRIPT_DIR/check-metric-registration.mjs"
+  local output_file="$TMP_DIR/metric-registration-output.txt"
+  local files_file="$TMP_DIR/metric-files.txt"
+
+  if [[ "$SCOPE" == "all" ]]; then
+    git -C "$ROOT_DIR" ls-files 'apps/backend/modules/**/*.ts' 'apps/backend/utils/**/*.ts' | grep -v '.test.ts' >"$files_file" || true
+  else
+    local changed_file="$TMP_DIR/changed-files.txt"
+    [[ -f "$changed_file" ]] || collect_changed_files "$changed_file"
+    grep -E '^apps/backend/(modules|utils)/.*\.ts' "$changed_file" | grep -v '.test.ts' >"$files_file" || true
+  fi
+  [[ -s "$files_file" ]] || return 0
+
+  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" --files-from "$files_file" >"$output_file"; then
+    echo -e "${RED}Metric registration rule checker failed.${NC}"
+    exit 2
+  fi
+
+  while read -r kind rule location message; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" == "BASELINE" ]]; then
+      echo -e "${YELLOW}Baseline $rule:${NC} $location ($message)"
+      baseline_hits=$((baseline_hits + 1))
+    elif [[ "$kind" == "VIOLATION" ]]; then
+      report_violation "$rule" "$location" "$message"
+    fi
+  done <"$output_file"
+}
 # B-TEST1: backend test files must not live in centralized __tests__/tests/test directories.
 check_b_test1() {
   (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
@@ -743,6 +777,7 @@ check_b_id7
 check_b_map1
 check_b_gf
 check_b_field_naming
+check_b_mf
 check_b_test1
 check_b_test2
 check_b_test3

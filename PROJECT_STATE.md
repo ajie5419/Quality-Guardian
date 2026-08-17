@@ -5,7 +5,7 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 09:02
+- 最后同步时间: 2026-08-17 10:09
 - 版本: 0.27.0
 - 后端模块数: 33
 - 模块 TS 文件数: 674
@@ -26,6 +26,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-17 指标治理阶段0-1 落地：指标字典成文（docs/metrics-registry.md + utils/metrics-registry.ts，42 指标 7 族，58 聚合点登记 + 24 豁免点）；门禁 B-MF 挂入 check:qms-arch（新增聚合必须登记 + 文档/代码 ID 一致性校验），存量零 baseline，测试 13/13 全绿。
 - 2026-08-17 待办核实闭环：EventEmitter 替换项标记完成（event-bus.ts 已于 d4015f43 删除；售后→供应商评分走 MetricRefreshQueue 持久化队列，报检创建走 Redis pub/sub 跨实例广播 + SSE；全仓库零残留，历史遗留清单清理）。
 - 2026-08-17 数据契约自动化收官：命名规则检测落地（B-N1 Boolean is/has 前缀、B-N2 DateTime At 后缀+语义时间例外、B-N3 字段 camelCase；scripts/check-field-naming.mjs 挂入 check:qms-arch，存量 13 处入 baseline 新增即拦截；--changed 模式仅 schema 变更时检查）；顺带修复 B-AUTH2 门禁脚本路径（$ROOT_DIR→$SCRIPT_DIR，修复 fixture 测试 3 个既有失败）；脚本测试 11/11 通过。
 - 2026-08-17 业务决策三项：**① 数据范围隔离暂不实施**（代码已就绪，随时可按手册开启）；**② 审批流引擎暂不实施**（需求明确后再启动）；**③ Ai/Reports/ITP 菜单按钮等生产部署回填**（随部署窗口处理）。决策已记录于 PROJECT_STATE 待办 / audit-action-plan / permission-consistency-report / permission-module。
@@ -72,8 +73,8 @@
 - [ ] 治理售后反馈部门、检验归档、BOM 项目和文档项目剩余的 18 条缺失身份
 - [x] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制（2026-08-17 核实：event-bus.ts 已删，MetricRefreshQueue 持久化队列 + Redis pub/sub 跨实例广播）
 - [x] 上传文件类型可配置化（匿名上传白名单收紧，默认纯图片，可切图片+PDF）
-- [ ] **指标治理阶段0（2026-08-17 立项）**：指标字典基线——docs/metrics-registry.md 文档登记 + apps/backend/utils/metrics-registry.ts 代码版登记表（首批约 25 指标 7 族：合格率/质量损失/售后/检验/供应商/工作台/其他），同步登记 51 处聚合点，文档与代码版一致性校验
-- [ ] **指标治理阶段1（依赖 0）**：门禁 B-MF——scripts/check-metric-registration.mjs，新增聚合（groupBy/aggregate/含聚合的 $queryRaw）必须登记指标，挂入 check:qms-arch，存量登记后零 baseline
+- [x] **指标治理阶段0（2026-08-17 完成）**：指标字典基线——docs/metrics-registry.md 文档登记 + apps/backend/utils/metrics-registry.ts 代码版登记表（**42 指标 7 族**），58 个聚合点全部登记 + 24 个豁免点（序号/行锁/对账/治理工具/监控），文档与代码版 ID 一致（42/42）
+- [x] **指标治理阶段1（2026-08-17 完成）**：门禁 B-MF——scripts/check-metric-registration.mjs（新增聚合必须登记 + 文档/代码 ID 一致性校验），挂入 check:qms-arch，存量零 baseline，测试 2 例，全套 13/13；顺带修复 bash 传输层 `$'` 序列截断问题（改写函数避开 ANSI-C quoting）
 - [ ] **指标治理阶段2（依赖 0，⚠️需业务确认口径）**：收敛质量损失三源聚合——getLossRecordsForAggregation/countLossRecordsForAggregation/getQualityLossTrendRows 三模块同构实现（检验 quality_records lossAmount>0 / 售后 after_sales 无过滤 / 车辆 isClaim OR lossAmount>0）收敛为 quality-loss 统一出口 + 数据源适配；**待确认统一口径（建议 lossAmount>0 OR isClaim=true）**
 - [ ] **指标治理阶段3（依赖 0）**：排行收敛（user.service:136 workload 改调 inspection-request-stats 排行出口）+ 删除 quality-loss-trend 死端点（api/薄转发/service/前端 constants 常量，已确认前端与小程序无调用）
 - [ ] **指标治理阶段4（依赖 2、3）**：拆 inspection-reporting.service.ts 上帝文件（494 行跨 8 域）——getSupplierScoringData→supplier、getWelderScoreStats→welder、getWorkOrderAggregateInspections→work-order，检验域内聚合保留，跨模块走 index.ts
