@@ -31,7 +31,7 @@
 - 修复：豁免条件改为 isExternalInspectionIssueResponsibility(responsibilityType)（SUPPLIER + OUTSOURCING 统一豁免）；部门由服务端按报检单快照继承（后端链路已就绪）
 - 验证：前端全量 65 文件/343 用例（含 useInspectionRequestTaskActions 23/23）；vue-tsc/eslint 干净
 
-**commit:** 待补
+**commit:** `6915703f` fix(web-antd): exempt supplier responsibility from close department validation
 
 **遗留问题：**
 - 无
