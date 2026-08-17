@@ -8,6 +8,27 @@ import { getCurrentUser } from '~/utils/current-user';
 import { RbacRoleService } from './rbac-role.service';
 
 /**
+ * Ownership assertion for personal-record scenarios (the inspection-issue
+ * pattern). Call it before mutating a record owned by someone else; when
+ * the owner is missing (legacy data) the check passes to avoid locking
+ * historical records. Collaborative modules should rely on data scope
+ * instead of ownership.
+ */
+export function assertRecordOwnership(params: {
+  label: string;
+  ownerId: null | string;
+  userId: string;
+}) {
+  if (params.ownerId && params.ownerId !== params.userId) {
+    throw new BusinessError(
+      ErrorCode.FORBIDDEN,
+      `无权操作：只能操作自己创建的${params.label}`,
+      403,
+    );
+  }
+}
+
+/**
  * Framework-level write authorization. Every write endpoint (post/put/
  * delete/patch) must call this (or requireSystemAdmin) with the permission
  * code declared for that operation; the architecture gate B-AUTH1 enforces

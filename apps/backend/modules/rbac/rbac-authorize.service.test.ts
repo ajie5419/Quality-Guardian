@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { authorizeWrite } from '~/modules/rbac/rbac-authorize.service';
+import {
+  assertRecordOwnership,
+  authorizeWrite,
+} from '~/modules/rbac/rbac-authorize.service';
 import { RbacRoleService } from '~/modules/rbac/rbac-role.service';
 import { BusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
@@ -76,5 +79,33 @@ describe('authorizeWrite', () => {
     expect(RbacRoleService.getUserPermissionCodes).toHaveBeenCalledWith(
       'user-9',
     );
+  });
+});
+
+describe('assertRecordOwnership', () => {
+  it('passes when the record belongs to the user', () => {
+    expect(() =>
+      assertRecordOwnership({
+        label: '记录',
+        ownerId: 'user-1',
+        userId: 'user-1',
+      }),
+    ).not.toThrow();
+  });
+
+  it('rejects when the record belongs to someone else', () => {
+    expect(() =>
+      assertRecordOwnership({
+        label: '记录',
+        ownerId: 'user-2',
+        userId: 'user-1',
+      }),
+    ).toThrow(BusinessError);
+  });
+
+  it('passes when the owner is missing (legacy data)', () => {
+    expect(() =>
+      assertRecordOwnership({ label: '记录', ownerId: null, userId: 'user-1' }),
+    ).not.toThrow();
   });
 });

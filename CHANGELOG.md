@@ -25,6 +25,21 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：所有权助手 + 数据范围接入准备（③②）
+
+**执行内容：**
+- ③ 框架助手 assertRecordOwnership（rbac 模块导出，个人数据场景所有权断言，缺失 owner 放行历史数据）+ 单测 3 例；协作类模块不加"只能改自己"（避免误伤），判断标准写入行动清单
+- ② 数据范围：inspection 检验记录列表查询接入 buildScopedWhere（api 传 context.dataScope + 用户，DEPT/SELF 策略生效；ScopedWhere 类型放宽兼容 Prisma 联合类型）；策略核查脚本 scripts/audit-data-scope-policies.ts（输出角色×模块策略矩阵）
+- 关键决策：**DATA_SCOPE_V2 不擅自默认开启**——本地策略数据多数为 SELF、super 角色无策略，开启将导致全员可见性骤变；改为"接入完成 + 核查脚本 + 业务确认后开启"（开启手册见行动清单）
+
+**验证结果：**
+- 全量测试 2704/2704；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- Phase 4 开启前置：业务确认策略矩阵（audit-data-scope-policies.ts 输出）→ 配置 data_permission_policies（含 super 全 ALL）→ DATA_SCOPE_V2=true → 回归观察
+- inspection issues/requests 读路径接入（records 已接入，其余同类改造）
+- 写路径范围校验（quality-loss 范式推广）
+
 ### 2026-08-17 阶段：导出类读接口授权（①）
 
 **执行内容：**
