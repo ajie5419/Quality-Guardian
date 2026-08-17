@@ -23,6 +23,25 @@
 
 ---
 
+### 2026-08-17 阶段：工序责任部门回填脚本（正式运维工具）
+
+**执行内容：**
+- scripts/process-responsible-department-backfill.ts：核心逻辑（部门树构建 + 名称路径逐级唯一解析 + 幂等 + dry-run/apply）；部门路径如 ['科技公司','制造 SOBU','采购部']，不硬编码环境 ID；重名/缺失 → unresolved 并列出候选，绝不猜测
+- scripts/backfill-process-responsible-department.ts：tsx 入口（默认 dry-run，--apply 执行；unresolved 非空时 apply 后 exit 1）
+- 测试 6/6：路径解析更新 / dry-run 不写 / 幂等 skip / 工序缺失 / 路径重名（列候选）/ supplierSource 不一致告警仍执行
+- package.json：maintenance:process-responsible-departments
+- 本地 dry-run 验证：4 工序（外购件/原材料/机加成品件-外协/辅材）全部已配置 skipped=4（此前接口不返回该字段导致误判"未配置"）
+
+**验证结果：**
+- vitest 6/6；tsc 干净；eslint 干净（--fix 后）；qms-arch 0 violations；docs drift PASSED
+
+**commit:** 待补
+
+**遗留问题：**
+- 生产部署时核对部门路径后运行（默认映射按用户规则：外购件/原材料→制造SOBU采购部、机加成品件-外协/辅材→生产履约部）
+
+---
+
 ### 2026-08-17 阶段：报检责任落库链路修复（工序责任部门 + 快照继承）
 
 **执行内容：**

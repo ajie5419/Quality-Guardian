@@ -5,11 +5,11 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 22:02
+- 最后同步时间: 2026-08-17 22:19
 - 版本: 0.27.0
 - 后端模块数: 34
 - 模块 TS 文件数: 683
-- 后端测试文件数: 298
+- 后端测试文件数: 299
 <!-- docs:sync-end -->
 
 ## 当前进度
@@ -26,6 +26,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-17 工序责任部门回填脚本成文（scripts/process-responsible-department-backfill.ts + 入口 + 6 测试）：部门按名称路径（如 科技公司/制造SOBU/采购部）解析、不硬编码 ID，重名/缺失报错列候选；dry-run/--apply 双模式、幂等 skip、supplierSource 与责任类型不一致仅告警；package.json 新增 maintenance:process-responsible-departments。本地 dry-run 验证 4 工序全部已配置（skipped=4）。生产部署时核对部门路径后跑 --apply 即可。
 - 2026-08-17 报检责任落库链路修复（工序责任部门 + 快照继承，**前端零改动**）：processes 恢复 responsibleDepartmentId（迁移 20260817160000，本地 DB 列与迁移记录已在，直接恢复文件）；创建报检单外部责任（进货/外协）前端不传部门 → 后端从工序主数据静默带出落库，未配置则在创建时提示"请联系管理员配置工序责任部门"（不再拖到关闭才报"责任部门不能为空"）；关闭链路删除 system_settings 服务端解析（删 4 个死代码文件：default service/setting service/bootstrap 脚本及其测试），提交缺部门时继承报检单快照（resolveSubmittedCloseResponsibility + hydrateOutsourcingLinkedIssueResponsibility）；检验记录继承链路确认已存在（buildInspectionRecordPayloadCore 全量带出责任）。**工序责任部门配置靠 SQL/脚本维护（本地已预配 4 工序），不做任何设置界面**（用户决策：只传数据、不显示，避免增加操作步骤；曾误加设置页工序列已回退）。真库验证：创建（外购件→采购部）→ 关闭 FAIL → NC-26KJ-052，报检单/不合格项责任逐字段一致 PASS；未配置工序创建时报错提示正确。
 - 2026-08-17 指标治理阶段4 落地（收官）：拆 inspection-reporting.service.ts（428→287 行）——3 个跨域函数经数据源核查实为检验域数据，拆至 inspection-score-data.service.ts，转发面与消费者零改动；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段3 落地：检验员在办量排行收敛——inspection 新增 getInspectorActiveTaskCounts（独立文件），user.service 动态 import 调用统一出口（顶层 import 会触发 inspection→user 模块加载循环）；quality-loss-trend 经核实为工作台在用（非死端点）保留；全量 2686 用例、qms-arch 0 violations。
