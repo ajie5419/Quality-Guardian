@@ -23,6 +23,22 @@
 
 ---
 
+### 2026-08-17 阶段：可用年份统一服务（系统级年份查询）
+
+**执行内容：**
+- 调查：年份下拉 4 处（检验记录硬编码 [2024,2025,2026]、不合格项/售后数据源错（接口只查 work_orders）、工单碰巧对）；year 参数接口 8 个各自为政
+- docs/available-years.md：年份来源注册表 + 统一接口 + 统一 hook + 年份语义约定（业务日期年份/含归档/统计默认当前年）
+- 后端：available-years.service.ts（YEAR_SOURCES 6 来源）+ /qms/common/years?scopes= 升级 + 60s 缓存 + 容错；work-order.getAvailableYears 迁移删除
+- 前端：useAvailableYears(scopes?) 泛化（模块级缓存/错误容错）；检验记录页硬编码替换为动态；售后/不合格项/工单传各自 scope
+- 测试：后端 4 例（合并去重降序/scopes 过滤/未知 scope 空/缓存 TTL）；前端 records 13/13（hook mock）
+- 真实库验证：全部来源合并 2026/2025/2024 ✓、按模块过滤 ✓、缓存命中 0ms ✓
+
+**验证结果：**
+- 后端全量 301 文件/2693 用例；qms-arch 0 violations（B-MF 未误拦 DISTINCT YEAR）；vue-tsc 干净
+
+**遗留问题：**
+- 前端 TeamSelect.test.ts 4 例 window 环境失败为既有问题（stash 验证与本次无关）
+- 数据千万级后再评估年份物化表；数据范围开启后接口加 userContext 过滤（文档已预留）
 ### 2026-08-17 阶段：数据生命周期 P3（归档框架）
 
 **执行内容：**

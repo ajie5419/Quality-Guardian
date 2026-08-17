@@ -16,7 +16,7 @@ export interface WorkOrderSearchFormValues {
 
 export function useWorkOrderQueryFilters() {
   const { t } = useI18n();
-  const { years: dynamicYears } = useAvailableYears();
+  const { years: dynamicYears } = useAvailableYears(['work-order']);
   const currentYear = ref<number>(new Date().getFullYear());
   const currentDateMode = ref<WorkOrderDateMode>('year');
   const currentDate = ref(dayjs());

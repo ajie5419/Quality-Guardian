@@ -80,44 +80,6 @@ describe('workOrderService – adversarial', () => {
     vi.clearAllMocks();
   });
 
-  describe('getAvailableYears', () => {
-    it('returns [currentYear] when no work orders exist', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([]);
-      const years = await WorkOrderService.getAvailableYears();
-      expect(years).toEqual([new Date().getFullYear()]);
-    });
-
-    it('deduplicates and sorts years descending', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([
-        { year: 2024 },
-        { year: 2026 },
-        { year: 2024 },
-        { year: 2025 },
-      ]);
-      const years = await WorkOrderService.getAvailableYears();
-      expect(years).toEqual([2026, 2025, 2024]);
-    });
-
-    it('filters out year=0 and negative years', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([
-        { year: 0 },
-        { year: -1 },
-        { year: 2026 },
-      ]);
-      const years = await WorkOrderService.getAvailableYears();
-      expect(years).toEqual([2026]);
-    });
-
-    it('handles bigint year values from MySQL', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([
-        { year: BigInt(2026) },
-        { year: BigInt(2025) },
-      ]);
-      const years = await WorkOrderService.getAvailableYears();
-      expect(years).toEqual([2026, 2025]);
-    });
-  });
-
   describe('getStatsForDashboard', () => {
     it('returns zero counts when no data', async () => {
       (prisma.work_orders.aggregate as any).mockResolvedValue({

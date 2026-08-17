@@ -154,7 +154,7 @@ async function loadAfterSalesStatusOptions() {
 
 onMounted(() => loadData());
 
-const { years: dynamicYears } = useAvailableYears();
+const { years: dynamicYears } = useAvailableYears(['after-sales']);
 const currentYear = ref<number>(new Date().getFullYear());
 const currentDateMode = ref<'month' | 'week' | 'year'>('year');
 const currentDate = ref(dayjs());

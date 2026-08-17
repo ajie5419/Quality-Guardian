@@ -12,3 +12,4 @@ export type {
   RetentionAction,
   RetentionRuleInput,
 } from './data-retention-rule.service';
+export { clearAvailableYearsCache, getAvailableYears } from './available-years.service';

@@ -152,7 +152,7 @@ async function loadIssueProcessOptions() {
   }
 }
 
-const { years: dynamicYears } = useAvailableYears();
+const { years: dynamicYears } = useAvailableYears(['inspection-record']);
 const currentYear = ref<number>(new Date().getFullYear());
 const currentDateMode = ref<'month' | 'week' | 'year'>('year');
 const currentDate = ref(dayjs());

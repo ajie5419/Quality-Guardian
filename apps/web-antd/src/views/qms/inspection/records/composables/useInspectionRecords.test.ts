@@ -18,6 +18,14 @@ const {
   mockUpdateInspectionRecord: vi.fn(),
 }));
 
+vi.mock('#/hooks/useAvailableYears', () => ({
+  useAvailableYears: () => ({
+    years: { value: [] as number[] },
+    loading: { value: false },
+    refreshYears: vi.fn(),
+  }),
+}));
+
 vi.mock('#/api/qms/inspection', () => ({
   createInspectionRecord: mockCreateInspectionRecord,
   updateInspectionRecord: mockUpdateInspectionRecord,
@@ -57,11 +65,8 @@ describe('useInspectionRecords', () => {
 
     expect(activeKey.value).toBe('incoming');
     expect(currentYear.value).toBe(new Date().getFullYear());
-    expect(yearOptions).toEqual([
-      { label: '2024年', value: 2024 },
-      { label: '2025年', value: 2025 },
-      { label: '2026年', value: 2026 },
-    ]);
+    // 年份选项来自动态接口（useAvailableYears），初始为空，onMounted 后填充
+    expect(yearOptions.value).toEqual([]);
     expect(modalVisible.value).toBe(false);
     expect(isEdit.value).toBe(false);
     expect(currentRecord.value).toBeUndefined();
