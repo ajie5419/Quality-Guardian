@@ -436,3 +436,16 @@ R2|apps/web-antd/src/views/qms/planning/inspection-forms/components/TemplateModa
 R3|apps/web-antd/src/views/qms/after-sales/index.vue|680
 R3|apps/web-antd/src/views/qms/file-center/index.vue|512
 R3|apps/web-antd/src/views/qms/inspection/issues/index.vue|643
+B-N1|apps/backend/prisma/schema.prisma|field-migrateReferences|1
+B-N1|apps/backend/prisma/schema.prisma|field-affectsProgress|1
+B-N1|apps/backend/prisma/schema.prisma|field-examPassed|1
+B-N1|apps/backend/prisma/schema.prisma|field-multiStationEnabled|1
+B-N1|apps/backend/prisma/schema.prisma|field-enabled|1
+B-N3|apps/backend/prisma/schema.prisma|field-work_order_number|1
+B-N3|apps/backend/prisma/schema.prisma|field-part_name|1
+B-N3|apps/backend/prisma/schema.prisma|field-part_number|1
+B-N3|apps/backend/prisma/schema.prisma|field-required_processes|1
+B-N3|apps/backend/prisma/schema.prisma|field-created_by|1
+B-N3|apps/backend/prisma/schema.prisma|field-created_at|1
+B-N3|apps/backend/prisma/schema.prisma|field-updated_at|1
+B-N3|apps/backend/prisma/schema.prisma|field-preference_data|1

@@ -86,6 +86,9 @@ Rules:
   B-TEST3: tests importing ~/utils/prisma must also vi.mock it
   B-AUTH1: write endpoints (post/put/delete/patch) must declare authorization (authorizeWrite/requireSystemAdmin) unless public
   B-AUTH2: frontend permission codes must be declared (shared enum or module menu authCode)
+  B-N1: Boolean scalar fields must be prefixed with is/has
+  B-N2: DateTime scalar fields must end with At or a documented semantic-time name
+  B-N3: scalar field names must be camelCase (no underscores)
 
 Modes:
   --changed  Check changed files only, including committed diff, staged changes,
@@ -418,7 +421,7 @@ check_b_auth2() {
   # (repo-wide scan) because it needs the full source tree.
   [[ "$SCOPE" != "all" ]] && return 0
   local out=''
-  out="$("$NODE_BIN" "$ROOT_DIR/scripts/check-permission-code-declarations.mjs" 2>&1)"
+  out="$("$NODE_BIN" "$SCRIPT_DIR/check-permission-code-declarations.mjs" 2>&1)"
   local code=$?
   if (( code != 0 )); then
     report_violation "B-AUTH2" "scripts/check-permission-code-declarations.mjs:1" "$(echo "$out" | head -1)"
@@ -628,6 +631,41 @@ check_b_gf() {
   fi
 }
 
+# B-N1/B-N2/B-N3: prisma schema field naming rules (docs/data-contract.md §4).
+# Scalar columns must follow is/has (Boolean), At (DateTime) and camelCase
+# conventions; legacy violations are grandfathered via the baseline file.
+# The schema is a single source file, so in --changed mode we only run when
+# the schema itself changed; --all always runs the check.
+check_b_field_naming() {
+  local helper="$SCRIPT_DIR/check-field-naming.mjs"
+  local schema="$ROOT_DIR/apps/backend/prisma/schema.prisma"
+  [[ -f "$schema" ]] || return 0
+
+  if [[ "$SCOPE" == "changed" ]]; then
+    local changed_file="$TMP_DIR/changed-files.txt"
+    [[ -f "$changed_file" ]] || collect_changed_files "$changed_file"
+    if ! grep -qx 'apps/backend/prisma/schema.prisma' "$changed_file"; then
+      return 0
+    fi
+  fi
+
+  local output_file="$TMP_DIR/field-naming-output.txt"
+  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" >"$output_file"; then
+    echo -e "${RED}Field naming rule checker failed.${NC}"
+    exit 2
+  fi
+
+  while IFS=$'\t' read -r kind rule location message; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" == "BASELINE" ]]; then
+      echo -e "${YELLOW}Baseline $rule:${NC} $location ($message)"
+      baseline_hits=$((baseline_hits + 1))
+    elif [[ "$kind" == "VIOLATION" ]]; then
+      report_violation "$rule" "$location" "$message"
+    fi
+  done <"$output_file"
+}
+
 # B-TEST1: backend test files must not live in centralized __tests__/tests/test directories.
 check_b_test1() {
   (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
@@ -704,6 +742,7 @@ check_b_sec1
 check_b_id7
 check_b_map1
 check_b_gf
+check_b_field_naming
 check_b_test1
 check_b_test2
 check_b_test3

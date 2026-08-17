@@ -132,9 +132,13 @@ export const ErrorCode = {
 - 新字段命名时，先查 `master-data-fields.ts` 是否已有同概念治理键；已有则复用其 `name` + `nameId` 命名模式。
 - 同名概念的 ID 列命名：`<fieldKey>Id`（如 `supplierId`、`projectId`、`partId`）。
 
-### 4.3 待自动化
+### 4.3 自动化（P2，2026-08-17 落地）
 
-- [ ] 文档约束先行；自动化检测（新列命名与治理键不一致 → 提示）列为 P2 后期
+- [x] 架构门禁新增字段命名检测（scripts/check-field-naming.mjs，规则 B-N1/B-N2/B-N3，挂入 `pnpm run check:qms-arch`）：
+  - **B-N1**：Boolean 标量字段必须 `is`/`has` 前缀（`isDeleted`、`hasOwner`）
+  - **B-N2**：DateTime 标量字段必须 `At` 后缀，或符合语义时间例外（`date`、`*Date`、`*Until`、`*Time`、`*AtCutoff`、`*AtSnapshot`）
+  - **B-N3**：标量字段名必须 camelCase（禁止下划线；关系字段随表名不受限）
+- 存量不合规字段（5 个 Boolean + 8 个 snake_case）已入 baseline 放行，**新增字段即拦截**；`--changed` 模式仅在 schema.prisma 变更时检查
 
 ---
 
@@ -211,6 +215,6 @@ pnpm run where:field <fieldName>
 | P0-c | 架构门禁：新增跨表 name 字段必须登记治理文件 | ✅ 规则 `B-GF`（scripts/check-governed-fields.py），增量检查：复用治理字段到未登记表 / 全新跨表字段 → 拦截 |
 | P1-a | `where:field` 影响面查询脚本 | ✅ `scripts/where-field.mjs` + `pnpm run where:field <字段>`（六层扫描） |
 | P1-b | 前端共享类型/禁裸请求门禁 | ✅ 规则 `R2`（views/qms 禁裸 axios/fetch），存量已 baseline，新增拦截 |
-| P2 | 命名规则自动化检测 | 待做（文档约束先行） |
+| P2 | 命名规则自动化检测 | ✅ 规则 `B-N1`/`B-N2`/`B-N3`（scripts/check-field-naming.mjs），存量 13 处入 baseline，新增字段即拦截 |
 
 > 已落地项通过 `pnpm run check:qms-arch`（含 B-EC/B-GF/R2）与 `pnpm run check:docs-drift` 强制执行。

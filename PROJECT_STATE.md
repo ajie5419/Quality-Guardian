@@ -5,7 +5,7 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 08:51
+- 最后同步时间: 2026-08-17 09:02
 - 版本: 0.27.0
 - 后端模块数: 33
 - 模块 TS 文件数: 674
@@ -26,6 +26,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-17 数据契约自动化收官：命名规则检测落地（B-N1 Boolean is/has 前缀、B-N2 DateTime At 后缀+语义时间例外、B-N3 字段 camelCase；scripts/check-field-naming.mjs 挂入 check:qms-arch，存量 13 处入 baseline 新增即拦截；--changed 模式仅 schema 变更时检查）；顺带修复 B-AUTH2 门禁脚本路径（$ROOT_DIR→$SCRIPT_DIR，修复 fixture 测试 3 个既有失败）；脚本测试 11/11 通过。
 - 2026-08-17 业务决策三项：**① 数据范围隔离暂不实施**（代码已就绪，随时可按手册开启）；**② 审批流引擎暂不实施**（需求明确后再启动）；**③ Ai/Reports/ITP 菜单按钮等生产部署回填**（随部署窗口处理）。决策已记录于 PROJECT_STATE 待办 / audit-action-plan / permission-consistency-report / permission-module。
 - 2026-08-17 权限模块文档成文：docs/permission-module.md（三层模型/权限码字典/授权组件/门禁/数据范围开启手册/缓存/token/运维脚本/排查表/已知边界），PROJECT_GUIDE 文档地图收录。
 - 2026-08-16 修复售后导出按钮权限缺失：3 组前端按钮码缺口（AfterSales/Outsourcing/ProjectDocs Export 等 4 码）补菜单声明+权限表+角色分配。
@@ -62,7 +63,7 @@
 - [ ] 审批流引擎（方案 B）：通用申请-审批链模块 —— **2026-08-17 业务决策：暂不实施**（需求明确后再启动）
 - [ ] 数据范围隔离（Phase 4）—— **2026-08-17 业务决策：暂不实施**（代码已就绪：读路径接入 + audit-data-scope-policies.ts 核查脚本；重新评估时按 docs/permission-module.md §5.2 开启手册执行）
 - [ ] Ai/Reports/ITP 权限码菜单按钮补全 —— **2026-08-17 业务决策：等生产部署回填**（随部署窗口一并处理，期间界面分配走脚本回填）
-- [ ] 数据契约自动化：命名规则检测（P2，文档约束先行）
+- [x] 数据契约自动化：命名规则检测（P2，B-N1/B-N2/B-N3 门禁 2026-08-17 落地，存量 13 处入 baseline）
 - [ ] 完成不合格品项剩余设备验收（真机、实际新增提交、照片上传、分页、草稿、账号切换）
 - [ ] 通过正式发布链路执行不合格项责任类型 migration 与 remediation（先 dry-run 审核 OPEN unresolved 清单）
 - [ ] 完成 supplier identity wave 生产回填与健康检查（此前 17 条 PROCESS supplier identity 被错误绕过）

@@ -25,6 +25,23 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：数据契约自动化收官（命名规则检测 B-N1/B-N2/B-N3）
+
+**执行内容：**
+- 新增 scripts/check-field-naming.mjs：解析 prisma schema 标量字段，三条规则（docs/data-contract.md §4）——B-N1 Boolean 必须 is/has 前缀、B-N2 DateTime 必须 At 后缀或语义时间例外（date/*Date/*Until/*Time/*AtCutoff/*AtSnapshot）、B-N3 字段名 camelCase（关系字段随表名不受限）；输出 TSV 与 check-qms-source-rules.mjs 同契约（BASELINE/VIOLATION）
+- 存量噪音实测：1293 字段中 5 个 Boolean + 8 个 snake_case 标量（project_boms 7 + user_preferences 1）不合规 → 13 条入 baseline；B-N2 通过规则化例外零存量违规
+- 挂入 check-qms-architecture.sh（usage + check_b_field_naming + 调用顺序）；--changed 模式仅 schema.prisma 变更时检查，--all 全量
+- 顺带修复 B-AUTH2 门禁脚本路径 $ROOT_DIR→$SCRIPT_DIR（fixture 模式下脚本不存在导致 3 个既有测试失败）
+- 测试新增 2 例（违规拦截 / baseline 吸收），全套 11/11 通过；新增违规拦截演示验证（temp_col → B-N3 拦截，isTemp/tempDate 正确放行）
+- docs/data-contract.md §4.3 + 路线图 P2 更新为已落地
+
+**验证结果：**
+- scripts 测试 11/11；check:qms-arch --all 0 violations（13 条 baseline 吸收）；prettier 全绿
+
+**遗留问题：**
+- 存量 13 处不合规字段维持 baseline（含 project_boms.created_at/updated_at 等）；是否治理改名（migration + 代码引用）由业务决定
+- 同义异名检测仍为文档约束（语义匹配误报高，不建议自动化）
+
 ### 2026-08-17 阶段：业务决策三项落档
 
 **执行内容：**
