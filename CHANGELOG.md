@@ -39,7 +39,7 @@
 - scripts 测试 11/11；check:qms-arch --all 0 violations（13 条 baseline 吸收）；prettier 全绿
 
 **遗留问题：**
-- 存量 13 处不合规字段维持 baseline（含 project_boms.created_at/updated_at 等）；是否治理改名（migration + 代码引用）由业务决定
+- 存量 13 处不合规字段维持 baseline —— **2026-08-17 业务决策：放行不治理，仅拦截新增**（project_boms 等整表 snake_case 属历史遗留，改名涉及 migration+外键+前端消费，回归风险大，收益低）
 - 同义异名检测仍为文档约束（语义匹配误报高，不建议自动化）
 
 ### 2026-08-17 阶段：业务决策三项落档

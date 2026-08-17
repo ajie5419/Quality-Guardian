@@ -138,7 +138,7 @@ export const ErrorCode = {
   - **B-N1**：Boolean 标量字段必须 `is`/`has` 前缀（`isDeleted`、`hasOwner`）
   - **B-N2**：DateTime 标量字段必须 `At` 后缀，或符合语义时间例外（`date`、`*Date`、`*Until`、`*Time`、`*AtCutoff`、`*AtSnapshot`）
   - **B-N3**：标量字段名必须 camelCase（禁止下划线；关系字段随表名不受限）
-- 存量不合规字段（5 个 Boolean + 8 个 snake_case）已入 baseline 放行，**新增字段即拦截**；`--changed` 模式仅在 schema.prisma 变更时检查
+- 存量不合规字段（5 个 Boolean + 8 个 snake_case）已入 baseline 放行（**2026-08-17 业务决策：存量放行不治理，仅拦截新增**）；`--changed` 模式仅在 schema.prisma 变更时检查
 
 ---
 
