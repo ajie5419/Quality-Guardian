@@ -4,7 +4,6 @@ import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import prisma from '~/utils/prisma';
 
 import { InspectionReportStatisticsService } from './inspection-report-statistics.service';
-import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
 
 export const InspectionReportingService = {
   async findIssueIdBySerialNumber(serialNumber: number) {
@@ -83,88 +82,6 @@ export const InspectionReportingService = {
       recentIssues,
       todayInspections,
       todayIssues,
-    };
-  },
-
-  async getSupplierScoringData(params: {
-    engineeringSupplierIds: string[];
-    incomingSupplierIds: string[];
-    processTeamIds: string[];
-    since: Date;
-  }) {
-    const recentEngineeringWhere = buildSupplierEngineeringIssueWhere({
-      since: params.since,
-      supplierIds: params.engineeringSupplierIds,
-    });
-    const allEngineeringWhere = buildSupplierEngineeringIssueWhere({
-      supplierIds: params.engineeringSupplierIds,
-    });
-    const inspectionSourceOr: Prisma.inspectionsWhereInput[] = [];
-    if (params.incomingSupplierIds.length > 0) {
-      inspectionSourceOr.push({
-        category: 'INCOMING',
-        supplierId: { in: params.incomingSupplierIds },
-      });
-    }
-    if (params.processTeamIds.length > 0) {
-      inspectionSourceOr.push({
-        category: 'PROCESS',
-        teamId: { in: params.processTeamIds },
-      });
-    }
-
-    const [
-      incomingStats,
-      engineeringStats,
-      engineeringStatusStats,
-      records,
-      engineeringTotalStats,
-    ] = await Promise.all([
-      prisma.inspections.groupBy({
-        by: ['category', 'supplierId', 'teamId', 'result'],
-        where: {
-          OR: inspectionSourceOr,
-          isDeleted: false,
-          inspectionDate: { gte: params.since },
-        },
-        _count: { id: true },
-        _sum: { quantity: true },
-      }),
-      prisma.quality_records.groupBy({
-        by: ['supplierId'],
-        where: recentEngineeringWhere,
-        _sum: { lossAmount: true, quantity: true },
-        _count: { id: true },
-      }),
-      prisma.quality_records.groupBy({
-        by: ['supplierId', 'status'],
-        where: recentEngineeringWhere,
-        _count: { id: true },
-      }),
-      prisma.quality_records.findMany({
-        where: recentEngineeringWhere,
-        select: {
-          supplierId: true,
-          supplierName: true,
-          lossAmount: true,
-          severity: true,
-          date: true,
-        },
-        orderBy: { date: 'desc' },
-      }),
-      prisma.quality_records.groupBy({
-        by: ['supplierId'],
-        where: allEngineeringWhere,
-        _count: { id: true },
-      }),
-    ]);
-
-    return {
-      engineeringStats,
-      engineeringStatusStats,
-      engineeringTotalStats,
-      incomingStats,
-      records,
     };
   },
 
@@ -331,66 +248,6 @@ export const InspectionReportingService = {
       where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
       orderBy: { lossAmount: 'desc' },
       take: 3,
-    });
-  },
-
-  async getWelderScoreStats(options?: {
-    welderIds?: string[];
-    welderNames?: string[];
-  }) {
-    const welderIds = [
-      ...new Set(
-        (options?.welderIds ?? [])
-          .map((id) => String(id || '').trim())
-          .filter(Boolean),
-      ),
-    ];
-    const welderNames = [
-      ...new Set(
-        (options?.welderNames ?? [])
-          .map((name) => String(name || '').trim())
-          .filter(Boolean),
-      ),
-    ];
-    const idFilter = welderIds.length > 0;
-    const nameFilter = welderNames.length > 0;
-    if (!idFilter && !nameFilter) {
-      return prisma.quality_records.groupBy({
-        by: ['responsibleWelderId', 'responsibleWelder', 'severity'],
-        where: { isDeleted: false },
-        _count: { id: true },
-      });
-    }
-    const orFilters: Prisma.quality_recordsWhereInput[] = [];
-    if (idFilter) {
-      orFilters.push({ responsibleWelderId: { in: welderIds } });
-    }
-    if (nameFilter) {
-      // Historical rows without a canonical id fall back to exact name
-      // matching; ambiguous names are ignored by the resolver later.
-      orFilters.push({
-        responsibleWelderId: null,
-        responsibleWelder: { in: welderNames },
-      });
-    }
-    return prisma.quality_records.groupBy({
-      by: ['responsibleWelderId', 'responsibleWelder', 'severity'],
-      where: { isDeleted: false, OR: orFilters },
-      _count: { id: true },
-    });
-  },
-
-  async getWorkOrderAggregateInspections(workOrderNumber: string) {
-    return prisma.inspections.findMany({
-      where: { isDeleted: false, workOrderNumber },
-      orderBy: [{ inspectionDate: 'desc' }],
-      include: {
-        items: {
-          orderBy: [{ order: 'asc' }],
-          select: { checkItem: true, result: true },
-        },
-        process: { select: { name: true } },
-      },
     });
   },
 

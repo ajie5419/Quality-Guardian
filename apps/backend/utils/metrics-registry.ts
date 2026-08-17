@@ -114,7 +114,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     freshness: 'projected',
     implementationPoints: [
       'modules/report/pass-rate-projection-query.service.ts#getProjectedPassRateDrillDownByRange',
-      'modules/inspection/inspection-reporting.service.ts#getSupplierScoringData',
+      'modules/inspection/inspection-score-data.service.ts#getSupplierScoringData',
     ],
   },
   {
@@ -555,7 +555,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     consumers: '焊工评分页面/工作台',
     freshness: 'real-time',
     implementationPoints: [
-      'modules/inspection/inspection-reporting.service.ts#getWelderScoreStats',
+      'modules/inspection/inspection-score-data.service.ts#getWelderScoreStats',
       'modules/welder/welder.service.ts#findAll',
     ],
   },

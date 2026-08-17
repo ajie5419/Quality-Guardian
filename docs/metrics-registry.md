@@ -115,7 +115,7 @@
 | --- | --- | --- | --- |
 | ~~M-B03/M-B04/M-B05 三源同构实现~~ | **✅ 2026-08-17 完成**：getTrendData/getDrillDown/getAllLosses 统一走 quality_loss_index 物化表（口径写入时统一：Internal amount>0、External/Commissioning isClaim||amount>0、Manual amount>0）；三模块 12 个直查函数 + 转发链已删除 | — | 阶段 2 ✅ |
 | ~~M-G08 排行双实现~~ | **✅ 2026-08-17 完成**：user.service 改调 inspection-request-stats 的 getInspectorActiveTaskCounts（统一出口） | — | 阶段 3 ✅ |
-| M-G01 跨域实现 | getWelderScoreStats 在 inspection-reporting | 迁回 welder 模块（连同 getSupplierScoringData/getWorkOrderAggregateInspections） | 阶段 4 |
+| ~~M-G01 跨域实现~~ | **✅ 2026-08-17 完成（判断修正）**：3 个函数数据源均为检验域表（inspections/quality_records），按模块自包含原则**留在 inspection 模块**，从 inspection-reporting.service.ts 拆出至 inspection-score-data.service.ts（报表中心文件 428→287 行） | — | 阶段 4 ✅ |
 
 ## 5. 维护说明
 

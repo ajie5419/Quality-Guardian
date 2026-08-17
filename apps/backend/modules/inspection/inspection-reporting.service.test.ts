@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionReportingService } from '~/modules/inspection/inspection-reporting.service';
+import { InspectionScoreDataService } from '~/modules/inspection/inspection-score-data.service';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
@@ -159,7 +160,7 @@ describe('inspectionReportingService', () => {
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
-      const result = await InspectionReportingService.getSupplierScoringData({
+      const result = await InspectionScoreDataService.getSupplierScoringData({
         engineeringSupplierIds: ['s-1'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: ['s-1'],
@@ -190,7 +191,7 @@ describe('inspectionReportingService', () => {
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
-      await InspectionReportingService.getSupplierScoringData({
+      await InspectionScoreDataService.getSupplierScoringData({
         engineeringSupplierIds: [],
         since: new Date('2024-01-01'),
         incomingSupplierIds: [],
@@ -219,7 +220,7 @@ describe('inspectionReportingService', () => {
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
-      await InspectionReportingService.getSupplierScoringData({
+      await InspectionScoreDataService.getSupplierScoringData({
         engineeringSupplierIds: ['supplier-1'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: [],
@@ -507,7 +508,7 @@ describe('inspectionReportingService', () => {
         },
       ]);
 
-      const result = await InspectionReportingService.getWelderScoreStats();
+      const result = await InspectionScoreDataService.getWelderScoreStats();
 
       expect(result).toHaveLength(1);
       expect(result[0].responsibleWelder).toBe('Welder A');
@@ -527,7 +528,7 @@ describe('inspectionReportingService', () => {
     it('filters by welder ids and legacy names when requested', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([]);
 
-      await InspectionReportingService.getWelderScoreStats({
+      await InspectionScoreDataService.getWelderScoreStats({
         welderIds: ['welder-1'],
         welderNames: ['Welder A'],
       });
@@ -555,7 +556,7 @@ describe('inspectionReportingService', () => {
       ]);
 
       const result =
-        await InspectionReportingService.getWorkOrderAggregateInspections(
+        await InspectionScoreDataService.getWorkOrderAggregateInspections(
           'WO-001',
         );
 

@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：指标治理阶段4（拆上帝文件，收官）
+
+**执行内容：**
+- 数据源核查修正方案：getSupplierScoringData/getWelderScoreStats/getWorkOrderAggregateInspections 查询的全是检验域表（inspections/quality_records），按模块自包含原则（数据源归属）留在 inspection 模块，而非迁往消费者模块
+- 拆出新文件 inspection-score-data.service.ts（3 个函数 + InspectionScoreDataService 导出）；inspection-reporting.service.ts 428→287 行（报表聚合中心聚焦检验域）；InspectionCoreService spread 合并 InspectionScoreDataService，inspection.service 转发面不变，supplier/welder/work-order 消费者零改动
+- 测试：inspection-reporting.service.test.ts 的 3 个 describe 改引用 InspectionScoreDataService（import 同步）；metrics-registry 实现点更新（M-A04/M-G01）
+
+**验证结果：**
+- 全量 297 文件/2686 用例通过；qms-arch --all 0 violations；B-MF 零违规；tsc/eslint/prettier 全绿
+
+**遗留问题：**
+- 指标治理五阶段全部完成（0 字典 / 1 B-MF 门禁 / 2 三源收敛 / 3 排行收敛 / 4 拆文件）；后续新聚合由 B-MF 门禁强制登记
+
 ### 2026-08-17 阶段：指标治理阶段3（排行收敛）
 
 **执行内容：**
