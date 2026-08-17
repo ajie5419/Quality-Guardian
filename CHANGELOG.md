@@ -25,6 +25,18 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：权限模块文档成文
+
+**执行内容：**
+- 新增 docs/permission-module.md：权限体系三层模型（认证/授权/数据权限）、权限码字典与新增码完整流程（shared 枚举 → 模块声明 → 重建 dist → 一致性回填 → 界面分配）、authorizeWrite / requireSystemAdmin / assertRecordOwnership 用法与 403/401 响应契约、B-AUTH1/B-AUTH2/B-EC 三扇门禁与豁免清单、数据范围现状与开启手册（策略核查 → 配置 → 开关 → 回归）、60s 缓存与失效、token 治理（4h access / 30d refresh / 账号 ACTIVE 校验）、6 个运维脚本与部署顺序、新增写端点开发指南、故障排查表、已知边界诚实清单
+- PROJECT_GUIDE.md 文档地图收录本文件；PROJECT_STATE.md 最近变更同步
+
+**验证结果：**
+- 纯文档变更；docs drift PASSED
+
+**遗留问题：**
+- 无（业务决策项见文档第 5.2 节与 PROJECT_STATE 待办）
+
 ### 2026-08-17 阶段：所有权助手 + 数据范围接入准备（③②）
 
 **执行内容：**

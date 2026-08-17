@@ -152,6 +152,7 @@ pnpm --dir apps/backend exec tsc --noEmit        # 后端类型检查
 | `docs/release-workflow.md` | 发布流程 | 发布/提 PR 前 |
 | `docs/after-sales-quality-loss.md` | 售后/质量损失/报表三模块契约 | 改这三条链路前 |
 | `docs/data-contract.md` | **数据契约规范**（字段治理/错误码/命名/前端/影响面） | **新增/改动数据字段、错误码、前端数据消费前** |
+| `docs/permission-module.md` | **权限模块文档**（授权组件/权限码字典/门禁/数据范围/token/运维脚本） | 涉及权限码、authorizeWrite、数据范围、403 排查前 |
 | `docs/master-data-identity-governance.md` | 主数据身份治理 | 涉及 identity/canonical ID |
 | `docs/optimization-plan.md` | 2026-08 优化路线图 | 接优化任务前 |
 | `docs/weapp-development.md` | 微信小程序开发 | 改 `apps/weapp/` 前 |
