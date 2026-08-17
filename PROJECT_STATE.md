@@ -5,10 +5,10 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 10:24
+- 最后同步时间: 2026-08-17 10:34
 - 版本: 0.27.0
 - 后端模块数: 33
-- 模块 TS 文件数: 674
+- 模块 TS 文件数: 675
 - 后端测试文件数: 297
 <!-- docs:sync-end -->
 
@@ -26,6 +26,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-17 指标治理阶段3 落地：检验员在办量排行收敛——inspection 新增 getInspectorActiveTaskCounts（独立文件），user.service 动态 import 调用统一出口（顶层 import 会触发 inspection→user 模块加载循环）；quality-loss-trend 经核实为工作台在用（非死端点）保留；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段2 落地：质量损失三源聚合收敛——getTrendData 改查 quality_loss_index 物化表（四源口径写入时统一 isClaim||amount>0），删除 3 模块 12 个同构直查函数 + 转发链（此前仅 getTrendData 消费）；metrics-registry 42→41（M-D07 并入 M-B03）；全量 2686 用例通过，qms-arch 0 violations。
 - 2026-08-17 指标治理阶段0-1 落地：指标字典成文（docs/metrics-registry.md + utils/metrics-registry.ts，42 指标 7 族，58 聚合点登记 + 24 豁免点）；门禁 B-MF 挂入 check:qms-arch（新增聚合必须登记 + 文档/代码 ID 一致性校验），存量零 baseline，测试 13/13 全绿。
 - 2026-08-17 待办核实闭环：EventEmitter 替换项标记完成（event-bus.ts 已于 d4015f43 删除；售后→供应商评分走 MetricRefreshQueue 持久化队列，报检创建走 Redis pub/sub 跨实例广播 + SSE；全仓库零残留，历史遗留清单清理）。
@@ -77,7 +78,7 @@
 - [x] **指标治理阶段0（2026-08-17 完成）**：指标字典基线——docs/metrics-registry.md 文档登记 + apps/backend/utils/metrics-registry.ts 代码版登记表（**42 指标 7 族**），58 个聚合点全部登记 + 24 个豁免点（序号/行锁/对账/治理工具/监控），文档与代码版 ID 一致（42/42）
 - [x] **指标治理阶段1（2026-08-17 完成）**：门禁 B-MF——scripts/check-metric-registration.mjs（新增聚合必须登记 + 文档/代码 ID 一致性校验），挂入 check:qms-arch，存量零 baseline，测试 2 例，全套 13/13；顺带修复 bash 传输层 `$'` 序列截断问题（改写函数避开 ANSI-C quoting）
 - [x] **指标治理阶段2（2026-08-17 完成，口径已确认 lossAmount>0 OR isClaim=true）**：质量损失三源聚合收敛——getTrendData 改查 quality_loss_index 物化表（四源口径写入时统一：Internal amount>0 / External、Commissioning isClaim||amount>0 / Manual amount>0）；getDrillDown/getAllLosses 同走 index 表；**删除 3 模块 12 个同构直查函数 + 全部转发链**（inspection-reporting / after-sales-integration / vehicle-commissioning + inspection.service / after-sales.service / exports.ts）；metrics-registry 同步（M-D07 并入 M-B03 删除，42→41 指标）
-- [ ] **指标治理阶段3（依赖 0）**：排行收敛（user.service:136 workload 改调 inspection-request-stats 排行出口）+ 删除 quality-loss-trend 死端点（api/薄转发/service/前端 constants 常量，已确认前端与小程序无调用）
+- [x] **指标治理阶段3（2026-08-17 完成）**：排行收敛——inspection 模块新增轻量 getInspectorActiveTaskCounts（独立文件，避免模块加载循环），user.service 在办量改调统一出口（函数内动态 import 规避 inspection→user 循环依赖）；**quality-loss-trend 判断修正：非死端点**（工作台 dashboard/index.vue 经常量间接调用趋势图），保留
 - [ ] **指标治理阶段4（依赖 2、3）**：拆 inspection-reporting.service.ts 上帝文件（494 行跨 8 域）——getSupplierScoringData→supplier、getWelderScoreStats→welder、getWorkOrderAggregateInspections→work-order，检验域内聚合保留，跨模块走 index.ts
 - [ ] 其他待办详见 PROGRESS.md 待办段
 

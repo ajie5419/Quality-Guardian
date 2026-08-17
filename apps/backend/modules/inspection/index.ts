@@ -9,4 +9,5 @@ export {
 export { InspectionProcessResolutionService } from './inspection-process-resolution.service';
 export { inspectionRequestResponsibilityOptionsQuerySchema } from './inspection-request-responsibility-options.schema';
 export { InspectionRequestResponsibilityOptionsService } from './inspection-request-responsibility-options.service';
+export { getInspectorActiveTaskCounts } from './inspection-request-stats-workload';
 export { InspectionService } from './inspection.service';

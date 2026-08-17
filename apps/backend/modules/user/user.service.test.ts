@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { getInspectorActiveTaskCounts } from '~/modules/inspection';
 import { isRbacReadV2Enabled } from '~/modules/rbac';
 import { UserService } from '~/modules/user/user.service';
 import prisma from '~/utils/prisma';
@@ -34,6 +35,10 @@ vi.mock('~/utils/prisma', () => ({
       groupBy: vi.fn(),
     },
   },
+}));
+
+vi.mock('~/modules/inspection', async () => ({
+  getInspectorActiveTaskCounts: vi.fn(),
 }));
 
 vi.mock('@paralleldrive/cuid2', () => ({
@@ -81,9 +86,9 @@ describe('userService', () => {
           roles: { name: 'admin' },
         },
       ]);
-      (prisma.qms_inspection_requests.groupBy as any).mockResolvedValue([
-        { inspectorId: 'u1', _count: { id: 3 } },
-      ]);
+      vi.mocked(getInspectorActiveTaskCounts).mockResolvedValue(
+        new Map([['u1', 3]]),
+      );
       (prisma.departments.findMany as any).mockResolvedValue([
         { id: 'dept-1', name: 'IT Department' },
       ]);

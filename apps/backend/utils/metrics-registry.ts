@@ -655,7 +655,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'user',
     consumers: '用户管理列表（在办量列）',
     freshness: 'real-time',
-    implementationPoints: ['modules/user/user.service.ts#findAll'],
+    implementationPoints: [
+      'modules/inspection/inspection-request-stats-workload.ts#getInspectorActiveTaskCounts',
+    ],
   },
 ];
 

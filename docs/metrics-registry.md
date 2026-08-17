@@ -107,15 +107,14 @@
 | M-G05 | vehicleDailyReport | 车辆每日报告 | aggregate(issues) 落库 daily_reports | vehicle_commissioning_issues→daily_reports | 车辆日报 | 每日 |
 | M-G06 | supervisionProjectStats | 监造项目统计 | supervision-project:132,137 groupBy | supervision_issues+日报 | 监造项目详情 | 实时 |
 | M-G07 | dfmeaRpnStats | DFMEA RPN 统计 | findMany 后 JS reduce（avg/max/高中低计数） | dfmea | /qms/planning/dfmea/projects/[id]/stats | 实时 |
-| M-G08 | userInspectorWorkload | 检验员在办量（用户管理） | user.service:136 groupBy(inspectorId, DISPATCHED/INSPECTING)（阶段 3 收敛为 M-D04 出口） | qms_inspection_requests | 用户管理列表 | 实时 |
+| M-G08 | userInspectorWorkload | 检验员在办量（用户管理） | **getInspectorActiveTaskCounts（inspection-request-stats 统一出口，2026-08-17 收敛完成）** | qms_inspection_requests | 用户管理列表 | 实时 |
 
 ## 4. 已知待收敛项（阶段 2/3/4）
 
 | 项 | 现状 | 目标 | 阶段 |
 | --- | --- | --- | --- |
 | ~~M-B03/M-B04/M-B05 三源同构实现~~ | **✅ 2026-08-17 完成**：getTrendData/getDrillDown/getAllLosses 统一走 quality_loss_index 物化表（口径写入时统一：Internal amount>0、External/Commissioning isClaim||amount>0、Manual amount>0）；三模块 12 个直查函数 + 转发链已删除 | — | 阶段 2 ✅ |
-| M-G08 排行双实现 | user.service 独立 groupBy | 收敛为调用 M-D04 排行出口 | 阶段 3 |
-| quality-loss-trend 死端点 | 前端/小程序均无调用 | 删除 | 阶段 3 |
+| ~~M-G08 排行双实现~~ | **✅ 2026-08-17 完成**：user.service 改调 inspection-request-stats 的 getInspectorActiveTaskCounts（统一出口） | — | 阶段 3 ✅ |
 | M-G01 跨域实现 | getWelderScoreStats 在 inspection-reporting | 迁回 welder 模块（连同 getSupplierScoringData/getWorkOrderAggregateInspections） | 阶段 4 |
 
 ## 5. 维护说明

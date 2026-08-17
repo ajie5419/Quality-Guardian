@@ -12,6 +12,11 @@ import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { generateAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 
+async function loadInspectorActiveTaskCounts(): Promise<Map<string, number>> {
+  const inspection = await import('~/modules/inspection');
+  return inspection.getInspectorActiveTaskCounts();
+}
+
 export interface UserQueryParams {
   page?: number;
   pageSize?: number;
@@ -133,20 +138,12 @@ export const UserService = {
           roles: true,
         },
       }),
-      prisma.qms_inspection_requests.groupBy({
-        by: ['inspectorId'],
-        where: {
-          isDeleted: false,
-          status: { in: ['DISPATCHED', 'INSPECTING'] },
-          inspectorId: { not: null },
-        },
-        _count: { id: true },
-      }),
+      // 动态加载：inspection 模块导出链上有文件依赖 user 模块，顶层 import 会形成
+      // 模块加载循环（InspectionCoreService TDZ）；函数内加载由 Node/vitest 缓存。
+      loadInspectorActiveTaskCounts(),
     ]);
 
-    const workloadMap = new Map(
-      workload.map((w) => [w.inspectorId, w._count.id]),
-    );
+    const workloadMap = workload;
 
     // Get all departments for deptName lookup
     const departments = await prisma.departments.findMany({

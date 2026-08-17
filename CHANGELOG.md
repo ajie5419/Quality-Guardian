@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：指标治理阶段3（排行收敛）
+
+**执行内容：**
+- inspection 模块新增 inspection-request-stats-workload.ts（getInspectorActiveTaskCounts：DISPATCHED/INSPECTING 按 inspectorId groupBy 计数）并经 index.ts 导出；user.service 用户列表在办量改调统一出口（原独立 groupBy 删除）
+- 循环依赖处理：user → inspection 顶层 import 会与 inspection → user（WxSubscribeMessageService）形成模块加载循环（InspectionCoreService TDZ，adversarial 测试暴露）→ 改为函数内动态 import（loadInspectorActiveTaskCounts 辅助函数），Node/vitest 缓存模块，无性能影响
+- **quality-loss-trend 判断修正**：此前列为死端点，经查工作台 dashboard/index.vue 通过 getQualityLossTrend 常量链实际调用（趋势图），**保留**；metrics-registry 待收敛表移除该行
+- metrics-registry：M-G08 实现点改为 inspection-request-stats-workload.ts#getInspectorActiveTaskCounts
+
+**验证结果：**
+- 全量 297 文件/2686 用例通过；qms-arch --all 0 violations；B-MF 零违规；tsc/eslint 全绿
+
+**遗留问题：**
+- 阶段4（拆 inspection-reporting.service.ts 上帝文件）待做
+
 ### 2026-08-17 阶段：指标治理阶段2（质量损失三源聚合收敛）
 
 **执行内容：**
