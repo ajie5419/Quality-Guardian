@@ -6,3 +6,4 @@ export {
   listCronJobs,
   registerCronJob,
 } from './scheduler-registry';
+export { clearCronJobRegistry } from './scheduler-registry';

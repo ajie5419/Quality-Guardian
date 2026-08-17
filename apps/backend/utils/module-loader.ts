@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import { afterSalesModule } from '~/modules/after-sales/after-sales.module';
 import { aiModule } from '~/modules/ai/ai.module';
 import { dashboardModule } from '~/modules/dashboard/dashboard.module';
+import { dataLifecycleModule } from '~/modules/data-lifecycle/data-lifecycle.module';
 import { dataScopeModule } from '~/modules/data-scope/data-scope.module';
 import { deptModule } from '~/modules/dept/dept.module';
 import { dictionaryModule } from '~/modules/dictionary/dictionary.module';
@@ -69,6 +70,7 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   supplierIdentityModule,
   systemModule,
   systemLogModule,
+  dataLifecycleModule,
   taskDispatchModule,
   teamModule,
   userModule,

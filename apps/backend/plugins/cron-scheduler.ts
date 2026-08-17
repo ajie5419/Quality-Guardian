@@ -1,9 +1,11 @@
 import process from 'node:process';
 
+import { ensureDefaultRetentionRules } from '~/modules/data-lifecycle';
 import { registerNcOverdueReminder } from '~/modules/inspection/cron/nc-overdue';
 import { registerMetrologyDueReminder } from '~/modules/metrology/cron/due-reminder';
 import { runSchedulerTick, syncCronJobDefinitions } from '~/modules/scheduler';
 import { registerSupplierMonthlySnapshot } from '~/modules/supplier/cron/monthly-snapshot';
+import { registerAuditLogCleanup } from '~/modules/system-log/cron/audit-log-cleanup';
 import { createModuleLogger } from '~/utils/logger';
 
 const logger = createModuleLogger('CronScheduler');
@@ -20,6 +22,12 @@ export function startCronScheduler() {
   registerMetrologyDueReminder();
   registerNcOverdueReminder();
   registerSupplierMonthlySnapshot();
+  registerAuditLogCleanup();
+
+  // Data lifecycle: idempotent retention-rule seed (P2).
+  void ensureDefaultRetentionRules().catch((error: unknown) => {
+    logger.error({ err: error }, 'ensure default retention rules failed');
+  });
 
   // Persist registered definitions into cron_jobs, then start polling.
   void syncCronJobDefinitions()

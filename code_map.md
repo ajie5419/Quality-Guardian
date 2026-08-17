@@ -32,6 +32,7 @@
 - **supplier-identity/** — 供应商跨身份域映射与解析
 - **system/** — 系统配置与基础设置
 - **system-log/** — 系统操作日志记录与审计
+- **data-lifecycle/** — 数据生命周期：保留期规则登记（data_retention_rules）、归档框架、到期处置（docs/data-lifecycle.md）
 - **task-dispatch/** — ITP 任务派发与流转：分配、状态推进、归档联动
 - **team/** — TEAM 主数据身份、别名、来源与合并审计
 - **user/** — 用户账号、认证（登录/刷新/微信小程序登录绑定）、个人偏好

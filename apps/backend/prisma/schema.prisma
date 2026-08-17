@@ -256,6 +256,22 @@ model login_logs {
   @@index([isDeleted])
 }
 
+model data_retention_rules {
+  id             String   @id @default(cuid())
+  dataClass      String   @unique @db.VarChar(64) // 数据类 key（如 audit-log / inspection-record）
+  displayName    String   @db.VarChar(64) // 中文名
+  retentionDays  Int      // 保留天数
+  action         String   @db.VarChar(16) // ARCHIVE / DELETE / PURGE
+  isEnabled      Boolean  @default(true)
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([enabled])
+
+  // @module data-lifecycle
+}
+
 model departments {
   id           String   @id
   name         String
