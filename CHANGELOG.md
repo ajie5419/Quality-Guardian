@@ -39,7 +39,7 @@
 - 真库端到端：创建进货报检单（不传部门）→ 工序自动带出采购部 ✅；关闭 FAIL（外部责任不传部门）→ 生成 NC-26KJ-052，不再报"责任部门不能为空" ✅；报检单/不合格项责任逐字段一致 PASS ✅；未配置工序创建时报"工序【辅材-生产】未配置责任部门，请联系管理员在报检设置中配置" ✅
 - 全量：后端 298 文件/2686 用例（18:29 干净全过；并发负载下 4 文件 9 例 5s 超时为既有 flaky，单跑 24/24 通过）；前端 65/343；qms-arch 0 violations；vue-tsc/eslint 干净；docs drift PASSED
 
-**commit:** 待补
+**commit:** `24a39d5e` fix(inspection): inherit responsibility snapshot on close and resolve department from process master
 
 **遗留问题：**
 - 生产部署时需在设置页为各工序预配责任部门（或脚本回填）
