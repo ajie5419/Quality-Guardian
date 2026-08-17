@@ -348,35 +348,6 @@ describe('afterSalesService – adversarial', () => {
     });
   });
 
-  describe('getQualityLossTrendRows', () => {
-    it('returns empty array', async () => {
-      const result = await AfterSalesService.getQualityLossTrendRows({
-        granularity: 'month',
-        year: 2026,
-      });
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('getLossRecordsForAggregation', () => {
-    it('returns empty array when no records', async () => {
-      const result = await AfterSalesService.getLossRecordsForAggregation({});
-      expect(result).toEqual([]);
-    });
-
-    it('handles undefined params', async () => {
-      const result = await AfterSalesService.getLossRecordsForAggregation();
-      expect(result).toEqual([]);
-    });
-  });
-
-  describe('countLossRecordsForAggregation', () => {
-    it('returns 0 when no records', async () => {
-      const result = await AfterSalesService.countLossRecordsForAggregation({});
-      expect(result).toBe(0);
-    });
-  });
-
   describe('updateByRoute', () => {
     it('updates record when costs not changed', async () => {
       (prisma.after_sales.update as any).mockResolvedValue({});

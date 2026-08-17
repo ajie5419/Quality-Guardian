@@ -128,36 +128,6 @@ describe('inspectionReportingService', () => {
     });
   });
 
-  describe('getQualityLossTrendRows', () => {
-    it('should query monthly data for month granularity', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([
-        { a: 100, p: 1 },
-        { a: 200, p: 6 },
-      ]);
-
-      const result = await InspectionReportingService.getQualityLossTrendRows({
-        granularity: 'month',
-        year: 2024,
-      });
-
-      expect(result).toEqual([
-        { a: 100, p: 1 },
-        { a: 200, p: 6 },
-      ]);
-    });
-
-    it('should query weekly data for week granularity', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([{ a: 50, p: 3 }]);
-
-      const result = await InspectionReportingService.getQualityLossTrendRows({
-        granularity: 'week',
-        year: 2024,
-      });
-
-      expect(result).toEqual([{ a: 50, p: 3 }]);
-    });
-  });
-
   describe('getWorkspaceIssueSummary', () => {
     it('should return aggregated workspace data', async () => {
       (prisma.quality_records.findMany as any)
@@ -177,81 +147,6 @@ describe('inspectionReportingService', () => {
       expect(result.openIssuesCount).toBe(2);
       expect(result.openIssues).toHaveLength(1);
       expect(result.recentIssues).toHaveLength(1);
-    });
-  });
-
-  describe('getLossRecordsForAggregation', () => {
-    it('should return loss records with default filters', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        { id: 'qr-1', lossAmount: 100 },
-      ]);
-
-      const result =
-        await InspectionReportingService.getLossRecordsForAggregation();
-
-      expect(result).toHaveLength(1);
-      expect(prisma.quality_records.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            isDeleted: false,
-            lossAmount: { gt: 0 },
-          }),
-        }),
-      );
-    });
-
-    it('should filter by workOrderNumber when provided', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([]);
-
-      await InspectionReportingService.getLossRecordsForAggregation({
-        workOrderNumber: 'WO-001',
-      });
-
-      const callWhere = (prisma.quality_records.findMany as any).mock
-        .calls[0][0].where;
-      expect(callWhere.workOrderNumber).toEqual({
-        contains: 'WO-001',
-      });
-    });
-  });
-
-  describe('countLossRecordsForAggregation', () => {
-    it('should count loss records', async () => {
-      (prisma.quality_records.count as any).mockResolvedValue(10);
-
-      const result =
-        await InspectionReportingService.countLossRecordsForAggregation();
-
-      expect(result).toBe(10);
-    });
-  });
-
-  describe('getQualityLossDrillDownRecords', () => {
-    it('should return drill-down records with date range', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        { id: 'qr-1' },
-      ]);
-
-      const result =
-        await InspectionReportingService.getQualityLossDrillDownRecords({
-          end: new Date('2024-06-30'),
-          start: new Date('2024-06-01'),
-        });
-
-      expect(result).toHaveLength(1);
-    });
-
-    it('should use default take of 500', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([]);
-
-      await InspectionReportingService.getQualityLossDrillDownRecords({
-        end: new Date('2024-06-30'),
-        start: new Date('2024-06-01'),
-      });
-
-      const callArgs = (prisma.quality_records.findMany as any).mock
-        .calls[0][0];
-      expect(callArgs.take).toBe(500);
     });
   });
 

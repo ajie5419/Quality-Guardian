@@ -219,7 +219,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: 'GET /qms/quality-loss/charts（钻取）',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/quality-loss/quality-loss-record-maintenance.service.ts#getDrillDown',
+    ],
   },
   {
     id: 'M-B05',
@@ -233,7 +235,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'quality-loss',
     consumers: '质量损失列表/导出',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/quality-loss/quality-loss.service.ts#getAllLosses',
+    ],
   },
   {
     id: 'M-B06',
@@ -421,21 +425,6 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     freshness: 'real-time',
     implementationPoints: [
       'modules/inspection/inspection-reporting.service.ts#getReportPeriodMetrics',
-    ],
-  },
-  {
-    id: 'M-D07',
-    key: 'qualityLossTrendInspectionSource',
-    name: '质量损失趋势（检验源）',
-    definition: '按周/月聚合检验侧损失金额（M-B03 的三源之一）。',
-    formula:
-      'raw SQL：SUM(lossAmount) GROUP BY WEEK/MONTH(date)（inspection-reporting:43）',
-    sourceTable: 'quality_records',
-    owner: 'inspection',
-    consumers: 'quality-loss 趋势合并',
-    freshness: 'real-time',
-    implementationPoints: [
-      'modules/inspection/inspection-reporting.service.ts#getQualityLossTrendRows',
     ],
   },
 

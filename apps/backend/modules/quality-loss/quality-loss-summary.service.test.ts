@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossDataScopeService } from '~/modules/quality-loss/quality-loss-data-scope.service';
 import { QualityLossRecordMaintenanceService } from '~/modules/quality-loss/quality-loss-record-maintenance.service';
 import { QualityLossReportingService } from '~/modules/quality-loss/quality-loss-reporting.service';
@@ -9,7 +8,6 @@ import { QualityLossRouteUpdateService } from '~/modules/quality-loss/quality-lo
 import { QualityLossSummaryService } from '~/modules/quality-loss/quality-loss-summary.service';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -53,8 +51,6 @@ vi.mock('~/modules/data-scope/data-scope.service', () => ({
 vi.mock('~/modules/inspection/inspection.service', () => ({
   InspectionService: {
     findIssueIdBySerialNumber: vi.fn(),
-    getQualityLossDrillDownRecords: vi.fn(),
-    getQualityLossTrendRows: vi.fn(),
     updateQualityLossFields: vi.fn(),
   },
 }));
@@ -62,8 +58,6 @@ vi.mock('~/modules/inspection/inspection.service', () => ({
 vi.mock('~/modules/after-sales', () => ({
   AfterSalesAPI: {
     findIdBySerialNumber: vi.fn(),
-    getQualityLossDrillDownRecords: vi.fn(),
-    getQualityLossTrendRows: vi.fn(),
     updateQualityLossFields: vi.fn(),
   },
 }));
@@ -73,8 +67,6 @@ vi.mock(
   () => ({
     VehicleCommissioningService: {
       findIssueId: vi.fn(),
-      getQualityLossDrillDownRecords: vi.fn(),
-      getQualityLossTrendRows: vi.fn(),
       updateQualityLossFields: vi.fn(),
     },
   }),
@@ -421,15 +413,6 @@ describe('quality-loss core services', () => {
     vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
       count: 1,
     } as never);
-    vi.mocked(
-      InspectionService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([] as never);
-    vi.mocked(AfterSalesAPI.getQualityLossDrillDownRecords).mockResolvedValue(
-      [] as never,
-    );
-    vi.mocked(
-      VehicleCommissioningService.getQualityLossDrillDownRecords,
-    ).mockResolvedValue([] as never);
     vi.mocked(prisma.quality_loss_index.findMany).mockResolvedValue([]);
     vi.mocked(prisma.quality_loss_index.updateMany).mockResolvedValue({
       count: 1,

@@ -40,25 +40,6 @@ export const InspectionReportingService = {
     });
   },
 
-  async getQualityLossTrendRows(params: {
-    granularity: 'month' | 'week';
-    year: number;
-  }) {
-    return params.granularity === 'week'
-      ? prisma.$queryRaw<
-          Array<{
-            a: bigint | null | number | Prisma.Decimal;
-            p: bigint | number;
-          }>
-        >`SELECT WEEK(date, 3) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${params.year} AND isDeleted = 0 GROUP BY p`
-      : prisma.$queryRaw<
-          Array<{
-            a: bigint | null | number | Prisma.Decimal;
-            p: bigint | number;
-          }>
-        >`SELECT MONTH(date) as p, SUM(IFNULL(lossAmount, 0)) as a FROM quality_records WHERE YEAR(date) = ${params.year} AND isDeleted = 0 GROUP BY p`;
-  },
-
   async getWorkspaceIssueSummary(params: { today: Date }) {
     const [
       openIssues,
@@ -103,53 +84,6 @@ export const InspectionReportingService = {
       todayInspections,
       todayIssues,
     };
-  },
-
-  async getLossRecordsForAggregation(params?: {
-    skip?: number;
-    take?: number;
-    workOrderNumber?: string;
-  }) {
-    return prisma.quality_records.findMany({
-      where: {
-        isDeleted: false,
-        lossAmount: { gt: 0 },
-        ...(params?.workOrderNumber
-          ? { workOrderNumber: { contains: params.workOrderNumber } }
-          : {}),
-      },
-      orderBy: { date: 'desc' },
-      ...(params?.skip === undefined ? {} : { skip: params.skip }),
-      ...(params?.take === undefined ? {} : { take: params.take }),
-    });
-  },
-
-  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
-    return prisma.quality_records.count({
-      where: {
-        isDeleted: false,
-        lossAmount: { gt: 0 },
-        ...(params?.workOrderNumber
-          ? { workOrderNumber: { contains: params.workOrderNumber } }
-          : {}),
-      },
-    });
-  },
-
-  async getQualityLossDrillDownRecords(params: {
-    end: Date;
-    start: Date;
-    take?: number;
-  }) {
-    return prisma.quality_records.findMany({
-      where: {
-        isDeleted: false,
-        date: { gte: params.start, lte: params.end },
-        lossAmount: { gt: 0 },
-      },
-      orderBy: { date: 'desc' },
-      take: params.take || 500,
-    });
   },
 
   async getSupplierScoringData(params: {

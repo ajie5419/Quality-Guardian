@@ -81,33 +81,6 @@ export const AfterSalesService = {
     return AfterSalesIntegrationService.updateQualityLossFields(params);
   },
 
-  async getQualityLossTrendRows(params: {
-    granularity: 'month' | 'week';
-    year: number;
-  }) {
-    return AfterSalesIntegrationService.getQualityLossTrendRows(params);
-  },
-
-  async getLossRecordsForAggregation(params?: {
-    skip?: number;
-    take?: number;
-    workOrderNumber?: string;
-  }) {
-    return AfterSalesIntegrationService.getLossRecordsForAggregation(params);
-  },
-
-  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
-    return AfterSalesIntegrationService.countLossRecordsForAggregation(params);
-  },
-
-  async getQualityLossDrillDownRecords(params: {
-    end: Date;
-    start: Date;
-    take?: number;
-  }) {
-    return AfterSalesIntegrationService.getQualityLossDrillDownRecords(params);
-  },
-
   async getSupplierScoringData(params: { since: Date; supplierIds: string[] }) {
     return AfterSalesIntegrationService.getSupplierScoringData(params);
   },

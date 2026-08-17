@@ -22,12 +22,12 @@
 | A 合格率 | M-A01 ~ M-A07 | 7 | report |
 | B 质量损失 | M-B01 ~ M-B06 | 6 | quality-loss |
 | C 售后 | M-C01 ~ M-C06 | 6 | after-sales |
-| D 检验 | M-D01 ~ M-D07 | 7 | inspection |
+| D 检验 | M-D01 ~ M-D06 | 6 | inspection |
 | E 供应商 | M-E01 ~ M-E03 | 3 | supplier |
 | F 工作台 | M-F01 ~ M-F05 | 5 | dashboard / work-order |
 | G 其他 | M-G01 ~ M-G08 | 8 | 各域 |
 
-**合计 42 个登记指标**（覆盖 51 处聚合点的全部聚合函数；同名聚合函数如 M-B03/M-B04/M-B05 为多源适配，由阶段 2 收敛）。
+**合计 41 个登记指标**（覆盖 51 处聚合点的全部聚合函数；同名聚合函数如 M-B03/M-B04/M-B05 为多源适配，由阶段 2 收敛）。
 
 ## 3. 指标明细
 
@@ -51,9 +51,9 @@
 | --- | --- | --- | --- | --- | --- | --- |
 | M-B01 | qualityLossTotal | 损失总量/周量（手工台账） | SUM(amount) WHERE occurDate≥yearStart/weekStart | quality_losses | /qms/quality-loss/dashboard | 实时 |
 | M-B02 | manualLoss | 报告周期手工损失 | SUM(amount) WHERE occurDate∈[start,end] | quality_losses | /qms/reports/summary（internalLoss 组成） | 实时 |
-| M-B03 | qualityLossTrend | 损失趋势（三源合并） | mergeTrendData(getQualityLossTrendRows×3 源) | quality_records+after_sales+vehicle_commissioning_issues | /qms/quality-loss/charts | 实时 |
-| M-B04 | qualityLossDrillDown | 损失钻取（三源） | getQualityLossDrillDownRecords×3 源 | 同上三源 | charts 钻取 | 实时 |
-| M-B05 | lossRecordsAggregation | 损失记录分页聚合（三源适配） | getLossRecordsForAggregation/countLossRecordsForAggregation；统一口径 lossAmount>0 OR isClaim=true | 同上三源 | 损失列表/导出 | 实时 |
+| M-B03 | qualityLossTrend | 损失趋势（统一出口） | **getTrendData 查 quality_loss_index 按 source 分组**（四源口径写入时统一，2026-08-17 三源直查函数退役） | quality_loss_index | /qms/quality-loss/charts | 实时 |
+| M-B04 | qualityLossDrillDown | 损失钻取（统一出口） | getDrillDown 查 quality_loss_index | quality_loss_index | charts 钻取 | 实时 |
+| M-B05 | lossRecordsAggregation | 损失记录分页聚合（统一出口） | getAllLosses 查 quality_loss_index；口径 lossAmount>0 OR isClaim=true | quality_loss_index | 损失列表/导出 | 实时 |
 | M-B06 | qualityLossDashboard | 质量损失看板汇总 | getDashboardSummary | quality_losses+三源 | /qms/quality-loss/dashboard | 实时 |
 
 ### C. 售后族（after-sales 模块）
@@ -77,7 +77,6 @@
 | M-D04 | inspectionRequestStats | 报检任务统计（检验员负载/排行） | JS 聚合；CLOSED+closedAt 区间规则 | qms_inspection_requests | /qms/inspection/requests/stats；用户管理在办量（阶段 3 收敛） | 实时 |
 | M-D05 | workspaceIssueSummary | 工作台问题汇总 | getWorkspaceIssueSummary | quality_records+inspections | /qms/dashboard | 实时 |
 | M-D06 | inspectionReportPeriodMetrics | 检验报告周期指标 | getReportPeriodMetrics（新问题/关闭/内部损失） | quality_records | /qms/reports/summary（internalLoss 组成） | 实时 |
-| M-D07 | qualityLossTrendInspectionSource | 损失趋势（检验源） | raw SQL SUM(lossAmount) GROUP BY WEEK/MONTH | quality_records | quality-loss 趋势合并 | 实时 |
 
 ### E. 供应商族（supplier 模块）
 
@@ -114,7 +113,7 @@
 
 | 项 | 现状 | 目标 | 阶段 |
 | --- | --- | --- | --- |
-| M-B03/M-B04/M-B05 三源同构实现 | 检验/售后/车辆各写一份（口径已不一致：售后无金额过滤） | 统一 quality-loss 出口 + 数据源适配，口径 lossAmount>0 OR isClaim=true | 阶段 2 |
+| ~~M-B03/M-B04/M-B05 三源同构实现~~ | **✅ 2026-08-17 完成**：getTrendData/getDrillDown/getAllLosses 统一走 quality_loss_index 物化表（口径写入时统一：Internal amount>0、External/Commissioning isClaim||amount>0、Manual amount>0）；三模块 12 个直查函数 + 转发链已删除 | — | 阶段 2 ✅ |
 | M-G08 排行双实现 | user.service 独立 groupBy | 收敛为调用 M-D04 排行出口 | 阶段 3 |
 | quality-loss-trend 死端点 | 前端/小程序均无调用 | 删除 | 阶段 3 |
 | M-G01 跨域实现 | getWelderScoreStats 在 inspection-reporting | 迁回 welder 模块（连同 getSupplierScoringData/getWorkOrderAggregateInspections） | 阶段 4 |

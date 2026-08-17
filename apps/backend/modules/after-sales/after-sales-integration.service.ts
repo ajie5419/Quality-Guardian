@@ -87,69 +87,6 @@ export const AfterSalesIntegrationService = {
     });
   },
 
-  async getQualityLossTrendRows(params: {
-    granularity: 'month' | 'week';
-    year: number;
-  }) {
-    return params.granularity === 'week'
-      ? prisma.$queryRaw<
-          Array<{
-            a: bigint | null | number | Prisma.Decimal;
-            p: bigint | number;
-          }>
-        >`SELECT WEEK(occurDate, 3) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${params.year} AND isDeleted = 0 GROUP BY p`
-      : prisma.$queryRaw<
-          Array<{
-            a: bigint | null | number | Prisma.Decimal;
-            p: bigint | number;
-          }>
-        >`SELECT MONTH(occurDate) as p, SUM(IFNULL(materialCost, 0) + IFNULL(laborTravelCost, 0)) as a FROM after_sales WHERE YEAR(occurDate) = ${params.year} AND isDeleted = 0 GROUP BY p`;
-  },
-
-  async getLossRecordsForAggregation(params?: {
-    skip?: number;
-    take?: number;
-    workOrderNumber?: string;
-  }) {
-    return prisma.after_sales.findMany({
-      where: {
-        isDeleted: false,
-        ...(params?.workOrderNumber
-          ? { workOrderNumber: { contains: params.workOrderNumber } }
-          : {}),
-      },
-      orderBy: { occurDate: 'desc' },
-      ...(params?.skip === undefined ? {} : { skip: params.skip }),
-      ...(params?.take === undefined ? {} : { take: params.take }),
-    });
-  },
-
-  async countLossRecordsForAggregation(params?: { workOrderNumber?: string }) {
-    return prisma.after_sales.count({
-      where: {
-        isDeleted: false,
-        ...(params?.workOrderNumber
-          ? { workOrderNumber: { contains: params.workOrderNumber } }
-          : {}),
-      },
-    });
-  },
-
-  async getQualityLossDrillDownRecords(params: {
-    end: Date;
-    start: Date;
-    take?: number;
-  }) {
-    return prisma.after_sales.findMany({
-      where: {
-        isDeleted: false,
-        occurDate: { gte: params.start, lte: params.end },
-      },
-      orderBy: { occurDate: 'desc' },
-      take: params.take || 500,
-    });
-  },
-
   async getSupplierScoringData(params: { since: Date; supplierIds: string[] }) {
     const supplierIds = params.supplierIds.filter(Boolean);
     const supplierWhere = { supplierBrandId: { in: supplierIds } };

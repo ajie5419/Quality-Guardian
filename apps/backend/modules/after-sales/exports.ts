@@ -25,26 +25,6 @@ export const AfterSalesAPI = {
   ) => AfterSalesIntegrationService.findEarliestVehicleFailureDate(...args),
 
   // Bulk read for aggregations and trend
-  getLossRecordsForAggregation: (
-    ...args: Parameters<
-      typeof AfterSalesIntegrationService.getLossRecordsForAggregation
-    >
-  ) => AfterSalesIntegrationService.getLossRecordsForAggregation(...args),
-  countLossRecordsForAggregation: (
-    ...args: Parameters<
-      typeof AfterSalesIntegrationService.countLossRecordsForAggregation
-    >
-  ) => AfterSalesIntegrationService.countLossRecordsForAggregation(...args),
-  getQualityLossDrillDownRecords: (
-    ...args: Parameters<
-      typeof AfterSalesIntegrationService.getQualityLossDrillDownRecords
-    >
-  ) => AfterSalesIntegrationService.getQualityLossDrillDownRecords(...args),
-  getQualityLossTrendRows: (
-    ...args: Parameters<
-      typeof AfterSalesIntegrationService.getQualityLossTrendRows
-    >
-  ) => AfterSalesIntegrationService.getQualityLossTrendRows(...args),
   getSupplierScoringData: (
     ...args: Parameters<
       typeof AfterSalesIntegrationService.getSupplierScoringData

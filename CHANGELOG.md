@@ -25,6 +25,21 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：指标治理阶段2（质量损失三源聚合收敛）
+
+**执行内容：**
+- 统一出口：getTrendData 从手工表+三源模块直查改为一次查询 quality_loss_index 物化表按 source 分组——四源口径在 index 写入时已统一（Internal amount>0 / External、Commissioning isClaim||amount>0 / Manual amount>0），与业务确认口径 lossAmount>0 OR isClaim=true 一致
+- 确认 getDrillDown（quality-loss-record-maintenance）与 getAllLosses 已走 index 表
+- 删除 12 个同构直查函数 + 全部转发链：inspection-reporting、after-sales-integration、vehicle-commissioning 各 4 个（getQualityLossTrendRows/getLossRecordsForAggregation/countLossRecordsForAggregation/getQualityLossDrillDownRecords）；inspection.service / after-sales.service / after-sales/exports.ts 转发同步删除；resolveTrendRows 辅助函数退役
+- 测试清理：6 个测试文件删除/改造（adversarial 3 块、integration 6 it、inspection-reporting 4 块、vehicle 2 it、core 调用行与断言、ql-summary mock 行）；getTrendData 测试 mock 改为 index 单查询带 source
+- metrics-registry 同步：M-B03 实现点改 getTrendData；M-B04 加 getDrillDown；M-B05 加 getAllLosses；M-D07（检验源趋势）并入 M-B03 删除，42→41 指标；docs/metrics-registry.md 同步（B 族统一出口描述 + 待收敛表阶段 2 完成）
+
+**验证结果：**
+- 全量测试 297 文件/2686 用例通过（基线 2704 → 删除 18 个退役函数用例）；qms-arch --all 0 violations；B-MF 零违规（41 指标文档/代码一致）；tsc/eslint 全绿
+
+**遗留问题：**
+- 阶段3（排行收敛 + quality-loss-trend 死端点删除）、阶段4（拆上帝文件）待做
+
 ### 2026-08-17 阶段：指标治理阶段0-1（字典 + B-MF 门禁）
 
 **执行内容：**
