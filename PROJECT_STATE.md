@@ -84,12 +84,12 @@
 - [x] **指标治理阶段2（2026-08-17 完成，口径已确认 lossAmount>0 OR isClaim=true）**：质量损失三源聚合收敛——getTrendData 改查 quality_loss_index 物化表（四源口径写入时统一：Internal amount>0 / External、Commissioning isClaim||amount>0 / Manual amount>0）；getDrillDown/getAllLosses 同走 index 表；**删除 3 模块 12 个同构直查函数 + 全部转发链**（inspection-reporting / after-sales-integration / vehicle-commissioning + inspection.service / after-sales.service / exports.ts）；metrics-registry 同步（M-D07 并入 M-B03 删除，42→41 指标）
 - [x] **指标治理阶段3（2026-08-17 完成）**：排行收敛——inspection 模块新增轻量 getInspectorActiveTaskCounts（独立文件，避免模块加载循环），user.service 在办量改调统一出口（函数内动态 import 规避 inspection→user 循环依赖）；**quality-loss-trend 判断修正：非死端点**（工作台 dashboard/index.vue 经常量间接调用趋势图），保留
 - [x] **指标治理阶段4（2026-08-17 完成，判断修正）**：拆 inspection-reporting.service.ts——3 个跨域函数（getSupplierScoringData/getWelderScoreStats/getWorkOrderAggregateInspections）经数据源核查实为检验域数据（inspections/quality_records），按模块自包含原则留在 inspection 模块，拆至新文件 inspection-score-data.service.ts（报表中心 428→287 行）；InspectionCoreService spread 合并保持转发面不变，消费者零改动；metrics-registry 实现点同步
-- [ ] **数据生命周期 P1**：审计日志自动清理（audit_logs/login_logs 3 个月到期删，cron 每日，复用 scheduler）——止血（当前无限增长）
-- [ ] **数据生命周期 P2**：保留期登记表 data_retention_rules（10 年主口径/审计 3 个月/快照 1-2 年/临时 30 天）
+- [x] **数据生命周期 P1（2026-08-17 完成）**：审计日志自动清理——system-log.audit-cleanup cron（每日 03:00）删除超 90 天 audit_logs/login_logs（分批 ID 列表防锁）；真实库干跑 1556+511 条超期
+- [x] **数据生命周期 P2（2026-08-17 完成）**：data_retention_rules 表 + 9 条默认规则幂等种子（业务 3650 天 ARCHIVE×6/审计 90 DELETE/快照 730 DELETE/临时 30 PURGE）；启动时 ensureDefaultRetentionRules
 - [x] **数据生命周期 P3（2026-08-17 完成）**：归档框架——3 业务表加 archivedAt/retainUntil；创建链路回填 retainUntil（不合格记录界面+导入）；daily-archive cron（每日 02:00）ARCHIVE 打标记 + 快照超期清理；**年份查询/统计不过滤归档（追溯场景，docs §3.5 决策）**；列表页含归档开关待归档真触发时再做
 - [ ] **数据生命周期 P4**：OSS 冷存储规则（按需，文件不删只转冷）
 - [ ] **数据生命周期 P5**：到期评估界面（到期前 90 天预警 + 续留/销毁/导出三选一 + 未决策自动续留 1 年）
-- [x] **可用年份统一服务（2026-08-17 完成）**：docs/available-years.md + YEAR_SOURCES 注册表（6 数据源，含归档）+ /qms/common/years?scopes 接口 + 60s 缓存；前端 useAvailableYears 泛化（scopes/缓存/容错），检验记录页硬编码 [2024,2025,2026] 替换为动态，售后/不合格项/工单传各自 scope（修正数据源错）；真实库验证 2026/2025/2024 合并 ✓
+- [x] **可用年份统一服务（2026-08-17 完成）**：docs/available-years.md + YEAR_SOURCES 注册表（7 数据源，含归档）+ /qms/common/years?scopes 接口 + 60s 缓存；前端 useAvailableYears 泛化（scopes/缓存/容错），检验记录页硬编码 [2024,2025,2026] 替换为动态，售后/不合格项/工单传各自 scope（修正数据源错）；真实库验证 2026/2025/2024 合并 ✓
 - [ ] 其他待办详见 PROGRESS.md 待办段
 
 ---
