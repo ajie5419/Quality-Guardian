@@ -44,7 +44,7 @@ QMS:Inspection:List/Create/Edit/Delete/Export、QMS:AfterSales:Export、QMS:Insp
 | 🟡 MENU\_\* 占位孤儿码（7 个） | ✅ cleanup-menu-placeholder-codes.ts 软删 | 7 码软删 + 5 条关联解除 |
 | 🟡 死码（6 个：QMS:Inspection:\*/AfterSales:Export） | ✅ 从 PERMISSION_CODES 删除 | 无业务引用确认 |
 | 🟡 Supervision 3 按钮 | ✅ supervision.module.ts 补按钮声明 | 启动同步后界面可分配 |
-| 🟡 Ai/Reports/ITP 12 码菜单按钮 | ⏳ 待业务决策（涉及前端导航/既有菜单 merge） | 见行动清单待办 |
+| 🟡 Ai/Reports/ITP 12 码菜单按钮 | ⏸ **2026-08-17 业务决策：等生产部署回填**（随部署窗口一并处理，期间界面分配走脚本回填） | 见行动清单待办 |
 
 ## 三、验证快照（修复后）
 

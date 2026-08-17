@@ -92,6 +92,7 @@ assertRecordOwnership({ label: '记录', ownerId: record.createdBy, userId: user
 ### 5.1 现状
 
 - 开关：DATA_SCOPE_V2 环境变量（默认 false，未开启 = 全员可见全库）
+- 状态：**2026-08-17 业务决策：暂不实施**（代码已就绪；重新评估时按 5.2 开启手册执行）
 - 已接入读路径的模块：after-sales、quality-loss、supplier、work-order、inspection（records 列表 2026-08-17 接入）
 - 写路径范围校验：quality-loss（assertDeleteAccess 范式）
 
@@ -158,4 +159,4 @@ assertRecordOwnership({ label: '记录', ownerId: record.createdBy, userId: user
 - 一般列表/统计读接口仍仅登录校验（未逐接口授权；数据可见性由数据范围控制）
 - inspection 的 issues/requests 读路径尚未接入数据范围（records 已接入，同类改造进行中）
 - 写路径数据范围校验仅 quality-loss 实现（范式已确立，推广待排期）
-- Ai/Reports/ITP 部分权限码无对应菜单按钮（界面不可分配，走脚本回填；业务决策是否补按钮）
+- Ai/Reports/ITP 部分权限码无对应菜单按钮（界面不可分配，走脚本回填；**2026-08-17 业务决策：等生产部署回填**）

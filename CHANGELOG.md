@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：业务决策三项落档
+
+**执行内容：**
+- ① 数据范围隔离（Phase 4）：业务决策**暂不实施**（代码已就绪，重新评估按 docs/permission-module.md §5.2 执行）
+- ② 审批流引擎（方案 B）：业务决策**暂不实施**（需求明确后再启动）
+- ③ Ai/Reports/ITP 权限码菜单按钮：业务决策**等生产部署回填**（随部署窗口处理，期间走脚本回填）
+- 决策同步落档：PROJECT_STATE.md 待办+最近变更、docs/audit-action-plan.md、docs/permission-consistency-report.md、docs/permission-module.md
+
+**验证结果：**
+- 纯文档变更；docs drift PASSED
+
+**遗留问题：**
+- 无（待办项保留为未勾选，标注决策状态，不误关闭）
+
 ### 2026-08-17 阶段：权限模块文档成文
 
 **执行内容：**
