@@ -16,7 +16,6 @@ export namespace InspectionSettingsApi {
     code: null | string;
     id: string;
     name: string;
-    responsibleDepartmentId: null | string;
     sort: number;
     status: number;
     supplierSource: 'Outsourcing' | 'Supplier';
@@ -68,7 +67,6 @@ export function createInspectionProcessApi(data: {
   categories: InspectionSettingsApi.ProcessCategory[];
   code?: null | string;
   name: string;
-  responsibleDepartmentId?: null | string;
   sort?: number;
   supplierSource: InspectionSettingsApi.ProcessSupplierSource;
 }) {
@@ -83,7 +81,6 @@ export function updateInspectionProcessApi(
   data: {
     code?: null | string;
     name?: string;
-    responsibleDepartmentId?: null | string;
     sort?: number;
     status?: 0 | 1;
     supplierSource?: InspectionSettingsApi.ProcessSupplierSource;

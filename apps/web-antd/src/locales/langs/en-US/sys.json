@@ -47,8 +47,6 @@
     "supplierSource": "Supplier Source",
     "supplierSourceSupplier": "Regular supplier",
     "supplierSourceOutsourcing": "Outsourcing unit",
-    "responsibleDept": "Responsible Department",
-    "responsibleDeptPlaceholder": "Select department",
     "processInspection": "Process Inspection",
     "incomingInspection": "Incoming Inspection",
     "visibleIn": "Visible In",

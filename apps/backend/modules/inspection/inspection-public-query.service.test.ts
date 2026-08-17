@@ -100,14 +100,12 @@ describe('inspection public query service', () => {
         category: 'PROCESS',
         processId: 'process-1',
         processName: 'Canonical Welding',
-        responsibleDepartmentId: null,
         supplierSource: 'Supplier',
       },
       {
         category: 'INCOMING',
         processId: 'process-1',
         processName: 'Canonical Welding',
-        responsibleDepartmentId: null,
         supplierSource: 'Outsourcing',
       },
     ]);
@@ -119,14 +117,12 @@ describe('inspection public query service', () => {
         category: 'PROCESS',
         processId: 'process-1',
         processName: 'Canonical Welding',
-        responsibleDepartmentId: null,
         supplierSource: 'Supplier',
       },
       {
         category: 'INCOMING',
         processId: 'process-1',
         processName: 'Canonical Welding',
-        responsibleDepartmentId: null,
         supplierSource: 'Outsourcing',
       },
     ]);
