@@ -5,6 +5,12 @@ import { WelderScoreRefreshService } from '~/modules/welder';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => {
+  const dataRetentionRules = {
+    findUnique: vi.fn().mockResolvedValue({
+      isEnabled: true,
+      retentionDays: 3650,
+    }),
+  };
   const qualityRecords = {
     create: vi.fn(),
     findMany: vi.fn(),
@@ -24,6 +30,8 @@ vi.mock('~/utils/prisma', () => {
       findFirst: vi.fn(),
     },
     quality_records: qualityRecords,
+
+    data_retention_rules: dataRetentionRules,
   };
   return {
     default: {
@@ -899,6 +907,7 @@ describe('inspectionIssueMutationService', () => {
           nonConformanceNumber: null,
           partName: 'Part',
           responsibleWelderId: null,
+          retainUntil: expect.any(Date),
         },
       });
     });

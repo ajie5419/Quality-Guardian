@@ -6,6 +6,7 @@ export {
   DataRetentionRuleService,
   DEFAULT_RETENTION_RULES,
   ensureDefaultRetentionRules,
+  resolveRetainUntil,
 } from './data-retention-rule.service';
 export type {
   RetentionAction,

@@ -107,3 +107,32 @@ export const DataRetentionRuleService = {
     });
   },
 };
+
+const RETENTION_RULE_CACHE = new Map<
+  string,
+  { days: number; expiresAt: number }
+>();
+
+/**
+ * 按数据类解析保留期截止时间（创建记录时回填 retainUntil 用）。
+ * 60s 内存缓存；规则禁用或缺失时返回 null（不设保留期）。
+ */
+export async function resolveRetainUntil(
+  dataClass: string,
+  now = new Date(),
+): Promise<Date | null> {
+  const cached = RETENTION_RULE_CACHE.get(dataClass);
+  if (cached && cached.expiresAt > Date.now()) {
+    return new Date(now.getTime() + cached.days * 24 * 60 * 60 * 1000);
+  }
+  const rule = await prisma.data_retention_rules.findUnique({
+    where: { dataClass },
+    select: { isEnabled: true, retentionDays: true },
+  });
+  if (!rule?.isEnabled) return null;
+  RETENTION_RULE_CACHE.set(dataClass, {
+    days: rule.retentionDays,
+    expiresAt: Date.now() + 60 * 1000,
+  });
+  return new Date(now.getTime() + rule.retentionDays * 24 * 60 * 60 * 1000);
+}
