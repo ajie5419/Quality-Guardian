@@ -25,6 +25,20 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：指标治理真实验证（本地数据库）与 SQL 参数化 bug 修复
+
+**执行内容：**
+- 本地数据库 quality_guard_local_test 实测：数据规模（index 21 条/检验记录 236/售后 54/车辆 53/报检 3288）
+- 三源口径抽查 100% 一致：External after_sales 54→符合口径 19→index 物化 19；Internal 236→2→2；Commissioning 53→0→0
+- **发现并修复 bug**：getTrendData 的 SELECT 表达式（WEEK/MONTH）误写入 $queryRaw 的 ${} 占位 → Prisma 当参数绑定 → p 列变常量字符串 → GROUP BY 失效 → 趋势全 0；单测 mock 绕过 SQL 生成未暴露，真实库执行暴露；改用 Prisma.sql 片段修复
+- 修复后真实数据验证：1月 13380（检验 5300+售后 8080）、2月 230012.24、3月 31775，与手工模拟 SQL 完全一致；周趋势 17 点；getInspectorActiveTaskCounts 在办 8 人；getAllLosses 分页 total=21
+
+**验证结果：**
+- 真实库全部通过；quality-loss 模块回归 120/120；qms-arch 0 violations；eslint 干净
+
+**遗留问题：**
+- 临时验证脚本已删除；建议生产/测试环境部署后抽查趋势图数字与报表一致
+
 ### 2026-08-17 阶段：指标治理阶段4（拆上帝文件，收官）
 
 **执行内容：**

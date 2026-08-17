@@ -130,7 +130,7 @@ export const QualityLossService = {
           p: bigint | number;
           source: string;
         }>
-      >`SELECT ${isWeek ? 'WEEK(occurDate, 3)' : 'MONTH(occurDate)'} as p, source, SUM(amount) as a
+      >`SELECT ${isWeek ? Prisma.sql`WEEK(occurDate, 3)` : Prisma.sql`MONTH(occurDate)`} as p, source, SUM(amount) as a
         FROM quality_loss_index
         WHERE YEAR(occurDate) = ${year} AND isDeleted = 0
         GROUP BY p, source`;

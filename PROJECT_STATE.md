@@ -5,7 +5,7 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 10:38
+- 最后同步时间: 2026-08-17 11:30
 - 版本: 0.27.0
 - 后端模块数: 33
 - 模块 TS 文件数: 676
@@ -29,6 +29,7 @@
 - 2026-08-17 指标治理阶段4 落地（收官）：拆 inspection-reporting.service.ts（428→287 行）——3 个跨域函数经数据源核查实为检验域数据，拆至 inspection-score-data.service.ts，转发面与消费者零改动；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段3 落地：检验员在办量排行收敛——inspection 新增 getInspectorActiveTaskCounts（独立文件），user.service 动态 import 调用统一出口（顶层 import 会触发 inspection→user 模块加载循环）；quality-loss-trend 经核实为工作台在用（非死端点）保留；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段2 落地：质量损失三源聚合收敛——getTrendData 改查 quality_loss_index 物化表（四源口径写入时统一 isClaim||amount>0），删除 3 模块 12 个同构直查函数 + 转发链（此前仅 getTrendData 消费）；metrics-registry 42→41（M-D07 并入 M-B03）；全量 2686 用例通过，qms-arch 0 violations。
+- 2026-08-17 指标治理真实验证（本地库 quality_guard_local_test）：三源口径抽查 100% 一致（External 54→19、Internal 236→2、Commissioning 53→0）；getTrendData 真实执行暴露并修复 SQL 参数化 bug（SELECT 表达式误入 ${} 被当参数绑定 → 全 0，改用 Prisma.sql 片段）；修复后 1月 13380/2月 230012.24/3月 31775 与模拟 SQL 一致；getAllLosses 分页 21 条、在办 8 人正常。
 - 2026-08-17 指标治理阶段0-1 落地：指标字典成文（docs/metrics-registry.md + utils/metrics-registry.ts，42 指标 7 族，58 聚合点登记 + 24 豁免点）；门禁 B-MF 挂入 check:qms-arch（新增聚合必须登记 + 文档/代码 ID 一致性校验），存量零 baseline，测试 13/13 全绿。
 - 2026-08-17 待办核实闭环：EventEmitter 替换项标记完成（event-bus.ts 已于 d4015f43 删除；售后→供应商评分走 MetricRefreshQueue 持久化队列，报检创建走 Redis pub/sub 跨实例广播 + SSE；全仓库零残留，历史遗留清单清理）。
 - 2026-08-17 数据契约自动化收官：命名规则检测落地（B-N1 Boolean is/has 前缀、B-N2 DateTime At 后缀+语义时间例外、B-N3 字段 camelCase；scripts/check-field-naming.mjs 挂入 check:qms-arch，存量 13 处入 baseline 新增即拦截；--changed 模式仅 schema 变更时检查）；顺带修复 B-AUTH2 门禁脚本路径（$ROOT_DIR→$SCRIPT_DIR，修复 fixture 测试 3 个既有失败）；脚本测试 11/11 通过。
