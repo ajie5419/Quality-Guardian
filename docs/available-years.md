@@ -26,6 +26,7 @@ YEAR_SOURCES = [
   { scope: 'work-order', table: 'work_orders', column: 'deliveryDate' },
   { scope: 'quality-loss', table: 'quality_loss_index', column: 'occurDate' },
   { scope: 'metrology-plan', table: 'metrology_calibration_plans', column: 'planYear' },
+  { scope: 'vehicle-commissioning', table: 'vehicle_commissioning_issues', column: 'date' },
   // 新模块年份需求 = 注册表加一行
 ]
 ```
@@ -51,6 +52,9 @@ useAvailableYears(scopes?: string[])  // 传 scopes 按模块取，不传取全�
 - 错误容错：回退当前年 + 前一年
 - 替换所有硬编码年份下拉
 ```
+
+
+> 说明：质量策划（planning：BOM/DFMEA/ITP/项目文档）无业务日期列（仅 createdAt/updatedAt），暂不注册年份来源；如业务需要按年份管理，先为相关表补充业务日期字段再注册。
 
 ## 3. 年份语义统一约定
 

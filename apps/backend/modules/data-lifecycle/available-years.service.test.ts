@@ -25,12 +25,13 @@ describe('available years service', () => {
       .mockResolvedValueOnce([{ year: 2026 }, { year: 2023 }])
       .mockResolvedValueOnce([{ year: 2022 }])
       .mockResolvedValueOnce([{ year: 2021 }])
-      .mockResolvedValueOnce([{ year: 2024 }]);
+      .mockResolvedValueOnce([{ year: 2024 }])
+      .mockResolvedValueOnce([{ year: 2026 }]);
 
     const years = await getAvailableYears();
 
     expect(years).toEqual([2026, 2025, 2024, 2023, 2022, 2021]);
-    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(6);
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(7);
   });
 
   it('filters sources by scopes', async () => {
@@ -57,10 +58,10 @@ describe('available years service', () => {
 
     await getAvailableYears();
     await getAvailableYears();
-    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(6); // second call cached
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(7); // second call cached
 
     clearAvailableYearsCache();
     await getAvailableYears();
-    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(12); // cache cleared
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(14); // cache cleared
   });
 });

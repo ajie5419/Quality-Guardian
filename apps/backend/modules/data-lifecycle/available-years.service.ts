@@ -21,6 +21,7 @@ export const YEAR_SOURCES: YearSource[] = [
   { scope: 'work-order', table: 'work_orders', column: 'deliveryDate' },
   { scope: 'quality-loss', table: 'quality_loss_index', column: 'occurDate' },
   { scope: 'metrology-plan', table: 'metrology_calibration_plans', column: 'planYear' },
+  { scope: 'vehicle-commissioning', table: 'vehicle_commissioning_issues', column: 'date' },
 ];
 
 const CACHE_TTL_MS = 60 * 1000;
