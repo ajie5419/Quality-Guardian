@@ -23,6 +23,21 @@
 
 ---
 
+### 2026-08-17 阶段：修复关闭弹窗对供应商责任的部门误校验（前端 bug）
+
+**执行内容：**
+- 现象：报检关闭弹窗选"不合格"点确定，供应商责任必报"不合格项责任部门不能为空"，外协责任正常——用户测试发现
+- 根因：useInspectionRequestTaskActions.ts validateCloseForm 的必填校验只对 OUTSOURCING_UNIT 豁免责任部门，漏了 SUPPLIER；而模板部门字段对两种外部责任都隐藏（!isExternalResponsibility）→ 供应商用户看不到也填不了部门，校验却强制要求 → 死锁
+- 修复：豁免条件改为 isExternalInspectionIssueResponsibility(responsibilityType)（SUPPLIER + OUTSOURCING 统一豁免）；部门由服务端按报检单快照继承（后端链路已就绪）
+- 验证：前端全量 65 文件/343 用例（含 useInspectionRequestTaskActions 23/23）；vue-tsc/eslint 干净
+
+**commit:** 待补
+
+**遗留问题：**
+- 无
+
+---
+
 ### 2026-08-17 阶段：工序责任部门回填脚本（正式运维工具）
 
 **执行内容：**

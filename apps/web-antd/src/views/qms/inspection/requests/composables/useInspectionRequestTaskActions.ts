@@ -248,8 +248,9 @@ export function useInspectionRequestTaskActions(
     const requiredFields = [
       [linkedIssueDraft.value.partName, '部件名称'],
       [linkedIssueDraft.value.processName, '工序'],
-      ...(linkedIssueDraft.value.responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
+      ...(isExternalInspectionIssueResponsibility(
+        linkedIssueDraft.value.responsibilityType,
+      )
         ? []
         : [
             [linkedIssueDraft.value.responsibleDepartment, '责任部门'],
