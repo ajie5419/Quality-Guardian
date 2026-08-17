@@ -14,7 +14,6 @@ import {
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { normalizeInspectionRequestText } from './inspection-request';
 import { failCloseRequest } from './inspection-request-close.schema';
-import { resolveInspectionRequestResponsibilityDepartmentId } from './inspection-request-responsibility-default.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
 type Request = {
@@ -258,39 +257,26 @@ function applyCanonicalResponsibility<T extends Request>(
 
 async function resolveSubmittedCloseResponsibility(options: {
   category?: null | string;
+  request: Request;
   responsibility: Record<string, unknown>;
   tx: Prisma.TransactionClient;
 }) {
-  const responsibilityType = normalizeInspectionIssueResponsibilityType(
-    options.responsibility.responsibilityType,
+  // The request snapshot is the single source of truth: a close payload that
+  // omits the department inherits it from the request instead of re-resolving
+  // system configuration (which historically left incoming/outsourcing closes
+  // with "responsible department cannot be empty").
+  const submittedDepartmentId = normalizeInspectionRequestText(
+    options.responsibility.responsibleDepartmentId,
   );
-  const isServerResolvedDepartment =
-    responsibilityType ===
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT ||
-    (options.category === 'INCOMING' &&
-      responsibilityType === INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER);
-  if (isServerResolvedDepartment) {
-    if (
-      normalizeInspectionRequestText(
-        options.responsibility.responsibleDepartmentId,
-      )
-    ) {
-      failCloseRequest('VALIDATION', '外部责任部门由系统配置解析');
-    }
-    return resolveInspectionIssueResponsibility(
-      {
-        ...options.responsibility,
-        responsibleDepartmentId:
-          await resolveInspectionRequestResponsibilityDepartmentId(
-            responsibilityType,
-            options.tx,
-          ),
-      },
-      options.tx,
-    );
-  }
+  const responsibleDepartmentId =
+    submittedDepartmentId ||
+    normalizeInspectionRequestText(options.request.responsibleDepartmentId) ||
+    undefined;
   return resolveInspectionIssueResponsibility(
-    options.responsibility,
+    {
+      ...options.responsibility,
+      responsibleDepartmentId,
+    },
     options.tx,
   );
 }
@@ -394,6 +380,7 @@ export async function resolveLegacyCloseRequestResponsibility<
   const submittedResponsibility = options.responsibility
     ? await resolveSubmittedCloseResponsibility({
         category: options.request.category,
+        request: options.request,
         responsibility: options.responsibility,
         tx: options.tx,
       })

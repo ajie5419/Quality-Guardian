@@ -26,6 +26,7 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 
+import { getDeptList } from '#/api/system/dept';
 import {
   createInspectionProcessApi,
   deleteInspectionProcessApi,
@@ -113,6 +114,7 @@ const processRows = ref<ProcessItem[]>([]);
 const processProcessIds = ref(new Set<string>());
 const incomingProcessIds = ref(new Set<string>());
 const selectionDirty = ref(false);
+const deptOptions = ref<Array<{ label: string; value: string }>>([]);
 const processModalOpen = ref(false);
 const projectionStatus = ref<null | PassRateProjectionApi.Status>(null);
 const editingProcessId = ref<null | string>(null);
@@ -120,6 +122,7 @@ const processDraft = reactive<{
   categories: ProcessCategory[];
   code: string;
   name: string;
+  responsibleDepartmentId: null | string;
   sort: number;
   status: 0 | 1;
   supplierSource: InspectionSettingsApi.ProcessSupplierSource;
@@ -127,6 +130,7 @@ const processDraft = reactive<{
   categories: [],
   code: '',
   name: '',
+  responsibleDepartmentId: null,
   sort: 0,
   status: 1,
   supplierSource: 'Supplier',
@@ -151,6 +155,12 @@ const columns = computed(() => [
     key: 'supplierSource',
     title: t('sys.inspectionSettings.supplierSource'),
     width: 130,
+  },
+  {
+    dataIndex: 'responsibleDepartmentId',
+    key: 'responsibleDepartmentId',
+    title: t('sys.inspectionSettings.responsibleDept'),
+    width: 170,
   },
   {
     key: 'status',
@@ -207,6 +217,37 @@ async function loadSettings() {
     message.error(t('common.loadFailed'));
   } finally {
     loading.value = false;
+  }
+}
+
+interface DeptTreeNode {
+  children?: DeptTreeNode[];
+  id: string;
+  name?: string;
+}
+
+function flattenDeptTree(
+  nodes: DeptTreeNode[],
+  depth = 0,
+): Array<{ label: string; value: string }> {
+  const result: Array<{ label: string; value: string }> = [];
+  for (const node of nodes || []) {
+    if (!node?.id) continue;
+    const prefix = depth > 0 ? `${'  '.repeat(depth)}└ ` : '';
+    result.push({ label: prefix + (node.name || node.id), value: node.id });
+    if (Array.isArray(node.children) && node.children.length > 0) {
+      result.push(...flattenDeptTree(node.children, depth + 1));
+    }
+  }
+  return result;
+}
+
+async function loadDepartments() {
+  try {
+    const list = await getDeptList();
+    deptOptions.value = flattenDeptTree(Array.isArray(list) ? list : []);
+  } catch {
+    deptOptions.value = [];
   }
 }
 
@@ -342,12 +383,35 @@ async function saveSelections() {
   }
 }
 
+async function handleResponsibleDepartmentChange(
+  record: Record<string, unknown>,
+  value: unknown,
+) {
+  const previous = record.responsibleDepartmentId;
+  const next = (value as null | string | undefined) ?? null;
+  record.responsibleDepartmentId = next;
+  try {
+    await updateInspectionProcessApi(record.id as string, {
+      responsibleDepartmentId: next,
+    });
+  } catch {
+    record.responsibleDepartmentId = previous;
+    message.error(t('common.saveFailed'));
+  }
+}
+
+function handleProcessDraftDeptChange(value: unknown) {
+  processDraft.responsibleDepartmentId =
+    (value as null | string | undefined) ?? null;
+}
+
 function openCreateModal() {
   editingProcessId.value = null;
   Object.assign(processDraft, {
     categories: [],
     code: '',
     name: '',
+    responsibleDepartmentId: null,
     sort: processRows.value.length,
     status: 1,
     supplierSource: 'Supplier',
@@ -361,6 +425,7 @@ function openEditModal(item: ProcessItem) {
     categories: [...item.categories],
     code: item.code || '',
     name: item.name,
+    responsibleDepartmentId: item.responsibleDepartmentId,
     sort: item.sort,
     status: item.status === 1 ? 1 : 0,
     supplierSource: item.supplierSource,
@@ -385,6 +450,7 @@ async function saveProcess() {
       ? updateInspectionProcessApi(editingProcessId.value, {
           code: processDraft.code.trim() || null,
           name,
+          responsibleDepartmentId: processDraft.responsibleDepartmentId,
           sort: processDraft.sort,
           status: processDraft.status,
           supplierSource: processDraft.supplierSource,
@@ -393,6 +459,7 @@ async function saveProcess() {
           categories: processDraft.categories,
           code: processDraft.code.trim() || null,
           name,
+          responsibleDepartmentId: processDraft.responsibleDepartmentId,
           sort: processDraft.sort,
           supplierSource: processDraft.supplierSource,
         }));
@@ -433,7 +500,10 @@ async function removeProcess(id: string) {
   }
 }
 
-onMounted(loadSettings);
+onMounted(() => {
+  void loadSettings();
+  void loadDepartments();
+});
 </script>
 
 <template>
@@ -643,7 +713,7 @@ onMounted(loadSettings);
           :data-source="processRows"
           :loading="loading"
           :pagination="false"
-          :scroll="{ x: 820 }"
+          :scroll="{ x: 1000 }"
           row-key="id"
           size="middle"
         >
@@ -670,6 +740,22 @@ onMounted(loadSettings);
                     : t('sys.inspectionSettings.supplierSourceSupplier')
                 }}
               </span>
+            </template>
+            <template v-else-if="column.key === 'responsibleDepartmentId'">
+              <Select
+                :value="record.responsibleDepartmentId"
+                :disabled="!canEdit"
+                :options="deptOptions"
+                :placeholder="
+                  t('sys.inspectionSettings.responsibleDeptPlaceholder')
+                "
+                allow-clear
+                size="small"
+                class="w-full"
+                @change="
+                  (value) => handleResponsibleDepartmentChange(record, value)
+                "
+              />
             </template>
             <template v-else-if="column.key === 'process'">
               <Switch
@@ -776,6 +862,18 @@ onMounted(loadSettings);
                 value: 'Outsourcing',
               },
             ]"
+          />
+        </Form.Item>
+        <Form.Item :label="t('sys.inspectionSettings.responsibleDept')">
+          <Select
+            :value="processDraft.responsibleDepartmentId ?? undefined"
+            :options="deptOptions"
+            :placeholder="
+              t('sys.inspectionSettings.responsibleDeptPlaceholder')
+            "
+            allow-clear
+            class="w-full"
+            @change="handleProcessDraftDeptChange"
           />
         </Form.Item>
         <Form.Item

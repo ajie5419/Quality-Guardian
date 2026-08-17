@@ -10,12 +10,6 @@ import { resolveInspectionIssueResponsibility } from './inspection-issue-respons
 import { resolveV2RequestResponsibility } from './inspection-request-create-responsibility.service';
 import { assertInspectionRequestResponsibilityPolicy } from './inspection-request-responsibility-policy.service';
 
-const { resolveInspectionRequestResponsibilityDepartmentId } = vi.hoisted(
-  () => ({
-    resolveInspectionRequestResponsibilityDepartmentId: vi.fn(),
-  }),
-);
-
 vi.mock('~/modules/supplier-identity', () => ({
   SupplierIdentityService: {
     resolveSupplierById: vi.fn(),
@@ -31,9 +25,17 @@ vi.mock('./inspection-request-responsibility-policy.service', () => ({
   assertInspectionRequestResponsibilityPolicy: vi.fn(),
 }));
 
-vi.mock('./inspection-request-responsibility-default.service', () => ({
-  resolveInspectionRequestResponsibilityDepartmentId,
-}));
+function processTx(departmentId: null | string = 'dept-production') {
+  return {
+    processes: {
+      findFirst: vi.fn().mockResolvedValue({
+        id: 'process-1',
+        name: '外购件',
+        responsibleDepartmentId: departmentId,
+      }),
+    },
+  } as never;
+}
 
 describe('resolveV2RequestResponsibility', () => {
   beforeEach(() => {
@@ -46,9 +48,6 @@ describe('resolveV2RequestResponsibility', () => {
       supplierCategory: null,
       supplierName: null,
     });
-    resolveInspectionRequestResponsibilityDepartmentId.mockResolvedValue(
-      'dept-production',
-    );
   });
 
   it('accepts direct internal responsibility without an execution TEAM', async () => {
@@ -61,7 +60,7 @@ describe('resolveV2RequestResponsibility', () => {
           supplierId: '',
         },
       },
-      {} as any,
+      {} as never,
     );
 
     expect(result).toMatchObject({
@@ -78,7 +77,7 @@ describe('resolveV2RequestResponsibility', () => {
     });
   });
 
-  it('server-resolves the INCOMING outsourcing department when its supplier category matches', async () => {
+  it('resolves the INCOMING outsourcing department from the process default when its supplier category matches', async () => {
     vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
       responsibilityType: 'OUTSOURCING_UNIT',
       responsibleDepartment: OUTSOURCING_INSPECTION_RESPONSIBLE_DEPARTMENT,
@@ -99,27 +98,25 @@ describe('resolveV2RequestResponsibility', () => {
       resolveV2RequestResponsibility(
         {
           category: 'INCOMING',
+          processId: 'process-1',
           v2Responsibility: {
             responsibilityType: 'OUTSOURCING_UNIT',
             supplierId: 'supplier-outsourcing',
           },
         },
-        {} as any,
+        processTx(),
       ),
     ).resolves.toMatchObject({
       supplierId: 'supplier-outsourcing',
       teamId: null,
     });
-    expect(
-      resolveInspectionRequestResponsibilityDepartmentId,
-    ).toHaveBeenCalledWith('OUTSOURCING_UNIT', expect.any(Object));
     expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
       expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
       expect.any(Object),
     );
   });
 
-  it('server-resolves the INCOMING supplier department before creating R', async () => {
+  it('resolves the INCOMING supplier department from the process default', async () => {
     vi.mocked(resolveInspectionIssueResponsibility).mockResolvedValueOnce({
       responsibilityType: 'SUPPLIER',
       responsibleDepartment: 'Purchasing',
@@ -128,9 +125,6 @@ describe('resolveV2RequestResponsibility', () => {
       supplierCategory: SUPPLIER_CATEGORY.SUPPLIER,
       supplierName: 'Supplier A',
     });
-    resolveInspectionRequestResponsibilityDepartmentId.mockResolvedValueOnce(
-      'dept-purchasing',
-    );
     vi.mocked(
       SupplierIdentityService.resolveSupplierById,
     ).mockResolvedValueOnce({
@@ -143,22 +137,22 @@ describe('resolveV2RequestResponsibility', () => {
       resolveV2RequestResponsibility(
         {
           category: 'INCOMING',
+          processId: 'process-1',
           v2Responsibility: {
             responsibilityType: 'SUPPLIER',
             supplierId: 'supplier-1',
           },
         },
-        {} as any,
+        processTx('dept-purchasing'),
       ),
     ).resolves.toMatchObject({
       supplierId: 'supplier-1',
       teamId: null,
     });
-    expect(
-      resolveInspectionRequestResponsibilityDepartmentId,
-    ).toHaveBeenCalledWith('SUPPLIER', expect.any(Object));
     expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
-      expect.objectContaining({ responsibleDepartmentId: 'dept-purchasing' }),
+      expect.objectContaining({
+        responsibleDepartmentId: 'dept-purchasing',
+      }),
       expect.any(Object),
     );
   });
@@ -174,19 +168,16 @@ describe('resolveV2RequestResponsibility', () => {
             supplierId: '',
           },
         },
-        {} as any,
+        {} as never,
       ),
     ).rejects.toMatchObject({
       code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
     });
-    expect(
-      resolveInspectionRequestResponsibilityDepartmentId,
-    ).not.toHaveBeenCalled();
     expect(resolveInspectionIssueResponsibility).not.toHaveBeenCalled();
   });
 
   it.each(['INCOMING', 'PROCESS'] as const)(
-    'rejects a client-selected outsourcing department for %s',
+    'accepts a client-selected outsourcing department for %s',
     async (category) => {
       await expect(
         resolveV2RequestResponsibility(
@@ -198,15 +189,13 @@ describe('resolveV2RequestResponsibility', () => {
               supplierId: 'supplier-outsourcing',
             },
           },
-          {} as any,
+          {} as never,
         ),
-      ).rejects.toMatchObject({
-        code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
-      });
-      expect(
-        resolveInspectionRequestResponsibilityDepartmentId,
-      ).not.toHaveBeenCalled();
-      expect(resolveInspectionIssueResponsibility).not.toHaveBeenCalled();
+      ).resolves.toBeDefined();
+      expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
+        expect.objectContaining({ responsibleDepartmentId: 'dept-client' }),
+        expect.any(Object),
+      );
     },
   );
 
@@ -231,19 +220,20 @@ describe('resolveV2RequestResponsibility', () => {
       resolveV2RequestResponsibility(
         {
           category: 'INCOMING',
+          processId: 'process-1',
           v2Responsibility: {
             responsibilityType: 'SUPPLIER',
             supplierId: 'supplier-outsourcing',
           },
         },
-        {} as any,
+        processTx(),
       ),
     ).rejects.toMatchObject({
       code: 'INVALID_INSPECTION_REQUEST_RESPONSIBILITY',
     });
   });
 
-  it('server-resolves the hidden PROCESS outsourcing department before creating R', async () => {
+  it('resolves the hidden PROCESS outsourcing department from the process default', async () => {
     expect(
       getInspectionRequestResponsibilitySupplierCategory('OUTSOURCING_UNIT'),
     ).toBe(SUPPLIER_CATEGORY.OUTSOURCING);
@@ -264,35 +254,46 @@ describe('resolveV2RequestResponsibility', () => {
         id: 'supplier-outsourcing',
         name: 'Outsourcing Unit A',
       });
-    await expect(
-      SupplierIdentityService.resolveSupplierById(
-        'supplier-outsourcing',
-        {} as any,
-      ),
-    ).resolves.toMatchObject({ category: SUPPLIER_CATEGORY.OUTSOURCING });
 
     await expect(
       resolveV2RequestResponsibility(
         {
           category: 'PROCESS',
+          processId: 'process-1',
           v2Responsibility: {
             responsibilityType: 'OUTSOURCING_UNIT',
             supplierId: 'supplier-outsourcing',
           },
         },
-        {} as any,
+        processTx(),
       ),
     ).resolves.toMatchObject({
       supplierId: 'supplier-outsourcing',
       team: '',
       teamId: null,
     });
-    expect(
-      resolveInspectionRequestResponsibilityDepartmentId,
-    ).toHaveBeenCalledWith('OUTSOURCING_UNIT', expect.any(Object));
     expect(resolveInspectionIssueResponsibility).toHaveBeenCalledWith(
       expect.objectContaining({ responsibleDepartmentId: 'dept-production' }),
       expect.any(Object),
     );
+  });
+
+  it('rejects when the process has no configured responsible department', async () => {
+    await expect(
+      resolveV2RequestResponsibility(
+        {
+          category: 'INCOMING',
+          processId: 'process-1',
+          v2Responsibility: {
+            responsibilityType: 'SUPPLIER',
+            supplierId: 'supplier-1',
+          },
+        },
+        processTx(null),
+      ),
+    ).rejects.toMatchObject({
+      code: 'VALIDATION',
+    });
+    expect(resolveInspectionIssueResponsibility).not.toHaveBeenCalled();
   });
 });

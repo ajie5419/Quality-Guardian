@@ -47,6 +47,8 @@
     "supplierSource": "供应商来源",
     "supplierSourceSupplier": "普通供应商",
     "supplierSourceOutsourcing": "外协加工单位",
+    "responsibleDept": "责任部门",
+    "responsibleDeptPlaceholder": "选择责任部门",
     "processInspection": "过程报检",
     "incomingInspection": "进货检验",
     "visibleIn": "显示在",

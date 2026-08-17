@@ -23,6 +23,30 @@
 
 ---
 
+### 2026-08-17 阶段：报检责任落库链路修复（工序责任部门 + 快照继承）
+
+**执行内容：**
+- 背景：生产"进货检验关闭报错：不合格项责任部门 ID 不能为空"；根因 = 外部责任（INCOMING/OUTSOURCING）部门由 system_settings 服务端解析，生产未配置 + 名称 bootstrap 失败 → 报检单部门缺失/关闭时重新解析失败
+- 数据：processes 恢复 responsibleDepartmentId（迁移 20260817160000 文件恢复，DB 列与迁移记录已存在）；本地预配 4 工序（外购件/原材料→采购部、机加成品件-外协/辅材→生产履约部）
+- 创建链路（inspection-request-create-responsibility.service.ts）：删"外部责任拒绝客户端部门 + 服务端解析"；部门来源优先级 = 客户端显式提交 > 工序主数据（processes.responsibleDepartmentId）> 未配置则创建时 BusinessError 提示（错误码 VALIDATION，消息带工序名）
+- 关闭链路（inspection-request-close-responsibility.service.ts + inspection-request-close.service.ts）：删 system_settings 解析分支（resolveSubmittedCloseResponsibility 提交缺部门 → 从报检单快照兜底；hydrateOutsourcingLinkedIssueResponsibility 不再拒绝客户端部门、以 close 责任覆盖）
+- 死代码删除（4 文件 + 测试）：inspection-request-responsibility-default.service(.test)、system 的 inspection-request-outsourcing-responsibility-setting.service(.test)、bootstrap-inspection-request-process-outsourcing-responsibility(.test)；system/index.ts 清理导出
+- 设置页：工序表格新增"责任部门"列（内联下拉，部门树展平；复用备份分支 e4d05970 的实现）；前端 API 类型 + i18n（responsibleDept/responsibleDeptPlaceholder）
+- 检验记录：确认继承链路已存在（buildInspectionRecordPayloadCore 全量带出报检单责任），无需改动
+- 测试：create-responsibility 9/9（工序带出/客户端部门/未配置报错）、close-responsibility 22/22（快照继承/客户端部门/并发 CAS）、close.service 34/34（hydrate 覆盖）、process-master 18/18、public-query fixture 补字段
+
+**验证结果：**
+- 真库端到端：创建进货报检单（不传部门）→ 工序自动带出采购部 ✅；关闭 FAIL（外部责任不传部门）→ 生成 NC-26KJ-052，不再报"责任部门不能为空" ✅；报检单/不合格项责任逐字段一致 PASS ✅；未配置工序创建时报"工序【辅材-生产】未配置责任部门，请联系管理员在报检设置中配置" ✅
+- 全量：后端 298 文件/2686 用例（18:29 干净全过；并发负载下 4 文件 9 例 5s 超时为既有 flaky，单跑 24/24 通过）；前端 65/343；qms-arch 0 violations；vue-tsc/eslint 干净；docs drift PASSED
+
+**commit:** 待补
+
+**遗留问题：**
+- 生产部署时需在设置页为各工序预配责任部门（或脚本回填）
+- 全量套件在高负载下动态 import 用例偶发 5s 超时（既有问题，非本次引入）
+
+---
+
 ### 2026-08-17 阶段：数据生命周期方案 B（归档 7/7 全覆盖 + 存量兜底推算）
 
 **执行内容：**

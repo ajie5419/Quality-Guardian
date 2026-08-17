@@ -158,6 +158,7 @@ export const ProcessMasterService = {
         name: true,
         sort: true,
         supplierSource: true,
+        responsibleDepartmentId: true,
       },
     });
   },
@@ -180,6 +181,7 @@ export const ProcessMasterService = {
         sort: true,
         status: true,
         supplierSource: true,
+        responsibleDepartmentId: true,
       },
     });
 
@@ -201,7 +203,7 @@ export const ProcessMasterService = {
       orderBy: [{ sort: 'asc' }, { process: { name: 'asc' } }],
       select: {
         category: true,
-        process: { select: { id: true, name: true, supplierSource: true } },
+        process: { select: { id: true, name: true, responsibleDepartmentId: true, supplierSource: true } },
       },
     });
 
@@ -209,6 +211,7 @@ export const ProcessMasterService = {
       category: item.category as InspectionRequestProcessCategory,
       processId: item.process.id,
       processName: item.process.name,
+      responsibleDepartmentId: item.process.responsibleDepartmentId,
       supplierSource: item.process.supplierSource,
     }));
   },
@@ -257,6 +260,9 @@ export const ProcessMasterService = {
         sort: input.sort ?? 0,
         status: 1,
         supplierSource: input.supplierSource,
+        ...(input.responsibleDepartmentId === undefined
+          ? {}
+          : { responsibleDepartmentId: input.responsibleDepartmentId }),
       };
       const process = existing
         ? await tx.processes.update({
@@ -269,6 +275,7 @@ export const ProcessMasterService = {
               sort: true,
               status: true,
               supplierSource: true,
+              responsibleDepartmentId: true,
             },
           })
         : await tx.processes.create({
@@ -280,6 +287,7 @@ export const ProcessMasterService = {
               sort: true,
               status: true,
               supplierSource: true,
+              responsibleDepartmentId: true,
             },
           });
       await configureProcessOptions(
@@ -315,11 +323,15 @@ export const ProcessMasterService = {
           ...(input.supplierSource === undefined
             ? {}
             : { supplierSource: input.supplierSource }),
+          ...(input.responsibleDepartmentId === undefined
+            ? {}
+            : { responsibleDepartmentId: input.responsibleDepartmentId }),
         },
         select: {
           code: true,
           id: true,
           name: true,
+          responsibleDepartmentId: true,
           sort: true,
           status: true,
           supplierSource: true,

@@ -457,6 +457,7 @@ model processes {
   name                      String                               @unique
   code                      String?
   supplierSource            String                               @default("Supplier") @db.VarChar(20)
+  responsibleDepartmentId String?                              // 工序默认责任部门（2026-08-17 工序责任映射）
   inspectionRequestCategory String                               @default("PROCESS") @db.VarChar(20)
   sort                      Int                                  @default(0)
   status                    Int                                  @default(1)

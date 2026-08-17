@@ -21,6 +21,7 @@ export const processMasterCreateSchema = z.object({
   name: processNameSchema,
   sort: processSortSchema,
   supplierSource: processSupplierSourceSchema,
+  responsibleDepartmentId: z.string().trim().min(1).nullable().optional(),
 });
 
 export const processMasterUpdateSchema = z
@@ -30,6 +31,7 @@ export const processMasterUpdateSchema = z
     sort: processSortSchema,
     status: z.union([z.literal(0), z.literal(1)]).optional(),
     supplierSource: processSupplierSourceSchema.optional(),
+    responsibleDepartmentId: z.string().trim().min(1).nullable().optional(),
   })
   .refine(
     (input) =>
@@ -37,7 +39,8 @@ export const processMasterUpdateSchema = z
       input.name !== undefined ||
       input.sort !== undefined ||
       input.status !== undefined ||
-      input.supplierSource !== undefined,
+      input.supplierSource !== undefined ||
+      input.responsibleDepartmentId !== undefined,
     { message: 'At least one field must be provided' },
   );
 

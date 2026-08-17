@@ -5,11 +5,11 @@
 ## 硬数据（自动生成，勿手改）
 
 <!-- docs:sync-start -->
-- 最后同步时间: 2026-08-17 15:30
+- 最后同步时间: 2026-08-17 18:36
 - 版本: 0.27.0
 - 后端模块数: 34
-- 模块 TS 文件数: 687
-- 后端测试文件数: 301
+- 模块 TS 文件数: 683
+- 后端测试文件数: 298
 <!-- docs:sync-end -->
 
 ## 当前进度
@@ -26,6 +26,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-17 报检责任落库链路修复（工序责任部门 + 快照继承）：processes 恢复 responsibleDepartmentId（迁移 20260817160000，本地 DB 列与迁移记录已在，直接恢复文件）；创建报检单外部责任（进货/外协）前端不传部门 → 后端从工序主数据自动带出落库，未配置则在创建时提示"请联系管理员在报检设置中配置"（不再拖到关闭才报"责任部门不能为空"）；关闭链路删除 system_settings 服务端解析（删 4 个死代码文件：default service/setting service/bootstrap 脚本及其测试），提交缺部门时继承报检单快照（resolveSubmittedCloseResponsibility + hydrateOutsourcingLinkedIssueResponsibility）；检验记录继承链路确认已存在（buildInspectionRecordPayloadCore 全量带出责任）；设置页工序表格新增"责任部门"列（管理员维护，内联下拉）。真库验证：创建（外购件→采购部）→ 关闭 FAIL → NC-26KJ-052，报检单/不合格项责任逐字段一致 PASS；未配置工序创建时报错提示正确。
 - 2026-08-17 指标治理阶段4 落地（收官）：拆 inspection-reporting.service.ts（428→287 行）——3 个跨域函数经数据源核查实为检验域数据，拆至 inspection-score-data.service.ts，转发面与消费者零改动；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段3 落地：检验员在办量排行收敛——inspection 新增 getInspectorActiveTaskCounts（独立文件），user.service 动态 import 调用统一出口（顶层 import 会触发 inspection→user 模块加载循环）；quality-loss-trend 经核实为工作台在用（非死端点）保留；全量 2686 用例、qms-arch 0 violations。
 - 2026-08-17 指标治理阶段2 落地：质量损失三源聚合收敛——getTrendData 改查 quality_loss_index 物化表（四源口径写入时统一 isClaim||amount>0），删除 3 模块 12 个同构直查函数 + 转发链（此前仅 getTrendData 消费）；metrics-registry 42→41（M-D07 并入 M-B03）；全量 2686 用例通过，qms-arch 0 violations。

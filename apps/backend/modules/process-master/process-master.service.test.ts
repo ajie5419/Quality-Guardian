@@ -1,6 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
+import { processMasterUpdateSchema } from './process-master.schema';
+
 import { ProcessMasterService } from './process-master.service';
 
 vi.mock('~/utils/prisma', () => {
@@ -69,6 +71,7 @@ describe('process master service', () => {
         name: true,
         sort: true,
         supplierSource: true,
+        responsibleDepartmentId: true,
       },
     });
   });
@@ -189,6 +192,98 @@ describe('process master service', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           supplierSource: 'Outsourcing',
+        }),
+      }),
+    );
+  });
+
+  it('persists the responsible department when creating a process', async () => {
+    vi.mocked(prisma.processes.findUnique).mockResolvedValue(null);
+    vi.mocked(prisma.processes.create).mockResolvedValue({
+      code: null,
+      id: 'process-3',
+      name: '外购件',
+      responsibleDepartmentId: 'dept-1',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Supplier',
+    } as never);
+
+    await ProcessMasterService.create({
+      categories: ['PROCESS'],
+      name: '外购件',
+      responsibleDepartmentId: 'dept-1',
+      sort: 1,
+      supplierSource: 'Supplier',
+    });
+
+    expect(prisma.processes.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibleDepartmentId: 'dept-1',
+        }),
+      }),
+    );
+  });
+
+  it('updates the responsible department independently of other fields', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+    } as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: null,
+      id: 'process-1',
+      name: '外购件',
+      responsibleDepartmentId: 'dept-2',
+      sort: 1,
+      status: 1,
+      supplierSource: 'Supplier',
+    } as never);
+
+    await ProcessMasterService.update('process-1', {
+      responsibleDepartmentId: 'dept-2',
+    });
+
+    expect(prisma.processes.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibleDepartmentId: 'dept-2',
+        }),
+      }),
+    );
+  });
+
+  it('accepts a department-only update and rejects an empty update payload', () => {
+    expect(
+      processMasterUpdateSchema.parse({ responsibleDepartmentId: 'dept-2' }),
+    ).toMatchObject({ responsibleDepartmentId: 'dept-2' });
+    expect(
+      processMasterUpdateSchema.safeParse({}).success,
+    ).toBe(false);
+  });
+
+  it('clears the responsible department when null is provided', async () => {
+    vi.mocked(prisma.processes.findFirst).mockResolvedValue({
+      id: 'process-1',
+    } as never);
+    vi.mocked(prisma.processes.update).mockResolvedValue({
+      code: null,
+      id: 'process-1',
+      name: '外购件',
+      responsibleDepartmentId: null,
+      sort: 1,
+      status: 1,
+      supplierSource: 'Supplier',
+    } as never);
+
+    await ProcessMasterService.update('process-1', {
+      responsibleDepartmentId: null,
+    });
+
+    expect(prisma.processes.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          responsibleDepartmentId: null,
         }),
       }),
     );
