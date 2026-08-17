@@ -136,7 +136,7 @@ apps/backend/
 - [ ] 通过发布流程部署 TEAM identity migrations，执行有序 reconciliation/category backfill，并核对生产报检排行总数与 unresolved 审计
 - [ ] Deliver the process identity bootstrap and inspection-request option migration through the release workflow, then verify production counts without manual database edits
 - [ ] 通过发布流程部署质量分类 migration 和有序维护脚本，核对三套初始分类、历史回填数量及 unresolved 审计
-- [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
+- [x] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制（2026-08-17 核实闭环：event-bus.ts 已于 d4015f43 删除，售后→供应商评分改走 MetricRefreshQueue 持久化队列；报检任务创建用 Redis pub/sub 跨实例广播 + SSE）
 
 ## 基线数据（用于异常检测）
 

@@ -26,6 +26,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-17 待办核实闭环：EventEmitter 替换项标记完成（event-bus.ts 已于 d4015f43 删除；售后→供应商评分走 MetricRefreshQueue 持久化队列，报检创建走 Redis pub/sub 跨实例广播 + SSE；全仓库零残留，历史遗留清单清理）。
 - 2026-08-17 数据契约自动化收官：命名规则检测落地（B-N1 Boolean is/has 前缀、B-N2 DateTime At 后缀+语义时间例外、B-N3 字段 camelCase；scripts/check-field-naming.mjs 挂入 check:qms-arch，存量 13 处入 baseline 新增即拦截；--changed 模式仅 schema 变更时检查）；顺带修复 B-AUTH2 门禁脚本路径（$ROOT_DIR→$SCRIPT_DIR，修复 fixture 测试 3 个既有失败）；脚本测试 11/11 通过。
 - 2026-08-17 业务决策三项：**① 数据范围隔离暂不实施**（代码已就绪，随时可按手册开启）；**② 审批流引擎暂不实施**（需求明确后再启动）；**③ Ai/Reports/ITP 菜单按钮等生产部署回填**（随部署窗口处理）。决策已记录于 PROJECT_STATE 待办 / audit-action-plan / permission-consistency-report / permission-module。
 - 2026-08-17 权限模块文档成文：docs/permission-module.md（三层模型/权限码字典/授权组件/门禁/数据范围开启手册/缓存/token/运维脚本/排查表/已知边界），PROJECT_GUIDE 文档地图收录。
@@ -69,7 +70,7 @@
 - [ ] 完成 supplier identity wave 生产回填与健康检查（此前 17 条 PROCESS supplier identity 被错误绕过）
 - [ ] 使用已登录业务账号验收秦皇岛吉兴机械制造供应商画像的 7 月 8 日数据
 - [ ] 治理售后反馈部门、检验归档、BOM 项目和文档项目剩余的 18 条缺失身份
-- [ ] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制
+- [x] 将单进程 EventEmitter 替换为可持久化、跨实例、可重试的事件机制（2026-08-17 核实：event-bus.ts 已删，MetricRefreshQueue 持久化队列 + Redis pub/sub 跨实例广播）
 - [x] 上传文件类型可配置化（匿名上传白名单收紧，默认纯图片，可切图片+PDF）
 - [ ] 其他待办详见 PROGRESS.md 待办段
 

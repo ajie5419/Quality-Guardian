@@ -25,6 +25,19 @@
 
 ## 执行记录
 
+### 2026-08-17 阶段：待办核实——EventEmitter 替换项闭环
+
+**执行内容：**
+- 全仓库核实：utils/event-bus.ts（单进程 EventEmitter）已于 d4015f43（2026-07-29，make supplier score refresh durable）删除，零残留引用
+- 现状：售后→供应商评分刷新走 MetricRefreshQueue 持久化队列（可重试）；报检任务创建走 Redis pub/sub 跨实例广播 + SSE 推送；Redis pub/sub 不持久化属实时推送场景，业务副作用均有队列/cron 双保险
+- PROGRESS.md:139 + PROJECT_STATE 待办标记完成（附证据）
+
+**验证结果：**
+- grep EventEmitter/event-bus 全仓库零匹配（测试虚构引用除外）
+
+**遗留问题：**
+- 无（实时推送通道本身不承诺回放，属设计边界非缺陷）
+
 ### 2026-08-17 阶段：数据契约自动化收官（命名规则检测 B-N1/B-N2/B-N3）
 
 **执行内容：**
