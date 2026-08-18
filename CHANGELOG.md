@@ -37,7 +37,7 @@
 - 真库：scope=pending(13)/abnormal(13)/my-inspection(5)/my-report(1，vben 新建 IR-20260818-0002)/匿名公开状态（IR-20260817-0013 最小字段）全部通过
 - vue-tsc/eslint 干净；qms-arch 0 violations；docs drift PASSED
 
-**commit:** 待补
+**commit:** `25187fde` feat(inspection): role-based request list scopes and entry "my reports" tab
 
 **遗留问题：**
 - 移动端报检入口暂未加"我的报检"（如需后续补）
