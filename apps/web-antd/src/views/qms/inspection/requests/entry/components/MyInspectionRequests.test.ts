@@ -105,6 +105,26 @@ describe('myInspectionRequests', () => {
     expect(wrapper.text()).toContain('已派单');
   });
 
+  it('still shows local receipts when the server scope fails', async () => {
+    mocks.accessToken.mockReturnValue('token-1');
+    mocks.getInspectionRequests.mockRejectedValue(new Error('boom'));
+    seedReceipts([
+      {
+        partName: '部件C',
+        processName: '外购件',
+        requestNo: 'IR-20260818-0003',
+        submittedAt: '2026-08-18T04:00:00.000Z',
+        workOrderNumber: 'WO-3',
+      },
+    ]);
+
+    const wrapper = mount(MyInspectionRequests);
+    await flushPromises();
+
+    expect(wrapper.text()).toContain('IR-20260818-0003');
+    expect(wrapper.text()).toContain('部件C');
+  });
+
   it('shows the empty state without receipts', async () => {
     const wrapper = mount(MyInspectionRequests);
     await flushPromises();

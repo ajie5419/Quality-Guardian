@@ -76,7 +76,11 @@ async function buildRequestListScopeWhere(
       return { status: 'CLOSED' };
     }
     case 'dispatched': {
-      return { status: { in: ['DISPATCHED', 'INSPECTING'] } };
+      // 待检验：已派未检或检验中且无未闭环 NC；不合格单只在 abnormal 视图中出现
+      return {
+        status: { in: ['DISPATCHED', 'INSPECTING'] },
+        OR: [{ linkedIssueId: null }, { linkedIssueStatus: { not: 'OPEN' } }],
+      };
     }
     case 'my-inspection': {
       const currentUserId = await resolveInspectionRequestCurrentUserId(

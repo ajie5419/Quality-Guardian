@@ -5,7 +5,7 @@ export const inspectionRequestCheckResultOptions = [
 
 export const inspectionRequestViewOptions = [
   { label: '待派单', value: 'pending' },
-  { label: '已派单', value: 'dispatched' },
+  { label: '待检验', value: 'dispatched' },
   { label: '已完成单', value: 'closed' },
   { label: '不合格异常单', value: 'abnormal' },
   { label: '我的检验', value: 'my-inspection' },

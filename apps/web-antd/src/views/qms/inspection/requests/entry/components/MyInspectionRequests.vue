@@ -15,7 +15,6 @@ import {
   getInspectionRequests,
   getPublicInspectionRequestStatus,
 } from '#/api/qms/inspection-request';
-import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 import { readLocalInspectionReceipts } from './myInspectionReceipts';
 
@@ -41,7 +40,6 @@ const STATUS_META: Record<string, { color: string; text: string }> = {
   SUBMITTED: { color: 'blue', text: '待派单' },
 };
 
-const { handleApiError } = useErrorHandler();
 const accessStore = useAccessStore();
 
 const isLoggedIn = computed(() => Boolean(accessStore.accessToken));
@@ -91,7 +89,7 @@ async function reload() {
     if (receipts.length > 0) {
       const statuses = await Promise.all(
         receipts.map((receipt) =>
-          getPublicInspectionRequestStatus(receipt.requestNo),
+          getPublicInspectionRequestStatus(receipt.requestNo).catch(() => null),
         ),
       );
       localRows = receipts.map((receipt, index) =>
@@ -100,12 +98,16 @@ async function reload() {
     }
     let serverRows: MyRequestRow[] = [];
     if (isLoggedIn.value) {
-      const result = await getInspectionRequests({
-        page: 1,
-        pageSize: 20,
-        scope: 'my-report',
-      });
-      serverRows = (result.items || []).map((item) => requestToRow(item));
+      try {
+        const result = await getInspectionRequests({
+          page: 1,
+          pageSize: 20,
+          scope: 'my-report',
+        });
+        serverRows = (result.items || []).map((item) => requestToRow(item));
+      } catch {
+        // Server scope may fail (expired token etc.); local receipts still show.
+      }
     }
     const seen = new Set<string>();
     rows.value = [...serverRows, ...localRows].filter((row) => {
@@ -113,8 +115,6 @@ async function reload() {
       seen.add(row.requestNo);
       return true;
     });
-  } catch (error) {
-    handleApiError(error, 'Load My Inspection Requests');
   } finally {
     loading.value = false;
   }
