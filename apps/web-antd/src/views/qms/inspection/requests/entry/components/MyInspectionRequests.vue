@@ -128,13 +128,13 @@ function statusTag(status: null | string) {
 }
 
 const columns = [
-  { key: 'requestNo', title: '报检单号' },
-  { key: 'partName', title: '部件' },
-  { key: 'processName', title: '工序' },
-  { key: 'workOrderNumber', title: '工单号' },
-  { key: 'status', title: '状态' },
-  { key: 'inspectorName', title: '检验员' },
-  { key: 'dispatcherName', title: '派单员' },
+  { dataIndex: 'requestNo', key: 'requestNo', title: '报检单号' },
+  { dataIndex: 'partName', key: 'partName', title: '部件' },
+  { dataIndex: 'processName', key: 'processName', title: '工序' },
+  { dataIndex: 'workOrderNumber', key: 'workOrderNumber', title: '工单号' },
+  { dataIndex: 'status', key: 'status', title: '状态' },
+  { dataIndex: 'inspectorName', key: 'inspectorName', title: '检验员' },
+  { dataIndex: 'dispatcherName', key: 'dispatcherName', title: '派单员' },
 ];
 
 onMounted(reload);

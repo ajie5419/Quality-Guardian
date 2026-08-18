@@ -73,6 +73,8 @@ describe('myInspectionRequests', () => {
     );
     expect(wrapper.text()).toContain('IR-20260818-0001');
     expect(wrapper.text()).toContain('部件A');
+    expect(wrapper.text()).toContain('外购件');
+    expect(wrapper.text()).toContain('WO-1');
     expect(wrapper.text()).toContain('待派单');
   });
 
