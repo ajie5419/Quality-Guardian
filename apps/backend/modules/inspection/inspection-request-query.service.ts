@@ -61,19 +61,47 @@ function normalizeRequestListStatuses(value: unknown) {
     .filter(Boolean);
 }
 
+async function buildMyRelatedRequestWhere(
+  userinfo: UserSession,
+): Promise<Record<string, unknown>> {
+  const currentUserId = await resolveInspectionRequestCurrentUserId(
+    userinfo,
+    prisma,
+  );
+  if (!currentUserId) return { AND: [{ id: '__none__' }] };
+  return {
+    AND: [
+      { OR: [{ inspectorId: currentUserId }, { reporterId: currentUserId }] },
+    ],
+  };
+}
+
 async function buildRequestListScopeWhere(
   userinfo: UserSession,
   query: ReturnType<typeof normalizeRequestListQuery>,
+  options: { isDispatchHolder: boolean },
 ): Promise<Record<string, unknown>> {
   switch (query.scope) {
     case 'abnormal': {
-      return {
+      const base = {
         linkedIssueId: { not: null },
         linkedIssueStatus: 'OPEN',
       };
+      return options.isDispatchHolder
+        ? base
+        : {
+            ...base,
+            ...(await buildMyRelatedRequestWhere(userinfo)),
+          };
     }
     case 'closed': {
-      return { status: 'CLOSED' };
+      const base = { status: 'CLOSED' };
+      return options.isDispatchHolder
+        ? base
+        : {
+            ...base,
+            ...(await buildMyRelatedRequestWhere(userinfo)),
+          };
     }
     case 'dispatched': {
       // 待检验：已派未检或检验中且无未闭环 NC；不合格单只在 abnormal 视图中出现
@@ -112,16 +140,23 @@ async function buildRequestListScopeWhere(
 async function buildRequestListWhere(
   userinfo: UserSession,
   query: ReturnType<typeof normalizeRequestListQuery>,
+  options: { isDispatchHolder: boolean },
 ) {
   const currentUserId = query.mine
     ? await resolveInspectionRequestCurrentUserId(userinfo, prisma)
     : null;
-  const scopeWhere = await buildRequestListScopeWhere(userinfo, query);
+  const scopeWhere = await buildRequestListScopeWhere(userinfo, query, options);
   const statusWhere = query.scope ? {} : getRequestListStatusWhere(query);
+  // 无派单权限的用户只能看与自己相关的数据（自由搜索/无 scope 查询同样受限）
+  const myRelatedWhere =
+    !options.isDispatchHolder && !query.scope
+      ? await buildMyRelatedRequestWhere(userinfo)
+      : {};
 
   return {
     isDeleted: false,
     ...scopeWhere,
+    ...myRelatedWhere,
     ...(query.scope
       ? {}
       : {
@@ -349,20 +384,26 @@ export const InspectionRequestQueryService = {
     rawQuery: Record<string, unknown>,
   ) {
     const query = normalizeRequestListQuery(rawQuery);
-    if (query.scope === 'pending' || query.scope === 'dispatched') {
-      const userId = String(userinfo?.userId ?? userinfo?.id ?? '');
-      const codes = userId
-        ? await RbacRoleService.getUserPermissionCodes(userId)
-        : [];
-      if (!codes.includes(INSPECTION_REQUEST_PERMISSION_CODES.DISPATCH)) {
-        throw new BusinessError(
-          ErrorCode.FORBIDDEN,
-          '无权限查看待派单或已派单',
-          403,
-        );
-      }
+    const userId = String(userinfo?.userId ?? userinfo?.id ?? '');
+    const codes = userId
+      ? await RbacRoleService.getUserPermissionCodes(userId)
+      : [];
+    const isDispatchHolder = codes.includes(
+      INSPECTION_REQUEST_PERMISSION_CODES.DISPATCH,
+    );
+    if (
+      !isDispatchHolder &&
+      (query.scope === 'pending' || query.scope === 'dispatched')
+    ) {
+      throw new BusinessError(
+        ErrorCode.FORBIDDEN,
+        '无权限查看待派单或待检验',
+        403,
+      );
     }
-    const where = await buildRequestListWhere(userinfo, query);
+    const where = await buildRequestListWhere(userinfo, query, {
+      isDispatchHolder,
+    });
     const runQuery = (includeWorkOrders: boolean) =>
       Promise.all([
         prisma.qms_inspection_requests.findMany({

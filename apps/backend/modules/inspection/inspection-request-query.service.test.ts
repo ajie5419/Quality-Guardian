@@ -47,6 +47,7 @@ vi.mock('~/utils/prisma', () => ({
 describe('inspection request query service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    getUserPermissionCodes.mockResolvedValue([]);
     resolveSuppliersByTeamIds.mockResolvedValue(new Map());
     resolveActiveDepartmentSourceIdsByTeamIds.mockResolvedValue(new Map());
     findActiveByIdsOrNames.mockResolvedValue([]);
@@ -432,6 +433,54 @@ describe('inspection request query service', () => {
         }),
       }),
     );
+  });
+
+  it('restricts closed scope to my related requests without the dispatch permission', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'user-1',
+    } as never);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1', userId: 'user-1' } as any,
+      { scope: 'closed' },
+    );
+
+    const called = vi.mocked(prisma.qms_inspection_requests.findMany).mock
+      .calls[0]?.[0] as { where: { AND?: unknown[] } };
+    expect(called.where).toMatchObject({ status: 'CLOSED' });
+    expect(called.where.AND).toEqual([
+      {
+        OR: [{ inspectorId: 'user-1' }, { reporterId: 'user-1' }],
+      },
+    ]);
+  });
+
+  it('restricts abnormal scope to my related requests without the dispatch permission', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'user-1',
+    } as never);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1', userId: 'user-1' } as any,
+      { scope: 'abnormal' },
+    );
+
+    const called = vi.mocked(prisma.qms_inspection_requests.findMany).mock
+      .calls[0]?.[0] as { where: { AND?: unknown[] } };
+    expect(called.where).toMatchObject({
+      linkedIssueStatus: 'OPEN',
+    });
+    expect(called.where.AND).toEqual([
+      {
+        OR: [{ inspectorId: 'user-1' }, { reporterId: 'user-1' }],
+      },
+    ]);
   });
 
   it('filters abnormal scope to requests with an open linked NC', async () => {
