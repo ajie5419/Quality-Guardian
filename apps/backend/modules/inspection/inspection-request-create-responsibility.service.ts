@@ -72,11 +72,11 @@ export async function resolveV2RequestResponsibility(
     payload.category === 'INCOMING' ||
     responsibilityType ===
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
-  const responsibleDepartmentId = submittedDepartmentId
-    ? submittedDepartmentId
-    : needsProcessDepartment
+  const responsibleDepartmentId =
+    submittedDepartmentId ||
+    (needsProcessDepartment
       ? await resolveProcessResponsibleDepartmentId(payload.processId, tx)
-      : payload.v2Responsibility.responsibleDepartmentId;
+      : payload.v2Responsibility.responsibleDepartmentId);
   const responsibility = await resolveInspectionIssueResponsibility(
     { ...payload.v2Responsibility, responsibleDepartmentId },
     tx,
@@ -138,7 +138,9 @@ async function resolveProcessResponsibleDepartmentId(
     const displayName = process?.name || processId;
     throw new BusinessError(
       'VALIDATION',
-      '工序【' + displayName + '】未配置责任部门，请联系管理员在报检设置中配置',
+      `工序【${
+        displayName
+      }】未配置责任部门，请管理员运行 maintenance:process-responsible-departments 配置后重试`,
       400,
     );
   }

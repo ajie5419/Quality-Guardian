@@ -78,7 +78,7 @@
 **更正（2026-08-17 追加）：** 24a39d5e 误把 e4d05970 的设置页"工序表格责任部门列"（含 process-master CRUD 支持、前端 API 类型、i18n）一并捡回——违反用户"只传数据、不显示"的决策（增加操作步骤，用户已明确反对并再次要求回退）。已撤销：设置页 index.vue / inspection-settings.ts / sys.json ×2 / process-master schema+service+test / inspection-public-query fixture 全部恢复 8b3090a4 版本。**保留**：后端创建链路（工序静默带出部门）、关闭链路（快照继承）、死代码删除、迁移、schema 字段。工序责任部门配置改为 SQL/脚本维护（本地已预配 4 工序），前端零改动。
 
 **遗留问题：**
-- 生产部署时需在设置页为各工序预配责任部门（或脚本回填）
+- 生产部署时核对部门路径后运行 maintenance:process-responsible-departments 回填脚本
 - 全量套件在高负载下动态 import 用例偶发 5s 超时（既有问题，非本次引入）
 
 ---
