@@ -1,3 +1,5 @@
+import { WELDER_PERMISSION_CODES } from '@qgs/shared';
+import { authorizeWrite } from '~/modules/rbac';
 import { welderCreateBodySchema } from '~/modules/welder/welder.schema';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
@@ -11,6 +13,7 @@ import {
 export default defineValidatedHandler(
   welderCreateBodySchema,
   async (event, body) => {
+    await authorizeWrite(event, WELDER_PERMISSION_CODES.CREATE);
     try {
       return useResponseSuccess(await WelderService.create(body));
     } catch (error: unknown) {

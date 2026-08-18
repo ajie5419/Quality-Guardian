@@ -1,5 +1,7 @@
+import { INSPECTION_REQUEST_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
 import { InspectionRequestDeleteService } from '~/modules/inspection/inspection-request-delete.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { BusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
@@ -13,6 +15,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, INSPECTION_REQUEST_PERMISSION_CODES.DELETE);
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', 'ID required');

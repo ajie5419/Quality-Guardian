@@ -1,5 +1,7 @@
+import { AI_GENERATION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { callAi } from '~/modules/ai/ai';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import {
   internalServerErrorResponse,
@@ -7,17 +9,14 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, AI_GENERATION_PERMISSION_CODES.GENERATE);
   const body = await readBody(event);
   const { statistics, year } = body;
 
   const systemPrompt = `你是一位制造企业的质量总监 (Quality Director)。
 请根据提供的质量聚合统计数据，撰写一份简短、专业且具备行动导向的“质量月度洞察简报”。
 
-输出要求：
-1. 使用 Markdown 格式。
-2. 包含：现状总结（针对 Pareto 图）、风险预警（针对高频部件）、管理建议。
-3. 语气要严谨且具有洞察力。
-4. 长度在 300 字以内。`;
+输出要求：1) 使用 Markdown 格式；2) 包含现状总结（Pareto）、风险预警（高频部件）、管理建议；3) 语气严谨有洞察力；4) 300 字以内。`;
 
   const userPrompt = `年度：${year} 年
 统计数据概览：

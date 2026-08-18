@@ -1,5 +1,8 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { RbacRoleService } from '~/modules/rbac/rbac-role.service';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  clearPermissionCodesCache,
+  RbacRoleService,
+} from '~/modules/rbac/rbac-role.service';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
 
@@ -22,6 +25,7 @@ vi.mock('~/utils/prisma', () => {
     roles: {
       count: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
     },
@@ -67,6 +71,7 @@ vi.mock('@paralleldrive/cuid2', () => ({
 
 describe('rbacRoleService', () => {
   beforeEach(() => {
+    clearPermissionCodesCache();
     vi.clearAllMocks();
     vi.mocked(prisma.menus.findMany).mockResolvedValue([
       {
@@ -582,5 +587,81 @@ describe('rbacRoleService', () => {
 
       expect(prisma.data_permission_policies.upsert).toHaveBeenCalled();
     });
+  });
+});
+
+describe('rbacRoleService permission code cache', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    clearPermissionCodesCache();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('caches permission codes within the TTL window', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'user-1',
+      roleId: 'role-1',
+      roles: { id: 'role-1', name: 'user' },
+    } as never);
+    vi.mocked(prisma.roles.findFirst).mockResolvedValue({
+      id: 'role-1',
+      name: 'user',
+    } as never);
+    vi.mocked(prisma.rbac_role_permissions.findMany).mockResolvedValue([
+      { permission: { code: 'QMS:Test:A' } },
+    ] as never);
+
+    const first = await RbacRoleService.getUserPermissionCodes('user-1');
+    const second = await RbacRoleService.getUserPermissionCodes('user-1');
+
+    expect(first).toEqual(['QMS:Test:A']);
+    expect(second).toEqual(['QMS:Test:A']);
+    expect(prisma.rbac_role_permissions.findMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-fetches after the TTL expires', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'user-1',
+      roleId: 'role-1',
+      roles: { id: 'role-1', name: 'user' },
+    } as never);
+    vi.mocked(prisma.roles.findFirst).mockResolvedValue({
+      id: 'role-1',
+      name: 'user',
+    } as never);
+    vi.mocked(prisma.rbac_role_permissions.findMany).mockResolvedValue([
+      { permission: { code: 'QMS:Test:A' } },
+    ] as never);
+
+    await RbacRoleService.getUserPermissionCodes('user-1');
+    vi.advanceTimersByTime(61_000);
+    await RbacRoleService.getUserPermissionCodes('user-1');
+
+    expect(prisma.rbac_role_permissions.findMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('invalidates the cache on permission persistence', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'user-1',
+      roleId: 'role-1',
+      roles: { id: 'role-1', name: 'user' },
+    } as never);
+    vi.mocked(prisma.roles.findFirst).mockResolvedValue({
+      id: 'role-1',
+      name: 'user',
+    } as never);
+    vi.mocked(prisma.rbac_role_permissions.findMany).mockResolvedValue([
+      { permission: { code: 'QMS:Test:A' } },
+    ] as never);
+
+    await RbacRoleService.getUserPermissionCodes('user-1');
+    clearPermissionCodesCache();
+    await RbacRoleService.getUserPermissionCodes('user-1');
+
+    expect(prisma.rbac_role_permissions.findMany).toHaveBeenCalledTimes(2);
   });
 });

@@ -3,6 +3,7 @@ import {
   supplierIdentityInputSchema,
   SupplierIdentityService,
 } from '~/modules/supplier-identity';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
@@ -15,6 +16,8 @@ import {
 export default defineValidatedHandler(
   supplierIdentityInputSchema,
   async (event, body) => {
+    const adminCheck = requireSystemAdmin(event, getCurrentUser(event));
+    if (adminCheck) return adminCheck;
     try {
       SupplierIdentityAccessService.ensureAdmin(getCurrentUser(event));
       return useResponseSuccess(await SupplierIdentityService.create(body));

@@ -8,6 +8,18 @@ ROOT_DIR="${QMS_ARCH_ROOT_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 QMS_VIEWS_DIR="$ROOT_DIR/apps/web-antd/src/views/qms"
 BACKEND_DIR="$ROOT_DIR/apps/backend"
 SOURCE_RULE_CHECKER="$SCRIPT_DIR/check-qms-source-rules.mjs"
+
+# Locate node: PATH first, then common install roots (macOS / Linux).
+NODE_BIN="$(command -v node 2>/dev/null || true)"
+if [[ -z "$NODE_BIN" ]]; then
+  for candidate in /usr/local/bin/node /opt/homebrew/bin/node "$HOME/.local/share/pnpm/node"; do
+    if [[ -x "$candidate" ]]; then NODE_BIN="$candidate"; break; fi
+  done
+fi
+if [[ -z "$NODE_BIN" ]]; then
+  echo "error: node not found" >&2
+  exit 1
+fi
 MAX_INDEX_LINES=500
 BASELINE_FILE="${QMS_ARCH_BASELINE:-$ROOT_DIR/scripts/qms-architecture-baseline.txt}"
 SCOPE="${QMS_ARCH_SCOPE:-changed}"
@@ -38,6 +50,7 @@ Usage: check-qms-architecture.sh [--changed|--all]
 
 Rules:
   R1: no direct requestClient usage under apps/web-antd/src/views/qms
+  R2: no bare axios/fetch usage under apps/web-antd/src/views/qms
   R3: index.vue must not exceed the line threshold
   B-D1: backend legacy architecture directories must not exist
   B-R1: api/ files must not import prisma directly
@@ -55,6 +68,8 @@ Rules:
   B-M2: conditions must not branch on Chinese string literals
   B-E1: empty catch blocks are forbidden
   B-E2: catch blocks must record errors with an approved logger
+  B-EC: BusinessError codes must be members of the shared ErrorCode dictionary
+  B-GF: newly added cross-table name columns must be registered as governed fields
   B-ID1: selector value keys must use canonical IDs, not names
   B-ID2: supplier-related change events must pair identity names with IDs
   B-ID3: controlled supplier writes must pair supplierName with supplierId
@@ -69,6 +84,12 @@ Rules:
   B-TEST1: backend tests must not live in centralized __tests__/tests/test directories
   B-TEST2: backend test files must have a sibling source file (orphan tests forbidden)
   B-TEST3: tests importing ~/utils/prisma must also vi.mock it
+  B-AUTH1: write endpoints (post/put/delete/patch) must declare authorization (authorizeWrite/requireSystemAdmin) unless public
+  B-AUTH2: frontend permission codes must be declared (shared enum or module menu authCode)
+  B-N1: Boolean scalar fields must be prefixed with is/has
+  B-N2: DateTime scalar fields must end with At or a documented semantic-time name
+  B-N3: scalar field names must be camelCase (no underscores)
+  B-MF: new aggregations (groupBy/aggregate/aggregate raw SQL) must be registered in docs/metrics-registry.md
 
 Modes:
   --changed  Check changed files only, including committed diff, staged changes,
@@ -294,6 +315,35 @@ check_r1() {
   grep_rule "R1" "Do not call requestClient directly from qms views." '\brequestClient[[:space:]]*\.' "${QMS_VIEW_TARGETS[@]}"
 }
 
+# R2: qms views must not use bare axios/fetch — go through #/api wrappers
+# (useRequest / request.ts) so auth, error handling and response shape stay
+# centralized. Historical bare usage is grandfathered via baseline (R2 lines).
+check_r2() {
+  (( ${#QMS_VIEW_TARGETS[@]} == 0 )) && return 0
+  local file=''
+  local repo_path=''
+  local line_no=''
+  local match_line=''
+  local seen=''
+
+  # Collect raw hits; each is "file:line:content".
+  while IFS= read -r hit; do
+    [[ -n "$hit" ]] || continue
+    file="${hit%%:*}"
+    rest="${hit#*:}"
+    line_no="${rest%%:*}"
+    repo_path="$(to_repo_path "$file")"
+
+    # baseline R2|path|line — grandfather specific historical lines.
+    if awk -F'|' -v p="$repo_path" -v l="$line_no" '$1=="R2" && $2==p && $3==l {found=1} END{exit !found}' "$BASELINE_FILE"; then
+      echo -e "${YELLOW}Baseline R2:${NC} $repo_path:$line_no (grandfathered)"
+      baseline_hits=$((baseline_hits + 1))
+      continue
+    fi
+    report_violation "R2" "$repo_path:$line_no" "Bare axios/fetch in qms views; use the #/api wrapper instead."
+  done < <(grep -nHE "(from[[:space:]]+['\"]axios['\"])|(axios\.(get|post|put|delete|patch))|\bfetch\(" "${QMS_VIEW_TARGETS[@]}" || true)
+}
+
 check_r3() {
   local index_file=''
   local lines=''
@@ -334,6 +384,49 @@ check_b_d1() {
       report_violation "B-D1" "$(to_repo_path "$dir"):1" "Legacy backend architecture directory must not exist."
     fi
   done
+}
+
+check_b_auth1() {
+  # Write endpoints must call authorizeWrite (or requireSystemAdmin).
+  # Public, auth, upload, telegram and webhook routes are exempt.
+  local file=''
+  local repo_path=''
+  local base_name=''
+
+  (( ${#API_TS_TARGETS[@]} == 0 )) && return 0
+  for file in "${API_TS_TARGETS[@]}"; do
+    base_name="$(basename "$file")"
+    case "$base_name" in
+      *.post.ts|*.put.ts|*.delete.ts|*.patch.ts) ;;
+      *) continue ;;
+    esac
+    repo_path="$(to_repo_path "$file")"
+    case "$repo_path" in
+      apps/backend/api/qms/public/*|apps/backend/api/auth/*|apps/backend/api/uploads/*|apps/backend/api/telegram/*|apps/backend/api/webhook/*|apps/backend/api/upload.ts|apps/backend/api/qms/upload.post.ts|apps/backend/api/system/log/client.post.ts|apps/backend/api/user/preferences/*)
+        continue
+        ;;
+    esac
+    if ! grep -qE 'authorizeWrite|requireSystemAdmin|assert[A-Z][A-Za-z]*Permission|ensurePermission' "$file"; then
+      baseline_limit=""
+      if baseline_limit="$(baseline_line_limit "B-AUTH1" "$repo_path")" && (( baseline_limit >= 1 )); then
+        echo -e "${YELLOW}Baseline B-AUTH1:${NC} $repo_path (write endpoint without auth declaration)"
+        baseline_hits=$((baseline_hits + 1))
+      else
+        report_violation "B-AUTH1" "$repo_path:1" "Write endpoint must declare authorization (authorizeWrite/requireSystemAdmin) or be public."
+      fi
+    fi
+  done
+}
+check_b_auth2() {
+  # Frontend permission codes must be declared; runs only in --all mode
+  # (repo-wide scan) because it needs the full source tree.
+  [[ "$SCOPE" != "all" ]] && return 0
+  local out=''
+  out="$("$NODE_BIN" "$SCRIPT_DIR/check-permission-code-declarations.mjs" 2>&1)"
+  local code=$?
+  if (( code != 0 )); then
+    report_violation "B-AUTH2" "scripts/check-permission-code-declarations.mjs:1" "$(echo "$out" | head -1)"
+  fi
 }
 
 check_b_r1() {
@@ -426,7 +519,7 @@ check_backend_source_rules() {
   if (( ${#REPO_IDENTITY_TARGETS[@]} > 0 )); then
     printf '%s\n' "${REPO_IDENTITY_TARGETS[@]}" >"$identity_files_file"
   fi
-  if ! node "$SOURCE_RULE_CHECKER" \
+  if ! "$NODE_BIN" "$SOURCE_RULE_CHECKER" \
     --root "$ROOT_DIR" \
     --baseline "$BASELINE_FILE" \
     --files-from "$files_file" \
@@ -501,6 +594,112 @@ check_b_map1() {
   done <"$changed_file"
 }
 
+# B-GF: newly added cross-table name columns must be registered in
+# master-data-fields.ts (the governed-fields registry). Only NEW columns are
+# checked (incremental), so legacy ungoverned columns are not flagged.
+# Ambiguous generic columns (name/category/type) and identity tables are
+# excluded; run the python helper and report its findings.
+check_b_gf() {
+  local helper="$SCRIPT_DIR/check-governed-fields.py"
+  [[ -f "$helper" ]] || return 0
+
+  local py_bin="$(command -v python3 || echo /usr/bin/python3)"
+  [[ -x "$py_bin" ]] || return 0
+
+  # Only meaningful in --changed mode (need a base ref to diff schema columns).
+  [[ "$SCOPE" == "all" ]] && return 0
+
+  local base_ref=''
+  base_ref="$(resolve_base_ref || true)"
+  if [[ -z "$base_ref" ]]; then
+    return 0
+  fi
+
+  # Diff the schema between base ref and working tree; feed the added column
+  # lines to the helper, which cross-checks against the governance registry.
+  local added_schema=''
+  added_schema="$(git -C "$ROOT_DIR" diff "$base_ref" -- apps/backend/prisma/schema.prisma | grep -E '^\+' | grep -v '^+++' || true)"
+
+  [[ -n "$added_schema" ]] || return 0
+
+  local output=''
+  output="$(printf '%s\n' "$added_schema" | "$py_bin" "$helper" --root "$ROOT_DIR" 2>/dev/null || true)"
+  if [[ -n "$output" ]]; then
+    while IFS='|' read -r rule location message; do
+      [[ -n "$rule" && -n "$location" ]] || continue
+      report_violation "$rule" "$location" "$message"
+    done <<<"$output"
+  fi
+}
+
+# B-N1/B-N2/B-N3: prisma schema field naming rules (docs/data-contract.md §4).
+# Scalar columns must follow is/has (Boolean), At (DateTime) and camelCase
+# conventions; legacy violations are grandfathered via the baseline file.
+# The schema is a single source file, so in --changed mode we only run when
+# the schema itself changed; --all always runs the check.
+check_b_field_naming() {
+  local helper="$SCRIPT_DIR/check-field-naming.mjs"
+  local schema="$ROOT_DIR/apps/backend/prisma/schema.prisma"
+  [[ -f "$schema" ]] || return 0
+
+  if [[ "$SCOPE" == "changed" ]]; then
+    local changed_file="$TMP_DIR/changed-files.txt"
+    [[ -f "$changed_file" ]] || collect_changed_files "$changed_file"
+    if ! grep -qx 'apps/backend/prisma/schema.prisma' "$changed_file"; then
+      return 0
+    fi
+  fi
+
+  local output_file="$TMP_DIR/field-naming-output.txt"
+  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" >"$output_file"; then
+    echo -e "${RED}Field naming rule checker failed.${NC}"
+    exit 2
+  fi
+
+  while IFS=$'\t' read -r kind rule location message; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" == "BASELINE" ]]; then
+      echo -e "${YELLOW}Baseline $rule:${NC} $location ($message)"
+      baseline_hits=$((baseline_hits + 1))
+    elif [[ "$kind" == "VIOLATION" ]]; then
+      report_violation "$rule" "$location" "$message"
+    fi
+  done <"$output_file"
+}
+
+# B-MF: metric registration gate (docs/metrics-registry.md + utils/metrics-registry.ts).
+# New aggregation sites (groupBy / aggregate / aggregate raw SQL) in modules/ and
+# utils/ must be registered as a metric implementation point or exempt entry;
+# doc/code id parity is verified by the helper as well.
+check_b_mf() {
+  local helper="$SCRIPT_DIR/check-metric-registration.mjs"
+  local output_file="$TMP_DIR/metric-registration-output.txt"
+  local files_file="$TMP_DIR/metric-files.txt"
+
+  if [[ "$SCOPE" == "all" ]]; then
+    git -C "$ROOT_DIR" ls-files 'apps/backend/modules/**/*.ts' 'apps/backend/utils/**/*.ts' | grep -v '.test.ts' >"$files_file" || true
+  else
+    local changed_file="$TMP_DIR/changed-files.txt"
+    [[ -f "$changed_file" ]] || collect_changed_files "$changed_file"
+    grep -E '^apps/backend/(modules|utils)/.*\.ts' "$changed_file" | grep -v '.test.ts' >"$files_file" || true
+  fi
+  [[ -s "$files_file" ]] || return 0
+
+  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" --files-from "$files_file" >"$output_file"; then
+    echo -e "${RED}Metric registration rule checker failed.${NC}"
+    exit 2
+  fi
+
+  while read -r kind rule location message; do
+    [[ -n "$kind" ]] || continue
+    if [[ "$kind" == "BASELINE" ]]; then
+      echo -e "${YELLOW}Baseline $rule:${NC} $location ($message)"
+      baseline_hits=$((baseline_hits + 1))
+    elif [[ "$kind" == "VIOLATION" ]]; then
+      report_violation "$rule" "$location" "$message"
+    fi
+  done <"$output_file"
+}
 # B-TEST1: backend test files must not live in centralized __tests__/tests/test directories.
 check_b_test1() {
   (( ${#BACKEND_TEST_TARGETS[@]} == 0 )) && return 0
@@ -562,6 +761,7 @@ echo "target files: qms=${#QMS_VIEW_TARGETS[@]} api=${#API_TS_TARGETS[@]} module
 echo
 
 check_r1
+check_r2
 check_r3
 check_b_d1
 check_b_r1
@@ -575,9 +775,14 @@ check_backend_source_rules
 check_b_sec1
 check_b_id7
 check_b_map1
+check_b_gf
+check_b_field_naming
+check_b_mf
 check_b_test1
 check_b_test2
 check_b_test3
+check_b_auth1
+check_b_auth2
 
 echo
 if (( violations > 0 )); then

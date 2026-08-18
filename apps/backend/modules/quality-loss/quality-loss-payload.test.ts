@@ -73,6 +73,8 @@ describe('quality-loss payload utils', () => {
       id: 'cuid-1',
       isDeleted: false,
       lossId: 'QL-2026-ABC123',
+      archivedAt: null,
+      retainUntil: null,
       occurDate: new Date('2026-01-02T00:00:00.000Z'),
       partId: null,
       partName: null,

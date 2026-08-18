@@ -10,6 +10,7 @@ import {
   businessErrorResponse,
   isBusinessError,
 } from '~/utils/business-error';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -29,6 +30,9 @@ export default defineEventHandler(async (event) => {
 
 export const publicInspectionRequestCreateV2Handler = defineEventHandler(
   async (event) => {
+    // Optional identity: anonymous scans stay anonymous, signed-in callers
+    // (token attached by the web client) get their reporterId recorded.
+    const userinfo = verifyAccessToken(event);
     const body = inspectionRequestCreateV2BodySchema.parse(
       await readBody(event),
     );
@@ -42,7 +46,7 @@ export const publicInspectionRequestCreateV2Handler = defineEventHandler(
       return useResponseSuccess(
         await InspectionRequestCreateService.createRequest(
           event,
-          null,
+          userinfo,
           body,
           true,
           'V2',

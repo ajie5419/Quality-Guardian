@@ -1,4 +1,6 @@
+import { VEHICLE_COMMISSIONING_WRITE_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
+import { authorizeWrite } from '~/modules/rbac';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
@@ -10,6 +12,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, VEHICLE_COMMISSIONING_WRITE_CODES.DELETE);
   const userinfo = getCurrentUser(event);
   const id = getRequiredRouterParam(event, 'id', '缺少问题ID');
   if (typeof id !== 'string') return id;

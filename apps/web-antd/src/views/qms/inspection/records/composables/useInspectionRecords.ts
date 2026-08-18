@@ -1,6 +1,6 @@
 import type { QmsInspectionApi } from '#/api/qms/inspection';
 
-import { ref } from 'vue';
+import { computed, ref } from 'vue';
 
 import { message } from 'ant-design-vue';
 
@@ -8,6 +8,7 @@ import {
   createInspectionRecord,
   updateInspectionRecord,
 } from '#/api/qms/inspection';
+import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
 interface FormRefLike {
@@ -23,10 +24,13 @@ export function useInspectionRecords() {
   const { handleApiError } = useErrorHandler();
   const activeKey = ref('incoming');
   const currentYear = ref(new Date().getFullYear());
-  const yearOptions = [2024, 2025, 2026].map((y) => ({
-    label: `${y}年`,
-    value: y,
-  }));
+  const { years: availableYears } = useAvailableYears(['inspection-record']);
+  const yearOptions = computed(() =>
+    availableYears.value.map((y) => ({
+      label: `${y}年`,
+      value: y,
+    })),
+  );
 
   const gridRef = ref<GridRefLike>();
   const formRef = ref<FormRefLike>();

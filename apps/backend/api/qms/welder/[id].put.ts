@@ -1,3 +1,5 @@
+import { WELDER_PERMISSION_CODES } from '@qgs/shared';
+import { authorizeWrite } from '~/modules/rbac';
 import { welderUpdateBodySchema } from '~/modules/welder/welder.schema';
 import { WelderService } from '~/modules/welder/welder.service';
 import { logApiError } from '~/utils/api-logger';
@@ -11,6 +13,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 export default defineValidatedHandler(
   welderUpdateBodySchema,
   async (event, body) => {
+    await authorizeWrite(event, WELDER_PERMISSION_CODES.EDIT);
     const id = getRequiredRouterParam(event, 'id', '缺少焊工ID');
     if (typeof id !== 'string') {
       return id;

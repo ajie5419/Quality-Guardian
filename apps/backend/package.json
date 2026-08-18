@@ -29,6 +29,7 @@
     "maintenance:quality-classifications": "tsx scripts/backfill-quality-classifications.ts",
     "maintenance:inspection-issue-divisions": "tsx scripts/backfill-inspection-issue-divisions.ts",
     "maintenance:inspection-issue-responsibilities": "tsx scripts/backfill-inspection-issue-responsibilities.ts",
+    "maintenance:process-responsible-departments": "tsx scripts/backfill-process-responsible-department.ts",
     "maintenance:inspection-issue-responsibility-remediation": "tsx scripts/remediate-inspection-issue-responsibilities.ts",
     "maintenance:role-page-permissions": "tsx scripts/backfill-role-page-permissions.ts",
     "maintenance:work-order-confirm-permission": "tsx scripts/backfill-work-order-confirm-permission.ts",

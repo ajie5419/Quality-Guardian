@@ -3,6 +3,7 @@ import type { ModuleDeclaration } from '~/utils/module-types';
 import {
   AUDIT_TEMPLATES,
   INSPECTION_ISSUE_PERMISSION_CODES,
+  INSPECTION_RECORD_PERMISSION_CODES,
 } from '@qgs/shared';
 
 export const inspectionModule: ModuleDeclaration = {
@@ -87,6 +88,98 @@ export const inspectionModule: ModuleDeclaration = {
           name: 'QMSInspectionMaterialRequestsReject',
           order: 2,
           title: '驳回',
+        },
+      ],
+    },
+    {
+      key: 'outsourcing',
+      parentPath: '/qms',
+      path: '/qms/outsourcing',
+      name: 'QMSOutsourcing',
+      component: 'qms/outsourcing/index',
+      authCode: 'QMS:Outsourcing:List',
+      order: 21,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:delivery',
+        title: '外协管理',
+      },
+      buttons: [
+        {
+          authCode: 'QMS:Outsourcing:Create',
+          name: 'QMSOutsourcingCreate',
+          order: 1,
+          title: '新增',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Edit',
+          name: 'QMSOutsourcingEdit',
+          order: 2,
+          title: '编辑',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Delete',
+          name: 'QMSOutsourcingDelete',
+          order: 3,
+          title: '删除',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Export',
+          name: 'QMSOutsourcingExport',
+          order: 4,
+          title: '导出',
+        },
+        {
+          authCode: 'QMS:Outsourcing:Import',
+          name: 'QMSOutsourcingImport',
+          order: 5,
+          title: '导入',
+        },
+      ],
+    },
+    {
+      key: 'inspection-records',
+      parentPath: '/qms/inspection',
+      path: '/qms/inspection/records',
+      name: 'QMSInspectionRecords',
+      component: 'qms/inspection/records/index',
+      authCode: INSPECTION_RECORD_PERMISSION_CODES.LIST,
+      order: 4,
+      type: 'menu',
+      meta: {
+        icon: 'carbon:document',
+        title: '检验记录',
+      },
+      buttons: [
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.CREATE,
+          name: 'QMSInspectionRecordsCreate',
+          order: 1,
+          title: '新增',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.EXPORT,
+          name: 'QMSInspectionRecordsExport',
+          order: 2,
+          title: '导出',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.EDIT,
+          name: 'QMSInspectionRecordsEdit',
+          order: 2,
+          title: '编辑',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.DELETE,
+          name: 'QMSInspectionRecordsDelete',
+          order: 3,
+          title: '删除',
+        },
+        {
+          authCode: INSPECTION_RECORD_PERMISSION_CODES.IMPORT,
+          name: 'QMSInspectionRecordsImport',
+          order: 4,
+          title: '导入',
         },
       ],
     },

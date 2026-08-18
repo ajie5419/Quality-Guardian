@@ -97,6 +97,8 @@ export async function getInspectionRequests(params?: {
   page?: number;
   pageSize?: number;
   processName?: string;
+  scope?: string;
+  sinceDays?: number;
   status?: string;
   workOrderNumber?: string;
 }) {
@@ -105,6 +107,26 @@ export async function getInspectionRequests(params?: {
     total: number;
   }>(QMS_API.INSPECTION_REQUESTS, { params });
   return normalizeListResponse<InspectionRequest>(raw);
+}
+
+export interface PublicInspectionRequestStatus {
+  closedAt: null | string;
+  dispatchedAt: null | string;
+  dispatcherName: string;
+  inspectorName: string;
+  linkedIssueStatus: null | string;
+  requestNo: string;
+  status: string;
+}
+
+/** Minimal status lookup for anonymous scanned request entries. */
+export async function getPublicInspectionRequestStatus(
+  requestNo: string,
+): Promise<null | PublicInspectionRequestStatus> {
+  return publicRequestClient.get<null | PublicInspectionRequestStatus>(
+    QMS_API.PUBLIC_INSPECTION_REQUEST_STATUS,
+    { params: { requestNo } },
+  );
 }
 
 export async function getInspectionRequestStats() {

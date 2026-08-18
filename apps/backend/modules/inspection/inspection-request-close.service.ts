@@ -60,11 +60,8 @@ export function hydrateOutsourcingLinkedIssueResponsibility(options: {
   ) {
     return options.linkedIssue;
   }
-  if (
-    normalizeInspectionRequestText(options.linkedIssue.responsibleDepartmentId)
-  ) {
-    failCloseRequest('VALIDATION', '外部责任部门由系统配置解析');
-  }
+  // The close responsibility (inherited from the request snapshot by the
+  // close pipeline) is the department source; the client never resolves it.
   return {
     ...options.linkedIssue,
     responsibleDepartmentId: options.responsibility.responsibleDepartmentId,

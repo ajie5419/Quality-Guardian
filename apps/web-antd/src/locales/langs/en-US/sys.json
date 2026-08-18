@@ -83,7 +83,13 @@
     "rebuildProjectionTitle": "Rebuild Pass-rate Projection",
     "projectionRebuildConfirm": "The report stays on the legacy calculation until a complete generation is published.",
     "projectionRebuildQueued": "Pass-rate projection rebuild queued",
-    "projectionRebuildQueueFailed": "Failed to queue pass-rate projection rebuild"
+    "projectionRebuildQueueFailed": "Failed to queue pass-rate projection rebuild",
+    "uploadSettings": "Upload Settings",
+    "uploadTypeLabel": "Allowed Upload File Types",
+    "uploadTypeDesc": "Controls the allowed file formats for all upload endpoints, including anonymous inspection uploads. Formats that can carry scripts (SVG, HTML, macro documents, ...) are always rejected. Changes take effect immediately.",
+    "uploadTypeImages": "Images only (jpg / jpeg / png / webp)",
+    "uploadTypeImagesPdf": "Images + PDF",
+    "uploadTypeImagesPdfOffice": "Images + PDF + Word/Excel (recommended)"
   },
   "qualityClassification": {
     "title": "Quality Classification Settings",

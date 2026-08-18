@@ -181,8 +181,8 @@ describe('inspectionRequestCloseService', () => {
     });
   });
 
-  it('rejects a client-selected outsourcing linked issue department', () => {
-    expect(() =>
+  it('overrides a client-supplied outsourcing linked issue department with the close responsibility', () => {
+    expect(
       hydrateOutsourcingLinkedIssueResponsibility({
         linkedIssue: {
           responsibilityType: 'OUTSOURCING_UNIT',
@@ -191,7 +191,11 @@ describe('inspectionRequestCloseService', () => {
         },
         responsibility: { responsibleDepartmentId: 'dept-production' },
       }),
-    ).toThrow('外部责任部门由系统配置解析');
+    ).toEqual({
+      responsibilityType: 'OUTSOURCING_UNIT',
+      responsibleDepartmentId: 'dept-production',
+      supplierId: 'supplier-outsourcing',
+    });
   });
 
   it('hydrates a supplier linked issue with the canonical incoming department', () => {

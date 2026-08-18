@@ -1,5 +1,7 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError, logApiWarn } from '~/utils/api-logger';
@@ -14,6 +16,7 @@ import {
 const createSupplierBodySchema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.SUPPLIER.CREATE);
   const userinfo = getCurrentUser(event);
 
   try {

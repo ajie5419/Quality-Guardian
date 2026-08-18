@@ -162,42 +162,7 @@ describe('vehicleCommissioningService', () => {
     );
   });
 
-  it('queries loss aggregation records and counts with work order filter', async () => {
-    vi.mocked(prisma.vehicle_commissioning_issues.findMany).mockResolvedValue([
-      createdRow,
-    ] as never);
-    vi.mocked(prisma.vehicle_commissioning_issues.count).mockResolvedValue(
-      1 as never,
-    );
-
-    await VehicleCommissioningService.getLossRecordsForAggregation({
-      skip: 10,
-      take: 5,
-      workOrderNumber: 'WO',
-    });
-    await VehicleCommissioningService.countLossRecordsForAggregation({
-      workOrderNumber: 'WO',
-    });
-
-    expect(prisma.vehicle_commissioning_issues.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        skip: 10,
-        take: 5,
-        where: expect.objectContaining({
-          isDeleted: false,
-          workOrderNumber: { contains: 'WO' },
-        }),
-      }),
-    );
-    expect(prisma.vehicle_commissioning_issues.count).toHaveBeenCalledWith({
-      where: expect.objectContaining({
-        isDeleted: false,
-        workOrderNumber: { contains: 'WO' },
-      }),
-    });
-  });
-
-  it('queries quality loss drilldown and dashboard stats', async () => {
+  it('queries quality loss dashboard stats', async () => {
     vi.mocked(prisma.vehicle_commissioning_issues.findMany).mockResolvedValue([
       createdRow,
     ] as never);
@@ -213,27 +178,11 @@ describe('vehicleCommissioningService', () => {
       2 as never,
     );
 
-    await VehicleCommissioningService.getQualityLossDrillDownRecords({
-      start: new Date('2026-01-01T00:00:00.000Z'),
-      end: new Date('2026-01-31T00:00:00.000Z'),
-      take: 20,
-    });
     const stats = await VehicleCommissioningService.getStatsForDashboard({
       weekStart: new Date('2026-01-01T00:00:00.000Z'),
       yearStart: new Date('2026-01-01T00:00:00.000Z'),
     });
 
-    expect(prisma.vehicle_commissioning_issues.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        take: 20,
-        where: expect.objectContaining({
-          date: {
-            gte: new Date('2026-01-01T00:00:00.000Z'),
-            lte: new Date('2026-01-31T00:00:00.000Z'),
-          },
-        }),
-      }),
-    );
     expect(stats).toEqual({
       totalCount: 3,
       totalLoss: 300,

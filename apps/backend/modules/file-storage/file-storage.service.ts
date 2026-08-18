@@ -34,6 +34,10 @@ import {
   getStorageStrategyForProvider,
   normalizeStorageProvider,
 } from './storage-strategy';
+import {
+  assertAllowedUploadExtension,
+  resolveUploadAllowedExtensions,
+} from './upload-policy';
 
 type UploadFileParams = {
   data: Buffer;
@@ -108,14 +112,6 @@ function createStoredName(originalName: string, mimeType?: null | string) {
   const random = Math.random().toString(36).slice(2, 8);
   const ext = sanitizeExtension(originalName, mimeType);
   return `${timestamp}_${random}${ext}`;
-}
-
-function getMimeType(filename: string, fallback?: null | string) {
-  return (
-    fallback ||
-    MIME_TYPES[extname(filename).toLowerCase()] ||
-    'application/octet-stream'
-  );
 }
 
 function parsePositiveInteger(value: unknown, fallback: number) {
@@ -413,7 +409,13 @@ export const FileStorageService = {
     params: UploadFileStreamParams,
   ): Promise<UploadFileResult> {
     const originalName = basename(params.filename || 'upload');
-    const mimeType = getMimeType(originalName, params.mimeType);
+    const allowedExtensions = await resolveUploadAllowedExtensions();
+    const safeExt = assertAllowedUploadExtension(
+      originalName,
+      params.mimeType,
+      allowedExtensions,
+    );
+    const mimeType = MIME_TYPES[safeExt] || 'application/octet-stream';
     const storedName = createStoredName(originalName, mimeType);
     const uploadedBy =
       params.uploadedBy === undefined ? undefined : String(params.uploadedBy);

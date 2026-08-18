@@ -16,8 +16,11 @@ interface UserContext {
   username?: string;
 }
 
-type ScopedWhere = Record<string, unknown> & {
-  AND?: unknown[];
+// Prisma where inputs use union types for AND (array or single object);
+// an index-signature-friendly shape keeps buildScopedWhere generic.
+type ScopedWhere = {
+  [key: string]: unknown;
+  AND?: unknown;
 };
 
 function toStringArray(raw: null | string) {

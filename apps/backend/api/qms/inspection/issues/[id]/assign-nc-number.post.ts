@@ -1,5 +1,7 @@
+import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
 import { InspectionApiService } from '~/modules/inspection/inspection-api.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import {
   businessErrorResponse,
@@ -16,6 +18,10 @@ export default defineEventHandler(async (event) => {
   const id = getRequiredRouterParam(event, 'id', '缺少ID');
   if (typeof id !== 'string') return id;
   try {
+    await authorizeWrite(
+      event,
+      INSPECTION_ISSUE_PERMISSION_CODES.ASSIGN_NC_NUMBER,
+    );
     const record = await InspectionApiService.assignIssueNcNumber(
       getCurrentUser(event),
       id,

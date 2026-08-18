@@ -11,10 +11,7 @@ import type { QualityLossQueryParams, TrendRow } from './quality-loss-format';
 
 import { Prisma } from '@prisma/client';
 import { createIdentityAggregateItem } from '@qgs/shared';
-import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { InspectionService } from '~/modules/inspection/inspection.service';
-import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -33,21 +30,6 @@ import { QualityLossRouteUpdateService } from './quality-loss-route-update.servi
 import { QualityLossSummaryService } from './quality-loss-summary.service';
 
 const logger = createModuleLogger('QualityLossService');
-
-async function resolveTrendRows(
-  label: string,
-  loader: () => Promise<TrendRow[]>,
-): Promise<TrendRow[]> {
-  try {
-    return await loader();
-  } catch (error) {
-    logger.warn(
-      { err: error, source: label },
-      'Quality loss trend source failed',
-    );
-    return [];
-  }
-}
 
 async function applyDeptNames(items: QualityLossItem[]) {
   const names = await MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
@@ -139,29 +121,44 @@ export const QualityLossService = {
     const isWeek = granularity === 'week';
 
     try {
-      const [manual, internal, external, commissioning] = await Promise.all([
-        resolveTrendRows('manual', () =>
-          isWeek
-            ? prisma.$queryRaw<
-                TrendRow[]
-              >`SELECT WEEK(occurDate, 3) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`
-            : prisma.$queryRaw<
-                TrendRow[]
-              >`SELECT MONTH(occurDate) as p, SUM(amount) as a FROM quality_losses WHERE YEAR(occurDate) = ${year} AND isDeleted = 0 GROUP BY p`,
-        ),
-        resolveTrendRows('internal', () =>
-          InspectionService.getQualityLossTrendRows({ granularity, year }),
-        ),
-        resolveTrendRows('external', () =>
-          AfterSalesAPI.getQualityLossTrendRows({ granularity, year }),
-        ),
-        resolveTrendRows('commissioning', () =>
-          VehicleCommissioningService.getQualityLossTrendRows({
-            granularity,
-            year,
-          }),
-        ),
-      ]);
+      // 统一出口：直接查询 quality_loss_index 物化表（四源口径在写入时统一：
+      // Internal amount>0 / External isClaim||amount>0 / Commissioning isClaim||amount>0 / Manual amount>0）。
+      // 不再调用各源模块的直查函数（已退役，见 metrics-registry M-B03）。
+      const rows = await prisma.$queryRaw<
+        Array<{
+          a: bigint | null | number | Prisma.Decimal;
+          p: bigint | number;
+          source: string;
+        }>
+      >`SELECT ${isWeek ? Prisma.sql`WEEK(occurDate, 3)` : Prisma.sql`MONTH(occurDate)`} as p, source, SUM(amount) as a
+        FROM quality_loss_index
+        WHERE YEAR(occurDate) = ${year} AND isDeleted = 0
+        GROUP BY p, source`;
+
+      const manual: TrendRow[] = [];
+      const internal: TrendRow[] = [];
+      const external: TrendRow[] = [];
+      const commissioning: TrendRow[] = [];
+      for (const row of rows) {
+        const item: TrendRow = { p: Number(row.p), a: Number(row.a) || 0 };
+        switch (row.source) {
+          case 'External': {
+            external.push(item);
+            break;
+          }
+          case 'Internal': {
+            internal.push(item);
+            break;
+          }
+          case 'Manual': {
+            manual.push(item);
+            break;
+          }
+          default: {
+            commissioning.push(item);
+          }
+        }
+      }
 
       const merged = mergeTrendData(
         manual,

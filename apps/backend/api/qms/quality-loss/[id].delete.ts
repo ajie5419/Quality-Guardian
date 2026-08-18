@@ -1,5 +1,7 @@
+import { PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler } from 'h3';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
@@ -10,6 +12,7 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.DELETE);
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', 'Missing ID');

@@ -1,5 +1,7 @@
+import { REPORTS_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -18,6 +20,7 @@ const bodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, REPORTS_PERMISSION_CODES.EDIT);
   const userinfo = getCurrentUser(event);
 
   try {

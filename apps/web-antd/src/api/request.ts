@@ -173,6 +173,13 @@ export const publicRequestClient = new RequestClient({
 publicRequestClient.addRequestInterceptor({
   fulfilled: async (config) => {
     config.headers['Accept-Language'] = preferences.app.locale;
+    // Signed-in callers keep their identity on public endpoints (e.g. the
+    // scanned request entry) so the reporter id is recorded server-side;
+    // anonymous callers simply omit the header.
+    const accessStore = useAccessStore();
+    if (accessStore.accessToken) {
+      config.headers.Authorization = `Bearer ${accessStore.accessToken}`;
+    }
     if (config.params) {
       const cleanParams = Object.entries(config.params).filter(
         ([_, v]) => v !== undefined && v !== null && v !== '',

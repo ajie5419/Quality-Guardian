@@ -136,6 +136,7 @@ export const InspectionRequestCreateService = {
             quantity: payload.quantity,
             stationSelection: payload.stationSelection,
             reporter: payload.reporter,
+            reporterId: userinfo?.id ? String(userinfo.id) : null,
             requestInfo:
               normalizeInspectionRequestText(body.requestInfo) || null,
             // requestNo is generated inside the retried scope so each attempt

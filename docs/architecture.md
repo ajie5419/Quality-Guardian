@@ -1,5 +1,24 @@
 # Quality Guardian 后端架构重构方案
 
+> ## ⚠️ 文档状态（2026-08-16 标注）
+>
+> 本文档是 **2026 年架构重构的规划/历史快照**，其中的目标架构（`core/module-registry` + `defineModule()` + `xxx.definition.ts`）**已被实际落地架构取代**，路径（`apps/server`、`core/`、`__tests__/`）与当前代码不一致。
+>
+> **当前实际架构的权威描述见 [PROJECT_GUIDE.md](./PROJECT_GUIDE.md) 第 3-4 节。** 摘要对照：
+>
+> | 历史方案（本文档） | 当前实际（代码） |
+> | --- | --- |
+> | `core/module-registry` + `defineModule()` | `apps/backend/utils/module-loader.ts` + `<module>.module.ts` 声明 |
+> | `xxx.definition.ts` 声明模块 | `<module>.module.ts`（菜单/dataScope/audit/idResolution） |
+> | `apps/server/` | `apps/backend/` |
+> | `core/data-scope` / `core/audit` 引擎 | `modules/data-scope/`、`modules/system-log/`（框架中间件驱动） |
+> | 集中 `__tests__/` 目录 | 测试与被测代码同目录（门禁强制） |
+> | `schema` 校验文件 | `utils/define-validated-handler.ts` + zod |
+>
+> 本文档第 2 节（QMS 业务特征分析，含供应商评分/画像/报检附件契约）与第 6 节（前端策略）仍具参考价值；架构蓝图部分仅作历史参考，**不要按本文档的 `defineModule` 模式编写新代码**。
+
+---
+
 ## 一、当前架构诊断
 
 ### 1.1 数据概览

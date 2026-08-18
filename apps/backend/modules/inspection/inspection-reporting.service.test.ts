@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { InspectionReportingService } from '~/modules/inspection/inspection-reporting.service';
+import { InspectionScoreDataService } from '~/modules/inspection/inspection-score-data.service';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
@@ -128,36 +129,6 @@ describe('inspectionReportingService', () => {
     });
   });
 
-  describe('getQualityLossTrendRows', () => {
-    it('should query monthly data for month granularity', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([
-        { a: 100, p: 1 },
-        { a: 200, p: 6 },
-      ]);
-
-      const result = await InspectionReportingService.getQualityLossTrendRows({
-        granularity: 'month',
-        year: 2024,
-      });
-
-      expect(result).toEqual([
-        { a: 100, p: 1 },
-        { a: 200, p: 6 },
-      ]);
-    });
-
-    it('should query weekly data for week granularity', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([{ a: 50, p: 3 }]);
-
-      const result = await InspectionReportingService.getQualityLossTrendRows({
-        granularity: 'week',
-        year: 2024,
-      });
-
-      expect(result).toEqual([{ a: 50, p: 3 }]);
-    });
-  });
-
   describe('getWorkspaceIssueSummary', () => {
     it('should return aggregated workspace data', async () => {
       (prisma.quality_records.findMany as any)
@@ -180,81 +151,6 @@ describe('inspectionReportingService', () => {
     });
   });
 
-  describe('getLossRecordsForAggregation', () => {
-    it('should return loss records with default filters', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        { id: 'qr-1', lossAmount: 100 },
-      ]);
-
-      const result =
-        await InspectionReportingService.getLossRecordsForAggregation();
-
-      expect(result).toHaveLength(1);
-      expect(prisma.quality_records.findMany).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({
-            isDeleted: false,
-            lossAmount: { gt: 0 },
-          }),
-        }),
-      );
-    });
-
-    it('should filter by workOrderNumber when provided', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([]);
-
-      await InspectionReportingService.getLossRecordsForAggregation({
-        workOrderNumber: 'WO-001',
-      });
-
-      const callWhere = (prisma.quality_records.findMany as any).mock
-        .calls[0][0].where;
-      expect(callWhere.workOrderNumber).toEqual({
-        contains: 'WO-001',
-      });
-    });
-  });
-
-  describe('countLossRecordsForAggregation', () => {
-    it('should count loss records', async () => {
-      (prisma.quality_records.count as any).mockResolvedValue(10);
-
-      const result =
-        await InspectionReportingService.countLossRecordsForAggregation();
-
-      expect(result).toBe(10);
-    });
-  });
-
-  describe('getQualityLossDrillDownRecords', () => {
-    it('should return drill-down records with date range', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        { id: 'qr-1' },
-      ]);
-
-      const result =
-        await InspectionReportingService.getQualityLossDrillDownRecords({
-          end: new Date('2024-06-30'),
-          start: new Date('2024-06-01'),
-        });
-
-      expect(result).toHaveLength(1);
-    });
-
-    it('should use default take of 500', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([]);
-
-      await InspectionReportingService.getQualityLossDrillDownRecords({
-        end: new Date('2024-06-30'),
-        start: new Date('2024-06-01'),
-      });
-
-      const callArgs = (prisma.quality_records.findMany as any).mock
-        .calls[0][0];
-      expect(callArgs.take).toBe(500);
-    });
-  });
-
   describe('getSupplierScoringData', () => {
     it('should return supplier scoring data with supplierIds', async () => {
       (prisma.inspections.groupBy as any).mockResolvedValue([]);
@@ -264,7 +160,7 @@ describe('inspectionReportingService', () => {
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
-      const result = await InspectionReportingService.getSupplierScoringData({
+      const result = await InspectionScoreDataService.getSupplierScoringData({
         engineeringSupplierIds: ['s-1'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: ['s-1'],
@@ -295,7 +191,7 @@ describe('inspectionReportingService', () => {
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
-      await InspectionReportingService.getSupplierScoringData({
+      await InspectionScoreDataService.getSupplierScoringData({
         engineeringSupplierIds: [],
         since: new Date('2024-01-01'),
         incomingSupplierIds: [],
@@ -324,7 +220,7 @@ describe('inspectionReportingService', () => {
         .mockResolvedValueOnce([]);
       (prisma.quality_records.findMany as any).mockResolvedValue([]);
 
-      await InspectionReportingService.getSupplierScoringData({
+      await InspectionScoreDataService.getSupplierScoringData({
         engineeringSupplierIds: ['supplier-1'],
         since: new Date('2024-01-01'),
         incomingSupplierIds: [],
@@ -612,7 +508,7 @@ describe('inspectionReportingService', () => {
         },
       ]);
 
-      const result = await InspectionReportingService.getWelderScoreStats();
+      const result = await InspectionScoreDataService.getWelderScoreStats();
 
       expect(result).toHaveLength(1);
       expect(result[0].responsibleWelder).toBe('Welder A');
@@ -632,7 +528,7 @@ describe('inspectionReportingService', () => {
     it('filters by welder ids and legacy names when requested', async () => {
       (prisma.quality_records.groupBy as any).mockResolvedValue([]);
 
-      await InspectionReportingService.getWelderScoreStats({
+      await InspectionScoreDataService.getWelderScoreStats({
         welderIds: ['welder-1'],
         welderNames: ['Welder A'],
       });
@@ -660,7 +556,7 @@ describe('inspectionReportingService', () => {
       ]);
 
       const result =
-        await InspectionReportingService.getWorkOrderAggregateInspections(
+        await InspectionScoreDataService.getWorkOrderAggregateInspections(
           'WO-001',
         );
 

@@ -1,6 +1,7 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
+import { resolveRetainUntil } from '~/modules/data-lifecycle';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   buildImportRowError,
@@ -343,6 +344,7 @@ export const InspectionIssueMutationService = {
                 ...payload,
                 nonConformanceNumber,
                 responsibleWelderId,
+                retainUntil: await resolveRetainUntil('inspection-record'),
               },
             });
             await MetricRefreshQueue.enqueueSupplierScores(

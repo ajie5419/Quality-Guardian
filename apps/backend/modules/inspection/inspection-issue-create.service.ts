@@ -1,6 +1,7 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { Prisma } from '@prisma/client';
+import { resolveRetainUntil } from '~/modules/data-lifecycle';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { WelderScoreRefreshService } from '~/modules/welder';
@@ -80,6 +81,8 @@ export const InspectionIssueCreateService = {
         responsibleDepartmentId: responsibility.responsibleDepartmentId,
         responsibilityType: responsibility.responsibilityType,
         responsibleWelderId,
+        // 数据生命周期：创建时回填保留期截止（规则表 inspection-record，3650 天）
+        retainUntil: await resolveRetainUntil('inspection-record'),
       },
     });
     await QualityLossIndexQueue.enqueue(

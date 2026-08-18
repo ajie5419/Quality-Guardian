@@ -4,21 +4,16 @@
 export const PERMISSION_CODES = {
   QMS: {
     LOSS_ANALYSIS: {
-      EXPORT: 'QMS:LossAnalysis:Export',
-      EDIT: 'QMS:LossAnalysis:Edit',
+      CREATE: 'QMS:LossAnalysis:Create',
       DELETE: 'QMS:LossAnalysis:Delete',
+      EDIT: 'QMS:LossAnalysis:Edit',
+      EXPORT: 'QMS:LossAnalysis:Export',
+      IMPORT: 'QMS:LossAnalysis:Import',
     },
     AFTER_SALES: {
-      EXPORT: 'QMS:AfterSales:Export',
-      EDIT: 'QMS:AfterSales:Edit',
+      CREATE: 'QMS:AfterSales:Create',
       DELETE: 'QMS:AfterSales:Delete',
-    },
-    INSPECTION: {
-      EXPORT: 'QMS:Inspection:Export',
-      EDIT: 'QMS:Inspection:Edit',
-      DELETE: 'QMS:Inspection:Delete',
-      LIST: 'QMS:Inspection:List',
-      CREATE: 'QMS:Inspection:Create',
+      EDIT: 'QMS:AfterSales:Edit',
     },
     WORK_ORDER: {
       LIST: 'QMS:WorkOrder:List',
@@ -51,6 +46,19 @@ export const PERMISSION_CODES = {
         EDIT: 'QMS:Planning:ITP:Edit',
         DELETE: 'QMS:Planning:ITP:Delete',
         EXPORT: 'QMS:Planning:ITP:Export',
+      },
+      INSPECTION_FORM: {
+        LIST: 'QMS:Planning:InspectionForm:List',
+        CREATE: 'QMS:Planning:InspectionForm:Create',
+        EDIT: 'QMS:Planning:InspectionForm:Edit',
+        DELETE: 'QMS:Planning:InspectionForm:Delete',
+      },
+      PROJECT_DOCS: {
+        LIST: 'QMS:Planning:ProjectDocs:List',
+        CREATE: 'QMS:Planning:ProjectDocs:Create',
+        EDIT: 'QMS:Planning:ProjectDocs:Edit',
+        DELETE: 'QMS:Planning:ProjectDocs:Delete',
+        DOWNLOAD: 'QMS:Planning:ProjectDocs:Download',
       },
     },
     SUPPLIER: {

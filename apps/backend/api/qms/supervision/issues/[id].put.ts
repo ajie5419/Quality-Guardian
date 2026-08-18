@@ -1,6 +1,8 @@
+import { SUPERVISION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
@@ -15,6 +17,7 @@ const updateIssueBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT);
   const id = getRouterParam(event, 'id');
   if (!id) return badRequestResponse(event, '无效监造问题ID');
 
@@ -30,12 +33,7 @@ export default defineEventHandler(async (event) => {
       });
     } catch (error) {
       if (!isPrismaSchemaMismatchError(error)) throw error;
-      logApiError(
-        'supervision-issues-attachment-registration',
-        error,
-        { issueId: id },
-        event,
-      );
+      logApiError('supervision-attachment-registration', error);
     }
     return useResponseSuccess(data);
   } catch (error) {

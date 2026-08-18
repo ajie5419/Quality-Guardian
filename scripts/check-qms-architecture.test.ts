@@ -487,4 +487,135 @@ export function collect(rows: Array<{
       rmSync(rootDir, { force: true, recursive: true });
     }
   });
+
+  it('enforces prisma schema field naming rules', () => {
+    const rootDir = createFixture({
+      'apps/backend/prisma/schema.prisma': `
+model naming_ok {
+  id        String   @id @default(cuid())
+  isActive  Boolean  @default(true)
+  hasOwner  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  closeDate DateTime
+  updatedAt DateTime @updatedAt
+}
+
+model naming_bad {
+  id         String   @id @default(cuid())
+  active     Boolean  @default(true)
+  examPassed Boolean  @default(false)
+  plannedOn  DateTime
+  created_at DateTime @default(now())
+  due_date   String
+}
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-N1]');
+      expect(result.output).toContain('[B-N2]');
+      expect(result.output).toContain('[B-N3]');
+      expect(result.output).toContain('naming_bad.created_at');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('grandfathers baselined field naming violations', () => {
+    const rootDir = createFixture(
+      {
+        'apps/backend/prisma/schema.prisma': `
+model naming_legacy {
+  id         String   @id @default(cuid())
+  active     Boolean  @default(true)
+  examPassed Boolean  @default(false)
+  plannedOn  DateTime
+  created_at DateTime @default(now())
+  due_date   String
+}
+`,
+      },
+      [
+        'B-N1|apps/backend/prisma/schema.prisma|field-active|1',
+        'B-N1|apps/backend/prisma/schema.prisma|field-examPassed|1',
+        'B-N2|apps/backend/prisma/schema.prisma|field-plannedOn|1',
+        'B-N3|apps/backend/prisma/schema.prisma|field-created_at|1',
+        'B-N3|apps/backend/prisma/schema.prisma|field-due_date|1',
+      ].join('\n'),
+    );
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(0);
+      expect(result.output).toContain('Baseline B-N1');
+      expect(result.output).toContain('Baseline B-N3');
+      expect(result.output).toContain('QMS architecture check passed.');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('enforces metric registration for new aggregations', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/bad/bad-metric.service.ts': `
+import prisma from '~/utils/prisma';
+
+export const BadMetricService = {
+  async getNewMetric() {
+    return prisma.quality_records.groupBy({
+      by: ['defectCategoryId'],
+      _count: { id: true },
+    });
+  },
+};
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-MF]');
+      expect(result.output).toContain('getNewMetric');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('allows registered and exempt metric aggregation points', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/good/good-metric.service.ts': `
+import prisma from '~/utils/prisma';
+
+export const GoodMetricService = {
+  async getKnownMetric() {
+    return prisma.quality_records.groupBy({
+      by: ['defectCategoryId'],
+      _count: { id: true },
+    });
+  },
+};
+`,
+      'apps/backend/utils/metrics-registry.ts': `
+export const METRIC_REGISTRY: Array<{ id: string }> = [{ id: 'M-Z01' }];
+export const EXEMPT_AGGREGATION_POINTS: string[] = [
+  'modules/good/good-metric.service.ts#getKnownMetric',
+];
+`,
+      'docs/metrics-registry.md': `
+| ID | key |
+| --- | --- |
+| M-Z01 | knownMetric |
+`,
+    });
+
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(0);
+      expect(result.output).toContain('QMS architecture check passed.');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
 });

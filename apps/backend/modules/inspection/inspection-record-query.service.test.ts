@@ -47,11 +47,18 @@ vi.mock('~/utils/query-helpers', () => ({
   parsePagination: vi.fn().mockReturnValue({ skip: 0, take: 100 }),
 }));
 
-vi.mock('@qgs/shared', () => ({
-  buildInspectionRecordDateRange: vi.fn().mockReturnValue(undefined),
-  formatDate: vi.fn((d: any) => (d ? '2024-01-15' : null)),
-  normalizeInspectionStationSelection: vi.fn().mockReturnValue(null),
-}));
+vi.mock('@qgs/shared', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@qgs/shared')>();
+  return {
+    ...actual,
+    buildInspectionRecordDateRange: vi.fn().mockReturnValue(undefined),
+    formatDate: vi.fn((d: unknown) => (d ? '2024-01-15' : null)),
+    isDataScopeV2Enabled: vi.fn().mockReturnValue(false),
+    isRbacReadV2Enabled: vi.fn().mockReturnValue(false),
+    isRbacSuperMergeAllCodesEnabled: vi.fn().mockReturnValue(true),
+    normalizeInspectionStationSelection: vi.fn().mockReturnValue(null),
+  };
+});
 
 vi.mock('~/modules/inspection/inspection-record-types', () => ({
   deriveInspectionIssueStatus: vi.fn().mockReturnValue('NONE'),

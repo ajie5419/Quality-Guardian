@@ -23,7 +23,732 @@
 
 ---
 
-## 执行记录
+### 2026-08-18 阶段：报检界面迭代收尾（6 个修复 + 文档同步）
+
+**执行内容：**
+- 546d2038：公开创建接口可选解析 token（verifyAccessToken）——登录用户扫码报检落 reporterId；前端 publicRequestClient 登录时附带 token；空态文案注明本机回执边界；MyInspectionRequests 组件测试 3 个
+- bdb3e5e1：已派单改名"待检验"（DISPATCHED/INSPECTING 且无未闭环 NC）；MyInspectionRequests 加载隔离（服务器查询失败不影响本机回执，测试 4 个）
+- cfd2dcc5：修复入口页 MyInspectionRequests 组件未注册（抽 composable 时误删 import，Tab 渲染未知元素 + ref 无 reload）——"我的报检"空白的根因；switchToMyReports 加 nextTick 时序
+- 86f9eaab：表格列补 dataIndex（工序/工单号列显示空白修复）
+- f1a48605：列表初始加载带 scope（Tab 高亮"待派单"但首查返回全量的根因）
+- 0f3cc4f5：无派单权限用户 closed/abnormal/自由搜索强制限本人相关（inspectorId OR reporterId），测试 19 个
+- ARCHITECTURE.md 同步：删除 system_settings/bootstrap 责任解析的过期描述，改为"工序主数据 + 快照继承 + scope 权限"现状
+
+**验证结果：**
+- 后端全量 299/2698、前端全量 67/351、query 测试 19/19；vue-tsc/eslint/qms-arch/docs drift 全绿
+
+**commit:** 546d2038 / bdb3e5e1 / cfd2dcc5 / 86f9eaab / f1a48605 / 0f3cc4f5（+文档同步另提交）
+
+**遗留问题：**
+- 生产上线需先跑 maintenance:process-responsible-departments 回填工序责任部门
+- 部门级数据范围隔离仍属 Phase 4 暂缓项（当前无权限用户按"本人相关"过滤）
+
+---
+
+### 2026-08-18 阶段：报检任务界面角色化视图 + 入口页"我的报检"
+
+**执行内容：**
+- 报检任务页：Segmented 视图改为 待派单(pending)/已派单(dispatched)/已完成单(closed)/不合格异常单(abnormal)/我的检验(my-inspection 近7天)；pending/dispatched 仅派单权限可见（前端 useInspectionRequestViewAccess 过滤 + 后端 getUserPermissionCodes 校验 403 强制，防接口绕过）；页面压缩到 499/447 行过 R3
+- 后端列表扩展 scope 参数（pending/dispatched/closed/abnormal/my-inspection/my-report），异常单=linkedIssueId 非空且 linkedIssueStatus OPEN（跨状态）；my-* 强制锁定当前用户
+- 报检单新增 reporterId（迁移 20260818090000，登录创建落库，匿名 null）；"我的报检"登录态按 reporterId 查询
+- 公开状态接口 GET /qms/public/inspection/requests/status?requestNo=（匿名扫码查询，只返回状态类最小字段防单号枚举泄露）
+- 报检入口页（公开无登录）加 Tab：报检单 / 我的报检——提交成功存本机回执（localStorage，myInspectionReceipts 上限20去重）并自动切 Tab；匿名用户靠本机回执+公开状态接口展示，登录用户合并 reporterId 服务端数据（MyInspectionRequests.vue）；工序加载逻辑抽 useInspectionRequestWorkOrderProcesses、回执逻辑抽 useMyInspectionReports 保持行数
+- 测试：query service 17/17（scope×7+403+公开状态）、receipts 4/4、前端全量 66/347、后端全量 299/2696
+
+**验证结果：**
+- 真库：scope=pending(13)/abnormal(13)/my-inspection(5)/my-report(1，vben 新建 IR-20260818-0002)/匿名公开状态（IR-20260817-0013 最小字段）全部通过
+- vue-tsc/eslint 干净；qms-arch 0 violations；docs drift PASSED
+
+**commit:** `25187fde` feat(inspection): role-based request list scopes and entry "my reports" tab
+
+**遗留问题：**
+- 移动端报检入口暂未加"我的报检"（如需后续补）
+- 已完成单/异常单为全员可见（未做数据范围隔离，Phase 4 决策范围内）
+
+---
+
+### 2026-08-18 阶段：发布自动回填工序责任部门（接入 release-maintenance）
+
+**执行内容：**
+- release-maintenance-manifest 注册任务 process-responsible-department-backfill（revision 1）：每次发布（run-remote-release.sh 的 release-maintenance 阶段）自动以 --apply 运行回填脚本，幂等（已配 skipped）；unresolved 时抛错中断发布（fail-fast，防止漏配上线）
+- 测试更新：manifest 断言从"空 baseline"改为"含回填任务且不重放历史 wave"；manifest 5 + runner 5 + backfill 6 = 16/16
+- 本地真库执行验证：任务启动→COMPLETED，ledger 记录 (attempts 1, COMPLETED, revision 1)
+
+**验证结果：**
+- tsc/eslint 干净；qms-arch 0 violations；release-maintenance 套件 16/16
+
+**commit:** `e192b90a` feat(deploy): auto-backfill process responsible departments on release
+
+**遗留问题：**
+- 生产部门树若与默认路径不一致（unresolved），发布会在该阶段失败并列出候选部门——这是预期保护行为，按提示修正映射后重跑即可
+
+---
+
+### 2026-08-17 阶段：修复关闭弹窗对供应商责任的部门误校验（前端 bug）
+
+**执行内容：**
+- 现象：报检关闭弹窗选"不合格"点确定，供应商责任必报"不合格项责任部门不能为空"，外协责任正常——用户测试发现
+- 根因：useInspectionRequestTaskActions.ts validateCloseForm 的必填校验只对 OUTSOURCING_UNIT 豁免责任部门，漏了 SUPPLIER；而模板部门字段对两种外部责任都隐藏（!isExternalResponsibility）→ 供应商用户看不到也填不了部门，校验却强制要求 → 死锁
+- 修复：豁免条件改为 isExternalInspectionIssueResponsibility(responsibilityType)（SUPPLIER + OUTSOURCING 统一豁免）；部门由服务端按报检单快照继承（后端链路已就绪）
+- 验证：前端全量 65 文件/343 用例（含 useInspectionRequestTaskActions 23/23）；vue-tsc/eslint 干净
+
+**commit:** `6915703f` fix(web-antd): exempt supplier responsibility from close department validation
+
+**遗留问题：**
+- 无
+
+---
+
+### 2026-08-17 阶段：工序责任部门回填脚本（正式运维工具）
+
+**执行内容：**
+- scripts/process-responsible-department-backfill.ts：核心逻辑（部门树构建 + 名称路径逐级唯一解析 + 幂等 + dry-run/apply）；部门路径如 ['科技公司','制造 SOBU','采购部']，不硬编码环境 ID；重名/缺失 → unresolved 并列出候选，绝不猜测
+- scripts/backfill-process-responsible-department.ts：tsx 入口（默认 dry-run，--apply 执行；unresolved 非空时 apply 后 exit 1）
+- 测试 6/6：路径解析更新 / dry-run 不写 / 幂等 skip / 工序缺失 / 路径重名（列候选）/ supplierSource 不一致告警仍执行
+- package.json：maintenance:process-responsible-departments
+- 本地 dry-run 验证：4 工序（外购件/原材料/机加成品件-外协/辅材）全部已配置 skipped=4（此前接口不返回该字段导致误判"未配置"）
+
+**验证结果：**
+- vitest 6/6；tsc 干净；eslint 干净（--fix 后）；qms-arch 0 violations；docs drift PASSED
+
+**commit:** `cabea7de` feat(scripts): process responsible department backfill tool
+
+**遗留问题：**
+- 生产部署时核对部门路径后运行（默认映射按用户规则：外购件/原材料→制造SOBU采购部、机加成品件-外协/辅材→生产履约部）
+
+---
+
+### 2026-08-17 阶段：报检责任落库链路修复（工序责任部门 + 快照继承）
+
+**执行内容：**
+- 背景：生产"进货检验关闭报错：不合格项责任部门 ID 不能为空"；根因 = 外部责任（INCOMING/OUTSOURCING）部门由 system_settings 服务端解析，生产未配置 + 名称 bootstrap 失败 → 报检单部门缺失/关闭时重新解析失败
+- 数据：processes 恢复 responsibleDepartmentId（迁移 20260817160000 文件恢复，DB 列与迁移记录已存在）；本地预配 4 工序（外购件/原材料→采购部、机加成品件-外协/辅材→生产履约部）
+- 创建链路（inspection-request-create-responsibility.service.ts）：删"外部责任拒绝客户端部门 + 服务端解析"；部门来源优先级 = 客户端显式提交 > 工序主数据（processes.responsibleDepartmentId）> 未配置则创建时 BusinessError 提示（错误码 VALIDATION，消息带工序名）
+- 关闭链路（inspection-request-close-responsibility.service.ts + inspection-request-close.service.ts）：删 system_settings 解析分支（resolveSubmittedCloseResponsibility 提交缺部门 → 从报检单快照兜底；hydrateOutsourcingLinkedIssueResponsibility 不再拒绝客户端部门、以 close 责任覆盖）
+- 死代码删除（4 文件 + 测试）：inspection-request-responsibility-default.service(.test)、system 的 inspection-request-outsourcing-responsibility-setting.service(.test)、bootstrap-inspection-request-process-outsourcing-responsibility(.test)；system/index.ts 清理导出
+- 设置页：工序表格新增"责任部门"列（内联下拉，部门树展平；复用备份分支 e4d05970 的实现）；前端 API 类型 + i18n（responsibleDept/responsibleDeptPlaceholder）
+- 检验记录：确认继承链路已存在（buildInspectionRecordPayloadCore 全量带出报检单责任），无需改动
+- 测试：create-responsibility 9/9（工序带出/客户端部门/未配置报错）、close-responsibility 22/22（快照继承/客户端部门/并发 CAS）、close.service 34/34（hydrate 覆盖）、process-master 18/18、public-query fixture 补字段
+
+**验证结果：**
+- 真库端到端：创建进货报检单（不传部门）→ 工序自动带出采购部 ✅；关闭 FAIL（外部责任不传部门）→ 生成 NC-26KJ-052，不再报"责任部门不能为空" ✅；报检单/不合格项责任逐字段一致 PASS ✅；未配置工序创建时报"工序【辅材-生产】未配置责任部门，请联系管理员在报检设置中配置" ✅
+- 全量：后端 298 文件/2686 用例（18:29 干净全过；并发负载下 4 文件 9 例 5s 超时为既有 flaky，单跑 24/24 通过）；前端 65/343；qms-arch 0 violations；vue-tsc/eslint 干净；docs drift PASSED
+
+**commit:** `24a39d5e` fix(inspection): inherit responsibility snapshot on close and resolve department from process master
+
+**更正（2026-08-17 追加）：** 24a39d5e 误把 e4d05970 的设置页"工序表格责任部门列"（含 process-master CRUD 支持、前端 API 类型、i18n）一并捡回——违反用户"只传数据、不显示"的决策（增加操作步骤，用户已明确反对并再次要求回退）。已撤销：设置页 index.vue / inspection-settings.ts / sys.json ×2 / process-master schema+service+test / inspection-public-query fixture 全部恢复 8b3090a4 版本。**保留**：后端创建链路（工序静默带出部门）、关闭链路（快照继承）、死代码删除、迁移、schema 字段。工序责任部门配置改为 SQL/脚本维护（本地已预配 4 工序），前端零改动。
+
+**遗留问题：**
+- 生产部署时核对部门路径后运行 maintenance:process-responsible-departments 回填脚本
+- 全量套件在高负载下动态 import 用例偶发 5s 超时（既有问题，非本次引入）
+
+---
+
+### 2026-08-17 阶段：数据生命周期方案 B（归档 7/7 全覆盖 + 存量兜底推算）
+
+**执行内容：**
+- 盘点修正：规则表 7 个 10 年保留数据类此前仅 1/7 接入创建回填，另 4 类（计量/售后/质量损失/工单）连字段都没有
+- migration：after_sales / quality_losses / work_orders / measuring_instruments 补 archivedAt + retainUntil
+- 归档服务重写：ARCHIVE 分支扩展 7 类，**兜底推算**——retainUntil 为空的历史数据按 createdAt + 规则天数自动判定到期（OR 双分支：显式标签到期 / 无标签超龄）；快照清理不变
+- 测试更新：mock 7 表 + rules findMany + OR 断言
+- 真实库验证：270 条无标签老工单自动归档 ✓，54 条近期售后正确跳过 ✓，数据还原
+
+**验证结果：**
+- 全量 301 文件/2693 用例；qms-arch 0 violations；eslint 干净
+
+**遗留问题：**
+- 无（创建链路显式回填保留，显式优先于兜底）
+
+### 2026-08-17 阶段：可用年份统一服务（系统级年份查询）### 2026-08-17 阶段：可用年份统一服务（系统级年份查询）
+
+**执行内容：**
+- 调查：年份下拉 4 处（检验记录硬编码 [2024,2025,2026]、不合格项/售后数据源错（接口只查 work_orders）、工单碰巧对）；year 参数接口 8 个各自为政
+- docs/available-years.md：年份来源注册表 + 统一接口 + 统一 hook + 年份语义约定（业务日期年份/含归档/统计默认当前年）
+- 后端：available-years.service.ts（YEAR_SOURCES 6 来源）+ /qms/common/years?scopes= 升级 + 60s 缓存 + 容错；work-order.getAvailableYears 迁移删除
+- 前端：useAvailableYears(scopes?) 泛化（模块级缓存/错误容错）；检验记录页硬编码替换为动态；售后/不合格项/工单传各自 scope
+- 测试：后端 4 例（合并去重降序/scopes 过滤/未知 scope 空/缓存 TTL）；前端 records 13/13（hook mock）
+- 真实库验证：全部来源合并 2026/2025/2024 ✓、按模块过滤 ✓、缓存命中 0ms ✓
+
+**验证结果：**
+- 后端全量 301 文件/2693 用例；qms-arch 0 violations（B-MF 未误拦 DISTINCT YEAR）；vue-tsc 干净
+
+**遗留问题：**
+- 前端 TeamSelect.test.ts 4 例 window 环境失败为既有问题（stash 验证与本次无关）
+- 数据千万级后再评估年份物化表；数据范围开启后接口加 userContext 过滤（文档已预留）
+### 2026-08-17 阶段：数据生命周期 P3（归档框架）
+
+**执行内容：**
+- schema：quality_records/inspections/qms_inspection_requests 加 archivedAt/retainUntil；data_lifecycle_jobs 队列表（预留）；手写迁移 + migrate deploy
+- data-lifecycle-archive.service.ts：ARCHIVE 打标记（retainUntil 到期）三业务表；DELETE 快照清理（quality_loss_index/supplier_score_snapshots 按规则 730 天 cutoff）
+- cron：data-lifecycle.daily-archive 每日 02:00 注册
+- 测试 2 例；真实库验证：过期记录打标记 ✓、800 天前快照删除 ✓（21→20）
+
+**验证结果：**
+- 全量 300 文件/2693 用例；qms-arch 0 violations；tsc/eslint 全绿
+
+**遗留问题：**
+- 查询筛选界面待归档真实触发时再做；retainUntil 存量回填待上线仪式；P4/P5 待做
+
+### 2026-08-17 阶段：数据生命周期 P1+P2（审计日志清理 + 保留期规则）
+
+**执行内容：**
+- P1：system-log.audit-cleanup cron（每日 03:00）删除超 90 天审计/登录日志（分批 ID 列表防锁）；真实库干跑 1556+511 条超期
+- P2：data_retention_rules 表 + 9 条默认规则幂等种子（业务 3650 天 ARCHIVE×6/审计 90 DELETE/快照 730 DELETE/临时 30 PURGE）；新模块 data-lifecycle；启动时 ensureDefaultRetentionRules
+- 迁移：手写两轮（建表 + enabled→isEnabled，B-N1 正确拦截新表 enabled 与 cron_jobs 撞 baseline）；本地 shadow 库历史迁移重建失败（inspections 无建表迁移的既有技术债）→ migrate diff + deploy 绕行
+- 测试 5 例（种子幂等/缺省补齐/清理分批/空表跳过/注册定义）
+
+**验证结果：**
+- 全量 299 文件/2691 用例；qms-arch 0 violations；真实库种子幂等验证
+
+**遗留问题：**
+- P3-P5 待做
+
+### 2026-08-17 阶段：数据生命周期设计成文
+
+**执行内容：**
+- 与业务讨论定稿 docs/data-lifecycle.md：五阶段模型（创建→活跃→完结→归档→期满→处置）
+- 业务口径：业务数据至少保留 10 年；审计日志 3 个月；物化快照 1-2 年（可重建）；临时文件 30 天
+- 归档选型：打标记（archivedAt/retainUntil）不拆表，cron 队列化（复用 scheduler + quality_loss_index_jobs 模式）
+- 归档查询：历史数据只读（列表含归档筛选 + 徽标，详情只读，导出支持，统计走物化表）
+- 到期处置：到期前 90 天预警 → 人工三选一（续留/销毁/导出）→ 审计记录；安全默认未决策自动续留 1 年
+- 存量数据（如 2024 年）：10 年口径下仍为活跃数据，只走归档标记；上线仪式（摸底/回填/分批/干跑/可逆）
+- 本地库摸底：现有数据全部 2026 年（开发测试数据），无 2024 存量
+- P1-P5 实施计划入 PROJECT_STATE 待办
+
+**验证结果：**
+- 纯文档变更；docs drift PASSED
+
+**遗留问题：**
+- P1（审计日志清理）最急迫，随时可开工
+
+### 2026-08-17 阶段：指标治理真实验证（本地数据库）与 SQL 参数化 bug 修复
+
+**执行内容：**
+- 本地数据库 quality_guard_local_test 实测：数据规模（index 21 条/检验记录 236/售后 54/车辆 53/报检 3288）
+- 三源口径抽查 100% 一致：External after_sales 54→符合口径 19→index 物化 19；Internal 236→2→2；Commissioning 53→0→0
+- **发现并修复 bug**：getTrendData 的 SELECT 表达式（WEEK/MONTH）误写入 $queryRaw 的 ${} 占位 → Prisma 当参数绑定 → p 列变常量字符串 → GROUP BY 失效 → 趋势全 0；单测 mock 绕过 SQL 生成未暴露，真实库执行暴露；改用 Prisma.sql 片段修复
+- 修复后真实数据验证：1月 13380（检验 5300+售后 8080）、2月 230012.24、3月 31775，与手工模拟 SQL 完全一致；周趋势 17 点；getInspectorActiveTaskCounts 在办 8 人；getAllLosses 分页 total=21
+
+**验证结果：**
+- 真实库全部通过；quality-loss 模块回归 120/120；qms-arch 0 violations；eslint 干净
+
+**遗留问题：**
+- 临时验证脚本已删除；建议生产/测试环境部署后抽查趋势图数字与报表一致
+
+### 2026-08-17 阶段：指标治理阶段4（拆上帝文件，收官）
+
+**执行内容：**
+- 数据源核查修正方案：getSupplierScoringData/getWelderScoreStats/getWorkOrderAggregateInspections 查询的全是检验域表（inspections/quality_records），按模块自包含原则（数据源归属）留在 inspection 模块，而非迁往消费者模块
+- 拆出新文件 inspection-score-data.service.ts（3 个函数 + InspectionScoreDataService 导出）；inspection-reporting.service.ts 428→287 行（报表聚合中心聚焦检验域）；InspectionCoreService spread 合并 InspectionScoreDataService，inspection.service 转发面不变，supplier/welder/work-order 消费者零改动
+- 测试：inspection-reporting.service.test.ts 的 3 个 describe 改引用 InspectionScoreDataService（import 同步）；metrics-registry 实现点更新（M-A04/M-G01）
+
+**验证结果：**
+- 全量 297 文件/2686 用例通过；qms-arch --all 0 violations；B-MF 零违规；tsc/eslint/prettier 全绿
+
+**遗留问题：**
+- 指标治理五阶段全部完成（0 字典 / 1 B-MF 门禁 / 2 三源收敛 / 3 排行收敛 / 4 拆文件）；后续新聚合由 B-MF 门禁强制登记
+
+### 2026-08-17 阶段：指标治理阶段3（排行收敛）
+
+**执行内容：**
+- inspection 模块新增 inspection-request-stats-workload.ts（getInspectorActiveTaskCounts：DISPATCHED/INSPECTING 按 inspectorId groupBy 计数）并经 index.ts 导出；user.service 用户列表在办量改调统一出口（原独立 groupBy 删除）
+- 循环依赖处理：user → inspection 顶层 import 会与 inspection → user（WxSubscribeMessageService）形成模块加载循环（InspectionCoreService TDZ，adversarial 测试暴露）→ 改为函数内动态 import（loadInspectorActiveTaskCounts 辅助函数），Node/vitest 缓存模块，无性能影响
+- **quality-loss-trend 判断修正**：此前列为死端点，经查工作台 dashboard/index.vue 通过 getQualityLossTrend 常量链实际调用（趋势图），**保留**；metrics-registry 待收敛表移除该行
+- metrics-registry：M-G08 实现点改为 inspection-request-stats-workload.ts#getInspectorActiveTaskCounts
+
+**验证结果：**
+- 全量 297 文件/2686 用例通过；qms-arch --all 0 violations；B-MF 零违规；tsc/eslint 全绿
+
+**遗留问题：**
+- 阶段4（拆 inspection-reporting.service.ts 上帝文件）待做
+
+### 2026-08-17 阶段：指标治理阶段2（质量损失三源聚合收敛）
+
+**执行内容：**
+- 统一出口：getTrendData 从手工表+三源模块直查改为一次查询 quality_loss_index 物化表按 source 分组——四源口径在 index 写入时已统一（Internal amount>0 / External、Commissioning isClaim||amount>0 / Manual amount>0），与业务确认口径 lossAmount>0 OR isClaim=true 一致
+- 确认 getDrillDown（quality-loss-record-maintenance）与 getAllLosses 已走 index 表
+- 删除 12 个同构直查函数 + 全部转发链：inspection-reporting、after-sales-integration、vehicle-commissioning 各 4 个（getQualityLossTrendRows/getLossRecordsForAggregation/countLossRecordsForAggregation/getQualityLossDrillDownRecords）；inspection.service / after-sales.service / after-sales/exports.ts 转发同步删除；resolveTrendRows 辅助函数退役
+- 测试清理：6 个测试文件删除/改造（adversarial 3 块、integration 6 it、inspection-reporting 4 块、vehicle 2 it、core 调用行与断言、ql-summary mock 行）；getTrendData 测试 mock 改为 index 单查询带 source
+- metrics-registry 同步：M-B03 实现点改 getTrendData；M-B04 加 getDrillDown；M-B05 加 getAllLosses；M-D07（检验源趋势）并入 M-B03 删除，42→41 指标；docs/metrics-registry.md 同步（B 族统一出口描述 + 待收敛表阶段 2 完成）
+
+**验证结果：**
+- 全量测试 297 文件/2686 用例通过（基线 2704 → 删除 18 个退役函数用例）；qms-arch --all 0 violations；B-MF 零违规（41 指标文档/代码一致）；tsc/eslint 全绿
+
+**遗留问题：**
+- 阶段3（排行收敛 + quality-loss-trend 死端点删除）、阶段4（拆上帝文件）待做
+
+### 2026-08-17 阶段：指标治理阶段0-1（字典 + B-MF 门禁）
+
+**执行内容：**
+- 阶段0：docs/metrics-registry.md（指标字典：42 指标 7 族，含业务定义/口径/来源表/负责模块/消费/时效）+ apps/backend/utils/metrics-registry.ts（代码版登记表，METRIC_REGISTRY + EXEMPT_AGGREGATION_POINTS）；文档与代码版 ID 一致性 42/42；58 个聚合点全部登记（含质量损失三源、排行等），24 个豁免点（序号生成/行锁/对账/主数据治理工具/运维监控）
+- 阶段1：scripts/check-metric-registration.mjs（B-MF 门禁）：扫描 modules/utils 新增聚合（groupBy/aggregate/含 SUM/COUNT/GROUP BY 的 $queryRaw）→ 必须登记为指标实现点或豁免点，否则拦截；另校验文档↔代码 ID 一致性；挂入 check-qms-architecture.sh（--all 全量 / --changed 变更文件）；存量零 baseline；测试 2 例（拦截/放行）
+- 顺带修复：DSH 传输层对 `$'`（bash ANSI-C quoting）序列截断——bash 门禁函数改写避开（grep 去行尾 $ 锚点、while 用默认 IFS）；git ls-files 无匹配时 pipefail 退出问题（|| true 兜底）
+
+**验证结果：**
+- scripts 测试 13/13；check:qms-arch --all 0 violations（含 B-MF）；eslint/prettier 全绿；docs drift PASSED
+
+**遗留问题：**
+- 阶段2（质量损失三源收敛，口径已确认 lossAmount>0 OR isClaim=true）、阶段3（排行收敛+死端点）、阶段4（拆上帝文件）待做
+
+### 2026-08-17 阶段：待办核实——EventEmitter 替换项闭环
+
+**执行内容：**
+- 全仓库核实：utils/event-bus.ts（单进程 EventEmitter）已于 d4015f43（2026-07-29，make supplier score refresh durable）删除，零残留引用
+- 现状：售后→供应商评分刷新走 MetricRefreshQueue 持久化队列（可重试）；报检任务创建走 Redis pub/sub 跨实例广播 + SSE 推送；Redis pub/sub 不持久化属实时推送场景，业务副作用均有队列/cron 双保险
+- PROGRESS.md:139 + PROJECT_STATE 待办标记完成（附证据）
+
+**验证结果：**
+- grep EventEmitter/event-bus 全仓库零匹配（测试虚构引用除外）
+
+**遗留问题：**
+- 无（实时推送通道本身不承诺回放，属设计边界非缺陷）
+
+### 2026-08-17 阶段：数据契约自动化收官（命名规则检测 B-N1/B-N2/B-N3）
+
+**执行内容：**
+- 新增 scripts/check-field-naming.mjs：解析 prisma schema 标量字段，三条规则（docs/data-contract.md §4）——B-N1 Boolean 必须 is/has 前缀、B-N2 DateTime 必须 At 后缀或语义时间例外（date/*Date/*Until/*Time/*AtCutoff/*AtSnapshot）、B-N3 字段名 camelCase（关系字段随表名不受限）；输出 TSV 与 check-qms-source-rules.mjs 同契约（BASELINE/VIOLATION）
+- 存量噪音实测：1293 字段中 5 个 Boolean + 8 个 snake_case 标量（project_boms 7 + user_preferences 1）不合规 → 13 条入 baseline；B-N2 通过规则化例外零存量违规
+- 挂入 check-qms-architecture.sh（usage + check_b_field_naming + 调用顺序）；--changed 模式仅 schema.prisma 变更时检查，--all 全量
+- 顺带修复 B-AUTH2 门禁脚本路径 $ROOT_DIR→$SCRIPT_DIR（fixture 模式下脚本不存在导致 3 个既有测试失败）
+- 测试新增 2 例（违规拦截 / baseline 吸收），全套 11/11 通过；新增违规拦截演示验证（temp_col → B-N3 拦截，isTemp/tempDate 正确放行）
+- docs/data-contract.md §4.3 + 路线图 P2 更新为已落地
+
+**验证结果：**
+- scripts 测试 11/11；check:qms-arch --all 0 violations（13 条 baseline 吸收）；prettier 全绿
+
+**遗留问题：**
+- 存量 13 处不合规字段维持 baseline —— **2026-08-17 业务决策：放行不治理，仅拦截新增**（project_boms 等整表 snake_case 属历史遗留，改名涉及 migration+外键+前端消费，回归风险大，收益低）
+- 同义异名检测仍为文档约束（语义匹配误报高，不建议自动化）
+
+### 2026-08-17 阶段：业务决策三项落档
+
+**执行内容：**
+- ① 数据范围隔离（Phase 4）：业务决策**暂不实施**（代码已就绪，重新评估按 docs/permission-module.md §5.2 执行）
+- ② 审批流引擎（方案 B）：业务决策**暂不实施**（需求明确后再启动）
+- ③ Ai/Reports/ITP 权限码菜单按钮：业务决策**等生产部署回填**（随部署窗口处理，期间走脚本回填）
+- 决策同步落档：PROJECT_STATE.md 待办+最近变更、docs/audit-action-plan.md、docs/permission-consistency-report.md、docs/permission-module.md
+
+**验证结果：**
+- 纯文档变更；docs drift PASSED
+
+**遗留问题：**
+- 无（待办项保留为未勾选，标注决策状态，不误关闭）
+
+### 2026-08-17 阶段：权限模块文档成文
+
+**执行内容：**
+- 新增 docs/permission-module.md：权限体系三层模型（认证/授权/数据权限）、权限码字典与新增码完整流程（shared 枚举 → 模块声明 → 重建 dist → 一致性回填 → 界面分配）、authorizeWrite / requireSystemAdmin / assertRecordOwnership 用法与 403/401 响应契约、B-AUTH1/B-AUTH2/B-EC 三扇门禁与豁免清单、数据范围现状与开启手册（策略核查 → 配置 → 开关 → 回归）、60s 缓存与失效、token 治理（4h access / 30d refresh / 账号 ACTIVE 校验）、6 个运维脚本与部署顺序、新增写端点开发指南、故障排查表、已知边界诚实清单
+- PROJECT_GUIDE.md 文档地图收录本文件；PROJECT_STATE.md 最近变更同步
+
+**验证结果：**
+- 纯文档变更；docs drift PASSED
+
+**遗留问题：**
+- 无（业务决策项见文档第 5.2 节与 PROJECT_STATE 待办）
+
+### 2026-08-17 阶段：所有权助手 + 数据范围接入准备（③②）
+
+**执行内容：**
+- ③ 框架助手 assertRecordOwnership（rbac 模块导出，个人数据场景所有权断言，缺失 owner 放行历史数据）+ 单测 3 例；协作类模块不加"只能改自己"（避免误伤），判断标准写入行动清单
+- ② 数据范围：inspection 检验记录列表查询接入 buildScopedWhere（api 传 context.dataScope + 用户，DEPT/SELF 策略生效；ScopedWhere 类型放宽兼容 Prisma 联合类型）；策略核查脚本 scripts/audit-data-scope-policies.ts（输出角色×模块策略矩阵）
+- 关键决策：**DATA_SCOPE_V2 不擅自默认开启**——本地策略数据多数为 SELF、super 角色无策略，开启将导致全员可见性骤变；改为"接入完成 + 核查脚本 + 业务确认后开启"（开启手册见行动清单）
+
+**验证结果：**
+- 全量测试 2704/2704；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- Phase 4 开启前置：业务确认策略矩阵（audit-data-scope-policies.ts 输出）→ 配置 data_permission_policies（含 super 全 ALL）→ DATA_SCOPE_V2=true → 回归观察
+- inspection issues/requests 读路径接入（records 已接入，其余同类改造）
+- 写路径范围校验（quality-loss 范式推广）
+
+### 2026-08-17 阶段：导出类读接口授权（①）
+
+**执行内容：**
+- 6 个数据导出 GET 接口纳入权限码校验：检验记录导出（Records:Export）、计量导出（Metrology:Export）、质量损失导出（LossAnalysis:Export）、供应商导出（Supplier:Export）、工单导出（WorkOrder:Export）、车辆问题导出（VehicleCommissioning:Export）
+- @qgs/shared 补 METROLOGY.EXPORT、VEHICLE_COMMISSIONING.EXPORT 码；一致性回填（VehicleCommissioning:Export 新码 + 7 角色分配）
+- 车辆导出因 50 行限制下沉为模块 service（vehicle-commissioning-issues-export.get.service.ts，api 层薄转发）——顺带符合"api 薄层"架构
+
+**验证结果：**
+- 全量测试 2701/2701；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- 一般列表/统计读接口仍仅登录（数据可见性属 ② Phase 4 范围）；① 完成，其余 3-2 继续
+
+### 2026-08-16 阶段：token 吊销与账号状态即时校验（④）
+
+**执行内容：**
+- access token 有效期 7d → 4h（前端已有 401 自动刷新机制，refresh token 30d 不变，无体验影响）
+- 认证中间件 3.auth.ts 异步化：验证 token 后实时校验用户状态（users.status === ACTIVE），禁用/删除账号 1 分钟内失去全部 API 访问权（60s 内存缓存，clearAccountStatusCache 导出）
+- 新增中间件单测 5 例（公开路径跳过/无效 token 拒绝/禁用账号拒绝/活跃放行/状态缓存）；dictionary 集成测试适配 async 中间件；rbac 缓存测试并入主测试文件（B-TEST2 合规）
+
+**验证结果：**
+- 全量测试 2701/2701；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- 60s 账号状态缓存陈旧窗口（可接受）；④ 完成，其余 1-3 继续
+
+### 2026-08-16 阶段：权限码查询缓存（⑤）
+
+**执行内容：**
+- rbac-role.service 的 getUserPermissionCodes 加 60s 内存 TTL 缓存（写请求从 2-3 次 DB 查询降到 1 次）
+- 权限变更点失效：persistRolePermissions（所有角色权限写入统一入口）与 softDeleteRole 清缓存；clearPermissionCodesCache 从 rbac index 导出
+- 新增缓存行为单测 3 例（TTL 内命中、过期重查、变更失效）；既有 rbac 测试补 beforeEach 清缓存
+
+**验证结果：**
+- rbac 测试 257/257；typecheck/lint/qms-arch 0 violations/docs-drift PASSED
+
+**遗留问题：**
+- 多实例部署缓存最多 60s 陈旧（可接受权衡）；⑤ 完成，其余 1-4 继续
+
+### 2026-08-16 阶段：权限门禁 B-AUTH2（前端码必须声明）+ 声明有效性检查
+
+**执行内容：**
+- 新增 scripts/check-permission-code-declarations.mjs：校验前端引用的权限码必须有声明（shared 枚举或 module 菜单 authCode）、后端 authorizeWrite 引用的枚举必须存在于 shared（含嵌套 PERMISSION_CODES 与别名处理）
+- 挂入 check-qms-architecture.sh 新规则 B-AUTH2（--all 模式）；负向验证：前端假码被拦截（EXIT 1）、恢复后全绿
+- 修复检查暴露的问题：QMS:Inspection:Records:Export 补枚举+records 菜单按钮；INSPECTION_MATERIAL_PERMISSION_CODES 从模块内迁至 @qgs/shared（模块 re-export 兼容）；supervision actions 端点 import 别名 SPC 改回全名
+- 同步菜单 + 一致性回填（Records:Export 已在权限表，仅补声明）
+
+**验证结果：**
+- B-AUTH2 全绿（前端码 45 个全部有声明）；typecheck/lint/qms-arch 0 violations/docs-drift PASSED；rbac 测试 254/254
+
+**遗留问题：**
+- ⑥⑦ 完成；其余 1-5 项继续
+
+### 2026-08-16 阶段：修复售后导出按钮权限缺失（前端按钮码缺口）
+
+**问题**：售后反馈页面无导出按钮。根因：QMS:AfterSales:Export 码自始未被声明（菜单按钮无、权限表无、角色未分配），前端按钮按码显隐 → 普通用户永远不可见（仅管理员兜底）。
+
+**执行内容：**
+- 全量排查前端 45 个按钮权限码 vs 权限表，定位 3 组真实缺口：AfterSales:Export、Outsourcing:Export/Import、Planning:ProjectDocs:Export
+- after-sales.module.ts 补菜单+8 按钮声明（含 Export/Settle/Chart*）；inspection.module.ts 补 outsourcing 菜单+5 按钮；planning.module.ts 补 project-docs 菜单+5 按钮（此前这两个菜单仅有 DB seed 无代码声明）
+- 本地执行菜单同步（ensureModuleMenus）→ 4 个新码进菜单表 → backfill-permission-consistency.ts 补齐权限表 + 全角色分配（4 码 + 28 条）
+
+**验证结果**：
+- 4 码菜单/权限表就绪；全量测试通过；lint/typecheck/qms-arch 0 violations
+
+**遗留问题**：
+- 前端按钮码缺口清零；其余 useQmsPermissions 前缀为拼接模式非缺口
+
+### 2026-08-16 阶段：权限码一致性三类遗留处置
+
+**执行内容：**
+- 🔴 审计发现第二个回归：QMS:WorkOrder:Import 被 authorizeWrite 引用但权限表/菜单均无 → 工单导入非管理员被锁；升级 backfill-permission-consistency.ts 为"菜单码 + shared 枚举码"双源合并，本地执行补齐（1 码 + 7 条分配）
+- 🟡 MENU_* 占位孤儿码 7 个：新增 cleanup-menu-placeholder-codes.ts 软删 + 解除 5 条角色关联，本地执行
+- 🟡 死码 6 个（QMS:Inspection:List/Create/Edit/Delete/Export、QMS:AfterSales:Export）：确认无业务引用后从 PERMISSION_CODES 删除；重建 dist
+- 🟡 Supervision 菜单按钮声明补全（Create/Edit/Delete 3 按钮，supervision.module.ts），启动同步后界面可分配
+- ⏳ Ai/Reports/ITP 12 码菜单按钮：涉及前端导航/既有菜单 merge，待业务决策（行动清单记录）
+- docs/permission-consistency-report.md 更新处置结果
+
+**验证结果：**
+- 门禁全绿（lint/typecheck/qms-arch 0 violations/docs-drift）；本地 DB：权限表 197-6 死码未入表+7 占位软删 = 净 190 active + WorkOrder:Import 补齐
+
+**遗留问题：**
+- Ai/Reports/ITP 菜单按钮补全（业务决策）
+- 生产部署 4 个回填/清理脚本（幂等）
+
+### 2026-08-16 阶段：权限码数据一致性盘点与修复
+
+**执行内容：**
+- 三方盘点（rbac_permissions 177 码 vs menus.authCode 172 码 vs 代码枚举 103 值）：发现 4 类差异，产出 docs/permission-consistency-report.md
+- 🔴 修复真实回归：菜单有码但权限表无行的 20 个码中，物料审批 3 码被 authorizeWrite 引用 → 非管理员审批全 403；新增 backfill-permission-consistency.ts（菜单码全量同步权限表 + 全角色分配），本地执行：20 码 + 140 条角色分配；验证 QC 审批 ✅、越权删除仍 ❌
+- @qgs/shared 补 SUPERVISION_PERMISSION_CODES.LIST（菜单声明引用但枚举缺失）；重建 dist
+- 另发现：MENU_* 占位孤儿码 7 个（建议清理）、新业务码 12 个未同步菜单按钮（界面不可分配）、死码 8 个
+
+**验证结果：**
+- 门禁全绿（lint/typecheck/qms-arch 0 violations/docs-drift）；全量测试 2693 不受影响（授权演示脚本验证）
+
+**遗留问题：**
+- P1：Ai/Reports/Supervision/ITP 12 码的菜单按钮声明补全（ITP 码命名需业务确认）
+- P2：MENU_* 占位码清理、死码处置
+
+### 2026-08-16 阶段：统一授权框架 Phase 2f（系统设置/监造/收尾——B-AUTH1 基线清零）
+
+**执行内容：**
+- 系统设置类 22 个写端点：薄转发包装 requireSystemAdmin（7 个：字典增改、菜单编辑、角色数据范围、设置写入 3 个含 2 个原本无校验的开关接口）、内联插入（4 个）+ 已有 assertPermission 风格自动合规（8 个，门禁正则扩展为 authorizeWrite/requireSystemAdmin/assert*Permission/ensurePermission）
+- 监造 supervision 15 个写端点：新增 SUPERVISION_PERMISSION_CODES（Create/Edit/Delete）+ authorizeWrite 迁移 + 回填脚本 backfill-supervision-permissions.ts（本地执行：3 码 + 21 条角色分配）
+- 收尾 14 个：报检任务 5（现成 Requests 码）、归档任务 1、文件管理 2、供应商身份链接 3、主数据改名/AI 设置测试/手动故障率 3（requireSystemAdmin）
+- 豁免 4 类：登录态上传端点（qms/upload）、客户端日志上报、用户个人偏好（自服务操作）——门禁豁免列表
+- **B-AUTH1 基线清零：全部 189 个写端点均有授权声明或豁免**
+
+**验证结果：**
+- 全量 2693/2693；typecheck/lint/qms-arch 0 violations/docs-drift 全绿
+
+**遗留问题：**
+- 读端点授权（读接口的数据范围）属 Phase 4（数据范围启用）范畴，未在本期
+- 权限码数据一致性盘点（rbac_permissions vs 菜单 authCode）仍待做
+
+### 2026-08-16 阶段：统一授权框架 Phase 2e（报表/派发/车辆/AI/工作台迁移）
+
+**执行内容：**
+- @qgs/shared 新增 5 组权限码枚举：REPORTS（Create/Edit/Delete）、TASK_DISPATCH（Create/Update）、VEHICLE_COMMISSIONING_WRITE（Create/Edit/Delete）、AI_GENERATION（Generate）、DASHBOARD（ChartEdit）；重建 dist
+- 迁移 16 个写端点：报表 4（增删改/日报）、任务派发 2（状态/创建）、车辆验收 4（问题增删改/日报）、看板目标 1、AI 生成 5——含薄转发包装与块函数插入（修复一次批量生成的位置错位，git 恢复后重做）
+- 回填脚本 apps/backend/scripts/backfill-phase2e-permissions.ts（9 个新码 upsert + 全 ACTIVE 角色分配）；本地库已执行：9 码插入 + 63 条角色分配
+- B-AUTH1 baseline 清理：70 → 54（释放 16 条）
+
+**验证结果：**
+- 模块测试 184/184；全量 2693/2693；typecheck/lint/qms-arch 0 violations/docs-drift 全绿
+
+**遗留问题：**
+- 剩余 54 个写端点（系统设置类/监造/其余）；监造（supervision）无历史权限码，需新码+回填
+
+### 2026-08-16 阶段：统一授权框架 Phase 2d（策划全系迁移）
+
+**执行内容：**
+- PERMISSION_CODES 扩展：PLANNING 补 INSPECTION_FORM（4 码）、PROJECT_DOCS（5 码）；重建 dist
+- 迁移 26 个写端点：BOM 7（含项目）、DFMEA 6（含项目）、ITP 7（含项目/导入）、检验表单 3、项目文档 3——全部为"内联转发"模式，统一改为块函数 + authorizeWrite（修复批量生成产生的逗号残留）
+- B-AUTH1 baseline 清理：96 → 70（释放 26 条）
+
+**验证结果：**
+- planning 测试 20/20；qms-arch 0 violations
+
+**遗留问题：**
+- 剩余 70 个写端点（报表/工作台/派发/车辆/AI/监造/系统设置等）
+- 监造（supervision）无历史权限码，需新码+回填
+
+### 2026-08-16 阶段：统一授权框架 Phase 2c（售后/供应商/质量损失/工单迁移）
+
+**执行内容：**
+- PERMISSION_CODES 扩展：LOSS_ANALYSIS 补 CREATE/IMPORT、AFTER_SALES 补 CREATE（对齐历史 rbac_permissions 码）；重建 dist
+- 迁移 23 个写端点：售后 5、供应商 6、质量损失 4、工单 8（含 requirements 子域）——薄转发包装 4、内联插入 13、defineValidatedHandler 适配 6
+- B-AUTH1 baseline 清理：119 → 96（释放 23 条）
+
+**验证结果：**
+- 四模块测试 527/527；门禁全绿（待全量确认）
+
+**遗留问题：**
+- 剩余 96 个写端点（策划全系/报表/监造/派发/车辆/工作台/AI 等）
+- 监造（supervision）无历史权限码，需新码+回填
+
+### 2026-08-16 阶段：统一授权框架 Phase 2（计量/知识库/焊工迁移）
+
+**执行内容：**
+- @qgs/shared 新增 write-permission-codes.ts：METROLOGY_PERMISSION_CODES（11 码，含借还/检定计划子域）、KNOWLEDGE_PERMISSION_CODES、WELDER_PERMISSION_CODES（值对齐历史 rbac_permissions 码）；重建 dist
+- 迁移 21 个写端点：计量 11 个（台账 CRUD/导入/借还/检定计划 CRUD+导入）、知识库 6 个（条目/分类 CRUD）、焊工 4 个（CRUD/导入）——均加 authorizeWrite 声明（薄转发文件包装、内联文件插入、defineValidatedHandler 文件适配）
+- B-AUTH1 baseline 清理：140 → 119（释放已迁移 21 条，修完即删基线）
+
+**验证结果：**
+- metrology/knowledge/welder 测试 249/249；全量 296 文件/2693 用例通过；typecheck 通过；lint 全绿；qms-arch --all 0 violations；docs-drift PASSED
+- 本地库验证：历史 rbac_permissions 已含全部所需码（150+ 码），角色分配已就绪，无需回填
+
+**遗留问题：**
+- 剩余约 119 个写端点待迁移（售后/供应商/质量损失/策划全系/工单/报表/监造/派发/车辆/工作台/AI 等，下批继续）
+- 监造（supervision）等模块无历史权限码，迁移时需新码 + 回填
+
+### 2026-08-16 阶段：统一授权框架实施（Phase 1 + 示范迁移）
+
+**执行内容：**
+- 授权服务：modules/rbac/rbac-authorize.service.ts（authorizeWrite：登录态检查 + RbacService 权限码校验，无码抛 BusinessError FORBIDDEN 403 / UNAUTHORIZED 401；super 经现有菜单码合并机制豁免），rbac/index.ts 导出 + 单元测试 4 例
+- @qgs/shared 新增 INSPECTION_RECORD_PERMISSION_CODES（CREATE/EDIT/DELETE/IMPORT/LIST/VIEW）；重建 dist
+- 门禁 B-AUTH1（check-qms-architecture.sh）：写端点（post/put/delete/patch）必须含 authorizeWrite/requireSystemAdmin，public/auth/uploads/telegram/webhook 豁免；存量 140 个写端点入 baseline，新增未声明即拦截
+- 示范迁移 13 个写端点：检验记录 5 个（create/update/delete/batch-delete/import）、不合格品项 6 个（delete/update/assign-nc/batch-delete/import/create）、物料审批 2 个（approve/reject）；检验记录菜单 + 按钮 authCode 声明（inspection.module.ts）
+- 回填脚本 apps/backend/scripts/backfill-inspection-record-permissions.ts（rbac_permissions upsert + 全 ACTIVE 角色分配，零回归；业务收紧走角色管理界面）
+- 文档：需求单 Phase 1 标记完成、行动清单第 2 项更新
+
+**验证结果：**
+- rbac/file-storage 测试 289/289 通过；qms-arch --all 0 violations（B-AUTH1 生效 + baseline 匹配）
+- 待 typecheck/lint/全量测试结果补记
+
+**遗留问题：**
+- Phase 2 其余模块迁移待继续（计量/策划/监造/焊工/知识库/售后/供应商/工单等）
+- 部署前置：运行 backfill 脚本 + 角色权限配置调整（业务决策）
+- 权限码数据一致性盘点（rbac_permissions vs 菜单 authCode）待做
+
+### 2026-08-16 阶段：产出统一授权框架需求单
+
+**执行内容：**
+- 依据权限摸底报告产出 docs/authorization-framework-requirement.md：写端点声明制 + 默认拒绝 + 单一入口 + 分层校验（权限码/所有权/数据范围）；7 条 FR + 12 条 AC（含 CI 拦截验收）；技术要点落到现有代码位置（中间件先例、rbac 权限码解析、issue-access 范式、assertDeleteAccess 范式、门禁脚本扩展点）；四阶段实施批次（框架→核心模块→其余→数据范围）；风险提示（权限码数据盘点前置、误伤防控）
+- 更新 docs/audit-action-plan.md 第 2 项：需求单已产出，待立项
+
+### 2026-08-16 阶段：权限系统深入摸底（越权删改问题）
+
+**执行内容：**
+- 全量扫描 342 个 API 端点 + 33 个模块的权限保护现状，产出 docs/permission-audit-report.md：189 写端点中约 140 个仅登录零校验；52 个权限码仅 4 个业务点被后端消费；18 个模块 service 层零校验关键词；dataScope 默认关闭且只覆盖读路径；根因（RBAC 定位为前端菜单权限、无新增端点权限声明门禁、五套校验实现并存）
+- 更新 docs/audit-action-plan.md 第 1 项：代码摸底完成，剩生产 audit_logs 日志核查
+
+**验证结果：**
+- 扫描脚本统计 + 人工抽读关键 service（metrology deleteById 等）双重确认
+
+### 2026-08-16 阶段：产出审计行动清单 docs/audit-action-plan.md
+
+**执行内容：**
+- 依据系统性架构审计报告，产出可勾选行动清单 docs/audit-action-plan.md：已完成 4 项（含 commit 证据）+ P0 三项（越权摸底/权限强制校验/数据隔离）+ P1 三项（任务告警/导出修复/统计性能）+ P2 两项（日志归档/测试门槛）+ P3 四项，含每项的背景、动作、验收标准与建议执行顺序
+
+### 2026-08-16 阶段：修复上传拒绝时请求挂起（转圈无提示）
+
+**问题：** 上传被白名单拒绝时前端一直转圈、无提示。根因：upload.service.ts 中 uploadFileStream 在读取文件流之前先做白名单校验，校验失败抛错后 file 流无人消费，busboy 因背压停止读取请求体，once(busboy, 'finish') 永不触发，请求挂起。
+
+**执行内容：**
+- upload.service.ts：uploadFileStream 失败分支增加 file.resume()，消费残留流让 busboy 完成，请求正常返回 400（businessErrorResponse）
+- 前端报检入口页：上传 error 分支展示后端返回的具体原因（"不支持的文件类型，仅允许：..."），不再只显示笼统"上传失败"；upload-file.ts 的 QmsUploadResponse 增加 message 字段
+- 测试：upload.service.test.ts 新增用例"上传失败时 resume 文件流，请求正常终止"
+
+**验证结果：**
+- file-storage 模块 35/35 通过（含新增用例）
+
+### 2026-08-16 阶段：上传文件类型可配置化（匿名上传白名单收紧）
+
+**执行内容：**
+- 新增 modules/file-storage/upload-policy.ts：上传格式三级策略（白名单 allowlist 为安全控制，SVG/HTML/宏文档等可携带脚本的格式任何档位均排除）。设置 key UPLOAD_ALLOWED_EXTENSIONS，值 images（jpg/jpeg/png/webp）、images+pdf、images+pdf+office（+doc/docx/xls/xlsx）；默认文档档（实施中发现 KnowledgeEditModal 明确支持 Word/Excel 等附件，默认值从"仅图片"修正为文档档以免上线即回归），解析失败 fail-closed。扩展名判定以服务端解析为准，客户端 MIME 仅作为无扩展名时的兜底推断，不再直接信任
+- file-storage.service.ts：uploadFileStream 入口在生成存储名之前做白名单校验（assertAllowedUploadExtension），拒绝时抛 BusinessError(BAD_REQUEST)；删除 getMimeType（原优先取客户端 MIME）
+- upload.service.ts：catch 中识别 BusinessError 并转标准 400 响应（businessErrorResponse），三个上传端点（/api/upload、/api/qms/upload、/api/qms/public/upload）共用同一服务，全部生效
+- 重建 packages/qgs-shared dist：ErrorCode 枚举首次真正进入构建产物（此前数据契约新增的 enums/error-code.ts 从未被 build，运行期 import 会崩）
+- 前端 views/system/inspection-settings/index.vue 新增"上传设置"区块：下拉框（仅图片 / 图片+PDF / 图片+PDF+Word/Excel 三档），仅管理员可改，复用现有系统设置读写接口与权限；zh-CN/en-US sys.json 同步新增 6 个 i18n key
+- 测试：file-storage.service.test.ts 新增 9 个白名单用例（拒 html/svg、images+pdf 放行 pdf、images 拒 pdf、默认档放行 docx、客户端 MIME 谎报无效、无扩展名按 MIME 兜底、脏配置回退默认档）；原"上传 doc.pdf"用例改为默认策略下上传 png
+
+**验证结果：**
+- file-storage 模块测试 34/34 通过（3 文件）；后端全量 295 文件 / 2688 用例全部通过
+- 全仓 pnpm run check:type（turbo 3 任务）通过；pnpm lint 全绿（prettier + eslint）
+- pnpm run check:qms-arch:all：0 violations；bash scripts/check-docs-drift.sh：PASSED（模块 TS 文件数 671 已同步）
+
+**顺带修复（存量债，非本需求引入）：**
+- 8-16 定时任务框架提交（scheduler 模块）从未通过全量 lint：11 个文件 prettier 格式债 + 8 个文件 42 处 eslint 违规（node:test 风格测试、import/unicorn/perfectionist 排序等），导致 CI lint 门禁持续红色。本次一并修复：prettier --write + eslint --fix + 手工修正 eslint 自动修复引入的缺失 import（cron-job.service.test.ts 补 it）与 scripts/where-field.mjs 两处不可自动修复项；门禁脚本 check-qms-source-rules.mjs 仅 Set 成员排序（语义不变，qms-arch 全量重跑 0 violations 验证）
+- 修复 packages/qgs-shared/src/enums/error-code.ts 存量 prettier 格式
+
+**遗留问题：**
+- 白名单为固定三级预设（images / images+pdf / images+pdf+office）；若未来需要其他格式（图纸、压缩包等），需单独评审后扩展
+- 未做"未引用文件自动清理/配额"（用户确认暂不处理）
+- 部署注意：@qgs/shared 的 dist 已重建（ErrorCode 首次进入构建产物）；部署/CI 构建时需执行 shared 包 build（postinstall 已含 stub，正常流程会自动触发）
+
+### 2026-08-16 阶段：修复 validate-json.js 硬编码路径
+
+**执行内容：**
+- apps/web-antd/src/locales/validate-json.js 重写：原脚本硬编码了其他机器/目录的绝对路径（/Users/zhaoxiaojie/Downloads/main/...）且只检查 2 个语言文件，在任何环境都无法真正工作
+- 改为基于脚本自身位置（import.meta.url）解析 langs 目录，覆盖全部 8 个语言文件；新增 zh-CN/en-US 文件集合与翻译 key 一致性校验（防止中英文缺词），失败时退出码 1
+- 验证：正常 8/8 JSON 合法 + 4 对 key parity 全过（qms.json 821 keys、sys.json 147 keys 中英完全对齐）；负向注入缺失 key 正确 FAIL（exit 1）；还原后全绿；eslint + prettier 通过
+### 2026-08-16 阶段：定时任务框架实现（方案 A）
+
+**执行内容：**
+- 新增 `modules/scheduler/`：cron-expression.ts（5 段 cron 解析/匹配，纯函数）、scheduler-registry.ts（任务注册表）、cron-job.service.ts（定义落库 + 到点触发 + lastRunAt CAS 防重 + lastStatus/lastError 记录）、scheduler.module.ts；注册进 module-loader
+- 新增 `plugins/cron-scheduler.ts`：启动时注册 3 个业务任务 + sync 定义 + 60s 轮询 tick（unref）
+- 新增表 `cron_jobs`（migration `20260816120000_add_cron_jobs`，经 prisma migrate diff 生成增量 SQL + migrate deploy 应用；注：本地 shadow DB 重放历史链失败，因初始基线迁移缺失，采用增量迁移方案）
+- 3 个首批任务：metrology.due-reminder（每日 8:00 计量 30 天内到期 Telegram 提醒）、inspection.nc-overdue（每日 9:00 超 7 天未关闭 NC 催办）、supplier.monthly-snapshot（每月 1 日 2:00 全量评分快照）
+- 文档：docs/scheduler-design.md（设计 + 任务登记）、code_map.md 新增 scheduler 模块、scheduler/ARCHITECTURE.md
+
+**验证结果：**
+- scheduler 单元测试 13/13（cron 解析 7 + 调度器 6：触发/跳过/CAS 防重/失败记录）
+- 相关模块回归：108 测试文件 / 1186 用例全部通过（metrology/inspection/supplier 无回归）
+- `QMS_ARCH_SCOPE=all bash scripts/check-qms-architecture.sh`: 0 violations
+- `bash scripts/check-docs-drift.sh`: PASSED（33 模块已同步）
+- 未启动真实后端进程验证 plugin 轮询（待生产/本地运行验证）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 本地开发库的 shadow-database 迁移重放受历史基线缺失影响，新迁移采用增量方式；如需完整 shadow 支持需补齐历史基线（不建议动历史迁移）
+- 生产环境需观察 cron-scheduler 启动日志与 cron_jobs 落库
+
+### 2026-08-16 阶段：知识库四层载体分工成文
+
+**执行内容：**
+- `docs/PROJECT_GUIDE.md` 新增第 11 节「知识库四层载体分工」：docs 正文（被动）→ AGENTS 注入（中）→ skill 按需（强）→ 门禁强制（最强）的执行性分层表，以及新规则落地的放置规则与边界判断
+- `qg-project` 技能同步该分工的索引式说明（不复制正文，遵守"正文进 docs、指令进 AGENTS/Skill、红线进门禁"原则）
+
+**验证结果：**
+- `bash scripts/check-docs-drift.sh`: PASSED
+- 未运行 lint/typecheck（纯文档变更）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无
+
+### 2026-08-16 阶段：数据契约自动化落地
+
+**执行内容：**
+- `@qgs/shared` 新增 `src/enums/error-code.ts`：`ErrorCode`（9 个 code）+ `ERROR_UX_LEVEL`（前端分级）+ `isErrorCode`；挂入 enums/index
+- 架构门禁新增 3 条规则：
+  - `B-EC`（check-qms-source-rules.mjs）：BusinessError 错误码必须是共享枚举成员；存量 170 处自由字符串入 baseline，新增自由字符串拦截
+  - `B-GF`（scripts/check-governed-fields.py）：新增 schema 列复用治理字段到未登记表 / 全新跨表 name 字段 → 拦截（增量检查，零存量误伤）
+  - `R2`（check-qms-architecture.sh）：views/qms 禁裸 axios/fetch；存量 1 处入 baseline，新增拦截
+- 新增 `scripts/where-field.mjs`：字段影响面六层扫描（治理登记/schema/后端/shared/web-antd/WeApp），挂入 `pnpm run where:field`
+- `check-qms-architecture.sh` 增加 node 探测（沙箱/用户环境通用）
+- docs/data-contract.md 路线图更新为已落地状态
+
+**验证结果：**
+- `QMS_ARCH_SCOPE=all bash scripts/check-qms-architecture.sh`: 0 violations PASSED
+- `bash scripts/check-docs-drift.sh`: PASSED
+- 三项门禁模拟新增违规均正确拦截（B-EC 新错误码 / B-GF 新表复用治理字段 / R2 新裸 axios）
+- 未运行 lint/typecheck（脚本与枚举变更，@qgs/shared 枚举已用 tsc 转译验证）
+
+**commit:** 待提交
+
+**遗留问题：**
+- P2 命名规则自动化检测待做（文档约束已先行）
+
+### 2026-08-16 阶段：数据契约规范成文
+
+**执行内容：**
+- 新增 `docs/data-contract.md`（数据契约规范单一事实源）：字段治理登记流程与元数据标准、错误码字典（ErrorCode 枚举契约）、字段命名规则、前端数据消费约束、字段影响面 checklist，以及 P0-P2 自动化路线图
+- `CONSTRAINTS.md` 追加「数据契约规范」15 条硬约束（字段治理登记/错误码字典/命名/前端/影响面）
+- `docs/PROJECT_GUIDE.md` 红线新增第 14 条（数据契约四铁律）+ 文档地图收录 `docs/data-contract.md`
+
+**验证结果：**
+- `bash scripts/check-docs-drift.sh`: PASSED
+- 未运行 lint/typecheck（纯文档变更，不涉及业务代码）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 自动化项待落地：ErrorCode 枚举、BusinessError 错误码门禁、跨表字段登记门禁、where:field 脚本、前端约束门禁
+
+### 2026-08-16 阶段：文档知识库防漂移体系 + 文档补齐
+
+**执行内容：**
+- 新增 `docs/PROJECT_GUIDE.md`（项目档案，规范唯一权威：架构/能做什么/红线/工作流/文档地图）
+- 新增 `PROJECT_STATE.md`（状态日报：硬数据段由 `scripts/sync-project-state.sh` 自动实测生成）
+- 新增 `scripts/sync-project-state.sh`（`pnpm run docs:sync`）与 `scripts/check-docs-drift.sh`（`pnpm run check:docs-drift`：D1 版本/基线漂移、D2 模块缺 code_map、D3 引用消失模块、D4 ARCHITECTURE 缺失提示）
+- `check:docs-drift` 挂入 `pnpm check` 与 lefthook pre-push
+- `AGENTS.md` 增加"交接规矩"（新 AI 开工必读档案+日报）与文档链接；`qg-project` 技能改为索引式（不再维护规范正文副本）
+- 为 16 个缺失模块新建 ARCHITECTURE.md（ai/dashboard/data-scope/dept/dictionary/file-storage/knowledge/planning/rbac/report/system/system-log/task-dispatch/user/welder/work-order-requirement），32/32 模块全部具备
+- `docs/architecture.md` 顶部标注为历史方案，加"历史 vs 当前"对照表，指向 PROJECT_GUIDE
+- `PROGRESS.md` 版本号修正 0.24.0→0.27.0；基线数据改为实测并标注被 PROJECT_STATE 取代
+- `code_map.md` 补充缺失的 `master-data-governance` 模块条目
+
+**验证结果：**
+- `bash scripts/check-docs-drift.sh`: PASSED（0 违规、0 提示）
+- `bash scripts/sync-project-state.sh`: v0.27.0 / 32 modules / 660 TS / 293 tests
+- 未运行 lint/typecheck（本次为纯文档+脚本变更，不涉及业务代码）
+
+**commit:** 待提交
+
+**遗留问题：**
+- 无（文档治理闭环完成）
+
+### 2026-08-15 阶段：inspection 统计服务行数门禁修复
+
+**执行内容：**
+- `inspection-request-stats.service.ts` 505 行超出模块 500 行上限（[B-S1]），pre-push 门禁拒绝推送 main（当时 22 个待推提交）
+- 新建 `inspection-request-stats-accumulator.ts`（101 行）：提取统计累加器初始化（11 个 Map、6 个计数器、日趋势播种）与检验员判定辅助函数；计数器改为可变对象字段，行为零变更
+- 服务文件降至 462 行
+
+**验证结果：**
+- check:qms-arch: 0 violations / 通过
+- check:type: 3/3 通过
+- vitest（inspection-request-stats / inspection-route）: 33/33 通过
+
+**commit:** c55fcdb3
+
+---
+
+### 2026-08-15 全项目代码审计（只读）
+
+**执行内容：**
+- 全量只读审查：32 个后端模块、342 个 API 路由、5 个 middleware、44 个 utils、82 个 Prisma model、前端 apps/web-antd（193 vue + 267 ts）、apps/weapp、packages/qgs-shared
+- 8 个并行子代理分组深审（inspection / 质量评分域 / 售后报表AI域 / 计量监督域 / 策划生产域 / 平台管理域 / 基础设施层 / 前端与共享包），主代理独立复核全部严重级结论
+- 独立验证：后端 Vitest `293/293` 文件、`2666/2666` 用例 PASS；根目录 `pnpm test:unit`（happy-dom）`407/407` 文件、`3390/3390` 用例 PASS；`pnpm run check:type` 3/3 PASS；`check-qms-architecture.sh --all` exit 0（仅 inspection-request-stats.service.ts 505 行 1 条活跃违规）
+
+**关键发现（详见评审报告，未做任何代码变更）：**
+- P0 安全：ai/generate-itp 路径穿越（任意文件读取+外泄 LLM）；ai/match-cases 跨组织质检数据泄露；user 列表泄露 bcrypt 哈希；AI apiKey 明文无鉴权回读；软删/禁用用户仍可登录；登录无防爆破；DATA_SCOPE_V2 默认 false；metrology 公共借用 fail-open；supplier 写路径无数据权限
+- P1 硬约束：~43 个 handler 下沉 modules 架空 api 薄层；弱 zod 52 处；after-sales 全表加载+内存分页；work-order/supplier 导出静默截断（pageSize 钳 100）；request-dedupe 先于 auth 执行；data-scope 前缀歧义；BusinessError 迁移未完成
+- 模块评分区间 2.0（ai）～ 4.5（part-master/process-master）；前端整体 74/100（B）
+
+**遗留问题：**
+- 未修复任何代码；P0/P1 问题清单与修复优先级已交付，待后续 wave 按评审报告处理
+- 架构 baseline 267 行冻结债务（B-E2 57 / B-M1 140 / B-M2 37 等）未清理
+
+**commit:** （未提交，仅文档追加）
+
+---
 
 ## [0.27.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.26.0...qgs-v0.27.0) (2026-08-15)
 

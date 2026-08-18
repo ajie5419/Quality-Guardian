@@ -50,6 +50,8 @@ model inspections {
   isDeleted               Boolean                              @default(false)
   createdAt               DateTime                             @default(now())
   updatedAt               DateTime                             @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   items                   inspection_items[]
   archiveTask             inspection_archive_tasks?
   inspectionRequest       qms_inspection_requests?
@@ -155,6 +157,8 @@ model after_sales {
   linkedEngineeringId    String?
   createdAt              DateTime                              @default(now())
   updatedAt              DateTime                              @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   version                Int                                   @default(1)
   isDeleted              Boolean                               @default(false)
   workOrderNumber        String
@@ -254,6 +258,42 @@ model login_logs {
   createdAt DateTime @default(now())
 
   @@index([isDeleted])
+}
+
+model data_retention_rules {
+  id             String   @id @default(cuid())
+  dataClass      String   @unique @db.VarChar(64) // 数据类 key（如 audit-log / inspection-record）
+  displayName    String   @db.VarChar(64) // 中文名
+  retentionDays  Int      // 保留天数
+  action         String   @db.VarChar(16) // ARCHIVE / DELETE / PURGE
+  isEnabled      Boolean  @default(true)
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([isEnabled])
+
+  // @module data-lifecycle
+}
+
+model data_lifecycle_jobs {
+  id          String   @id @default(cuid())
+  dataClass   String   @db.VarChar(64) // 数据类（对应 data_retention_rules）
+  source      String   @db.VarChar(32) // 表名/来源
+  sourcePk    String   @db.VarChar(64)
+  action      String   @db.VarChar(16) // ARCHIVE / DELETE / PURGE
+  status      String   @default("PENDING") @db.VarChar(16) // PENDING / PROCESSING / DONE / FAILED
+  attempts    Int      @default(0)
+  availableAt DateTime @default(now())
+  reason      String?  @db.Text
+  isDeleted   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([dataClass, source, sourcePk])
+  @@index([status, availableAt])
+
+  // @module data-lifecycle
 }
 
 model departments {
@@ -417,6 +457,7 @@ model processes {
   name                      String                               @unique
   code                      String?
   supplierSource            String                               @default("Supplier") @db.VarChar(20)
+  responsibleDepartmentId String?                              // 工序默认责任部门（2026-08-17 工序责任映射）
   inspectionRequestCategory String                               @default("PROCESS") @db.VarChar(20)
   sort                      Int                                  @default(0)
   status                    Int                                  @default(1)
@@ -767,6 +808,8 @@ model quality_records {
   sourceAfterSalesId                      String?
   createdAt                               DateTime                              @default(now())
   updatedAt                               DateTime                              @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   version                                 Int                                   @default(1)
   isDeleted                               Boolean                               @default(false)
   inspectionId                            String?
@@ -1522,6 +1565,8 @@ model measuring_instruments {
   isDeleted        Boolean                       @default(false)
   createdAt        DateTime                      @default(now())
   updatedAt        DateTime                      @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   calibrationPlans metrology_calibration_plans[]
   borrowRecords    metrology_borrow_records[]
 
@@ -1653,6 +1698,8 @@ model work_orders {
   status                         work_orders_status                   @default(OPEN)
   createdAt                      DateTime                             @default(now())
   updatedAt                      DateTime                             @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   version                        Int                                  @default(1)
   isDeleted                      Boolean                              @default(false)
   effectiveTime                  DateTime?
@@ -1770,6 +1817,7 @@ model qms_inspection_requests {
   mutualCheckResult       String                               @default("PASS")
   requestInfo             String?                              @db.Text
   attachments             String?                              @db.LongText
+  reporterId              String?                              // 报检人用户ID（登录报检时记录，匿名扫码为 null）
   status                  inspection_request_status            @default(SUBMITTED)
   priority                Int                                  @default(3)
   dispatcherId            String?
@@ -1791,6 +1839,8 @@ model qms_inspection_requests {
   isDeleted               Boolean                              @default(false)
   createdAt               DateTime                             @default(now())
   updatedAt               DateTime                             @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   process                 processes?                           @relation(fields: [processId], references: [id], onDelete: SetNull)
   supplier                suppliers?                           @relation("inspection_requests_supplier", fields: [supplierId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   work_order              work_orders                          @relation(fields: [workOrderNumber], references: [workOrderNumber], onUpdate: Cascade)
@@ -1893,6 +1943,8 @@ model quality_losses {
   isDeleted       Boolean      @default(false)
   createdAt       DateTime     @default(now())
   updatedAt       DateTime     @updatedAt
+  archivedAt      DateTime? // 归档时间（数据生命周期 P3）
+  retainUntil     DateTime? // 保留期截止（数据生命周期 P3）
   createdBy       String?
   work_order      work_orders? @relation(fields: [workOrderNumber], references: [workOrderNumber], onDelete: SetNull, onUpdate: Cascade)
 
@@ -2282,6 +2334,24 @@ enum quality_plans_planStatus {
   APPROVED
   ACTIVE
   ARCHIVED
+}
+
+// @module scheduler
+model cron_jobs {
+  id          String    @id @default(cuid())
+  jobKey      String
+  cronExpr    String
+  description String?
+  enabled     Boolean   @default(true)
+  lastRunAt   DateTime?
+  lastStatus  String?
+  lastError   String?   @db.Text
+  isDeleted   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([jobKey, isDeleted])
+  @@index([enabled, isDeleted])
 }
 
 enum users_status {

@@ -10,12 +10,11 @@ import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
-import { Form, message } from 'ant-design-vue';
+import { Form, message, Tabs } from 'ant-design-vue';
 
 import { QMS_UPLOAD_ACTIONS } from '#/api/qms/constants';
 import {
   createPublicInspectionRequest,
-  getPublicInspectionRequestProcesses,
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
 import { getPublicIncomingMaterialInputSettingApi } from '#/api/system/inspection-settings';
@@ -23,12 +22,14 @@ import { useImageCompress } from '#/composables/useImageCompress';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
   applyUploadResponse,
+  getUploadResponse,
   normalizeUploadFileList,
 } from '#/views/qms/shared/utils/upload-file';
 
 import InspectionRequestEntryFormFields from './components/InspectionRequestEntryFormFields.vue';
 import InspectionRequestEntryShell from './components/InspectionRequestEntryShell.vue';
 import InspectionRequestEntrySubmitBar from './components/InspectionRequestEntrySubmitBar.vue';
+import MyInspectionRequests from './components/MyInspectionRequests.vue';
 import {
   buildIncomingInspectionRequestInfo,
   buildInspectionRequestEntryProcessOptions,
@@ -37,7 +38,6 @@ import {
   buildInspectionRequestPostSubmitQuery,
   getInspectionRequestEntryCopy,
   getInspectionRequestResponsibilityTypeOptions,
-  INCOMING_INSPECTION_PROCESS_NAME,
   inspectionRequestEntryCheckResultOptions,
   isIncomingInspectionEntryPath,
   mapInspectionRequestEntryWorkOrderOptions,
@@ -46,6 +46,8 @@ import { useInspectionRequestEntryFormState } from './useInspectionRequestEntryF
 import { useInspectionRequestIdentityOptions } from './useInspectionRequestIdentityOptions';
 import { useInspectionRequestPartOptions } from './useInspectionRequestPartOptions';
 import { useInspectionRequestStationSelection } from './useInspectionRequestStationSelection';
+import { useInspectionRequestWorkOrderProcesses } from './useInspectionRequestWorkOrderProcesses';
+import { useMyInspectionReports } from './useMyInspectionReports';
 
 import './index.css';
 
@@ -54,6 +56,8 @@ defineOptions({ name: 'PublicInspectionRequestEntry' });
 const route = useRoute();
 const router = useRouter();
 const submitting = ref(false);
+const { activeEntryTab, myReportsRef, switchToMyReports } =
+  useMyInspectionReports();
 const attachmentFileList = ref<UploadFile[]>([]);
 const workOrderLoading = ref(false);
 const workOrderOptions = ref<
@@ -65,17 +69,8 @@ const workOrderOptions = ref<
     value: string;
   }>
 >([]);
-const workOrderProcessesLoading = ref(false);
 const { compressImage } = useImageCompress();
 const { handleApiError } = useErrorHandler();
-const workOrderProcesses = ref<
-  Array<{
-    category: 'INCOMING' | 'PROCESS';
-    processId: string;
-    processName: string;
-    supplierSource: null | string;
-  }>
->([]);
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
@@ -108,6 +103,12 @@ const incomingMaterialFreeInputEnabled = ref(false);
 const isIncomingEntry = computed(() =>
   isIncomingInspectionEntryPath(String(route.path || '')),
 );
+
+const { workOrderProcesses, workOrderProcessesLoading } =
+  useInspectionRequestWorkOrderProcesses({
+    isIncomingEntry,
+    requestForm,
+  });
 
 const {
   bomPartOptions,
@@ -210,7 +211,9 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
       message.warning('自检记录上传完成，但未返回有效地址');
     }
   } else if (info.file.status === 'error') {
-    message.error(`${info.file.name} 上传失败`);
+    const response = getUploadResponse(info.file);
+    const reason = response?.message || '上传失败';
+    message.error(`${info.file.name} ${reason}`);
   }
 
   attachmentFileList.value = [...info.fileList];
@@ -219,63 +222,6 @@ function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
 
 async function handleBeforeUpload(file: File) {
   return compressImage(file);
-}
-
-async function loadWorkOrderProcessOptions(workOrderNumber: string) {
-  const normalized = workOrderNumber.trim();
-  if (!normalized) {
-    workOrderProcesses.value = [];
-    requestForm.processId = '';
-    requestForm.processName = isIncomingEntry.value
-      ? INCOMING_INSPECTION_PROCESS_NAME
-      : '';
-    return;
-  }
-
-  workOrderProcessesLoading.value = true;
-  try {
-    const list = await getPublicInspectionRequestProcesses({
-      workOrderNumber: normalized,
-    });
-    if (requestForm.workOrderNumber.trim() !== normalized) return;
-
-    workOrderProcesses.value = list || [];
-    const selected = isIncomingEntry.value
-      ? (requestForm.incomingType
-          ? workOrderProcesses.value.find(
-              (item) =>
-                item.category === 'INCOMING' &&
-                item.processId === requestForm.incomingType,
-            )
-          : undefined) ||
-        workOrderProcesses.value.find((item) => item.category === 'INCOMING')
-      : workOrderProcesses.value.find(
-          (item) => item.processId === requestForm.processId,
-        );
-    if (selected) {
-      requestForm.processId = selected.processId;
-      requestForm.processName = selected.processName;
-    } else {
-      requestForm.processId = '';
-      requestForm.processName = isIncomingEntry.value
-        ? INCOMING_INSPECTION_PROCESS_NAME
-        : '';
-    }
-  } catch (error: unknown) {
-    if (requestForm.workOrderNumber.trim() !== normalized) return;
-
-    handleApiError(error, 'Load Inspection Request Processes');
-    workOrderProcesses.value = [];
-    requestForm.processId = '';
-    requestForm.processName = isIncomingEntry.value
-      ? INCOMING_INSPECTION_PROCESS_NAME
-      : '';
-    message.error('工序加载失败，请稍后重试');
-  } finally {
-    if (requestForm.workOrderNumber.trim() === normalized) {
-      workOrderProcessesLoading.value = false;
-    }
-  }
 }
 
 async function submitRequest() {
@@ -361,9 +307,16 @@ async function submitRequest() {
     message.success(
       `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
     );
+    switchToMyReports(created, {
+      partName: requestForm.partName,
+      processName: requestForm.processName,
+      workOrderNumber: requestForm.workOrderNumber,
+    });
     resetRequestForm();
-    const nextQuery = buildInspectionRequestPostSubmitQuery(route.query);
-    void router.replace({ path: route.path, query: nextQuery });
+    void router.replace({
+      path: route.path,
+      query: buildInspectionRequestPostSubmitQuery(route.query),
+    });
   } finally {
     submitting.value = false;
   }
@@ -423,14 +376,6 @@ watch(
 );
 
 watch(
-  () => requestForm.workOrderNumber,
-  (workOrderNumber) => {
-    void loadWorkOrderProcessOptions(workOrderNumber);
-  },
-  { immediate: true },
-);
-
-watch(
   () => requestForm.incomingType,
   (incomingType) => {
     if (!isIncomingEntry.value || !incomingType) return;
@@ -455,40 +400,47 @@ watch(
 </script>
 <template>
   <InspectionRequestEntryShell :title="entryCopy.shellTitle">
-    <Form class="inspection-entry-form" layout="vertical">
-      <InspectionRequestEntryFormFields
-        v-model:form="requestForm"
-        v-model:attachment-file-list="attachmentFileList"
-        :upload-action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"
-        :before-upload="handleBeforeUpload"
-        :bom-part-options="isIncomingEntry ? partOptions : bomPartOptions"
-        :bom-parts-loading="bomPartsLoading"
-        :check-result-options="inspectionRequestEntryCheckResultOptions"
-        :entry-copy="entryCopy"
-        :is-incoming-entry="isIncomingEntry"
-        :part-search-loading="partSearchLoading"
-        :process-options="processOptions"
-        :requires-component-name="requiresComponentName"
-        :requires-station-selection="requiresStationSelection"
-        :station-quantity="stationQuantity"
-        :submitting="submitting"
-        :responsibility-department-options="responsibilityDepartmentOptions"
-        :responsibility-loading="responsibilityLoading"
-        :responsibility-type-options="responsibilityTypeOptions"
-        :supplier-options="supplierOptions"
-        :work-order-loading="workOrderLoading"
-        :work-order-options="workOrderOptions"
-        :work-order-processes-loading="workOrderProcessesLoading"
-        @attachment-change="handleAttachmentUploadChange"
-        @part-search="searchCanonicalPartOptions"
-        @responsibility-type-change="changeResponsibilityType"
-        @responsibility-options-search="loadResponsibilityOptions"
-        @work-order-search="loadWorkOrderOptions"
-      />
-      <InspectionRequestEntrySubmitBar
-        :submitting="submitting"
-        @submit="submitRequest"
-      />
-    </Form>
+    <Tabs v-model:active-key="activeEntryTab" class="inspection-entry-tabs">
+      <Tabs.TabPane key="form" tab="报检单">
+        <Form class="inspection-entry-form" layout="vertical">
+          <InspectionRequestEntryFormFields
+            v-model:form="requestForm"
+            v-model:attachment-file-list="attachmentFileList"
+            :upload-action="QMS_UPLOAD_ACTIONS.PUBLIC_UPLOAD"
+            :before-upload="handleBeforeUpload"
+            :bom-part-options="isIncomingEntry ? partOptions : bomPartOptions"
+            :bom-parts-loading="bomPartsLoading"
+            :check-result-options="inspectionRequestEntryCheckResultOptions"
+            :entry-copy="entryCopy"
+            :is-incoming-entry="isIncomingEntry"
+            :part-search-loading="partSearchLoading"
+            :process-options="processOptions"
+            :requires-component-name="requiresComponentName"
+            :requires-station-selection="requiresStationSelection"
+            :station-quantity="stationQuantity"
+            :submitting="submitting"
+            :responsibility-department-options="responsibilityDepartmentOptions"
+            :responsibility-loading="responsibilityLoading"
+            :responsibility-type-options="responsibilityTypeOptions"
+            :supplier-options="supplierOptions"
+            :work-order-loading="workOrderLoading"
+            :work-order-options="workOrderOptions"
+            :work-order-processes-loading="workOrderProcessesLoading"
+            @attachment-change="handleAttachmentUploadChange"
+            @part-search="searchCanonicalPartOptions"
+            @responsibility-type-change="changeResponsibilityType"
+            @responsibility-options-search="loadResponsibilityOptions"
+            @work-order-search="loadWorkOrderOptions"
+          />
+          <InspectionRequestEntrySubmitBar
+            :submitting="submitting"
+            @submit="submitRequest"
+          />
+        </Form>
+      </Tabs.TabPane>
+      <Tabs.TabPane key="my-reports" tab="我的报检">
+        <MyInspectionRequests ref="myReportsRef" />
+      </Tabs.TabPane>
+    </Tabs>
   </InspectionRequestEntryShell>
 </template>

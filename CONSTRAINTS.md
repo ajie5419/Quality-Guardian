@@ -94,6 +94,38 @@
 6. **必须**引用主数据时存 ID（外键），不能只存 name
 7. **必须**使用 `createModuleLogger` 记录日志，禁止 console.log/warn/error
 
+## 数据契约规范（2026-08-16 追加，权威文档：`docs/data-contract.md`）
+
+### 字段治理登记
+
+1. **禁止**新增未治理的跨表 name 字段 — 任何跨 2 张以上业务表复用、用于查询/统计分组/报表维度、或来自主数据/字典/派生的 name 字段，必须登记进 `apps/backend/utils/master-data-fields.ts`（含 source + canonical + targets + 读写策略）
+2. **必须**写路径接 `governed-write`（`buildGovernedXxxWriteFields`）或等价守卫，禁止绕过治理直接写 name 字段
+3. **必须**统计/报表按 canonical ID 聚合，禁止按名称归并（对应架构门禁 B-ID1/B-ID4/B-ID8/B-ID9）
+4. **禁止**新增同概念的第三套字段名 — 已有治理键（如 `respDept` vs `responsibleDepartment`）需在治理登记中显式映射，新字段必须复用既有命名模式
+
+### 错误码字典
+
+5. **必须** `BusinessError(code, message, httpStatus)` 的 `code` 使用 `ErrorCode` 枚举成员（定义于 `@qgs/shared`），**禁止**自由字符串错误码
+6. **禁止**在业务代码中发明新错误码字符串 — 新错误码必须加入 `ErrorCode` 字典
+7. **必须**前端按错误码分级提示（VALIDATION→表单级、FORBIDDEN/UNAUTHORIZED→权限、CONFLICT→刷新重试、其他→通用 error）
+
+### 字段命名
+
+8. **必须**请求/响应字段 camelCase；主数据引用 `name` 快照 + `nameId` canonical 引用成对存在
+9. **必须**布尔字段 `is`/`has` 前缀，时间字段 `At` 后缀
+
+### 前端数据消费（web-antd + weapp）
+
+10. **必须**类型/枚举/错误码从 `@qgs/shared` 导入，禁止在 `views/` 重复定义
+11. **必须**请求走统一封装（Web `useRequest` 系列、小程序 `api/request.ts`），**禁止**裸 `axios`/`fetch`
+12. **必须**表单项字段与后端 DTO 一致，**禁止**前端自造字段名
+13. **禁止**在 `views/` 硬编码业务值（部门/供应商 ID、工序名、字典 key）
+14. **禁止**前端根据名称猜测 ID 或拼接已分页结果再过滤
+
+### 字段影响面
+
+15. **必须**改动受控字段前核对影响面 checklist（schema → 治理登记 → governed-write → service/统计 → shared DTO → 前端 → code_map → 历史回填），详见 `docs/data-contract.md` 第 6 节
+
 ## 架构守护（自动化检测）
 
 本地提交前运行 `pnpm run check:qms-arch` 检查当前分支和工作树变更；CI 运行 `pnpm run check:qms-arch:all` 扫描全部已跟踪文件。两种模式执行相同规则，检测范围不同。

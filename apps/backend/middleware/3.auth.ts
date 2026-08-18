@@ -25,7 +25,39 @@ function isPublicPath(pathname: string) {
   return PUBLIC_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
 }
 
-export default defineEventHandler((event) => {
+/**
+ * Account-status check with a 60s in-memory cache. A disabled/deleted
+ * account loses API access within one minute instead of remaining valid
+ * for the whole access-token lifetime.
+ */
+const ACCOUNT_STATUS_TTL_MS = 60_000;
+const accountStatusCache = new Map<
+  string,
+  { active: boolean; expiresAt: number }
+>();
+
+export function clearAccountStatusCache() {
+  accountStatusCache.clear();
+}
+
+async function isUserActive(userId: string): Promise<boolean> {
+  const cached = accountStatusCache.get(userId);
+  if (cached && cached.expiresAt > Date.now()) return cached.active;
+
+  const { prisma } = await import('~/utils/prisma');
+  const user = await prisma.users.findFirst({
+    select: { status: true },
+    where: { id: userId, isDeleted: false },
+  });
+  const active = user?.status === 'ACTIVE';
+  accountStatusCache.set(userId, {
+    active,
+    expiresAt: Date.now() + ACCOUNT_STATUS_TTL_MS,
+  });
+  return active;
+}
+
+export default defineEventHandler(async (event) => {
   if (event.method === 'OPTIONS') return;
 
   const pathname = getRequestURL(event).pathname;
@@ -36,9 +68,13 @@ export default defineEventHandler((event) => {
     return unAuthorizedResponse(event);
   }
 
-  event.context.user = user;
   const userId = user.id ?? user.userId;
   if (userId !== undefined && userId !== null) {
+    event.context.user = user;
     event.context.userId = String(userId);
+    const active = await isUserActive(String(userId));
+    if (!active) {
+      return unAuthorizedResponse(event);
+    }
   }
 });

@@ -22,9 +22,6 @@ export const InspectionService = {
   getIssueChartAggregation: InspectionCoreService.getIssueChartAggregation,
   getIssues: InspectionCoreService.getIssues,
   getIssueStats: InspectionCoreService.getIssueStats,
-  getQualityLossTrendRows: InspectionCoreService.getQualityLossTrendRows,
-  getQualityLossDrillDownRecords:
-    InspectionCoreService.getQualityLossDrillDownRecords,
   getReportDefectRows: InspectionCoreService.getReportDefectRows,
   getReportMajorEvents: InspectionCoreService.getReportMajorEvents,
   getReportPeriodMetrics: InspectionCoreService.getReportPeriodMetrics,
@@ -38,10 +35,6 @@ export const InspectionService = {
   getWeeklyReportIssues: InspectionCoreService.getWeeklyReportIssues,
   getWorkOrderAggregateInspections:
     InspectionCoreService.getWorkOrderAggregateInspections,
-  getLossRecordsForAggregation:
-    InspectionCoreService.getLossRecordsForAggregation,
-  countLossRecordsForAggregation:
-    InspectionCoreService.countLossRecordsForAggregation,
   getWorkspaceIssueSummary: InspectionCoreService.getWorkspaceIssueSummary,
   normalizeQuantitySummary: InspectionCoreService.normalizeQuantitySummary,
   resolveOverallResult: InspectionCoreService.resolveOverallResult,

@@ -155,11 +155,12 @@ describe('qualityLossService', () => {
 
   describe('getTrendData', () => {
     it('should handle trend data aggregation', async () => {
-      (prisma.$queryRaw as any)
-        .mockResolvedValueOnce([{ p: 1, a: 100 }]) // manual
-        .mockResolvedValueOnce([{ p: 1, a: 200 }]) // internal
-        .mockResolvedValueOnce([{ p: 1, a: 300 }]) // external
-        .mockResolvedValueOnce([{ p: 1, a: 50 }]); // commissioning
+      (prisma.$queryRaw as any).mockResolvedValueOnce([
+        { p: 1, a: 100, source: 'Manual' },
+        { p: 1, a: 200, source: 'Internal' },
+        { p: 1, a: 300, source: 'External' },
+        { p: 1, a: 50, source: 'Commissioning' },
+      ]);
 
       const result = await QualityLossService.getTrendData('month');
 
@@ -175,11 +176,12 @@ describe('qualityLossService', () => {
     });
 
     it('should handle BigInt period and sum values', async () => {
-      (prisma.$queryRaw as any)
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(1000) }])
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(2000) }])
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(3000) }])
-        .mockResolvedValueOnce([{ p: BigInt(5), a: BigInt(500) }]);
+      (prisma.$queryRaw as any).mockResolvedValueOnce([
+        { p: BigInt(5), a: BigInt(1000), source: 'Manual' },
+        { p: BigInt(5), a: BigInt(2000), source: 'Internal' },
+        { p: BigInt(5), a: BigInt(3000), source: 'External' },
+        { p: BigInt(5), a: BigInt(500), source: 'Commissioning' },
+      ]);
 
       const result = await QualityLossService.getTrendData('week');
       const w5 = result.trend.find((t) => t.period === 'W5');

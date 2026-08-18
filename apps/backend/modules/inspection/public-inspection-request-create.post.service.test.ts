@@ -43,6 +43,12 @@ vi.mock('~/utils/response', () => ({
 
 vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
 
+const { verifyAccessToken } = vi.hoisted(() => ({
+  verifyAccessToken: vi.fn(),
+}));
+
+vi.mock('~/utils/jwt-utils', () => ({ verifyAccessToken }));
+
 vi.mock('./inspection-request-create.schema', () => ({
   inspectionRequestCreateV2BodySchema: { parse: vi.fn((body) => body) },
   validateInspectionRequestCreateV2Body: vi
@@ -57,6 +63,7 @@ vi.mock('./inspection-request-create.service', () => ({
 describe('public inspection request create handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    verifyAccessToken.mockReturnValue(null);
   });
 
   it('retires the public name-only legacy write path', async () => {

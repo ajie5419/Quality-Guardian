@@ -1,8 +1,9 @@
+import { INSPECTION_RECORD_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
-import { getCurrentUser } from '~/utils/current-user';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import {
   badRequestResponse,
@@ -12,7 +13,10 @@ import {
 
 export default defineEventHandler(async (event) => {
   try {
-    const userinfo = getCurrentUser(event);
+    const userinfo = await authorizeWrite(
+      event,
+      INSPECTION_RECORD_PERMISSION_CODES.DELETE,
+    );
     const body = (await readBody(event)) as { ids?: unknown };
     const ids = parseNonEmptyIdList(body.ids);
     if (!ids) {

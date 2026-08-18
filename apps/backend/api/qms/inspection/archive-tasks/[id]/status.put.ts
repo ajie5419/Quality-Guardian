@@ -1,6 +1,8 @@
+import { INSPECTION_RECORD_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import {
   badRequestResponse,
@@ -15,6 +17,7 @@ const schema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, INSPECTION_RECORD_PERMISSION_CODES.EDIT);
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') return id;
   try {

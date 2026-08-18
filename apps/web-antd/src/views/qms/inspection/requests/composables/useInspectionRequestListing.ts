@@ -7,8 +7,6 @@ import {
   getInspectionRequestStats,
 } from '#/api/qms/inspection-request';
 
-import { INCOMING_INSPECTION_PROCESS_NAME } from '../constants';
-
 interface InspectionRequestStatsState {
   byInspector: Array<{
     count: number;
@@ -43,13 +41,14 @@ interface InspectionRequestStatsState {
 }
 
 interface UseInspectionRequestListingOptions {
+  initialView?: string;
   onRequestsLoaded?: () => void;
 }
 
 export function useInspectionRequestListing(
   options: UseInspectionRequestListingOptions = {},
 ) {
-  const { onRequestsLoaded } = options;
+  const { initialView, onRequestsLoaded } = options;
 
   const loading = ref(false);
   const requests = ref<InspectionRequest[]>([]);
@@ -68,55 +67,30 @@ export function useInspectionRequestListing(
   const total = ref(0);
   const page = ref(1);
   const pageSize = ref(20);
-  const activeView = ref('current');
+  const activeView = ref(initialView || 'my-inspection');
 
   const query = reactive({
     keyword: '',
+    // The initial request must already carry the active view scope,
+    // otherwise the first load returns every request.
+    scope: (initialView || 'my-inspection') as string | undefined,
     status: undefined as InspectionRequestStatus | undefined,
   });
 
-  function applyViewStatus(value: string) {
-    switch (value) {
-      case 'dispatched': {
-        query.status = 'DISPATCHED';
-        break;
-      }
-      case 'inspecting': {
-        query.status = undefined;
-        break;
-      }
-      case 'submitted': {
-        query.status = 'SUBMITTED';
-        break;
-      }
-      default: {
-        query.status = undefined;
-      }
-    }
-  }
-
-  function shouldUseMineFilter() {
-    return activeView.value === 'inspecting';
-  }
-
-  function requestProcessNameFilter() {
-    return activeView.value === 'incoming'
-      ? INCOMING_INSPECTION_PROCESS_NAME
-      : undefined;
+  function applyViewScope(value: string) {
+    query.scope = value;
+    query.status = undefined;
   }
 
   async function loadRequests() {
     loading.value = true;
     try {
       const res = await getInspectionRequests({
-        current: !query.status,
-        includeClosed: shouldUseMineFilter(),
         keyword: query.keyword || undefined,
-        mine: shouldUseMineFilter(),
         page: page.value,
         pageSize: pageSize.value,
-        processName: requestProcessNameFilter(),
-        status: query.status,
+        scope: query.scope,
+        status: query.scope ? undefined : query.status,
       });
       requests.value = res.items || [];
       total.value = res.total || 0;
@@ -151,25 +125,14 @@ export function useInspectionRequestListing(
   ) {
     activeView.value = String(value);
     beforeReload?.();
-    applyViewStatus(activeView.value);
+    applyViewScope(activeView.value);
     page.value = 1;
     await loadRequests();
   }
 
   async function handleStatusFilterChange() {
-    switch (query.status) {
-      case 'DISPATCHED': {
-        activeView.value = 'dispatched';
-        break;
-      }
-      case 'SUBMITTED': {
-        activeView.value = 'submitted';
-        break;
-      }
-      default: {
-        activeView.value = 'current';
-      }
-    }
+    query.scope = undefined;
+    activeView.value = '';
     page.value = 1;
     await loadRequests();
   }

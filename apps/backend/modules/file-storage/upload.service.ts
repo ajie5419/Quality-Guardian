@@ -5,6 +5,7 @@ import { eventHandler, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getOptionalCurrentUser } from '~/utils/current-user';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 
@@ -68,6 +69,9 @@ export default eventHandler(async (event) => {
         .catch((error: unknown) => {
           uploadError =
             error instanceof Error ? error : new Error(String(error));
+          // Consume the remaining stream so busboy can finish and the
+          // request terminates with the error response instead of hanging.
+          file.resume();
         });
     });
     busboy.on('error', (error) => {
@@ -107,6 +111,9 @@ export default eventHandler(async (event) => {
       url: uploaded.url,
     });
   } catch (error) {
+    if (isBusinessError(error)) {
+      return businessErrorResponse(event, error);
+    }
     const message = error instanceof Error ? error.message : String(error);
     if (message.includes('max upload size')) {
       setResponseStatus(event, 413);

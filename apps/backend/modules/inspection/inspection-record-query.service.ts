@@ -1,3 +1,5 @@
+import type { ResolvedDataScope } from '~/modules/data-scope';
+
 import type {
   InspectionItemInput,
   InspectionTemplateMeta,
@@ -9,6 +11,7 @@ import {
   formatDate,
   normalizeInspectionStationSelection,
 } from '@qgs/shared';
+import { DataScopeService } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -194,27 +197,33 @@ export const InspectionRecordQueryService = {
       }),
     };
   },
-  async findAll(params: {
-    componentName?: string;
-    endDate?: string;
-    forExport?: boolean;
-    hasDocuments?: boolean;
-    inspector?: string;
-    keyword?: string;
-    level1Component?: string;
-    materialName?: string;
-    page?: number;
-    pageSize?: number;
-    processName?: string;
-    projectName?: string;
-    sourceInspectionId?: string;
-    startDate?: string;
-    supplierName?: string;
-    team?: string;
-    type?: string;
-    workOrderNumber?: string;
-    year?: number;
-  }) {
+  async findAll(
+    params: {
+      componentName?: string;
+      endDate?: string;
+      forExport?: boolean;
+      hasDocuments?: boolean;
+      inspector?: string;
+      keyword?: string;
+      level1Component?: string;
+      materialName?: string;
+      page?: number;
+      pageSize?: number;
+      processName?: string;
+      projectName?: string;
+      sourceInspectionId?: string;
+      startDate?: string;
+      supplierName?: string;
+      team?: string;
+      type?: string;
+      workOrderNumber?: string;
+      year?: number;
+    },
+    scopeContext?: {
+      scope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
+      user?: { id: number | string; username: string };
+    },
+  ) {
     const {
       page = 1,
       pageSize = 100,
@@ -343,6 +352,19 @@ export const InspectionRecordQueryService = {
       }
     }
 
+    let scopedWhere: Prisma.inspectionsWhereInput = where;
+    if (scopeContext?.scope && scopeContext.user) {
+      scopedWhere = await DataScopeService.buildScopedWhere(
+        'inspection',
+        where,
+        {
+          userId: String(scopeContext.user.id),
+          username: scopeContext.user.username,
+        },
+        scopeContext.scope,
+      );
+    }
+
     const runQuery = async (withArchiveTask: boolean) => {
       const include = {
         ...(withArchiveTask
@@ -375,11 +397,11 @@ export const InspectionRecordQueryService = {
       if (forExport) {
         return Promise.all([
           prisma.inspections.findMany({
-            where,
+            where: scopedWhere,
             orderBy: { createdAt: 'desc' },
             include,
           }),
-          prisma.inspections.count({ where }),
+          prisma.inspections.count({ where: scopedWhere }),
         ]);
       }
 
@@ -391,13 +413,13 @@ export const InspectionRecordQueryService = {
           });
       return Promise.all([
         prisma.inspections.findMany({
-          where,
+          where: scopedWhere,
           skip,
           take,
           orderBy: { createdAt: 'desc' },
           include,
         }),
-        prisma.inspections.count({ where }),
+        prisma.inspections.count({ where: scopedWhere }),
       ]);
     };
 

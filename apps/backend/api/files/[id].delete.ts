@@ -1,12 +1,15 @@
 import { defineEventHandler, setResponseStatus } from 'h3';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
+import { requireSystemAdmin } from '~/modules/user/system-auth';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { useResponseError, useResponseSuccess } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
+  const adminCheck = requireSystemAdmin(event, getCurrentUser(event));
+  if (adminCheck) return adminCheck;
   const userinfo = getCurrentUser(event);
 
   const id = getRequiredRouterParam(event, 'id', 'File ID is required');

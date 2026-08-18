@@ -1,5 +1,7 @@
+import { VEHICLE_COMMISSIONING_WRITE_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { authorizeWrite } from '~/modules/rbac';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
 import {
@@ -18,6 +20,7 @@ const bodySchema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, VEHICLE_COMMISSIONING_WRITE_CODES.CREATE);
   try {
     const body = bodySchema.parse(await readBody(event));
     return useResponseSuccess(

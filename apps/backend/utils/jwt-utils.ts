@@ -33,7 +33,10 @@ function getRequiredJwtSecret(
 
 export function generateAccessToken(user: UserSession) {
   return jwt.sign(user, getRequiredJwtSecret('JWT_ACCESS_SECRET'), {
-    expiresIn: '7d',
+    // Short-lived access token: 4h. The frontend refreshes automatically
+    // via /api/auth/refresh, so revoked/disabled accounts lose access
+    // quickly instead of keeping a 7-day token.
+    expiresIn: '4h',
   });
 }
 

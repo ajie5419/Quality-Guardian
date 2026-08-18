@@ -11,6 +11,7 @@ import { Prisma } from '@prisma/client';
 import { afterSalesModule } from '~/modules/after-sales/after-sales.module';
 import { aiModule } from '~/modules/ai/ai.module';
 import { dashboardModule } from '~/modules/dashboard/dashboard.module';
+import { dataLifecycleModule } from '~/modules/data-lifecycle/data-lifecycle.module';
 import { dataScopeModule } from '~/modules/data-scope/data-scope.module';
 import { deptModule } from '~/modules/dept/dept.module';
 import { dictionaryModule } from '~/modules/dictionary/dictionary.module';
@@ -27,6 +28,7 @@ import { qualityClassificationModule } from '~/modules/quality-classification/qu
 import { qualityLossModule } from '~/modules/quality-loss/quality-loss.module';
 import { rbacModule } from '~/modules/rbac/rbac.module';
 import { reportModule } from '~/modules/report/report.module';
+import { schedulerModule } from '~/modules/scheduler/scheduler.module';
 import { supervisionModule } from '~/modules/supervision/supervision.module';
 import { supplierIdentityModule } from '~/modules/supplier-identity/supplier-identity.module';
 import { supplierModule } from '~/modules/supplier/supplier.module';
@@ -62,11 +64,13 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   qualityLossModule,
   rbacModule,
   reportModule,
+  schedulerModule,
   supervisionModule,
   supplierModule,
   supplierIdentityModule,
   systemModule,
   systemLogModule,
+  dataLifecycleModule,
   taskDispatchModule,
   teamModule,
   userModule,

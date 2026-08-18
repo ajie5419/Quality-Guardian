@@ -1,3 +1,5 @@
+import { PERMISSION_CODES } from '@qgs/shared';
+import { authorizeWrite } from '~/modules/rbac';
 import { workOrderRequirementCreateBodySchema } from '~/modules/work-order/work-order-requirement.schema';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
@@ -12,6 +14,7 @@ import {
 export default defineValidatedHandler(
   workOrderRequirementCreateBodySchema,
   async (event, body) => {
+    await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.CREATE);
     const userinfo = getCurrentUser(event);
 
     try {

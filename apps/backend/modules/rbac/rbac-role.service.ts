@@ -13,6 +13,23 @@ import { redis } from '~/utils/redis';
 
 const INVISIBLE_PERMISSION_CHARS = /[\u200B-\u200D\uFEFF]/g;
 const SUPER_ROLE_KEYWORDS = ['super', 'admin'] as const;
+
+/**
+ * In-memory TTL cache for permission codes (60s). Permission changes
+ * invalidate the cache through clearPermissionCodesCache, which is called
+ * by every role-permission mutation below. Multi-instance deployments may
+ * see up to 60s of staleness after a permission change, which is an
+ * acceptable trade-off for avoiding 2-3 DB queries per authorized write.
+ */
+const PERMISSION_CODES_TTL_MS = 60_000;
+const permissionCodesCache = new Map<
+  string,
+  { codes: string[]; expiresAt: number }
+>();
+
+export function clearPermissionCodesCache() {
+  permissionCodesCache.clear();
+}
 const roleInputFields = {
   description: z.string().trim().max(191).optional(),
   name: z.string().trim().min(1).max(191).optional(),
@@ -173,6 +190,7 @@ async function persistRolePermissions(
       skipDuplicates: true,
     });
   }
+  clearPermissionCodesCache();
 }
 
 export const RbacRoleService = {
@@ -260,6 +278,7 @@ export const RbacRoleService = {
       data: { isDeleted: true, updatedAt: new Date() },
     });
     await redis.delByPattern('qms:menu:*');
+    clearPermissionCodesCache();
   },
 
   async getUserRoles(userId: string) {
@@ -288,6 +307,9 @@ export const RbacRoleService = {
   },
 
   async getUserPermissionCodes(userId: string) {
+    const cached = permissionCodesCache.get(userId);
+    if (cached && cached.expiresAt > Date.now()) return cached.codes;
+
     const roles = await this.getUserRoles(userId);
     if (roles.length === 0) return [] as string[];
 
@@ -313,6 +335,10 @@ export const RbacRoleService = {
       ]);
     }
 
+    permissionCodesCache.set(userId, {
+      codes,
+      expiresAt: Date.now() + PERMISSION_CODES_TTL_MS,
+    });
     return codes;
   },
 

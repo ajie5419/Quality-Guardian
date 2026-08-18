@@ -1,5 +1,7 @@
+import { METROLOGY_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, getQuery } from 'h3';
 import { MetrologyService } from '~/modules/metrology/metrology.service';
+import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import {
   internalServerErrorResponse,
@@ -7,6 +9,7 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
+  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.EXPORT);
   try {
     const query = getQuery(event);
     const result = await MetrologyService.getExportList({

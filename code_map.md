@@ -15,6 +15,7 @@
 - **file-storage/** — QMS 文件中心：文档上传、存储与分类
 - **inspection/** — 检验域核心：检验记录、不合格品、报检任务、模板、归档同步
 - **knowledge/** — 质量知识库：文档分类与知识条目
+- **master-data-governance/** — 主数据治理：受控主数据清单、处置闭环与统计门禁
 - **metric-refresh/** — 派生指标刷新任务与重试
 - **master-data-identity/** — 历史身份决策、投影与对账基线
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
@@ -25,11 +26,13 @@
 - **quality-loss/** — 质量损失记录与分析：金额、缺陷分级、供应商关联、趋势。读路径走物化表 `quality_loss_index`（见 `docs/after-sales-quality-loss.md`）
 - **rbac/** — 角色权限控制：角色分配与菜单/按钮授权
 - **report/** — 质量报表生成与路由（多维度报表输出）
+- **scheduler/** — 统一定时任务框架：cron 表达式、任务注册表、调度执行器（见 `docs/scheduler-design.md`）
 - **supervision/** — 质量监督检查：立项→任务分配→问题跟踪→报告
 - **supplier/** — 供应商质量评分：指标快照、全量排序、黑名单/观察期
 - **supplier-identity/** — 供应商跨身份域映射与解析
 - **system/** — 系统配置与基础设置
 - **system-log/** — 系统操作日志记录与审计
+- **data-lifecycle/** — 数据生命周期：保留期规则登记（data_retention_rules）、归档框架、到期处置（docs/data-lifecycle.md）
 - **task-dispatch/** — ITP 任务派发与流转：分配、状态推进、归档联动
 - **team/** — TEAM 主数据身份、别名、来源与合并审计
 - **user/** — 用户账号、认证（登录/刷新/微信小程序登录绑定）、个人偏好

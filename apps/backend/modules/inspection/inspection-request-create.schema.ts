@@ -107,11 +107,6 @@ export const inspectionRequestCreateV2BodySchema =
         body.responsibilityType ===
         INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT;
       const isExternal = !isInternal;
-      const isOutsourcing =
-        body.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT;
-      const isServerResolvedDepartment =
-        body.category === 'INCOMING' || isOutsourcing;
       if (body.category === 'INCOMING' && isInternal) {
         context.addIssue({
           code: z.ZodIssueCode.custom,
@@ -130,13 +125,6 @@ export const inspectionRequestCreateV2BodySchema =
           message:
             'PROCESS inspection requests cannot use supplier responsibility',
           path: ['responsibilityType'],
-        });
-      }
-      if (isServerResolvedDepartment && body.responsibleDepartmentId) {
-        context.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: 'External responsibility department is server-resolved',
-          path: ['responsibleDepartmentId'],
         });
       }
       if (isExternal && !body.supplierId) {
@@ -235,13 +223,10 @@ export function validateInspectionRequestCreateV2Body(
       hasPartIdentity &&
       Boolean(normalizeInspectionRequestText(body.processId)) &&
       Boolean(normalizeInspectionRequestText(body.reporter)) &&
-      (body.category === 'INCOMING' ||
-      body.responsibilityType ===
-        INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT
-        ? !normalizeInspectionRequestText(body.responsibleDepartmentId)
-        : Boolean(
-            normalizeInspectionRequestText(body.responsibleDepartmentId),
-          )) &&
+      (body.responsibilityType ===
+      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT
+        ? Boolean(normalizeInspectionRequestText(body.responsibleDepartmentId))
+        : true) &&
       Boolean(normalizeInspectionRequestText(body.responsibilityType)) &&
       (body.responsibilityType ===
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT

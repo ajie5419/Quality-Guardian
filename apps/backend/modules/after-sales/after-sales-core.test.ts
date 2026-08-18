@@ -139,25 +139,6 @@ describe('after-sales core helpers and services', () => {
       actualClaim: 10,
       id: 'as-1',
     });
-    await AfterSalesService.getQualityLossTrendRows({
-      granularity: 'month',
-      year: 2026,
-    });
-    await AfterSalesService.getLossRecordsForAggregation({
-      skip: 1,
-      take: 2,
-      workOrderNumber: 'WO',
-    });
-    await expect(
-      AfterSalesService.countLossRecordsForAggregation({
-        workOrderNumber: 'WO',
-      }),
-    ).resolves.toBe(3);
-    await AfterSalesService.getQualityLossDrillDownRecords({
-      end: new Date('2026-01-31T00:00:00.000Z'),
-      start: new Date('2026-01-01T00:00:00.000Z'),
-      take: 5,
-    });
     await AfterSalesService.getSupplierScoringData({
       since: new Date('2026-01-01T00:00:00.000Z'),
       supplierIds: ['supplier-1'],
@@ -195,13 +176,6 @@ describe('after-sales core helpers and services', () => {
         updatedAt: expect.any(Date),
       }),
     });
-    expect(prisma.after_sales.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          workOrderNumber: { contains: 'WO' },
-        }),
-      }),
-    );
   });
 
   it('updates route fields with quality loss recalculation only when costs change', async () => {

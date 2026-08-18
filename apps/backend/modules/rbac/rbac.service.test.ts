@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { clearPermissionCodesCache } from '~/modules/rbac/rbac-role.service';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import prisma from '~/utils/prisma';
 
@@ -55,6 +56,7 @@ vi.mock('~/utils/prisma', () => {
 
 describe('rbacService', () => {
   beforeEach(() => {
+    clearPermissionCodesCache();
     vi.clearAllMocks();
     (prisma.menus.findFirst as any).mockResolvedValue(null);
     (prisma.menus.create as any).mockResolvedValue({ id: 'created-menu' });
