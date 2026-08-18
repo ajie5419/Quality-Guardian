@@ -5,6 +5,7 @@ import {
 } from '~/modules/inspection/inspection-request-create.schema';
 import { InspectionRequestCreateService } from '~/modules/inspection/inspection-request-create.service';
 import { logApiError } from '~/utils/api-logger';
+import { verifyAccessToken } from '~/utils/jwt-utils';
 import {
   BusinessError,
   businessErrorResponse,
@@ -29,6 +30,9 @@ export default defineEventHandler(async (event) => {
 
 export const publicInspectionRequestCreateV2Handler = defineEventHandler(
   async (event) => {
+    // Optional identity: anonymous scans stay anonymous, signed-in callers
+    // (token attached by the web client) get their reporterId recorded.
+    const userinfo = verifyAccessToken(event);
     const body = inspectionRequestCreateV2BodySchema.parse(
       await readBody(event),
     );
@@ -42,7 +46,7 @@ export const publicInspectionRequestCreateV2Handler = defineEventHandler(
       return useResponseSuccess(
         await InspectionRequestCreateService.createRequest(
           event,
-          null,
+          userinfo,
           body,
           true,
           'V2',

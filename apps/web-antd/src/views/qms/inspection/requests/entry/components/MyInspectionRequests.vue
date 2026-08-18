@@ -177,7 +177,11 @@ defineExpose({ reload });
       </Table>
       <Empty
         v-else
-        :description="isLoggedIn ? '暂无报检记录' : '本机暂无报检记录'"
+        :description="
+          isLoggedIn
+            ? '暂无报检记录'
+            : '本机暂无报检记录（匿名报检仅保存在当前设备，登录后报检可在任意设备查看）'
+        "
       />
     </Spin>
   </div>
