@@ -33,7 +33,7 @@
 **验证结果：**
 - tsc/eslint 干净；qms-arch 0 violations；release-maintenance 套件 16/16
 
-**commit:** 待补
+**commit:** `e192b90a` feat(deploy): auto-backfill process responsible departments on release
 
 **遗留问题：**
 - 生产部门树若与默认路径不一致（unresolved），发布会在该阶段失败并列出候选部门——这是预期保护行为，按提示修正映射后重跑即可
