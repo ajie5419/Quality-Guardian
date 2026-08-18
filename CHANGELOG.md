@@ -23,6 +23,28 @@
 
 ---
 
+### 2026-08-18 阶段：报检界面迭代收尾（6 个修复 + 文档同步）
+
+**执行内容：**
+- 546d2038：公开创建接口可选解析 token（verifyAccessToken）——登录用户扫码报检落 reporterId；前端 publicRequestClient 登录时附带 token；空态文案注明本机回执边界；MyInspectionRequests 组件测试 3 个
+- bdb3e5e1：已派单改名"待检验"（DISPATCHED/INSPECTING 且无未闭环 NC）；MyInspectionRequests 加载隔离（服务器查询失败不影响本机回执，测试 4 个）
+- cfd2dcc5：修复入口页 MyInspectionRequests 组件未注册（抽 composable 时误删 import，Tab 渲染未知元素 + ref 无 reload）——"我的报检"空白的根因；switchToMyReports 加 nextTick 时序
+- 86f9eaab：表格列补 dataIndex（工序/工单号列显示空白修复）
+- f1a48605：列表初始加载带 scope（Tab 高亮"待派单"但首查返回全量的根因）
+- 0f3cc4f5：无派单权限用户 closed/abnormal/自由搜索强制限本人相关（inspectorId OR reporterId），测试 19 个
+- ARCHITECTURE.md 同步：删除 system_settings/bootstrap 责任解析的过期描述，改为"工序主数据 + 快照继承 + scope 权限"现状
+
+**验证结果：**
+- 后端全量 299/2698、前端全量 67/351、query 测试 19/19；vue-tsc/eslint/qms-arch/docs drift 全绿
+
+**commit:** 546d2038 / bdb3e5e1 / cfd2dcc5 / 86f9eaab / f1a48605 / 0f3cc4f5（+文档同步另提交）
+
+**遗留问题：**
+- 生产上线需先跑 maintenance:process-responsible-departments 回填工序责任部门
+- 部门级数据范围隔离仍属 Phase 4 暂缓项（当前无权限用户按"本人相关"过滤）
+
+---
+
 ### 2026-08-18 阶段：报检任务界面角色化视图 + 入口页"我的报检"
 
 **执行内容：**
