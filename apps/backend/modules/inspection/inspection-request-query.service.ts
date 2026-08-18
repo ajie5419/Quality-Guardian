@@ -49,7 +49,6 @@ const REQUEST_LIST_SCOPE_SET = new Set([
 function normalizeRequestListScope(value: string) {
   return REQUEST_LIST_SCOPE_SET.has(value) ? value : '';
 }
-
 export function getRequestListScopeFromQuery(query: { scope?: null | string }) {
   return normalizeRequestListScope(normalizeInspectionRequestText(query.scope));
 }
@@ -104,10 +103,18 @@ async function buildRequestListScopeWhere(
           };
     }
     case 'dispatched': {
-      // 待检验：已派未检或检验中且无未闭环 NC；不合格单只在 abnormal 视图中出现
+      // 待检验：已派未检或检验中且无未闭环 NC；不合格单只在 abnormal 视图中出现。
+      // 用 AND 数组包裹 OR，避免与关键字搜索的顶层 OR 互相覆盖。
       return {
         status: { in: ['DISPATCHED', 'INSPECTING'] },
-        OR: [{ linkedIssueId: null }, { linkedIssueStatus: { not: 'OPEN' } }],
+        AND: [
+          {
+            OR: [
+              { linkedIssueId: null },
+              { linkedIssueStatus: { not: 'OPEN' } },
+            ],
+          },
+        ],
       };
     }
     case 'my-inspection': {
