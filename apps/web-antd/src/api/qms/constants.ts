@@ -33,6 +33,7 @@ export const QMS_API = {
   INSPECTION_INSPECTORS: '/qms/inspection/requests/inspectors',
   PUBLIC_INSPECTION_REQUESTS: '/qms/public/inspection/requests',
   PUBLIC_INSPECTION_REQUESTS_V2: '/qms/public/inspection/requests/v2',
+  PUBLIC_INSPECTION_REQUEST_STATUS: '/qms/public/inspection/requests/status',
   PUBLIC_INSPECTION_REQUEST_PROCESSES:
     '/qms/public/inspection/requests/processes',
   PUBLIC_INSPECTION_REQUEST_PROCESS_DICTIONARY_OPTIONS:

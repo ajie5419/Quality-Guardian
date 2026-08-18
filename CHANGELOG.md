@@ -23,6 +23,28 @@
 
 ---
 
+### 2026-08-18 阶段：报检任务界面角色化视图 + 入口页"我的报检"
+
+**执行内容：**
+- 报检任务页：Segmented 视图改为 待派单(pending)/已派单(dispatched)/已完成单(closed)/不合格异常单(abnormal)/我的检验(my-inspection 近7天)；pending/dispatched 仅派单权限可见（前端 useInspectionRequestViewAccess 过滤 + 后端 getUserPermissionCodes 校验 403 强制，防接口绕过）；页面压缩到 499/447 行过 R3
+- 后端列表扩展 scope 参数（pending/dispatched/closed/abnormal/my-inspection/my-report），异常单=linkedIssueId 非空且 linkedIssueStatus OPEN（跨状态）；my-* 强制锁定当前用户
+- 报检单新增 reporterId（迁移 20260818090000，登录创建落库，匿名 null）；"我的报检"登录态按 reporterId 查询
+- 公开状态接口 GET /qms/public/inspection/requests/status?requestNo=（匿名扫码查询，只返回状态类最小字段防单号枚举泄露）
+- 报检入口页（公开无登录）加 Tab：报检单 / 我的报检——提交成功存本机回执（localStorage，myInspectionReceipts 上限20去重）并自动切 Tab；匿名用户靠本机回执+公开状态接口展示，登录用户合并 reporterId 服务端数据（MyInspectionRequests.vue）；工序加载逻辑抽 useInspectionRequestWorkOrderProcesses、回执逻辑抽 useMyInspectionReports 保持行数
+- 测试：query service 17/17（scope×7+403+公开状态）、receipts 4/4、前端全量 66/347、后端全量 299/2696
+
+**验证结果：**
+- 真库：scope=pending(13)/abnormal(13)/my-inspection(5)/my-report(1，vben 新建 IR-20260818-0002)/匿名公开状态（IR-20260817-0013 最小字段）全部通过
+- vue-tsc/eslint 干净；qms-arch 0 violations；docs drift PASSED
+
+**commit:** 待补
+
+**遗留问题：**
+- 移动端报检入口暂未加"我的报检"（如需后续补）
+- 已完成单/异常单为全员可见（未做数据范围隔离，Phase 4 决策范围内）
+
+---
+
 ### 2026-08-18 阶段：发布自动回填工序责任部门（接入 release-maintenance）
 
 **执行内容：**

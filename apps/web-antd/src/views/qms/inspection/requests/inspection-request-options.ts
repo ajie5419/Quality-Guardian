@@ -4,9 +4,12 @@ export const inspectionRequestCheckResultOptions = [
 ];
 
 export const inspectionRequestViewOptions = [
-  { label: '当前任务', value: 'current' },
-  { label: '待派单', value: 'submitted' },
+  { label: '待派单', value: 'pending' },
   { label: '已派单', value: 'dispatched' },
-  { label: '我的检验', value: 'inspecting' },
-  { label: '进货检验任务', value: 'incoming' },
+  { label: '已完成单', value: 'closed' },
+  { label: '不合格异常单', value: 'abnormal' },
+  { label: '我的检验', value: 'my-inspection' },
 ];
+
+/** Views that require the dispatch permission (management scope). */
+export const DISPATCH_ONLY_REQUEST_VIEWS = ['pending', 'dispatched'] as const;

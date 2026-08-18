@@ -8,4 +8,5 @@ export {
   parseCreateRoleInput,
   parseUpdateRoleInput,
 } from './rbac-role.service';
+export { RbacRoleService } from './rbac-role.service';
 export { RbacService } from './rbac.service';

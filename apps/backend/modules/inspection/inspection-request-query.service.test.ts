@@ -20,6 +20,14 @@ vi.mock('~/modules/team', () => ({
   TeamIdentityService: { resolveActiveDepartmentSourceIdsByTeamIds },
 }));
 
+const { getUserPermissionCodes } = vi.hoisted(() => ({
+  getUserPermissionCodes: vi.fn(),
+}));
+
+vi.mock('~/modules/rbac', () => ({
+  RbacRoleService: { getUserPermissionCodes },
+}));
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     qms_inspection_requests: {
@@ -29,6 +37,9 @@ vi.mock('~/utils/prisma', () => ({
     },
     quality_records: {
       findMany: vi.fn(),
+    },
+    users: {
+      findFirst: vi.fn(),
     },
   },
 }));
@@ -354,6 +365,167 @@ describe('inspection request query service', () => {
     expect(result.total).toBe(1);
     expect(result.items[0]?.workOrderNumbers).toEqual(['WO-001']);
     expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledTimes(2);
+  });
+
+  it('rejects pending scope without the dispatch permission', async () => {
+    getUserPermissionCodes.mockResolvedValue(['QMS:Inspection:Requests:Close']);
+
+    await expect(
+      InspectionRequestQueryService.getRequestList({ id: 'user-1' } as any, {
+        scope: 'pending',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    expect(prisma.qms_inspection_requests.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rejects dispatched scope without the dispatch permission', async () => {
+    getUserPermissionCodes.mockResolvedValue([]);
+
+    await expect(
+      InspectionRequestQueryService.getRequestList({ id: 'user-1' } as any, {
+        scope: 'dispatched',
+      }),
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  it('filters pending scope to SUBMITTED requests for dispatch permission holders', async () => {
+    getUserPermissionCodes.mockResolvedValue([
+      'QMS:Inspection:Requests:Dispatch',
+    ]);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1' } as any,
+      { scope: 'pending' },
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isDeleted: false,
+          status: 'SUBMITTED',
+        }),
+      }),
+    );
+  });
+
+  it('filters dispatched scope to DISPATCHED and INSPECTING requests', async () => {
+    getUserPermissionCodes.mockResolvedValue([
+      'QMS:Inspection:Requests:Dispatch',
+    ]);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1' } as any,
+      { scope: 'dispatched' },
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isDeleted: false,
+          status: { in: ['DISPATCHED', 'INSPECTING'] },
+        }),
+      }),
+    );
+  });
+
+  it('filters abnormal scope to requests with an open linked NC', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1' } as any,
+      { scope: 'abnormal' },
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isDeleted: false,
+          linkedIssueId: { not: null },
+          linkedIssueStatus: 'OPEN',
+        }),
+      }),
+    );
+  });
+
+  it('filters my-inspection scope to the current inspector within the last week', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'inspector-1',
+    } as never);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1', userId: 'user-1' } as any,
+      { scope: 'my-inspection' },
+    );
+
+    const called = vi.mocked(prisma.qms_inspection_requests.findMany).mock
+      .calls[0]?.[0] as {
+      where: { inspectorId: string; submittedAt: { gte: Date } };
+    };
+    expect(called.where.inspectorId).toBe('inspector-1');
+    expect(called.where.submittedAt.gte.getTime()).toBeGreaterThan(
+      Date.now() - 8 * 24 * 60 * 60 * 1000,
+    );
+  });
+
+  it('filters my-report scope to the current reporter', async () => {
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({
+      id: 'reporter-1',
+    } as never);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1', userId: 'user-1' } as any,
+      { scope: 'my-report' },
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isDeleted: false,
+          reporterId: 'reporter-1',
+        }),
+      }),
+    );
+  });
+
+  it('returns minimal status fields for a public request number lookup', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      closedAt: null,
+      dispatchedAt: new Date('2026-08-18T02:00:00.000Z'),
+      dispatcher: { realName: '调度员' },
+      inspector: { realName: '检验员' },
+      linkedIssueStatus: null,
+      requestNo: 'IR-20260818-0001',
+      status: 'DISPATCHED',
+    } as never);
+
+    const result =
+      await InspectionRequestQueryService.getPublicRequestStatus(
+        'IR-20260818-0001',
+      );
+
+    expect(result).toEqual({
+      closedAt: null,
+      dispatchedAt: new Date('2026-08-18T02:00:00.000Z'),
+      dispatcherName: '调度员',
+      inspectorName: '检验员',
+      linkedIssueStatus: null,
+      requestNo: 'IR-20260818-0001',
+      status: 'DISPATCHED',
+    });
   });
 
   it('filters active tasks by inspector id and multiple statuses', async () => {

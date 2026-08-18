@@ -33,10 +33,8 @@ import { useInspectionRequestListing } from './composables/useInspectionRequestL
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
 import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
 import { INCOMING_INSPECTION_PROCESS_NAME } from './constants';
-import {
-  inspectionRequestCheckResultOptions,
-  inspectionRequestViewOptions,
-} from './inspection-request-options';
+import { inspectionRequestCheckResultOptions } from './inspection-request-options';
+import { useInspectionRequestViewAccess } from './useInspectionRequestViewAccess';
 
 const route = useRoute();
 const router = useRouter();
@@ -48,6 +46,8 @@ const { isMobile } = useMobileViewport();
 const inspectorStatusOpen = ref(false);
 
 const canConfigQrBase = computed(() => hasAccessByRoles(['super', 'admin']));
+const { initialView: initialRequestView, visibleViewOptions } =
+  useInspectionRequestViewAccess();
 const {
   buildRequestUrl,
   copyRequestEntryUrl,
@@ -85,6 +85,7 @@ const {
   loadRequests,
   refreshInspectionRequestPage,
 } = useInspectionRequestListing({
+  initialView: initialRequestView.value,
   onRequestsLoaded() {
     openDispatchDetailFromRoute();
   },
@@ -402,7 +403,7 @@ watch(
             :keyword="query.keyword"
             :status="query.status"
             :status-options="statusOptions"
-            :view-options="inspectionRequestViewOptions"
+            :view-options="visibleViewOptions"
             @search="loadRequests"
             @status-change="handleStatusFilterChange"
             @update-active-view="handleActiveViewUpdate"

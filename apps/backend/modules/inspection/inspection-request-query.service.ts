@@ -1,6 +1,9 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import { ErrorCode, INSPECTION_REQUEST_PERMISSION_CODES } from '@qgs/shared';
+import { RbacRoleService } from '~/modules/rbac';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { buildTeamContainsWhere } from '~/utils/team-resolver';
@@ -24,10 +27,31 @@ function normalizeRequestListQuery(query: Record<string, unknown>) {
     page: Math.max(Number(query.page || 1), 1),
     pageSize: Math.min(Math.max(Number(query.pageSize || 20), 1), 100),
     processName: normalizeInspectionRequestText(query.processName),
+    scope: normalizeRequestListScope(
+      normalizeInspectionRequestText(query.scope),
+    ),
+    sinceDays: Math.max(Number(query.sinceDays) || 0, 0),
     statuses: normalizeRequestListStatuses(query.status),
     team: normalizeInspectionRequestText(query.team),
     workOrderNumber: normalizeInspectionRequestText(query.workOrderNumber),
   };
+}
+
+const REQUEST_LIST_SCOPE_SET = new Set([
+  'abnormal',
+  'closed',
+  'dispatched',
+  'my-inspection',
+  'my-report',
+  'pending',
+]);
+
+function normalizeRequestListScope(value: string) {
+  return REQUEST_LIST_SCOPE_SET.has(value) ? value : '';
+}
+
+export function getRequestListScopeFromQuery(query: { scope?: null | string }) {
+  return normalizeRequestListScope(normalizeInspectionRequestText(query.scope));
 }
 
 function normalizeRequestListStatuses(value: unknown) {
@@ -37,6 +61,50 @@ function normalizeRequestListStatuses(value: unknown) {
     .filter(Boolean);
 }
 
+async function buildRequestListScopeWhere(
+  userinfo: UserSession,
+  query: ReturnType<typeof normalizeRequestListQuery>,
+): Promise<Record<string, unknown>> {
+  switch (query.scope) {
+    case 'abnormal': {
+      return {
+        linkedIssueId: { not: null },
+        linkedIssueStatus: 'OPEN',
+      };
+    }
+    case 'closed': {
+      return { status: 'CLOSED' };
+    }
+    case 'dispatched': {
+      return { status: { in: ['DISPATCHED', 'INSPECTING'] } };
+    }
+    case 'my-inspection': {
+      const currentUserId = await resolveInspectionRequestCurrentUserId(
+        userinfo,
+        prisma,
+      );
+      const sinceMs = (query.sinceDays || 7) * 24 * 60 * 60 * 1000;
+      return {
+        inspectorId: currentUserId || undefined,
+        submittedAt: { gte: new Date(Date.now() - sinceMs) },
+      };
+    }
+    case 'my-report': {
+      const currentUserId = await resolveInspectionRequestCurrentUserId(
+        userinfo,
+        prisma,
+      );
+      return { reporterId: currentUserId || undefined };
+    }
+    case 'pending': {
+      return { status: 'SUBMITTED' };
+    }
+    default: {
+      return {};
+    }
+  }
+}
+
 async function buildRequestListWhere(
   userinfo: UserSession,
   query: ReturnType<typeof normalizeRequestListQuery>,
@@ -44,14 +112,22 @@ async function buildRequestListWhere(
   const currentUserId = query.mine
     ? await resolveInspectionRequestCurrentUserId(userinfo, prisma)
     : null;
-  const statusWhere = getRequestListStatusWhere(query);
+  const scopeWhere = await buildRequestListScopeWhere(userinfo, query);
+  const statusWhere = query.scope ? {} : getRequestListStatusWhere(query);
 
   return {
     isDeleted: false,
-    ...(query.mine && currentUserId ? { inspectorId: currentUserId } : {}),
-    ...(!query.mine && query.inspectorId
-      ? { inspectorId: query.inspectorId }
-      : {}),
+    ...scopeWhere,
+    ...(query.scope
+      ? {}
+      : {
+          ...(query.mine && currentUserId
+            ? { inspectorId: currentUserId }
+            : {}),
+          ...(!query.mine && query.inspectorId
+            ? { inspectorId: query.inspectorId }
+            : {}),
+        }),
     ...statusWhere,
     ...(query.workOrderNumber
       ? { workOrderNumber: query.workOrderNumber }
@@ -269,6 +345,19 @@ export const InspectionRequestQueryService = {
     rawQuery: Record<string, unknown>,
   ) {
     const query = normalizeRequestListQuery(rawQuery);
+    if (query.scope === 'pending' || query.scope === 'dispatched') {
+      const userId = String(userinfo?.userId ?? userinfo?.id ?? '');
+      const codes = userId
+        ? await RbacRoleService.getUserPermissionCodes(userId)
+        : [];
+      if (!codes.includes(INSPECTION_REQUEST_PERMISSION_CODES.DISPATCH)) {
+        throw new BusinessError(
+          ErrorCode.FORBIDDEN,
+          '无权限查看待派单或已派单',
+          403,
+        );
+      }
+    }
     const where = await buildRequestListWhere(userinfo, query);
     const runQuery = (includeWorkOrders: boolean) =>
       Promise.all([
@@ -323,6 +412,37 @@ export const InspectionRequestQueryService = {
         };
       }),
       total,
+    };
+  },
+
+  /**
+   * Minimal status lookup for anonymous scanned request entries: only
+   * status-class fields are exposed because request numbers are enumerable.
+   */
+  async getPublicRequestStatus(requestNo: string) {
+    const normalized = normalizeInspectionRequestText(requestNo);
+    if (!normalized) return null;
+    const request = await prisma.qms_inspection_requests.findFirst({
+      select: {
+        closedAt: true,
+        dispatchedAt: true,
+        dispatcher: { select: { realName: true } },
+        inspector: { select: { realName: true } },
+        linkedIssueStatus: true,
+        requestNo: true,
+        status: true,
+      },
+      where: { isDeleted: false, requestNo: normalized },
+    });
+    if (!request) return null;
+    return {
+      closedAt: request.closedAt,
+      dispatchedAt: request.dispatchedAt,
+      dispatcherName: request.dispatcher?.realName || '',
+      inspectorName: request.inspector?.realName || '',
+      linkedIssueStatus: request.linkedIssueStatus || null,
+      requestNo: request.requestNo,
+      status: request.status,
     };
   },
 };

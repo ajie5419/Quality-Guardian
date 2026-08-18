@@ -1817,6 +1817,7 @@ model qms_inspection_requests {
   mutualCheckResult       String                               @default("PASS")
   requestInfo             String?                              @db.Text
   attachments             String?                              @db.LongText
+  reporterId              String?                              // 报检人用户ID（登录报检时记录，匿名扫码为 null）
   status                  inspection_request_status            @default(SUBMITTED)
   priority                Int                                  @default(3)
   dispatcherId            String?
