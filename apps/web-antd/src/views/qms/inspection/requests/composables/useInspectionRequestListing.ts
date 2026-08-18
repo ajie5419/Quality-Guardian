@@ -71,7 +71,9 @@ export function useInspectionRequestListing(
 
   const query = reactive({
     keyword: '',
-    scope: undefined as string | undefined,
+    // The initial request must already carry the active view scope,
+    // otherwise the first load returns every request.
+    scope: (initialView || 'my-inspection') as string | undefined,
     status: undefined as InspectionRequestStatus | undefined,
   });
 
