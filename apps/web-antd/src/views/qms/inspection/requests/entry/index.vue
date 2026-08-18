@@ -29,6 +29,7 @@ import {
 import InspectionRequestEntryFormFields from './components/InspectionRequestEntryFormFields.vue';
 import InspectionRequestEntryShell from './components/InspectionRequestEntryShell.vue';
 import InspectionRequestEntrySubmitBar from './components/InspectionRequestEntrySubmitBar.vue';
+import MyInspectionRequests from './components/MyInspectionRequests.vue';
 import {
   buildIncomingInspectionRequestInfo,
   buildInspectionRequestEntryProcessOptions,

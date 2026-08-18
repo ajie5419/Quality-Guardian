@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { nextTick, ref } from 'vue';
 
 import { saveLocalInspectionReceipt } from './components/myInspectionReceipts';
 
@@ -21,7 +21,7 @@ export function useMyInspectionReports() {
   const activeEntryTab = ref('form');
   const myReportsRef = ref<MyInspectionReportsInstance>();
 
-  function switchToMyReports(
+  async function switchToMyReports(
     created: SubmittedInspectionRequestLike,
     fallback: {
       partName: string;
@@ -37,6 +37,8 @@ export function useMyInspectionReports() {
       workOrderNumber: created.workOrderNumber || fallback.workOrderNumber,
     });
     activeEntryTab.value = 'my-reports';
+    // The tab content mounts asynchronously; reload after the ref binds.
+    await nextTick();
     void myReportsRef.value?.reload();
   }
 
