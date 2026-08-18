@@ -26,6 +26,12 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
 vi.mock('~/modules/inspection/inspection-issue-welding', () => ({
   assertWelderForWeldingDefect: mocks.assertWelder,
 }));
+vi.mock('~/modules/data-lifecycle', () => ({
+  resolveRetainUntil: vi
+    .fn()
+    .mockResolvedValue(new Date('2026-08-18T00:00:00.000Z')),
+}));
+
 vi.mock('~/modules/metric-refresh', () => ({
   MetricRefreshQueue: { enqueueSupplierScores: mocks.enqueueScores },
 }));

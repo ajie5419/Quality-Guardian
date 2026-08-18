@@ -21,7 +21,8 @@ export function useAvailableYears(scopes?: string[]) {
         years.value = cached;
         return;
       }
-      const params = scopes && scopes.length > 0 ? { scopes: scopes.join(',') } : undefined;
+      const params =
+        scopes && scopes.length > 0 ? { scopes: scopes.join(',') } : undefined;
       const res = await requestClient.get<number[]>('/qms/common/years', {
         params,
       });

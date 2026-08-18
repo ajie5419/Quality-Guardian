@@ -1,7 +1,6 @@
 # 可用年份服务设计（Available Years）
 
-> 权威文档：2026-08-17 成文（系统级年份查询统一方案）。
-> 关联：docs/data-lifecycle.md §3.5（年份查询含归档）、docs/metrics-registry.md（指标登记）。
+> 权威文档：2026-08-17 成文（系统级年份查询统一方案）。关联：docs/data-lifecycle.md §3.5（年份查询含归档）、docs/metrics-registry.md（指标登记）。
 
 ## 1. 背景与问题
 
@@ -25,10 +24,18 @@ YEAR_SOURCES = [
   { scope: 'after-sales', table: 'after_sales', column: 'occurDate' },
   { scope: 'work-order', table: 'work_orders', column: 'deliveryDate' },
   { scope: 'quality-loss', table: 'quality_loss_index', column: 'occurDate' },
-  { scope: 'metrology-plan', table: 'metrology_calibration_plans', column: 'planYear' },
-  { scope: 'vehicle-commissioning', table: 'vehicle_commissioning_issues', column: 'date' },
+  {
+    scope: 'metrology-plan',
+    table: 'metrology_calibration_plans',
+    column: 'planYear',
+  },
+  {
+    scope: 'vehicle-commissioning',
+    table: 'vehicle_commissioning_issues',
+    column: 'date',
+  },
   // 新模块年份需求 = 注册表加一行
-]
+];
 ```
 
 ### 2.2 统一接口
@@ -53,7 +60,6 @@ useAvailableYears(scopes?: string[])  // 传 scopes 按模块取，不传取全�
 - 替换所有硬编码年份下拉
 ```
 
-
 > 说明：质量策划（planning：BOM/DFMEA/ITP/项目文档）无业务日期列（仅 createdAt/updatedAt），暂不注册年份来源；如业务需要按年份管理，先为相关表补充业务日期字段再注册。
 
 ## 2.4 新模块接入指南（三步）
@@ -65,7 +71,7 @@ useAvailableYears(scopes?: string[])  // 传 scopes 按模块取，不传取全�
 YEAR_SOURCES = [
   // ...现有来源
   { scope: 'my-module', table: 'my_table', column: '业务日期列' },
-]
+];
 
 // 第 2 步：前端页面接 hook（传自己的 scope）
 const { years } = useAvailableYears(['my-module']);

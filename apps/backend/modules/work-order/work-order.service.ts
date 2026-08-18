@@ -220,8 +220,6 @@ export const WorkOrderService = {
     });
   },
 
-
-
   async getStatsForDashboard(params: {
     weekStart: Date;
     yearStart: Date;

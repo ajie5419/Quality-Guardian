@@ -1,15 +1,12 @@
 # 权限模块文档（Permission Module）
 
-> 权威文档：2026-08-17 成文，覆盖统一授权框架（Phase 1-2）、门禁、数据范围、缓存、token 治理与运维脚本。
-> 关联：docs/authorization-framework-requirement.md（需求单）、docs/permission-consistency-report.md（一致性盘点）、docs/audit-action-plan.md（行动清单）。
+> 权威文档：2026-08-17 成文，覆盖统一授权框架（Phase 1-2）、门禁、数据范围、缓存、token 治理与运维脚本。关联：docs/authorization-framework-requirement.md（需求单）、docs/permission-consistency-report.md（一致性盘点）、docs/audit-action-plan.md（行动清单）。
 
 ---
 
 ## 1. 总览：权限体系三层模型
 
-认证层（你是谁）：middleware/3.auth.ts —— token 校验 + 账号状态校验
-授权层（你能不能做）：写操作 authorizeWrite / requireSystemAdmin；导出类读接口同 authorize 校验；所有权 assertRecordOwnership
-数据权限层（能看哪些数据）：DATA_SCOPE_V2 + data_permission_policies 策略 + DataScopeService.buildScopedWhere（读路径）
+认证层（你是谁）：middleware/3.auth.ts —— token 校验 + 账号状态校验授权层（你能不能做）：写操作 authorizeWrite / requireSystemAdmin；导出类读接口同 authorize 校验；所有权 assertRecordOwnership 数据权限层（能看哪些数据）：DATA_SCOPE_V2 + data_permission_policies 策略 + DataScopeService.buildScopedWhere（读路径）
 
 | 层 | 职责 | 强制方式 |
 | --- | --- | --- |
@@ -60,13 +57,17 @@ export default defineEventHandler(async (event) => {
 ### 3.2 requireSystemAdmin（系统管理操作）
 
 - 适用：系统管理类端点（用户/角色/菜单/部门/字典/设置/文件/主数据维护）
-- 用法：薄转发包装或内联插入（见 api/system/* 先例）
+- 用法：薄转发包装或内联插入（见 api/system/\* 先例）
 
 ### 3.3 assertRecordOwnership（个人数据所有权）
 
 ```ts
 import { assertRecordOwnership } from '~/modules/rbac';
-assertRecordOwnership({ label: '记录', ownerId: record.createdBy, userId: user.id });
+assertRecordOwnership({
+  label: '记录',
+  ownerId: record.createdBy,
+  userId: user.id,
+});
 ```
 
 - 适用场景：个人数据（如不合格品项：只能改自己创建的）
@@ -81,7 +82,7 @@ assertRecordOwnership({ label: '记录', ownerId: record.createdBy, userId: user
 
 | 规则 | 位置 | 作用 |
 | --- | --- | --- |
-| B-AUTH1 | scripts/check-qms-architecture.sh | 写端点（post/put/delete/patch）必须含 authorizeWrite/requireSystemAdmin/assert*Permission/ensurePermission，或属于豁免清单 |
+| B-AUTH1 | scripts/check-qms-architecture.sh | 写端点（post/put/delete/patch）必须含 authorizeWrite/requireSystemAdmin/assert\*Permission/ensurePermission，或属于豁免清单 |
 | B-AUTH2 | scripts/check-permission-code-declarations.mjs | 前端引用的权限码必须有声明（shared 枚举或模块菜单 authCode）；后端 authorizeWrite 引用的枚举必须存在 |
 | B-EC | scripts/check-qms-source-rules.mjs | BusinessError 错误码必须是 ErrorCode 枚举成员 |
 
@@ -105,10 +106,10 @@ assertRecordOwnership({ label: '记录', ownerId: record.createdBy, userId: user
 
 ### 5.3 策略回退规则
 
-| 策略缺失时 | 回退 |
-| --- | --- |
-| 用户有部门 | DEPT（本部门） |
-| 用户无部门 | SELF（本人） |
+| 策略缺失时            | 回退                         |
+| --------------------- | ---------------------------- |
+| 用户有部门            | DEPT（本部门）               |
+| 用户无部门            | SELF（本人）                 |
 | 用户是 super 且未配置 | 同样回退（必须显式配置 ALL） |
 
 ## 6. 缓存与失效
@@ -131,7 +132,7 @@ assertRecordOwnership({ label: '记录', ownerId: record.createdBy, userId: user
 | backfill-phase2e-permissions.ts | 报表/派发/车辆/AI/看板权限码回填 | ✅ |
 | backfill-supervision-permissions.ts | 监造权限码回填 | ✅ |
 | backfill-permission-consistency.ts | 菜单码+枚举码全量同步权限表（部署必跑） | ✅ |
-| cleanup-menu-placeholder-codes.ts | 清理 MENU_* 占位码（软删） | ✅ |
+| cleanup-menu-placeholder-codes.ts | 清理 MENU\_\* 占位码（软删） | ✅ |
 | audit-data-scope-policies.ts | 数据范围策略矩阵核查 | 只读 |
 
 **部署顺序**：consistency → 各模块回填（幂等可重复）→ cleanup →（如需隔离）策略配置 + DATA_SCOPE_V2。

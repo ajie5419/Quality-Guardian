@@ -1,9 +1,6 @@
 # 指标字典（Metrics Registry）
 
-> 权威文档：2026-08-17 成文。**一个指标，全世界只有一个定义**。任何聚合（groupBy / aggregate / 含聚合的 SQL）必须先查本字典：已存在则复用，不存在则登记后再写代码。
-> 代码版登记表（门禁输入，必须与本文档一致）：`apps/backend/utils/metrics-registry.ts`。
-> 门禁：B-MF（scripts/check-metric-registration.mjs）——新增聚合未登记即拦截（2026-08-17 立项，随阶段 1 落地）。
-> 关联：docs/data-contract.md（字段级治理）、apps/backend/utils/master-data-fields.ts（字段治理登记）。
+> 权威文档：2026-08-17 成文。**一个指标，全世界只有一个定义**。任何聚合（groupBy / aggregate / 含聚合的 SQL）必须先查本字典：已存在则复用，不存在则登记后再写代码。代码版登记表（门禁输入，必须与本文档一致）：`apps/backend/utils/metrics-registry.ts`。门禁：B-MF（scripts/check-metric-registration.mjs）——新增聚合未登记即拦截（2026-08-17 立项，随阶段 1 落地）。关联：docs/data-contract.md（字段级治理）、apps/backend/utils/master-data-fields.ts（字段治理登记）。
 
 ---
 
@@ -17,15 +14,15 @@
 
 ## 2. 指标总览
 
-| 族 | 编号段 | 指标数 | 负责模块 |
-| --- | --- | --- | --- |
-| A 合格率 | M-A01 ~ M-A07 | 7 | report |
-| B 质量损失 | M-B01 ~ M-B06 | 6 | quality-loss |
-| C 售后 | M-C01 ~ M-C06 | 6 | after-sales |
-| D 检验 | M-D01 ~ M-D06 | 6 | inspection |
-| E 供应商 | M-E01 ~ M-E03 | 3 | supplier |
-| F 工作台 | M-F01 ~ M-F05 | 5 | dashboard / work-order |
-| G 其他 | M-G01 ~ M-G08 | 8 | 各域 |
+| 族         | 编号段        | 指标数 | 负责模块               |
+| ---------- | ------------- | ------ | ---------------------- |
+| A 合格率   | M-A01 ~ M-A07 | 7      | report                 |
+| B 质量损失 | M-B01 ~ M-B06 | 6      | quality-loss           |
+| C 售后     | M-C01 ~ M-C06 | 6      | after-sales            |
+| D 检验     | M-D01 ~ M-D06 | 6      | inspection             |
+| E 供应商   | M-E01 ~ M-E03 | 3      | supplier               |
+| F 工作台   | M-F01 ~ M-F05 | 5      | dashboard / work-order |
+| G 其他     | M-G01 ~ M-G08 | 8      | 各域                   |
 
 **合计 41 个登记指标**（覆盖 51 处聚合点的全部聚合函数；同名聚合函数如 M-B03/M-B04/M-B05 为多源适配，由阶段 2 收敛）。
 
@@ -60,7 +57,7 @@
 
 | ID | key | 名称 | 口径 | 来源表 | 消费 | 时效 |
 | --- | --- | --- | --- | --- | --- | --- |
-| M-C01 | afterSalesKpi | 售后 KPI（总数/费用/未关闭/平均处理天数） | _count/_sum(materialCost+laborTravelCost)/AVG(DATEDIFF(closeDate,occurDate)) | after_sales | /qms/after-sales/stats | 实时 |
+| M-C01 | afterSalesKpi | 售后 KPI（总数/费用/未关闭/平均处理天数） | \_count/\_sum(materialCost+laborTravelCost)/AVG(DATEDIFF(closeDate,occurDate)) | after_sales | /qms/after-sales/stats | 实时 |
 | M-C02 | afterSalesDefectDistribution | 售后缺陷分类分布 | groupBy(defectCategoryId+身份快照) | after_sales | /qms/after-sales/stats | 实时 |
 | M-C03 | afterSalesSupplierDistribution | 售后供应商分布 | groupBy(supplierBrandId+身份快照) | after_sales | /qms/after-sales/stats | 实时 |
 | M-C04 | afterSalesDeptDistribution | 售后部门分布 | groupBy(respDeptId+身份快照) | after_sales | /qms/after-sales/stats | 实时 |
@@ -72,7 +69,7 @@
 | ID | key | 名称 | 口径 | 来源表 | 消费 | 时效 |
 | --- | --- | --- | --- | --- | --- | --- |
 | M-D01 | inspectionReportStatistics | 检验报告统计（缺陷分布/风险项目/供应商绩效） | getDefectDistribution/getTopRiskProjects/getSupplierPerformance | quality_records | 检验报告统计页 | 实时 |
-| M-D02 | inspectionIssueStats | 不合格品项统计（总数/损失/关闭率/类型分布） | aggregate(_count/_sum lossAmount)+count(closed)+groupBy(defectCategoryId) | quality_records | /qms/inspection/issues/stats | 实时 |
+| M-D02 | inspectionIssueStats | 不合格品项统计（总数/损失/关闭率/类型分布） | aggregate(\_count/\_sum lossAmount)+count(closed)+groupBy(defectCategoryId) | quality_records | /qms/inspection/issues/stats | 实时 |
 | M-D03 | inspectionIssueChartAggregate | 不合格品图表聚合 | metric: count/lossAmount/quantity | quality_records | /qms/inspection/issues/chart-aggregate | 实时 |
 | M-D04 | inspectionRequestStats | 报检任务统计（检验员负载/排行） | JS 聚合；CLOSED+closedAt 区间规则 | qms_inspection_requests | /qms/inspection/requests/stats；用户管理在办量（阶段 3 收敛） | 实时 |
 | M-D05 | workspaceIssueSummary | 工作台问题汇总 | getWorkspaceIssueSummary | quality_records+inspections | /qms/dashboard | 实时 |
@@ -112,8 +109,8 @@
 ## 4. 已知待收敛项（阶段 2/3/4）
 
 | 项 | 现状 | 目标 | 阶段 |
-| --- | --- | --- | --- |
-| ~~M-B03/M-B04/M-B05 三源同构实现~~ | **✅ 2026-08-17 完成**：getTrendData/getDrillDown/getAllLosses 统一走 quality_loss_index 物化表（口径写入时统一：Internal amount>0、External/Commissioning isClaim||amount>0、Manual amount>0）；三模块 12 个直查函数 + 转发链已删除 | — | 阶段 2 ✅ |
+| --- | --- | --- | --- | --- | --- |
+| ~~M-B03/M-B04/M-B05 三源同构实现~~ | **✅ 2026-08-17 完成**：getTrendData/getDrillDown/getAllLosses 统一走 quality_loss_index 物化表（口径写入时统一：Internal amount>0、External/Commissioning isClaim |  | amount>0、Manual amount>0）；三模块 12 个直查函数 + 转发链已删除 | — | 阶段 2 ✅ |
 | ~~M-G08 排行双实现~~ | **✅ 2026-08-17 完成**：user.service 改调 inspection-request-stats 的 getInspectorActiveTaskCounts（统一出口） | — | 阶段 3 ✅ |
 | ~~M-G01 跨域实现~~ | **✅ 2026-08-17 完成（判断修正）**：3 个函数数据源均为检验域表（inspections/quality_records），按模块自包含原则**留在 inspection 模块**，从 inspection-reporting.service.ts 拆出至 inspection-score-data.service.ts（报表中心文件 428→287 行） | — | 阶段 4 ✅ |
 
