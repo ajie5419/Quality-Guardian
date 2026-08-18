@@ -1,3 +1,8 @@
+import {
+  DEFAULT_PROCESS_DEPARTMENT_ASSIGNMENTS,
+  runProcessResponsibleDepartmentBackfill,
+} from './process-responsible-department-backfill';
+
 export interface ReleaseMaintenanceTaskDefinition {
   checksum: string;
   /** The application release that first requires this task before startup. */
@@ -17,7 +22,30 @@ export interface ReleaseMaintenanceTaskDefinition {
  * checksum; never edit a completed revision in place.
  */
 export const releaseMaintenanceManifest: readonly ReleaseMaintenanceTaskDefinition[] =
-  [];
+  [
+    {
+      checksum:
+        'd0c028aeb3baed4d967ea1e3a0fd45b1666c632ab27a62399516b3cbe7b48945',
+      introducedIn: '0.28.0',
+      revision: 1,
+      run: async () => {
+        const summary = await runProcessResponsibleDepartmentBackfill({
+          assignments: DEFAULT_PROCESS_DEPARTMENT_ASSIGNMENTS,
+          mode: 'apply',
+        });
+        if (summary.unresolved > 0) {
+          const detail = summary.entries
+            .filter((entry) => entry.action === 'unresolved')
+            .map((entry) => `${entry.processName}: ${entry.reason}`)
+            .join('; ');
+          throw new Error(
+            `Process responsible department backfill unresolved: ${detail}`,
+          );
+        }
+      },
+      taskKey: 'process-responsible-department-backfill',
+    },
+  ];
 
 export const retiredHistoricalReleaseMaintenanceTaskKeys = [
   'rbac-role-page-permissions',

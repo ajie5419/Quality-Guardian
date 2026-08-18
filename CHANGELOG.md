@@ -23,6 +23,23 @@
 
 ---
 
+### 2026-08-18 阶段：发布自动回填工序责任部门（接入 release-maintenance）
+
+**执行内容：**
+- release-maintenance-manifest 注册任务 process-responsible-department-backfill（revision 1）：每次发布（run-remote-release.sh 的 release-maintenance 阶段）自动以 --apply 运行回填脚本，幂等（已配 skipped）；unresolved 时抛错中断发布（fail-fast，防止漏配上线）
+- 测试更新：manifest 断言从"空 baseline"改为"含回填任务且不重放历史 wave"；manifest 5 + runner 5 + backfill 6 = 16/16
+- 本地真库执行验证：任务启动→COMPLETED，ledger 记录 (attempts 1, COMPLETED, revision 1)
+
+**验证结果：**
+- tsc/eslint 干净；qms-arch 0 violations；release-maintenance 套件 16/16
+
+**commit:** 待补
+
+**遗留问题：**
+- 生产部门树若与默认路径不一致（unresolved），发布会在该阶段失败并列出候选部门——这是预期保护行为，按提示修正映射后重跑即可
+
+---
+
 ### 2026-08-17 阶段：修复关闭弹窗对供应商责任的部门误校验（前端 bug）
 
 **执行内容：**

@@ -35,8 +35,12 @@ describe('release maintenance manifest', () => {
     expect(entrypoint).not.toContain('redis.disconnect()');
   });
 
-  it('starts with an explicit empty baseline instead of replaying historical waves', () => {
-    expect(releaseMaintenanceManifest).toEqual([]);
+  it('does not replay retired historical waves and only runs startup prerequisites', () => {
+    const keys = releaseMaintenanceManifest.map((task) => task.taskKey);
+    expect(keys).toContain('process-responsible-department-backfill');
+    for (const retired of retiredHistoricalReleaseMaintenanceTaskKeys) {
+      expect(keys).not.toContain(retired);
+    }
     expect(retiredHistoricalReleaseMaintenanceTaskKeys).toEqual(
       expect.arrayContaining([
         'rbac-role-page-permissions',
