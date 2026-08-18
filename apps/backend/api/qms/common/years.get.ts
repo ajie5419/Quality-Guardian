@@ -1,5 +1,4 @@
 import { defineEventHandler, getQuery } from 'h3';
-
 import { getAvailableYears } from '~/modules/data-lifecycle';
 import { logApiError } from '~/utils/api-logger';
 import { useResponseSuccess } from '~/utils/response';
