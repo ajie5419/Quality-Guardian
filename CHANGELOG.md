@@ -23,6 +23,13 @@
 
 ---
 
+## [0.28.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.27.0...qgs-v0.28.0) (2026-08-19)
+
+
+### Features
+
+* **qms:** inspection responsibility inheritance, role-based request views, my-reports entry ([#132](https://github.com/ajie5419/Quality-Guardian/issues/132)) ([81c8970](https://github.com/ajie5419/Quality-Guardian/commit/81c8970e67babc3d35a5f64640fe495683309ee8))
+
 ### 2026-08-18 阶段：PR #131 合并发布（责任继承 + 角色化视图 + 我的报检）
 
 **执行内容：**
