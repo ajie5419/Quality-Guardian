@@ -29,6 +29,7 @@ import InspectionDashboardHistoryList from './components/InspectionDashboardHist
 import InspectionDashboardRankCards from './components/InspectionDashboardRankCards.vue';
 import InspectionDashboardStatsCards from './components/InspectionDashboardStatsCards.vue';
 import InspectionDashboardTrendCard from './components/InspectionDashboardTrendCard.vue';
+import { useDashboardRankStats } from './composables/useDashboardRankStats';
 
 defineOptions({ name: 'QMSInspectionDashboard' });
 
@@ -73,6 +74,11 @@ const historyStatsOptions: Array<{
 ];
 
 const requestStats = ref({
+  byDepartment: [] as Array<{
+    count: number;
+    department: string;
+    responsibleDepartmentId: null | string;
+  }>,
   byInspector: [] as Array<{
     count: number;
     inspector: string;
@@ -138,6 +144,15 @@ const requestStats = ref({
   todaySubmittedProcessCount: 0,
 });
 
+const {
+  maxDepartmentCount,
+  maxSupplierCount,
+  maxTeamCount,
+  topDepartmentStats,
+  topSupplierStats,
+  topTeamStats,
+} = useDashboardRankStats(requestStats);
+
 const dashboardRangeLabel = computed(() => {
   if (rangeMode.value === 'custom' && customRange.value) {
     return `${customRange.value[0].format('YYYY-MM-DD')} 至 ${customRange.value[1].format('YYYY-MM-DD')}`;
@@ -151,22 +166,6 @@ const dashboardRangeLabel = computed(() => {
   };
   return map[rangeMode.value] || '本月';
 });
-
-const sortedTeamStats = computed(() =>
-  [...requestStats.value.byTeam].sort((a, b) => b.count - a.count),
-);
-const topTeamStats = computed(() => sortedTeamStats.value.slice(0, 12));
-const maxTeamCount = computed(() =>
-  Math.max(1, ...topTeamStats.value.map((item) => item.count)),
-);
-
-const sortedSupplierStats = computed(() =>
-  [...requestStats.value.bySupplier].sort((a, b) => b.count - a.count),
-);
-const topSupplierStats = computed(() => sortedSupplierStats.value.slice(0, 12));
-const maxSupplierCount = computed(() =>
-  Math.max(1, ...topSupplierStats.value.map((item) => item.count)),
-);
 
 const topSupplierReinspectionStats = computed(() =>
   [...requestStats.value.reinspectionRateBySupplier].slice(0, 8),
@@ -419,8 +418,10 @@ tryOnUnmounted(() => {
         </InspectionDashboardTrendCard>
 
         <InspectionDashboardRankCards
+          :max-department-count="maxDepartmentCount"
           :max-supplier-count="maxSupplierCount"
           :max-team-count="maxTeamCount"
+          :top-department-stats="topDepartmentStats"
           :reinspection-stats-total="requestStats.reinspectionRateByTeam.length"
           :supplier-reinspection-stats-total="
             requestStats.reinspectionRateBySupplier.length

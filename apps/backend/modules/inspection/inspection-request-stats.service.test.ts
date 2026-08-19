@@ -33,6 +33,9 @@ vi.mock('~/utils/prisma', () => ({
       count: vi.fn().mockResolvedValue(0),
       findMany: vi.fn().mockResolvedValue([]),
     },
+    processes: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     users: {
       findMany: vi.fn().mockResolvedValue([]),
     },
@@ -110,6 +113,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       ]),
     );
     identityMocks.resolveCanonicalIds.mockResolvedValue(new Map());
+    vi.mocked(prisma.processes.findMany).mockResolvedValue([]);
     vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([]);
   }
 
@@ -786,6 +790,72 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.todayClosedCount).toBe(3);
   });
 
+  it('falls back to the process master department when a request has no responsibility department snapshot', async () => {
+    const request = makeRequest({
+      id: 'process-fallback',
+      processId: 'proc-machining',
+      responsibleDepartmentId: null,
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      team: null,
+      teamId: null,
+      status: 'CLOSED',
+      closedAt: new Date('2026-06-01T11:00:00+08:00'),
+    });
+    setupMocks([request]);
+    vi.mocked(prisma.processes.findMany).mockResolvedValue([
+      { id: 'proc-machining', responsibleDepartmentId: 'dept-machining' },
+    ] as any);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { businessUnit: null, id: 'dept-machining', name: 'Machining BU' },
+    ]);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byDepartment).toEqual([
+      {
+        count: 1,
+        department: 'Machining BU',
+        responsibleDepartmentId: 'dept-machining',
+      },
+    ]);
+    expect(result.historyByDepartment).toEqual(result.byDepartment);
+    expect(result.reinspectionRateByDepartment).toEqual([
+      expect.objectContaining({
+        responsibleDepartmentId: 'dept-machining',
+        submittedCount: 1,
+      }),
+    ]);
+  });
+
+  it('keeps requests unresolved when neither the snapshot nor the process master has a department', async () => {
+    const request = makeRequest({
+      id: 'no-dept-anywhere',
+      processId: 'proc-unconfigured',
+      responsibleDepartmentId: null,
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      team: null,
+      teamId: null,
+    });
+    setupMocks([request]);
+    vi.mocked(prisma.processes.findMany).mockResolvedValue([
+      { id: 'proc-unconfigured', responsibleDepartmentId: null },
+    ] as any);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byDepartment).toEqual([
+      expect.objectContaining({
+        responsibleDepartmentId: null,
+        count: 1,
+      }),
+    ]);
+  });
   it('loads only fields required by the statistics calculation', async () => {
     setupMocks([]);
 

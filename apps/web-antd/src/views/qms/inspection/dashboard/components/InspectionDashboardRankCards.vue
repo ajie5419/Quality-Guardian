@@ -10,6 +10,12 @@ interface TeamReinspectionStat {
   teamId: null | string;
 }
 
+interface DepartmentStat {
+  count: number;
+  department: string;
+  responsibleDepartmentId: null | string;
+}
+
 interface TeamStat {
   count: number;
   team: string;
@@ -32,12 +38,14 @@ interface SupplierStat {
 }
 
 defineProps<{
+  maxDepartmentCount: number;
   maxSupplierCount: number;
   maxTeamCount: number;
   reinspectionStatsTotal: number;
   supplierReinspectionStatsTotal: number;
   supplierStatsTotal: number;
   teamStatsTotal: number;
+  topDepartmentStats: DepartmentStat[];
   topReinspectionStats: TeamReinspectionStat[];
   topSupplierReinspectionStats: SupplierReinspectionStat[];
   topSupplierStats: SupplierStat[];
@@ -53,6 +61,48 @@ const emit = defineEmits<{
 
 <template>
   <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+    <!-- Department rank card -->
+    <Card :body-style="{ padding: '16px' }">
+      <div class="mb-4 flex items-center justify-between">
+        <div>
+          <div class="font-medium text-gray-900">部门报检排行</div>
+          <div class="mt-1 text-xs text-gray-500">
+            共 {{ topDepartmentStats.length }} 个责任部门
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-gray-500">前 12 项</span>
+        </div>
+      </div>
+      <div v-if="topDepartmentStats.length > 0" class="space-y-3">
+        <div
+          v-for="item in topDepartmentStats"
+          :key="item.responsibleDepartmentId || 'unresolved-department'"
+          class="space-y-1"
+        >
+          <div class="flex items-start justify-between gap-3 text-sm">
+            <span class="break-words text-gray-800">
+              {{ item.department || '未明确部门' }}
+            </span>
+            <span class="shrink-0 font-semibold text-gray-900">
+              {{ item.count }}
+            </span>
+          </div>
+          <div class="h-1.5 overflow-hidden rounded bg-gray-100">
+            <div
+              class="h-full rounded bg-indigo-500"
+              :style="{
+                width: `${(item.count / maxDepartmentCount) * 100}%`,
+              }"
+            ></div>
+          </div>
+        </div>
+      </div>
+      <div v-else class="py-10 text-center text-sm text-gray-400">
+        当前范围暂无部门报检
+      </div>
+    </Card>
+
     <!-- Team rank card -->
     <Card :body-style="{ padding: '16px' }">
       <div class="mb-4 flex items-center justify-between">

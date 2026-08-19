@@ -27,6 +27,29 @@ import {
 } from './inspection-request-stats-identity';
 import { buildInspectionRequestDepartmentStats } from './inspection-request-stats-responsibility';
 
+/**
+ * Resolve the configured responsibility department for a set of processes.
+ * Used as a fallback for requests whose snapshot has no
+ * responsibleDepartmentId (e.g. created before process responsibility
+ * backfill), so department stats stay aligned with the process master data.
+ */
+async function resolveProcessDepartmentsById(
+  processIds: string[],
+): Promise<Map<string, string>> {
+  if (processIds.length === 0) return new Map();
+  const processes = await prisma.processes.findMany({
+    select: { id: true, responsibleDepartmentId: true },
+    where: { id: { in: processIds }, isDeleted: false },
+  });
+  return new Map(
+    processes
+      .map((process) => [process.id, process.responsibleDepartmentId] as const)
+      .filter((entry): entry is [string, string] =>
+        Boolean(entry[1] && entry[1].trim()),
+      ),
+  );
+}
+
 export const InspectionRequestStatsService = {
   async getRequestStats(query: {
     endDate?: string;
@@ -56,6 +79,7 @@ export const InspectionRequestStatsService = {
           supplierId: true,
           responsibilityType: true,
           responsibleDepartmentId: true,
+          processId: true,
           teamId: true,
         },
         where: {
@@ -117,27 +141,27 @@ export const InspectionRequestStatsService = {
         },
       }),
     ]);
-    const [
-      supplierNamesById,
-      teamNamesById,
-      teamCanonicalById,
-      responsibilityDepartments,
-    ] = await Promise.all([
-      SupplierIdentityService.resolveNamesByIds(
-        collectIdentityIds(periodRequests.map((item) => item.supplierId)),
-      ),
-      TeamIdentityService.resolveNamesByIds(
-        collectIdentityIds(periodRequests.map((item) => item.teamId)),
-      ),
-      TeamIdentityService.resolveCanonicalIds(
-        periodRequests.map((item) => item.teamId),
-      ),
-      DeptService.findActiveByIdsOrNames({
-        ids: collectIdentityIds(
-          periodRequests.map((item) => item.responsibleDepartmentId),
+    const [supplierNamesById, teamNamesById, teamCanonicalById] =
+      await Promise.all([
+        SupplierIdentityService.resolveNamesByIds(
+          collectIdentityIds(periodRequests.map((item) => item.supplierId)),
         ),
-      }),
-    ]);
+        TeamIdentityService.resolveNamesByIds(
+          collectIdentityIds(periodRequests.map((item) => item.teamId)),
+        ),
+        TeamIdentityService.resolveCanonicalIds(
+          periodRequests.map((item) => item.teamId),
+        ),
+      ]);
+    const processDepartmentsById = await resolveProcessDepartmentsById(
+      collectIdentityIds(periodRequests.map((item) => item.processId)),
+    );
+    const responsibilityDepartments = await DeptService.findActiveByIdsOrNames({
+      ids: collectIdentityIds([
+        ...periodRequests.map((item) => item.responsibleDepartmentId),
+        ...processDepartmentsById.values(),
+      ]),
+    });
     const departmentNamesById = new Map(
       responsibilityDepartments.map((department) => [
         department.id,
@@ -277,6 +301,7 @@ export const InspectionRequestStatsService = {
         );
         const departmentIdentityKey =
           normalizeIdentityId(item.responsibleDepartmentId) ||
+          normalizeIdentityId(processDepartmentsById.get(item.processId)) ||
           UNRESOLVED_IDENTITY_KEY;
         if (usesSupplierIdentity) {
           supplierMap.set(
