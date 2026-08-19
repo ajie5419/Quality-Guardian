@@ -17,7 +17,7 @@
 
 <!-- AI 维护：简述当前进行中的工作、目标、当前阶段。 -->
 
-- 主分支已发布 v0.27.0（2026-08-15，PR #130 合并）。
+- 主分支已发布 **v0.28.1**（2026-08-19，PR #136 合并；0.28.0 曾因回填工序名不匹配部署失败，0.28.1 修复后部署成功，生产 6 工序责任部门全部落库）。
 - 文档知识库治理已完成一轮：项目档案（docs/PROJECT_GUIDE.md）为规范唯一权威、状态日报（本文件）自动同步硬数据、漂移门禁（check:docs-drift）拦截版本/模块清单/基线漂移；33/33 模块已具备 ARCHITECTURE.md。
 - 数据契约规范已落地：docs/data-contract.md 成文 + ErrorCode 枚举 + B-EC/B-GF/R2 门禁 + where:field 影响面脚本（详见最近变更）。
 - 定时任务框架（方案 A）已实现：modules/scheduler/ + cron-scheduler plugin + 3 个首批任务（计量到期/NC 超时/供应商月度快照），设计文档 docs/scheduler-design.md。
@@ -27,6 +27,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-19 v0.28.1 发布并部署成功：0.28.0 部署失败定位为 release-maintenance 回填任务工序名不匹配生产库（机加成品件-外协→机加成品件，另有外协结构件/下料）；PR #135 修复清单对齐生产工序名 + manifest revision 2（4308d0b1），PR #136 发版 0.28.1 → deploy 成功（run 32209221724）；生产验证：6 工序责任部门全落库、ledger rev2 COMPLETED。
 - 2026-08-18 PR #131 合并发布准备（fe457a20）：报检责任继承 + 角色化视图 + 我的报检 + 发布回填全链路合并入 main，CI 6 项全绿；Lint 修复（eslint perfectionist import 排序，50a22bc2）。
 - 2026-08-18 报检界面迭代收尾（6 个修复）：公开创建接口可选解析 token（登录用户报检落 reporterId，546d2038）；已派单改名"待检验"并排除未闭环 NC 单（bdb3e5e1）；修复入口页 MyInspectionRequests 组件未注册导致"我的报检"空白（cfd2dcc5）；表格列补 dataIndex（工序/工单号显示，86f9eaab）；列表初始加载带 scope（待派单不再混入已关闭/不合格单，f1a48605）；无派单权限用户 closed/abnormal/自由搜索强制限本人相关（inspectorId OR reporterId，0f3cc4f5）。保留期确认：报检/检验/NC 10 年归档、审计 90 天、本机回执永久（上限 20 条）。
 - 2026-08-18 报检任务界面角色化视图：报检任务页 Segmented 视图改为 待派单/已派单/已完成单/不合格异常单/我的检验(近一周)——待派/已派仅派单权限可见（前端 Tab 显隐 + 后端 scope=pending/dispatched 权限 403 强制）；新增 scope 查询（abnormal=NC 未闭环、my-inspection=当前检验员近7天、my-report=当前报检人）；报检单新增 reporterId（迁移 20260818090000，登录创建时落库）；公开状态接口 GET /qms/public/inspection/requests/status?requestNo=（匿名扫码查询，仅返回状态类最小字段防枚举泄露）；报检入口页加 Tab（报检单/我的报检）——提交成功存本机回执（localStorage）并自动切换，匿名靠本机回执+公开状态接口，登录合并 reporterId 查询。真库验证：scope=pending/abnormal/my-inspection/my-report 全通、匿名公开状态查询通。
