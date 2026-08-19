@@ -27,6 +27,7 @@
 
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
+- 2026-08-18 PR #131 合并发布准备（fe457a20）：报检责任继承 + 角色化视图 + 我的报检 + 发布回填全链路合并入 main，CI 6 项全绿；Lint 修复（eslint perfectionist import 排序，50a22bc2）。
 - 2026-08-18 报检界面迭代收尾（6 个修复）：公开创建接口可选解析 token（登录用户报检落 reporterId，546d2038）；已派单改名"待检验"并排除未闭环 NC 单（bdb3e5e1）；修复入口页 MyInspectionRequests 组件未注册导致"我的报检"空白（cfd2dcc5）；表格列补 dataIndex（工序/工单号显示，86f9eaab）；列表初始加载带 scope（待派单不再混入已关闭/不合格单，f1a48605）；无派单权限用户 closed/abnormal/自由搜索强制限本人相关（inspectorId OR reporterId，0f3cc4f5）。保留期确认：报检/检验/NC 10 年归档、审计 90 天、本机回执永久（上限 20 条）。
 - 2026-08-18 报检任务界面角色化视图：报检任务页 Segmented 视图改为 待派单/已派单/已完成单/不合格异常单/我的检验(近一周)——待派/已派仅派单权限可见（前端 Tab 显隐 + 后端 scope=pending/dispatched 权限 403 强制）；新增 scope 查询（abnormal=NC 未闭环、my-inspection=当前检验员近7天、my-report=当前报检人）；报检单新增 reporterId（迁移 20260818090000，登录创建时落库）；公开状态接口 GET /qms/public/inspection/requests/status?requestNo=（匿名扫码查询，仅返回状态类最小字段防枚举泄露）；报检入口页加 Tab（报检单/我的报检）——提交成功存本机回执（localStorage）并自动切换，匿名靠本机回执+公开状态接口，登录合并 reporterId 查询。真库验证：scope=pending/abnormal/my-inspection/my-report 全通、匿名公开状态查询通。
 - 2026-08-17 工序责任部门回填脚本成文（scripts/process-responsible-department-backfill.ts + 入口 + 6 测试）：部门按名称路径（如 科技公司/制造SOBU/采购部）解析、不硬编码 ID，重名/缺失报错列候选；dry-run/--apply 双模式、幂等 skip、supplierSource 与责任类型不一致仅告警；package.json 新增 maintenance:process-responsible-departments。本地 dry-run 验证 4 工序全部已配置（skipped=4）。生产部署时核对部门路径后跑 --apply 即可。

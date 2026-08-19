@@ -23,6 +23,23 @@
 
 ---
 
+### 2026-08-18 阶段：PR #131 合并发布（责任继承 + 角色化视图 + 我的报检）
+
+**执行内容：**
+- PR #131（fe457a20）合并入 main：报检责任落库链路（工序主数据带出 + 快照继承）、报检任务界面角色化视图（5 视图 + DISPATCH 权限强制）、报检入口页"我的报检"Tab（本机回执 + reporterId）、发布回填任务（process-responsible-departments backfill，release-maintenance 幂等注册）
+- CI 修复两轮：第一轮 Unit Tests 失败（inspection-issue-create.service.test.ts 未 mock data-lifecycle，5877b153 修复）；第二轮 Lint 失败（eslint perfectionist/sort-imports：years.get.ts 多余空行、public-inspection-request-create.post.service.ts 导入顺序，50a22bc2 修复）——prettier --write 不处理 import 排序，需 eslint --fix；另本地 .eslintcache 旧缓存会导致 `pnpm lint` 假失败，清缓存后恢复
+- 合并后 release-please 判定 "No user facing commits found"（PR 标题无 conventional 前缀），本次以 feat(qms) 文档提交触发 0.28.0 发布
+
+**验证结果：**
+- CI 6 项全绿：Lint/Typecheck/QMS Arch/Unit Tests/Secret Scan/Prisma Migration 全部 pass（run 32097474686）
+
+**commit:** fe457a20（#131）/ 5877b153 / 50a22bc2
+
+**遗留问题：**
+- 发布后需核对 release-maintenance 回填结果（工序责任部门路径失败会 fail-fast）
+
+---
+
 ### 2026-08-18 阶段：报检界面迭代收尾（6 个修复 + 文档同步）
 
 **执行内容：**
