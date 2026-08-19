@@ -23,6 +23,13 @@
 
 ---
 
+## [0.28.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.1...qgs-v0.28.2) (2026-08-19)
+
+
+### Bug Fixes
+
+* **inspection:** fallback request stats to process master department; add department rank card ([#138](https://github.com/ajie5419/Quality-Guardian/issues/138)) ([18b0649](https://github.com/ajie5419/Quality-Guardian/commit/18b064905b06080d01b72d31936483a59658111c))
+
 ## [0.28.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.0...qgs-v0.28.1) (2026-08-19)
 
 
