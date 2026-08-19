@@ -192,6 +192,7 @@ export async function runProcessResponsibleDepartmentBackfill(options: {
  * Default assignments following the agreed business rules:
  *   - 外购件 / 原材料 -> supplier responsibility -> 采购部 (制造 SOBU)
  *   - 机加成品件 / 外协结构件 / 下料 / 辅材 -> outsourcing responsibility -> 生产履约部
+ *   - 成品检验 -> 品质部
  * Process names must match the target database `processes.name`; production
  * uses 机加成品件 (not the local-only 机加成品件-外协). Department paths must
  * match the target database department tree; adjust per deployment before
@@ -227,6 +228,11 @@ export const DEFAULT_PROCESS_DEPARTMENT_ASSIGNMENTS: ProcessDepartmentAssignment
     {
       departmentPath: ['生产履约部'],
       processName: '辅材',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['品质部'],
+      processName: '成品检验',
       responsibilityType: 'OUTSOURCING_UNIT',
     },
   ];
