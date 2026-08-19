@@ -17,6 +17,9 @@ vi.mock('~/utils/prisma', () => {
       updateMany: vi.fn(),
       upsert: vi.fn(),
     },
+    departments: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     processes: {
       count: vi.fn(),
       create: vi.fn(),
@@ -98,6 +101,7 @@ describe('process master service', () => {
           { category: 'INCOMING' },
         ],
         name: 'Welding',
+        responsibleDepartmentId: null,
         sort: 1,
         status: 1,
       },
@@ -107,6 +111,8 @@ describe('process master service', () => {
       {
         categories: ['PROCESS', 'INCOMING'],
         code: 'WELD',
+        responsibleDepartmentId: null,
+        responsibleDepartmentName: null,
         id: 'process-1',
         name: 'Welding',
         sort: 1,

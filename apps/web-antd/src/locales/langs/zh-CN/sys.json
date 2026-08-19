@@ -89,7 +89,8 @@
     "uploadTypeDesc": "控制所有上传入口（含匿名报检上传）允许的文件格式。SVG、HTML、宏文档等可携带脚本的格式始终禁止，修改后即时生效。",
     "uploadTypeImages": "仅图片（jpg / jpeg / png / webp）",
     "uploadTypeImagesPdf": "图片 + PDF",
-    "uploadTypeImagesPdfOffice": "图片 + PDF + Word/Excel（推荐）"
+    "uploadTypeImagesPdfOffice": "图片 + PDF + Word/Excel（推荐）",
+    "responsibleDepartment": "责任部门"
   },
   "qualityClassification": {
     "title": "质量分类设置",

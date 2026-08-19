@@ -26,6 +26,7 @@ import {
   Tooltip,
 } from 'ant-design-vue';
 
+import { getDeptList } from '#/api/system/dept';
 import {
   createInspectionProcessApi,
   deleteInspectionProcessApi,
@@ -120,6 +121,7 @@ const processDraft = reactive<{
   categories: ProcessCategory[];
   code: string;
   name: string;
+  responsibleDepartmentId: string;
   sort: number;
   status: 0 | 1;
   supplierSource: InspectionSettingsApi.ProcessSupplierSource;
@@ -127,10 +129,16 @@ const processDraft = reactive<{
   categories: [],
   code: '',
   name: '',
+  responsibleDepartmentId: '',
   sort: 0,
   status: 1,
   supplierSource: 'Supplier',
 });
+
+const deptOptions = ref<Array<{ id: string; label: string; value: string }>>(
+  [],
+);
+const deptLoading = ref(false);
 
 const columns = computed(() => [
   { key: 'name', title: t('sys.inspectionSettings.processName') },
@@ -151,6 +159,12 @@ const columns = computed(() => [
     key: 'supplierSource',
     title: t('sys.inspectionSettings.supplierSource'),
     width: 130,
+  },
+  {
+    dataIndex: 'responsibleDepartmentName',
+    key: 'responsibleDepartmentName',
+    title: t('sys.inspectionSettings.responsibleDepartment'),
+    width: 140,
   },
   {
     key: 'status',
@@ -177,7 +191,7 @@ const columns = computed(() => [
 async function loadSettings() {
   loading.value = true;
   try {
-    const [manualSetting, materialInputSetting, processes, rollout] =
+    const [manualSetting, materialInputSetting, processes, rollout, depts] =
       await Promise.all([
         getInspectionManualCreateSettingApi(),
         getPublicIncomingMaterialInputSettingApi(),
@@ -185,11 +199,17 @@ async function loadSettings() {
         canEdit.value
           ? getPassRateProjectionStatusApi()
           : Promise.resolve(null),
+        getDeptList().catch(() => []),
       ]);
     manualCreateEnabled.value = manualSetting.enabled;
     incomingMaterialFreeInputEnabled.value =
       materialInputSetting.incomingMaterialFreeInputEnabled;
     processRows.value = processes;
+    deptOptions.value = depts.map((department) => ({
+      id: department.id,
+      label: department.name,
+      value: department.id,
+    }));
     await loadUploadTypeSetting();
     processProcessIds.value = new Set(
       processes
@@ -348,6 +368,7 @@ function openCreateModal() {
     categories: [],
     code: '',
     name: '',
+    responsibleDepartmentId: '',
     sort: processRows.value.length,
     status: 1,
     supplierSource: 'Supplier',
@@ -361,6 +382,7 @@ function openEditModal(item: ProcessItem) {
     categories: [...item.categories],
     code: item.code || '',
     name: item.name,
+    responsibleDepartmentId: item.responsibleDepartmentId || '',
     sort: item.sort,
     status: item.status === 1 ? 1 : 0,
     supplierSource: item.supplierSource,
@@ -385,6 +407,7 @@ async function saveProcess() {
       ? updateInspectionProcessApi(editingProcessId.value, {
           code: processDraft.code.trim() || null,
           name,
+          responsibleDepartmentId: processDraft.responsibleDepartmentId,
           sort: processDraft.sort,
           status: processDraft.status,
           supplierSource: processDraft.supplierSource,
@@ -393,6 +416,7 @@ async function saveProcess() {
           categories: processDraft.categories,
           code: processDraft.code.trim() || null,
           name,
+          responsibleDepartmentId: processDraft.responsibleDepartmentId,
           sort: processDraft.sort,
           supplierSource: processDraft.supplierSource,
         }));
@@ -662,6 +686,9 @@ onMounted(loadSettings);
                 "
               />
             </template>
+            <template v-else-if="column.key === 'responsibleDepartmentName'">
+              <span>{{ record.responsibleDepartmentName || '—' }}</span>
+            </template>
             <template v-else-if="column.key === 'supplierSource'">
               <span>
                 {{
@@ -776,6 +803,16 @@ onMounted(loadSettings);
                 value: 'Outsourcing',
               },
             ]"
+          />
+        </Form.Item>
+        <Form.Item :label="t('sys.inspectionSettings.responsibleDepartment')">
+          <Select
+            v-model:value="processDraft.responsibleDepartmentId"
+            allow-clear
+            class="w-full"
+            :loading="deptLoading"
+            :options="deptOptions"
+            placeholder="请选择责任部门（可选，创建报检时自动带出）"
           />
         </Form.Item>
         <Form.Item

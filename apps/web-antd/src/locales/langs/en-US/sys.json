@@ -89,7 +89,8 @@
     "uploadTypeDesc": "Controls the allowed file formats for all upload endpoints, including anonymous inspection uploads. Formats that can carry scripts (SVG, HTML, macro documents, ...) are always rejected. Changes take effect immediately.",
     "uploadTypeImages": "Images only (jpg / jpeg / png / webp)",
     "uploadTypeImagesPdf": "Images + PDF",
-    "uploadTypeImagesPdfOffice": "Images + PDF + Word/Excel (recommended)"
+    "uploadTypeImagesPdfOffice": "Images + PDF + Word/Excel (recommended)",
+    "responsibleDepartment": "Responsible Department"
   },
   "qualityClassification": {
     "title": "Quality Classification Settings",

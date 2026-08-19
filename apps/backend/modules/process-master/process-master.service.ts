@@ -177,15 +177,33 @@ export const ProcessMasterService = {
           select: { category: true },
         },
         name: true,
+        responsibleDepartmentId: true,
         sort: true,
         status: true,
         supplierSource: true,
       },
     });
 
+    const departmentIds = rows
+      .map((process) => process.responsibleDepartmentId)
+      .filter(Boolean);
+    const departments =
+      departmentIds.length > 0
+        ? await prisma.departments.findMany({
+            where: { id: { in: departmentIds }, isDeleted: false },
+            select: { id: true, name: true },
+          })
+        : [];
+    const departmentNameById = new Map(
+      departments.map((department) => [department.id, department.name]),
+    );
+
     return rows.map(({ inspectionRequestOptions, ...process }) => ({
       ...process,
       categories: inspectionRequestOptions.map((item) => item.category),
+      responsibleDepartmentName: process.responsibleDepartmentId
+        ? (departmentNameById.get(process.responsibleDepartmentId) ?? null)
+        : null,
     }));
   },
 
@@ -254,6 +272,9 @@ export const ProcessMasterService = {
         code: normalizeOptionalText(input.code),
         isDeleted: false,
         name,
+        responsibleDepartmentId: normalizeOptionalText(
+          input.responsibleDepartmentId,
+        ),
         sort: input.sort ?? 0,
         status: 1,
         supplierSource: input.supplierSource,
@@ -266,6 +287,7 @@ export const ProcessMasterService = {
               code: true,
               id: true,
               name: true,
+              responsibleDepartmentId: true,
               sort: true,
               status: true,
               supplierSource: true,
@@ -277,6 +299,7 @@ export const ProcessMasterService = {
               code: true,
               id: true,
               name: true,
+              responsibleDepartmentId: true,
               sort: true,
               status: true,
               supplierSource: true,
@@ -315,6 +338,13 @@ export const ProcessMasterService = {
           ...(input.supplierSource === undefined
             ? {}
             : { supplierSource: input.supplierSource }),
+          ...(input.responsibleDepartmentId === undefined
+            ? {}
+            : {
+                responsibleDepartmentId: normalizeOptionalText(
+                  input.responsibleDepartmentId,
+                ),
+              }),
         },
         select: {
           code: true,
