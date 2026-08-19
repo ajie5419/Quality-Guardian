@@ -191,8 +191,9 @@ export async function runProcessResponsibleDepartmentBackfill(options: {
 /**
  * Default assignments following the agreed business rules:
  *   - 外购件 / 原材料 -> supplier responsibility -> 采购部 (制造 SOBU)
- *   - 机加成品件 / 外协结构件 / 下料 / 辅材 -> outsourcing responsibility -> 生产履约部
- *   - 成品检验 -> 品质部
+ *   - 机加成品件 / 外协结构件 / 下料 / 辅材 / 成品检验 / 焊接 / 组对 / 组拼 /
+ *     组装 / 装配 / 打砂 / 喷漆 / 涂装 / 探伤 / 焊后尺寸 / 整体拼装 / 机加 /
+ *     发货检验 / 外观 -> outsourcing responsibility -> 生产履约部
  * Process names must match the target database `processes.name`; production
  * uses 机加成品件 (not the local-only 机加成品件-外协). Department paths must
  * match the target database department tree; adjust per deployment before
@@ -231,8 +232,78 @@ export const DEFAULT_PROCESS_DEPARTMENT_ASSIGNMENTS: ProcessDepartmentAssignment
       responsibilityType: 'OUTSOURCING_UNIT',
     },
     {
-      departmentPath: ['品质部'],
+      departmentPath: ['生产履约部'],
       processName: '成品检验',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '焊接',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '组对',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '组拼',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '组装',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '装配',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '打砂',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '喷漆',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '涂装',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '探伤',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '焊后尺寸',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '整体拼装',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '机加',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '发货检验',
+      responsibilityType: 'OUTSOURCING_UNIT',
+    },
+    {
+      departmentPath: ['生产履约部'],
+      processName: '外观',
       responsibilityType: 'OUTSOURCING_UNIT',
     },
   ];
