@@ -25,30 +25,12 @@ import {
   UNRESOLVED_SUPPLIER_NAME,
   UNRESOLVED_TEAM_NAME,
 } from './inspection-request-stats-identity';
+import {
+  mergeSameNameCountRows,
+  mergeSameNameReinspectionRows,
+  resolveProcessDepartmentsById,
+} from './inspection-request-stats-merge';
 import { buildInspectionRequestDepartmentStats } from './inspection-request-stats-responsibility';
-
-/**
- * Resolve the configured responsibility department for a set of processes.
- * Used as a fallback for requests whose snapshot has no
- * responsibleDepartmentId (e.g. created before process responsibility
- * backfill), so department stats stay aligned with the process master data.
- */
-async function resolveProcessDepartmentsById(
-  processIds: string[],
-): Promise<Map<string, string>> {
-  if (processIds.length === 0) return new Map();
-  const processes = await prisma.processes.findMany({
-    select: { id: true, responsibleDepartmentId: true },
-    where: { id: { in: processIds }, isDeleted: false },
-  });
-  return new Map(
-    processes
-      .map((process) => [process.id, process.responsibleDepartmentId] as const)
-      .filter((entry): entry is [string, string] =>
-        Boolean(entry[1] && entry[1].trim()),
-      ),
-  );
-}
 
 export const InspectionRequestStatsService = {
   async getRequestStats(query: {
@@ -296,13 +278,18 @@ export const InspectionRequestStatsService = {
         }
         const supplierIdentityKey =
           normalizeIdentityId(item.supplierId) || UNRESOLVED_IDENTITY_KEY;
-        const teamIdentityKey = normalizeIdentityId(
-          teamCanonicalById.get(item.teamId) ?? item.teamId,
-        );
         const departmentIdentityKey =
           normalizeIdentityId(item.responsibleDepartmentId) ||
           normalizeIdentityId(processDepartmentsById.get(item.processId)) ||
           UNRESOLVED_IDENTITY_KEY;
+        const teamIdentityKey =
+          normalizeIdentityId(
+            teamCanonicalById.get(item.teamId) ?? item.teamId,
+          ) ||
+          (isInternalProcess &&
+          departmentIdentityKey !== UNRESOLVED_IDENTITY_KEY
+            ? `dept:${departmentIdentityKey}`
+            : '');
         if (usesSupplierIdentity) {
           supplierMap.set(
             supplierIdentityKey,
@@ -399,6 +386,10 @@ export const InspectionRequestStatsService = {
         historyInspectorMap.set(inspectorKey, existing);
       }
     }
+    const teamNamesByIdWithDeptFallback = new Map(teamNamesById);
+    for (const [departmentId, name] of departmentNamesById) {
+      teamNamesByIdWithDeptFallback.set(`dept:${departmentId}`, name);
+    }
     const inspectorNamesById = new Map(
       periodRequests.flatMap((item) => {
         const inspectorId = normalizeIdentityId(item.inspectorId);
@@ -407,10 +398,12 @@ export const InspectionRequestStatsService = {
           : [];
       }),
     );
-    const teamRows = createIdentityCountRows(
-      teamMap,
-      teamNamesById,
-      UNRESOLVED_TEAM_NAME,
+    const teamRows = mergeSameNameCountRows(
+      createIdentityCountRows(
+        teamMap,
+        teamNamesByIdWithDeptFallback,
+        UNRESOLVED_TEAM_NAME,
+      ),
     );
     const supplierRows = createIdentityCountRows(
       supplierMap,
@@ -450,10 +443,12 @@ export const InspectionRequestStatsService = {
         historyInspectorMap,
         inspectorNamesById,
       ),
-      historyByTeam: createIdentityCountRows(
-        historyTeamMap,
-        teamNamesById,
-        UNRESOLVED_TEAM_NAME,
+      historyByTeam: mergeSameNameCountRows(
+        createIdentityCountRows(
+          historyTeamMap,
+          teamNamesByIdWithDeptFallback,
+          UNRESOLVED_TEAM_NAME,
+        ),
       ).map(({ count, id, name }) => ({ count, team: name, teamId: id })),
       inspectorStatus,
       pendingDispatchCount,
@@ -467,10 +462,12 @@ export const InspectionRequestStatsService = {
         supplierId: id,
         team: name,
       })),
-      reinspectionRateByTeam: createReinspectionRows(
-        teamReinspectionMap,
-        teamNamesById,
-        UNRESOLVED_TEAM_NAME,
+      reinspectionRateByTeam: mergeSameNameReinspectionRows(
+        createReinspectionRows(
+          teamReinspectionMap,
+          teamNamesByIdWithDeptFallback,
+          UNRESOLVED_TEAM_NAME,
+        ),
       ).map(({ id, name, ...stat }) => ({
         ...stat,
         team: name,

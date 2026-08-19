@@ -143,7 +143,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
         responsibleDepartmentId: 'dept-machining',
       },
     ]);
-    expect(result.byTeam).toEqual([]);
+    expect(result.byTeam).toEqual([
+      {
+        count: 1,
+        team: 'Machining BU',
+        teamId: 'dept:dept-machining',
+      },
+    ]);
     expect(result.historyByDepartment).toEqual(result.byDepartment);
     expect(result.reinspectionRateByDepartment).toEqual([
       expect.objectContaining({
@@ -790,6 +796,81 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     expect(result.todayClosedCount).toBe(3);
   });
 
+  it('includes internal requests without a TEAM under the department-named team row', async () => {
+    const request = makeRequest({
+      id: 'dept-fallback-team',
+      processId: 'proc-machining',
+      responsibilityType: 'INTERNAL_DEPARTMENT',
+      responsibleDepartmentId: 'dept-machining',
+      team: null,
+      teamId: null,
+      status: 'CLOSED',
+      closedAt: new Date('2026-06-01T11:00:00+08:00'),
+    });
+    setupMocks([request]);
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { businessUnit: null, id: 'dept-machining', name: 'Machining BU' },
+    ]);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      {
+        count: 1,
+        team: 'Machining BU',
+        teamId: 'dept:dept-machining',
+      },
+    ]);
+    expect(result.historyByTeam).toEqual(result.byTeam);
+    expect(result.reinspectionRateByTeam).toEqual([
+      expect.objectContaining({
+        submittedCount: 1,
+        team: 'Machining BU',
+      }),
+    ]);
+  });
+
+  it('merges a department-fallback team row into the unique same-name real team row', async () => {
+    const requests = [
+      makeRequest({
+        id: 'real-team',
+        teamId: 'team-a',
+        team: '班组A',
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-a',
+      }),
+      makeRequest({
+        id: 'dept-only',
+        teamId: null,
+        team: null,
+        responsibilityType: 'INTERNAL_DEPARTMENT',
+        responsibleDepartmentId: 'dept-a',
+      }),
+    ];
+    setupMocks(requests);
+    identityMocks.resolveTeamNamesByIds.mockResolvedValue(
+      new Map([['team-a', '班组A']]),
+    );
+    vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+      { businessUnit: null, id: 'dept-a', name: '班组A' },
+    ]);
+
+    const result = await InspectionRequestStatsService.getRequestStats({
+      startDate: '2026-06-01',
+      endDate: '2026-06-01',
+    });
+
+    expect(result.byTeam).toEqual([
+      {
+        count: 2,
+        team: '班组A',
+        teamId: 'team-a',
+      },
+    ]);
+  });
   it('falls back to the process master department when a request has no responsibility department snapshot', async () => {
     const request = makeRequest({
       id: 'process-fallback',
