@@ -25,9 +25,9 @@ export const releaseMaintenanceManifest: readonly ReleaseMaintenanceTaskDefiniti
   [
     {
       checksum:
-        'd0c028aeb3baed4d967ea1e3a0fd45b1666c632ab27a62399516b3cbe7b48945',
+        'bb168d5082658200100c8fbc1d4e77fd82c947266135f1ccd9ef096b719ba59f',
       introducedIn: '0.28.0',
-      revision: 1,
+      revision: 2,
       run: async () => {
         const summary = await runProcessResponsibleDepartmentBackfill({
           assignments: DEFAULT_PROCESS_DEPARTMENT_ASSIGNMENTS,
