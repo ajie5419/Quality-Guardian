@@ -12,6 +12,13 @@ const processSupplierSourceSchema = z
   .enum(['Outsourcing', 'Supplier'])
   .default('Supplier');
 
+const processResponsibleDepartmentIdSchema = z
+  .string()
+  .trim()
+  .max(191)
+  .nullable()
+  .optional();
+
 export const processMasterCreateSchema = z.object({
   categories: z
     .array(inspectionRequestProcessCategorySchema)
@@ -19,6 +26,7 @@ export const processMasterCreateSchema = z.object({
     .default([]),
   code: processCodeSchema,
   name: processNameSchema,
+  responsibleDepartmentId: processResponsibleDepartmentIdSchema,
   sort: processSortSchema,
   supplierSource: processSupplierSourceSchema,
 });
@@ -27,6 +35,7 @@ export const processMasterUpdateSchema = z
   .object({
     code: processCodeSchema,
     name: processNameSchema.optional(),
+    responsibleDepartmentId: processResponsibleDepartmentIdSchema,
     sort: processSortSchema,
     status: z.union([z.literal(0), z.literal(1)]).optional(),
     supplierSource: processSupplierSourceSchema.optional(),
@@ -35,6 +44,7 @@ export const processMasterUpdateSchema = z
     (input) =>
       input.code !== undefined ||
       input.name !== undefined ||
+      input.responsibleDepartmentId !== undefined ||
       input.sort !== undefined ||
       input.status !== undefined ||
       input.supplierSource !== undefined,
