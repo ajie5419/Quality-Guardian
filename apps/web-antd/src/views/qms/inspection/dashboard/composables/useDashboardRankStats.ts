@@ -2,12 +2,6 @@ import type { Ref } from 'vue';
 
 import { computed } from 'vue';
 
-interface DepartmentStat {
-  count: number;
-  department: string;
-  responsibleDepartmentId: null | string;
-}
-
 interface TeamStat {
   count: number;
   team: string;
@@ -22,21 +16,10 @@ interface SupplierStat {
 
 export function useDashboardRankStats(
   requestStats: Ref<{
-    byDepartment: DepartmentStat[];
     bySupplier: SupplierStat[];
     byTeam: TeamStat[];
   }>,
 ) {
-  const sortedDepartmentStats = computed(() =>
-    [...requestStats.value.byDepartment].sort((a, b) => b.count - a.count),
-  );
-  const topDepartmentStats = computed(() =>
-    sortedDepartmentStats.value.slice(0, 12),
-  );
-  const maxDepartmentCount = computed(() =>
-    Math.max(1, ...topDepartmentStats.value.map((item) => item.count)),
-  );
-
   const sortedTeamStats = computed(() =>
     [...requestStats.value.byTeam].sort((a, b) => b.count - a.count),
   );
@@ -56,10 +39,8 @@ export function useDashboardRankStats(
   );
 
   return {
-    maxDepartmentCount,
     maxSupplierCount,
     maxTeamCount,
-    topDepartmentStats,
     topSupplierStats,
     topTeamStats,
   };

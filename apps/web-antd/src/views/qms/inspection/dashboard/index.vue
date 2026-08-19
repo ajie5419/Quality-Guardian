@@ -74,11 +74,6 @@ const historyStatsOptions: Array<{
 ];
 
 const requestStats = ref({
-  byDepartment: [] as Array<{
-    count: number;
-    department: string;
-    responsibleDepartmentId: null | string;
-  }>,
   byInspector: [] as Array<{
     count: number;
     inspector: string;
@@ -144,14 +139,8 @@ const requestStats = ref({
   todaySubmittedProcessCount: 0,
 });
 
-const {
-  maxDepartmentCount,
-  maxSupplierCount,
-  maxTeamCount,
-  topDepartmentStats,
-  topSupplierStats,
-  topTeamStats,
-} = useDashboardRankStats(requestStats);
+const { maxSupplierCount, maxTeamCount, topSupplierStats, topTeamStats } =
+  useDashboardRankStats(requestStats);
 
 const dashboardRangeLabel = computed(() => {
   if (rangeMode.value === 'custom' && customRange.value) {
@@ -418,10 +407,8 @@ tryOnUnmounted(() => {
         </InspectionDashboardTrendCard>
 
         <InspectionDashboardRankCards
-          :max-department-count="maxDepartmentCount"
           :max-supplier-count="maxSupplierCount"
           :max-team-count="maxTeamCount"
-          :top-department-stats="topDepartmentStats"
           :reinspection-stats-total="requestStats.reinspectionRateByTeam.length"
           :supplier-reinspection-stats-total="
             requestStats.reinspectionRateBySupplier.length
