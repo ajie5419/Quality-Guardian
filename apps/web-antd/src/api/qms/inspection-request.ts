@@ -22,11 +22,6 @@ export interface InspectionRequestStats {
     inspector: string;
     inspectorId: null | string;
   }>;
-  byDepartment: Array<{
-    count: number;
-    department: string;
-    responsibleDepartmentId: null | string;
-  }>;
   bySupplier: Array<{
     count: number;
     supplierId: null | string;
