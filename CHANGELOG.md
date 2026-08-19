@@ -23,6 +23,13 @@
 
 ---
 
+## [0.28.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.0...qgs-v0.28.1) (2026-08-19)
+
+
+### Bug Fixes
+
+* **scripts:** align process responsible-department backfill with production process names ([#135](https://github.com/ajie5419/Quality-Guardian/issues/135)) ([4308d0b](https://github.com/ajie5419/Quality-Guardian/commit/4308d0b1d2d0a215ccf4a644dd9228c45455897d))
+
 ## [0.28.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.27.0...qgs-v0.28.0) (2026-08-19)
 
 
