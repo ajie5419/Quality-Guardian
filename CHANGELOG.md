@@ -37,6 +37,24 @@
 
 * **qms:** inspection responsibility inheritance, role-based request views, my-reports entry ([#132](https://github.com/ajie5419/Quality-Guardian/issues/132)) ([81c8970](https://github.com/ajie5419/Quality-Guardian/commit/81c8970e67babc3d35a5f64640fe495683309ee8))
 
+### 2026-08-19 阶段：v0.28.0/0.28.1 发布与部署修复
+
+**执行内容：**
+- 0.28.0 部署失败定位：release-maintenance 回填任务 process-responsible-department-backfill@1 报 PROCESS_NOT_FOUND（生产库工序名「机加成品件」非「机加成品件-外协」，另有「外协结构件」「下料」两个 Outsourcing 工序未配）——回填逐条 apply 已写前 3 条（外购件/原材料/辅材），fail-fast 回滚
+- 修复（PR #135，4308d0b1）：DEFAULT_PROCESS_DEPARTMENT_ASSIGNMENTS 对齐生产库工序名（机加成品件/外协结构件/下料→生产履约部，外购件/原材料→采购部，辅材→生产履约部）；manifest 任务升 revision 2 + 新 checksum（ledger rev1 FAILED 记录保留，禁止改已完成 revision）
+- 0.28.1 发布（PR #136）→ tag qgs-v0.28.1 → deploy 成功（run 32209221724）
+
+**验证结果：**
+- 生产库真查：6 工序责任部门全部落库；ledger rev=2 COMPLETED attempts=1；rev=1 FAILED 保留
+- 本地：release-maintenance 相关测试 16/16；lint/tsc 全绿；PR #135/#136 CI 6 项全绿
+
+**commit:** 4308d0b1（#135）/ 4e97afea（#136）
+
+**遗留问题：**
+- 角色管理给调度员角色勾 QMS:Inspection:Requests:Dispatch；不合格项责任 migration dry-run 审核；supplier identity 回填等部署后事项待办
+
+---
+
 ### 2026-08-18 阶段：PR #131 合并发布（责任继承 + 角色化视图 + 我的报检）
 
 **执行内容：**
