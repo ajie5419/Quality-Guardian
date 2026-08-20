@@ -42,6 +42,14 @@
 
 ---
 
+## [0.29.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.2...qgs-v0.29.0) (2026-08-20)
+
+
+### Features
+
+* **@qgs/backend:** restrict completed view to 3 days and my-inspecti… ([98188eb](https://github.com/ajie5419/Quality-Guardian/commit/98188eb7b572efa07ff8ed758f74505a4c2dbde6))
+* **@qgs/backend:** restrict completed view to 3 days and my-inspection to open requests ([6bebf46](https://github.com/ajie5419/Quality-Guardian/commit/6bebf461a3ebc66dae98a892985e2713659c7b7d))
+
 ## [0.28.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.1...qgs-v0.28.2) (2026-08-19)
 
 
