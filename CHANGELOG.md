@@ -1,3 +1,22 @@
+### 2026-08-20 报检任务列表视图筛选调整：已完成仅 3 天 + 我的检验仅未完成
+
+**执行内容：**
+- `apps/backend/modules/inspection/inspection-request-query.service.ts`：`closed` scope 增加 `closedAt >= now - 3 天` 过滤（常量 `REQUEST_LIST_CLOSED_WINDOW_DAYS = 3`）；`my-inspection` scope 由"近 7 天窗口"改为只返回分派给当前检验员且未完成的检验单（`status in [DISPATCHED, INSPECTING]`），移除 `sinceDays` 参数（后端 normalize 与前端 API 类型同步删除）。
+- 为满足模块 ≤500 行门禁（B-S1），列表查询辅助逻辑拆出至新文件 `apps/backend/modules/inspection/inspection-request-list-query.ts`，服务文件 510→361 行，无跨模块 API 变化。
+- 更新测试：closed scope 3 天窗口（派单/非派单权限 2 例）、my-inspection 状态过滤无时间窗口。
+
+**验证结果：**
+- eslint / prettier（4 文件）: 通过；typecheck: 通过
+- vitest: inspection 模块 746/746 通过（含 query service 20 例）
+- check:qms-arch: 0 violations；check:docs-drift: PASSED
+
+**commit:** 待功能 PR 合并后由 release-please 记录
+
+**遗留问题：**
+- 无（纯查询层调整，无 migration、无数据变更）
+
+---
+
 # CHANGELOG.md — 执行记录
 
 每次 Codex 完成一个阶段后，在这里记录执行结果。

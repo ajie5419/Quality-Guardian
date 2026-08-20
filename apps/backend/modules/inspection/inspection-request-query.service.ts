@@ -1,5 +1,7 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import type { RequestListQuery } from './inspection-request-list-query';
+
 import { ErrorCode, INSPECTION_REQUEST_PERMISSION_CODES } from '@qgs/shared';
 import { RbacRoleService } from '~/modules/rbac';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
@@ -10,143 +12,21 @@ import { buildTeamContainsWhere } from '~/utils/team-resolver';
 
 import {
   mapInspectionRequest,
-  normalizeInspectionRequestStatus,
   normalizeInspectionRequestText,
   resolveInspectionRequestCurrentUserId,
 } from './inspection-request';
+import {
+  buildMyRelatedRequestWhere,
+  buildRequestListScopeWhere,
+  getRequestListStatusWhere,
+  normalizeRequestListQuery,
+} from './inspection-request-list-query';
 import { resolveInspectionRequestIssueResponsibilities } from './inspection-request-responsibility.service';
 import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
 
-function normalizeRequestListQuery(query: Record<string, unknown>) {
-  return {
-    currentOnly: String(query.current || '') === 'true',
-    includeClosed: String(query.includeClosed || '') === 'true',
-    inspectorId: normalizeInspectionRequestText(query.inspectorId),
-    keyword: normalizeInspectionRequestText(query.keyword),
-    mine: String(query.mine || '') === 'true',
-    page: Math.max(Number(query.page || 1), 1),
-    pageSize: Math.min(Math.max(Number(query.pageSize || 20), 1), 100),
-    processName: normalizeInspectionRequestText(query.processName),
-    scope: normalizeRequestListScope(
-      normalizeInspectionRequestText(query.scope),
-    ),
-    sinceDays: Math.max(Number(query.sinceDays) || 0, 0),
-    statuses: normalizeRequestListStatuses(query.status),
-    team: normalizeInspectionRequestText(query.team),
-    workOrderNumber: normalizeInspectionRequestText(query.workOrderNumber),
-  };
-}
-
-const REQUEST_LIST_SCOPE_SET = new Set([
-  'abnormal',
-  'closed',
-  'dispatched',
-  'my-inspection',
-  'my-report',
-  'pending',
-]);
-
-function normalizeRequestListScope(value: string) {
-  return REQUEST_LIST_SCOPE_SET.has(value) ? value : '';
-}
-export function getRequestListScopeFromQuery(query: { scope?: null | string }) {
-  return normalizeRequestListScope(normalizeInspectionRequestText(query.scope));
-}
-
-function normalizeRequestListStatuses(value: unknown) {
-  return String(value ?? '')
-    .split(',')
-    .map((item) => normalizeInspectionRequestStatus(item))
-    .filter(Boolean);
-}
-
-async function buildMyRelatedRequestWhere(
-  userinfo: UserSession,
-): Promise<Record<string, unknown>> {
-  const currentUserId = await resolveInspectionRequestCurrentUserId(
-    userinfo,
-    prisma,
-  );
-  if (!currentUserId) return { AND: [{ id: '__none__' }] };
-  return {
-    AND: [
-      { OR: [{ inspectorId: currentUserId }, { reporterId: currentUserId }] },
-    ],
-  };
-}
-
-async function buildRequestListScopeWhere(
-  userinfo: UserSession,
-  query: ReturnType<typeof normalizeRequestListQuery>,
-  options: { isDispatchHolder: boolean },
-): Promise<Record<string, unknown>> {
-  switch (query.scope) {
-    case 'abnormal': {
-      const base = {
-        linkedIssueId: { not: null },
-        linkedIssueStatus: 'OPEN',
-      };
-      return options.isDispatchHolder
-        ? base
-        : {
-            ...base,
-            ...(await buildMyRelatedRequestWhere(userinfo)),
-          };
-    }
-    case 'closed': {
-      const base = { status: 'CLOSED' };
-      return options.isDispatchHolder
-        ? base
-        : {
-            ...base,
-            ...(await buildMyRelatedRequestWhere(userinfo)),
-          };
-    }
-    case 'dispatched': {
-      // 待检验：已派未检或检验中且无未闭环 NC；不合格单只在 abnormal 视图中出现。
-      // 用 AND 数组包裹 OR，避免与关键字搜索的顶层 OR 互相覆盖。
-      return {
-        status: { in: ['DISPATCHED', 'INSPECTING'] },
-        AND: [
-          {
-            OR: [
-              { linkedIssueId: null },
-              { linkedIssueStatus: { not: 'OPEN' } },
-            ],
-          },
-        ],
-      };
-    }
-    case 'my-inspection': {
-      const currentUserId = await resolveInspectionRequestCurrentUserId(
-        userinfo,
-        prisma,
-      );
-      const sinceMs = (query.sinceDays || 7) * 24 * 60 * 60 * 1000;
-      return {
-        inspectorId: currentUserId || undefined,
-        submittedAt: { gte: new Date(Date.now() - sinceMs) },
-      };
-    }
-    case 'my-report': {
-      const currentUserId = await resolveInspectionRequestCurrentUserId(
-        userinfo,
-        prisma,
-      );
-      return { reporterId: currentUserId || undefined };
-    }
-    case 'pending': {
-      return { status: 'SUBMITTED' };
-    }
-    default: {
-      return {};
-    }
-  }
-}
-
 async function buildRequestListWhere(
   userinfo: UserSession,
-  query: ReturnType<typeof normalizeRequestListQuery>,
+  query: RequestListQuery,
   options: { isDispatchHolder: boolean },
 ) {
   const currentUserId = query.mine
@@ -216,27 +96,7 @@ async function buildRequestTeamDisplayWhere(keyword: string) {
   };
 }
 
-function getRequestListStatusWhere(
-  query: ReturnType<typeof normalizeRequestListQuery>,
-): Record<string, unknown> {
-  if (query.mine && query.includeClosed) {
-    return { status: { in: ['DISPATCHED', 'INSPECTING', 'CLOSED'] } };
-  }
-  if (query.statuses.length === 1) {
-    return { status: query.statuses[0] };
-  }
-  if (query.statuses.length > 1) {
-    return { status: { in: query.statuses } };
-  }
-  if (query.currentOnly) {
-    return { status: { in: ['SUBMITTED', 'DISPATCHED', 'INSPECTING'] } };
-  }
-  return {};
-}
-
-function getRequestListOrderBy(
-  query: ReturnType<typeof normalizeRequestListQuery>,
-) {
+function getRequestListOrderBy(query: RequestListQuery) {
   const activeInspectorTaskQuery =
     Boolean(query.inspectorId) &&
     query.statuses.length > 0 &&
