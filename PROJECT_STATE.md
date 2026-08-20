@@ -6,10 +6,10 @@
 
 <!-- docs:sync-start -->
 
-- 最后同步时间: 2026-08-18 11:02
-- 版本: 0.27.0
+- 最后同步时间: 2026-08-20 11:45
+- 版本: 0.28.2
 - 后端模块数: 34
-- 模块 TS 文件数: 683
+- 模块 TS 文件数: 684
 - 后端测试文件数: 299
 <!-- docs:sync-end -->
 
@@ -25,6 +25,7 @@
 
 ## 最近变更（倒序）
 
+- 2026-08-20 报检任务列表筛选调整（codex/inspection-list-filters 分支）：已完成单 scope=closed 只显示近 3 天关闭的检验单；我的检验 scope=my-inspection 改为只显示未完成检验单（DISPATCHED/INSPECTING），删除 sinceDays 参数；列表查询辅助拆至 inspection-request-list-query.ts。
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
 - 2026-08-19 v0.28.1 发布并部署成功：0.28.0 部署失败定位为 release-maintenance 回填任务工序名不匹配生产库（机加成品件-外协→机加成品件，另有外协结构件/下料）；PR #135 修复清单对齐生产工序名 + manifest revision 2（4308d0b1），PR #136 发版 0.28.1 → deploy 成功（run 32209221724）；生产验证：6 工序责任部门全落库、ledger rev2 COMPLETED。

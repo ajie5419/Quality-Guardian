@@ -103,7 +103,6 @@ export async function getInspectionRequests(params?: {
   pageSize?: number;
   processName?: string;
   scope?: string;
-  sinceDays?: number;
   status?: string;
   workOrderNumber?: string;
 }) {

@@ -435,7 +435,7 @@ describe('inspection request query service', () => {
     );
   });
 
-  it('restricts closed scope to my related requests without the dispatch permission', async () => {
+  it('restricts closed scope to my requests closed within the last 3 days without the dispatch permission', async () => {
     vi.mocked(prisma.users.findFirst).mockResolvedValue({
       id: 'user-1',
     } as never);
@@ -449,13 +449,49 @@ describe('inspection request query service', () => {
     );
 
     const called = vi.mocked(prisma.qms_inspection_requests.findMany).mock
-      .calls[0]?.[0] as { where: { AND?: unknown[] } };
+      .calls[0]?.[0] as {
+      where: { AND?: unknown[]; closedAt: { gte: Date } };
+    };
     expect(called.where).toMatchObject({ status: 'CLOSED' });
+    expect(called.where.closedAt.gte.getTime()).toBeGreaterThan(
+      Date.now() - 4 * 24 * 60 * 60 * 1000,
+    );
     expect(called.where.AND).toEqual([
       {
         OR: [{ inspectorId: 'user-1' }, { reporterId: 'user-1' }],
       },
     ]);
+  });
+
+  it('filters closed scope to requests closed within the last 3 days for dispatch holders', async () => {
+    getUserPermissionCodes.mockResolvedValue([
+      'QMS:Inspection:Requests:Dispatch',
+    ]);
+    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([]);
+    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([]);
+
+    await InspectionRequestQueryService.getRequestList(
+      { id: 'user-1', userId: 'user-1' } as any,
+      { scope: 'closed' },
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          isDeleted: false,
+          status: 'CLOSED',
+        }),
+      }),
+    );
+    const called = vi.mocked(prisma.qms_inspection_requests.findMany).mock
+      .calls[0]?.[0] as {
+      where: { AND?: unknown[]; closedAt: { gte: Date } };
+    };
+    expect(called.where.closedAt.gte.getTime()).toBeGreaterThan(
+      Date.now() - 4 * 24 * 60 * 60 * 1000,
+    );
+    expect(called.where.AND).toBeUndefined();
   });
 
   it('restricts abnormal scope to my related requests without the dispatch permission', async () => {
@@ -504,7 +540,7 @@ describe('inspection request query service', () => {
     );
   });
 
-  it('filters my-inspection scope to the current inspector within the last week', async () => {
+  it('filters my-inspection scope to the current inspector without a time window', async () => {
     vi.mocked(prisma.users.findFirst).mockResolvedValue({
       id: 'inspector-1',
     } as never);
@@ -519,12 +555,17 @@ describe('inspection request query service', () => {
 
     const called = vi.mocked(prisma.qms_inspection_requests.findMany).mock
       .calls[0]?.[0] as {
-      where: { inspectorId: string; submittedAt: { gte: Date } };
+      where: {
+        inspectorId: string;
+        status: { in: string[] };
+        submittedAt?: unknown;
+      };
     };
     expect(called.where.inspectorId).toBe('inspector-1');
-    expect(called.where.submittedAt.gte.getTime()).toBeGreaterThan(
-      Date.now() - 8 * 24 * 60 * 60 * 1000,
-    );
+    expect(called.where.status).toEqual({
+      in: ['DISPATCHED', 'INSPECTING'],
+    });
+    expect(called.where.submittedAt).toBeUndefined();
   });
 
   it('filters my-report scope to the current reporter', async () => {
