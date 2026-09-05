@@ -1,4 +1,8 @@
 export {
+  getLegacyInspectionPassRateSummaryByRange,
+  getPassRateMonthlyTrend,
+} from './pass-rate';
+export {
   passRateProjectionRebuildSchema,
   passRateProjectionToggleSchema,
 } from './pass-rate-projection-rollout.schema';
