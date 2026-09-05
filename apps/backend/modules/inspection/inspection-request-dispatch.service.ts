@@ -78,11 +78,20 @@ export const InspectionRequestDispatchService = {
     if (!dispatcherId)
       throw new BusinessError('BAD_REQUEST', '无法识别当前调度人', 400);
 
-    const requestWhere = dataScope
+    // User-facing HTTP dispatch must fail closed when the middleware did not
+    // resolve a scope; only the trusted Telegram/system path (event === null)
+    // may continue without a request-domain scope.
+    const isHttpEvent = Boolean(event && 'context' in event);
+    const effectiveDataScope =
+      dataScope ??
+      (isHttpEvent
+        ? { deptIds: [], module: 'inspection', scopeType: 'DEPT' as const }
+        : undefined);
+    const requestWhere = effectiveDataScope
       ? await buildScopedInspectionRequestWhere(
           { id, isDeleted: false },
           {
-            dataScope,
+            dataScope: effectiveDataScope,
             user: {
               userId: String(userinfo.id || userinfo.userId || ''),
               username: userinfo.username,

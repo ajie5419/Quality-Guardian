@@ -14,6 +14,9 @@ vi.mock('~/utils/prisma', () => ({
     users: {
       findFirst: vi.fn(),
     },
+    departments: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     qms_task_dispatches: {
       create: vi.fn(),
       updateMany: vi.fn(),

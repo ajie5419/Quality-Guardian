@@ -18,6 +18,9 @@ vi.mock('~/utils/prisma', () => ({
     users: {
       findFirst: vi.fn(),
     },
+    departments: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     $transaction: vi.fn(),
   },
 }));
