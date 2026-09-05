@@ -1,7 +1,11 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
+import { Prisma } from '@prisma/client';
 import {
   createIdentityAggregateItem,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
@@ -25,14 +29,34 @@ function getDisplayName(
   }).name;
 }
 
+async function buildScopedIssueWhere(
+  baseWhere: Prisma.quality_recordsWhereInput,
+  access?: AnalyticsAccessContext,
+): Promise<Prisma.quality_recordsWhereInput> {
+  if (!access) return baseWhere;
+  const user = requireAnalyticsUser(access);
+  return DataScopeService.buildInspectionWhere(
+    baseWhere,
+    user,
+    access.dataScope,
+  );
+}
+
 export const InspectionReportStatisticsService = {
-  async getDefectDistribution(yearStart: Date) {
+  async getDefectDistribution(
+    yearStart: Date,
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      { date: { gte: yearStart }, isDeleted: false },
+      access,
+    );
     const rows = await prisma.quality_records.groupBy({
       by: [
         'defectCategoryId',
         ...getInspectionIssueStatisticsSnapshotFields('defectType'),
       ],
-      where: { date: { gte: yearStart }, isDeleted: false },
+      where,
       _count: { id: true },
     });
     const canonicalNames =
@@ -64,13 +88,20 @@ export const InspectionReportStatisticsService = {
     }));
   },
 
-  async getTopRiskProjects(params: { end: Date; start: Date }) {
+  async getTopRiskProjects(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      access,
+    );
     const rows = await prisma.quality_records.groupBy({
       by: [
         'projectId',
         ...getInspectionIssueStatisticsSnapshotFields('projectName'),
       ],
-      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      where,
       _count: true,
       _sum: { lossAmount: true },
     });
@@ -115,17 +146,24 @@ export const InspectionReportStatisticsService = {
       .slice(0, 5);
   },
 
-  async getSupplierPerformance(params: { end: Date; start: Date }) {
+  async getSupplierPerformance(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      {
+        date: { gte: params.start, lte: params.end },
+        isDeleted: false,
+        supplierName: { not: null },
+      },
+      access,
+    );
     const rows = await prisma.quality_records.groupBy({
       by: [
         'supplierId',
         ...getInspectionIssueStatisticsSnapshotFields('supplierName'),
       ],
-      where: {
-        date: { gte: params.start, lte: params.end },
-        isDeleted: false,
-        supplierName: { not: null },
-      },
+      where,
       _count: true,
     });
     const groups = new Map<
