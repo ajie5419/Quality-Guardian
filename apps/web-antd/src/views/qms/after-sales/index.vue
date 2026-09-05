@@ -272,7 +272,7 @@ function handleDelete(row: QmsAfterSalesApi.AfterSalesItem) {
     content: t('common.confirmDeleteContent'),
     onOk: async () => {
       try {
-        await deleteAfterSales(row.id);
+        await deleteAfterSales(row.id, row.version);
         message.success(t('common.deleteSuccess'));
         invalidateAfterSales();
         chartRefreshKey.value++;

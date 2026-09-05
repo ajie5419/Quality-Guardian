@@ -16,6 +16,10 @@ import { useI18n } from '@vben/locales';
 import { message } from 'ant-design-vue';
 
 import { createAfterSales, updateAfterSales } from '#/api/qms/after-sales';
+import {
+  isIdempotencyReusedError,
+  useCreateOperationId,
+} from '#/composables/useCreateOperationId';
 import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
 
 import { createInitialFormState } from '../constants';
@@ -46,6 +50,8 @@ function hasRequiredClassificationIds(
 export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
   const { open, isEditMode, onSuccess, onClose } = options;
   const { t } = useI18n();
+  const { acquire: acquireOperationId, reset: resetOperationId } =
+    useCreateOperationId();
 
   const formState = reactive<AfterSalesFormState>({});
   const currentId = ref<null | string>(null);
@@ -207,12 +213,16 @@ export function useAfterSalesForm(options: UseAfterSalesFormOptions) {
         await updateAfterSales(currentId.value, data);
         message.success(t('common.saveSuccess'));
       } else {
-        await createAfterSales(data);
+        await createAfterSales(data, acquireOperationId());
         message.success(t('common.createSuccess'));
+        resetOperationId();
       }
       onClose();
       onSuccess();
-    } catch {
+    } catch (error: unknown) {
+      if (isIdempotencyReusedError(error)) {
+        resetOperationId();
+      }
       message.error(
         isEditMode.value ? t('common.saveFailed') : t('common.createFailed'),
       );
