@@ -61,16 +61,19 @@ describe('inspectionRecordDeleteService', () => {
         teamId: 'team-1',
         workOrderNumber: 'WO-1',
       };
-      const txFindUnique = vi.fn().mockResolvedValue(inspection);
-      const txUpdate = vi.fn().mockResolvedValue({ id: 'i-1' });
+      const txFindFirst = vi
+        .fn()
+        .mockResolvedValueOnce({ id: 'i-1' })
+        .mockResolvedValue(inspection);
+      const txUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
       const txFindMany = vi.fn().mockResolvedValue([{ id: 'task-1' }]);
       const txDeleteMany = vi.fn().mockResolvedValue({ count: 1 });
 
       (prisma.$transaction as any).mockImplementation(async (cb: any) =>
         cb({
           inspections: {
-            findUnique: txFindUnique,
-            update: txUpdate,
+            findFirst: txFindFirst,
+            updateMany: txUpdateMany,
           },
           inspection_archive_tasks: {
             findMany: txFindMany,
@@ -81,11 +84,11 @@ describe('inspectionRecordDeleteService', () => {
 
       const _result = await InspectionRecordDeleteService.delete('i-1');
 
-      expect(txFindUnique).toHaveBeenCalledWith({
-        where: { id: 'i-1' },
+      expect(txFindFirst).toHaveBeenCalledWith({
+        where: { id: 'i-1', isDeleted: false },
         select: expect.any(Object),
       });
-      expect(txUpdate).toHaveBeenCalledWith({
+      expect(txUpdateMany).toHaveBeenCalledWith({
         where: { id: 'i-1' },
         data: { isDeleted: true },
       });
@@ -112,8 +115,8 @@ describe('inspectionRecordDeleteService', () => {
       (prisma.$transaction as any).mockImplementation(async (cb: any) =>
         cb({
           inspections: {
-            findUnique: vi.fn().mockResolvedValue(null),
-            update: vi.fn().mockResolvedValue({ id: 'i-1' }),
+            findFirst: vi.fn().mockResolvedValue(null),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
           },
           inspection_archive_tasks: {
             findMany: vi.fn(),
@@ -122,19 +125,12 @@ describe('inspectionRecordDeleteService', () => {
         }),
       );
 
-      const result = await InspectionRecordDeleteService.delete('i-1');
-
-      expect(result).toEqual({ id: 'i-1' });
+      await expect(
+        InspectionRecordDeleteService.delete('i-1'),
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
       expect(
         MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
-      ).toHaveBeenCalledWith(
-        expect.any(Object),
-        {
-          supplierIds: [undefined],
-          teamIds: [undefined],
-        },
-        'inspection.deleted',
-      );
+      ).not.toHaveBeenCalled();
     });
   });
 

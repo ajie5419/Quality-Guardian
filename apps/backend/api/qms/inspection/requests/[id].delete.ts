@@ -22,7 +22,12 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
-    await InspectionRequestDeleteService.deleteRequest(event, id, userinfo);
+    await InspectionRequestDeleteService.deleteRequest(event, id, userinfo, {
+      dataScope: event.context.dataScope,
+      permission: 'QMS:Inspection:Requests:Delete',
+      scopeIdentity: event.context.dataScope ?? {},
+      user: userinfo,
+    });
     return useResponseSuccess(null);
   } catch (error) {
     logApiError('inspection-request-delete', error, { id }, event);

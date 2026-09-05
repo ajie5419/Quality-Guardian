@@ -1,13 +1,18 @@
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import type { InspectionAccessContext } from './inspection-access-context';
+import type { AuthorizedSourceContext } from './inspection-request-close-effects.service';
+
 import { TASK_DISPATCH_STATUS } from '@qgs/shared';
+import { createScopedRepository } from '~/modules/data-scope';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
+import { toScopedAccessContext } from './inspection-access-context';
 import {
   INSPECTION_REQUEST_STATUS,
   resolveInspectionRequestCurrentUserId,
@@ -18,19 +23,39 @@ import {
 const DISPATCH_PERMISSION_CODE = 'QMS:Inspection:Requests:Dispatch';
 
 export const InspectionRequestDeleteService = {
-  async deleteRequest(event: H3Event, id: string, userinfo: UserSession) {
+  async deleteRequest(
+    event: H3Event,
+    id: string,
+    userinfo: UserSession,
+    access?: InspectionAccessContext,
+  ) {
     // Load stable fields needed for ownership check and audit.
     // Status is NOT checked here; the authoritative status guard is
     // inside the transaction (atomic updateMany pattern per CONSTRAINTS.md).
-    const existing = await prisma.qms_inspection_requests.findFirst({
-      select: {
-        dispatchTaskId: true,
-        id: true,
-        reporter: true,
-        requestNo: true,
+    const scopedAccess = access
+      ? toScopedAccessContext(access)
+      : {
+          user: { id: userinfo.userId || userinfo.id || 'unknown' },
+          // Resolve the caller's policy instead of granting ALL when a legacy
+          // direct caller omits the middleware-provided scope.
+          scope: undefined,
+        };
+    const requestRepo = createScopedRepository(
+      'inspection',
+      prisma.qms_inspection_requests,
+    );
+    const existing = await requestRepo.findAccessible(
+      {
+        select: {
+          dispatchTaskId: true,
+          id: true,
+          reporter: true,
+          requestNo: true,
+        },
+        where: { id, isDeleted: false },
       },
-      where: { id, isDeleted: false },
-    });
+      scopedAccess,
+    );
     if (!existing) throw new BusinessError('NOT_FOUND', '报检任务不存在', 404);
 
     // Ownership check: the request creator (reporter username) may always
@@ -54,23 +79,30 @@ export const InspectionRequestDeleteService = {
     // concurrent request changed the status to INSPECTING or CLOSED, the
     // where clause won't match and count will be 0.
     await prisma.$transaction(async (tx) => {
-      const result = await tx.qms_inspection_requests.updateMany({
-        data: {
-          isDeleted: true,
-          status: INSPECTION_REQUEST_STATUS.CANCELLED,
-          updatedAt: new Date(),
-        },
-        where: {
-          id,
-          isDeleted: false,
-          status: {
-            in: [
-              INSPECTION_REQUEST_STATUS.SUBMITTED,
-              INSPECTION_REQUEST_STATUS.DISPATCHED,
-            ],
+      const txRequestRepo = createScopedRepository(
+        'inspection',
+        tx.qms_inspection_requests,
+      );
+      const result = await txRequestRepo.updateAccessible(
+        {
+          data: {
+            isDeleted: true,
+            status: INSPECTION_REQUEST_STATUS.CANCELLED,
+            updatedAt: new Date(),
+          },
+          where: {
+            id,
+            isDeleted: false,
+            status: {
+              in: [
+                INSPECTION_REQUEST_STATUS.SUBMITTED,
+                INSPECTION_REQUEST_STATUS.DISPATCHED,
+              ],
+            },
           },
         },
-      });
+        scopedAccess,
+      );
       if (result.count === 0) {
         throw new BusinessError(
           'BAD_REQUEST',
@@ -78,7 +110,22 @@ export const InspectionRequestDeleteService = {
           400,
         );
       }
+      const sourceContext: AuthorizedSourceContext = {
+        casVerified: true,
+        dataScopeVerified: true,
+        source: { id, model: 'qms_inspection_requests' },
+        transaction: tx,
+      };
       if (existing.dispatchTaskId) {
+        // qms-arch-allow R-SCOPE: task dispatch cancel follow-up; the id
+        // derives from the request that was CAS-guarded above in the same tx.
+        if (sourceContext.transaction !== tx || !sourceContext.casVerified) {
+          throw new BusinessError(
+            'FORBIDDEN',
+            '派生派单写入缺少授权上下文',
+            403,
+          );
+        }
         await tx.qms_task_dispatches.updateMany({
           data: { status: TASK_DISPATCH_STATUS.CANCELLED },
           where: { id: existing.dispatchTaskId },
