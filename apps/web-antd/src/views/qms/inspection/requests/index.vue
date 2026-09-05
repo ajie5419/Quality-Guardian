@@ -10,6 +10,7 @@ import { useAccess } from '@vben/access';
 import { Page } from '@vben/common-ui';
 import { useAccessStore, useUserStore } from '@vben/stores';
 
+import { isIncomingInspectionRequestCategory } from '@qgs/shared';
 import { Card, message } from 'ant-design-vue';
 
 import { getDeptList } from '#/api/system/dept';
@@ -32,7 +33,6 @@ import { useInspectionRequestInspectorTasks } from './composables/useInspectionR
 import { useInspectionRequestListing } from './composables/useInspectionRequestListing';
 import { useInspectionRequestPresentation } from './composables/useInspectionRequestPresentation';
 import { useInspectionRequestTaskActions } from './composables/useInspectionRequestTaskActions';
-import { INCOMING_INSPECTION_PROCESS_NAME } from './constants';
 import { inspectionRequestCheckResultOptions } from './inspection-request-options';
 import { useInspectionRequestViewAccess } from './useInspectionRequestViewAccess';
 
@@ -314,10 +314,9 @@ function openInspectionRecord(record: InspectionRequest) {
     path: '/qms/inspection/records',
     query: {
       sourceInspectionId: record.inspectionId,
-      type:
-        record.processName === INCOMING_INSPECTION_PROCESS_NAME
-          ? 'incoming'
-          : 'process',
+      type: isIncomingInspectionRequestCategory(record)
+        ? 'incoming'
+        : 'process',
     },
   });
 }

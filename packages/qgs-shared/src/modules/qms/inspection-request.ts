@@ -101,6 +101,8 @@ export interface InspectionRequest {
   dispatcherName?: null | string;
   dispatchRemark?: null | string;
   dispatchTaskId?: null | string;
+  /** Original failed quantity retained by the linked NC after a PASS reinspection. */
+  historicalUnqualifiedQuantity?: null | number;
   id: string;
   inspectionId?: null | string;
   inspectionResult?: InspectionRequestInspectionResult;

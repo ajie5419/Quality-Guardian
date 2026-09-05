@@ -159,7 +159,11 @@ export function useInspectionRequestPresentation(
     if (record.inspectionResult === 'FAIL' || hasLinkedIssue(record)) {
       const unqualifiedLabel =
         record.inspectionResult === 'FAIL' ? '不合格' : '曾不合格';
-      return `合格 ${qualified} / ${unqualifiedLabel} ${unqualified}`;
+      const displayedUnqualified =
+        record.inspectionResult === 'FAIL'
+          ? unqualified
+          : (record.historicalUnqualifiedQuantity ?? '-');
+      return `合格 ${qualified} / ${unqualifiedLabel} ${displayedUnqualified}`;
     }
     if (record.status === 'CLOSED') return `合格 ${qualified}`;
     return '-';

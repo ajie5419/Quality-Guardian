@@ -305,6 +305,34 @@ describe('close inspection request responsibility adjudication', () => {
     expect(wrapper.emitted('submit')).toHaveLength(1);
   });
 
+  it('preserves parent uploads on remark edits without restoring removed files', async () => {
+    const props = createProps();
+    const wrapper = mount(CloseInspectionModal, { props });
+    await flushPromises();
+    const attachments = [
+      { name: 'inspection.pdf', url: '/uploads/inspection.pdf' },
+    ];
+    await wrapper.setProps({ closeForm: { ...props.closeForm, attachments } });
+    wrapper
+      .findComponent({ name: 'MockTextArea' })
+      .vm.$emit('update:value', 'Reinspection passed');
+    await flushPromises();
+    expect(wrapper.emitted('update:closeForm')?.at(-1)?.[0]).toMatchObject({
+      attachments,
+      closeRemark: 'Reinspection passed',
+    });
+    await wrapper.setProps({
+      closeForm: { ...props.closeForm, attachments: [] },
+    });
+    wrapper
+      .findComponent({ name: 'MockTextArea' })
+      .vm.$emit('update:value', 'Updated remark');
+    await flushPromises();
+    expect(wrapper.emitted('update:closeForm')?.at(-1)?.[0]).toMatchObject({
+      attachments: [],
+    });
+  });
+
   it('limits partial PROCESS requests to internal and outsourcing responsibility types', async () => {
     const wrapper = mount(CloseInspectionModal, {
       props: createProps({

@@ -42,6 +42,7 @@ import {
   buildInspectionRequestEntryRequiredMessage,
   buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
+  getInspectionRequestEntryAttachmentWarning,
   getInspectionRequestEntryCopy,
   getInspectionRequestResponsibilityTypeOptions,
   inspectionRequestEntryCheckResultOptions,
@@ -206,12 +207,6 @@ function syncAttachmentsFromFiles(files: UploadFile[]) {
     );
 }
 
-function hasBlockingAttachmentState() {
-  return attachmentFileList.value.some((file) =>
-    ['error', 'uploading'].includes(String(file.status || '')),
-  );
-}
-
 function handleAttachmentUploadChange(info: UploadChangeParam<UploadFile>) {
   if (info.file.status === 'done') {
     if (applyUploadResponse(info.file)) {
@@ -236,6 +231,16 @@ async function handleBeforeUpload(file: File) {
 async function submitRequest() {
   if (submitting.value) return;
 
+  const attachmentWarning = getInspectionRequestEntryAttachmentWarning(
+    attachmentFileList.value,
+    requestForm.attachments.length,
+    entryCopy.value.attachmentLabel,
+  );
+  if (attachmentWarning) {
+    message.warning(attachmentWarning);
+    return;
+  }
+
   if (
     !requestForm.workOrderNumber ||
     requestForm.workOrderNumbers.length === 0 ||
@@ -254,8 +259,7 @@ async function submitRequest() {
     (requestForm.responsibilityType !==
       INSPECTION_ISSUE_RESPONSIBILITY_TYPE.INTERNAL_DEPARTMENT &&
       !requestForm.supplierId) ||
-    !requestForm.reporter ||
-    requestForm.attachments.length === 0
+    !requestForm.reporter
   ) {
     message.warning(
       buildInspectionRequestEntryRequiredMessage(
@@ -266,11 +270,6 @@ async function submitRequest() {
         requestForm.responsibilityType,
       ),
     );
-    return;
-  }
-
-  if (hasBlockingAttachmentState()) {
-    message.warning('自检记录仍在上传或上传失败，请处理后再提交');
     return;
   }
 

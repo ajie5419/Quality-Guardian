@@ -135,6 +135,47 @@ describe('inspection request query service', () => {
     });
   });
 
+  it('returns the linked NC quantity separately after a PASS reinspection', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
+      attachments: null,
+      closeAttachments: null,
+      inspection: null,
+      inspectionId: 'inspection-1',
+      inspectionResult: 'PASS',
+      inspector: null,
+      linkedIssueId: 'issue-1',
+      linkedIssueNo: 'NC-1',
+      process: { name: '进货检验' },
+      processName: '进货检验',
+      requestNo: 'IR-1',
+      supplierId: 'supplier-1',
+      supplierName: 'Supplier A',
+      team: 'Supplier A',
+      teamId: null,
+      unqualifiedQuantity: 0,
+      workOrderNumber: 'WO-001',
+      workOrders: [],
+    } as any);
+    vi.mocked(prisma.quality_records.findMany).mockResolvedValue([
+      {
+        id: 'issue-1',
+        inspectionId: 'inspection-1',
+        isDeleted: false,
+        nonConformanceNumber: 'NC-1',
+        quantity: 1,
+        status: 'CLOSED',
+      },
+    ] as any);
+    findActiveByIdsOrNames.mockResolvedValue([
+      { id: 'dept-purchasing', name: '采购部' },
+    ]);
+
+    const result = await InspectionRequestQueryService.getRequestDetail('IR-1');
+
+    expect(result?.unqualifiedQuantity).toBe(0);
+    expect(result?.historicalUnqualifiedQuantity).toBe(1);
+  });
+
   it('maps the persisted incoming supplier name to the task-list team display', async () => {
     vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue([
       {

@@ -5,12 +5,30 @@ import {
   buildInspectionRequestEntryRequiredMessage,
   buildInspectionRequestEntryResponsibilityPayload,
   buildInspectionRequestPostSubmitQuery,
+  getInspectionRequestEntryAttachmentWarning,
   getInspectionRequestResponsibilityTypeOptions,
   getInspectionRequestResponsibilityUnitCopy,
   mapInspectionRequestEntryBomPartOptions,
 } from './entry-mode';
 
 describe('inspection request entry identity options', () => {
+  it('reports attachment state before missing attachment validation', () => {
+    for (const status of ['error', 'uploading']) {
+      expect(
+        getInspectionRequestEntryAttachmentWarning([{ status }], 0, '来料资料'),
+      ).toBe('来料资料仍在上传或上传失败，请处理后再提交');
+    }
+    expect(getInspectionRequestEntryAttachmentWarning([], 0, '自检记录')).toBe(
+      '自检记录不能为空',
+    );
+    expect(
+      getInspectionRequestEntryAttachmentWarning(
+        [{ status: 'done' }],
+        1,
+        '来料资料',
+      ),
+    ).toBe('');
+  });
   it('uses category-specific responsibility choices', () => {
     expect(
       getInspectionRequestResponsibilityTypeOptions(false).map(

@@ -230,13 +230,13 @@ export function useInspectionRequestTaskActions(
     }
 
     if (!shouldCreateLinkedIssue.value) {
-      if (closeForm.attachments.length === 0) {
-        message.warning('检验记录不能为空');
+      if (hasBlockingCloseAttachmentState()) {
+        message.warning('检验记录仍在上传或上传失败，请处理后再完成检验');
         return false;
       }
 
-      if (hasBlockingCloseAttachmentState()) {
-        message.warning('检验记录仍在上传或上传失败，请处理后再完成检验');
+      if (closeForm.attachments.length === 0) {
+        message.warning('检验记录不能为空');
         return false;
       }
 
