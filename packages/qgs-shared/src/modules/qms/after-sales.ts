@@ -38,6 +38,7 @@ export interface AfterSalesItem {
   status: string; // 状态
   supplierBrand?: string; // 供应商名称/品牌
   supplierBrandId?: null | string; // Canonical supplier reference
+  version?: number; // Optimistic-lock version (OPTIMISTIC-LOCK-001)
   warrantyStatus: string; // 在保状态
   workOrderNumber: string; // 工单号
 }

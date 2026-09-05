@@ -83,9 +83,18 @@ export async function getAfterSalesChartAggregate(params: {
 
 /**
  * Create After-sales record
+ *
+ * `idempotencyKey` (IDEMPOTENCY-KEY-001 / PHASE-2): one UUID per
+ * user-initiated create attempt; network / button retries of the same attempt
+ * reuse the key.
  */
-export async function createAfterSales(data: AfterSalesWritePayload) {
-  return requestClient.post<AfterSalesItem>('/qms/after-sales', data);
+export async function createAfterSales(
+  data: AfterSalesWritePayload,
+  idempotencyKey?: string,
+) {
+  return requestClient.post<AfterSalesItem>('/qms/after-sales', data, {
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  });
 }
 
 export async function updateAfterSales(
@@ -95,8 +104,11 @@ export async function updateAfterSales(
   return requestClient.put<AfterSalesItem>(`/qms/after-sales/${id}`, data);
 }
 
-export async function deleteAfterSales(id: string) {
-  return requestClient.delete(`/qms/after-sales/${id}`);
+export async function deleteAfterSales(id: string, version?: number) {
+  // OPTIMISTIC-LOCK-001: user deletes carry the version the client read.
+  return requestClient.delete(`/qms/after-sales/${id}`, {
+    params: { version },
+  });
 }
 
 /**
