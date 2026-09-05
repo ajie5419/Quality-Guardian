@@ -111,7 +111,7 @@ export function useSupplierActions(options: {
       content: `${t('common.confirmDeleteContent')} [${row.name}] ?`,
       onOk: async () => {
         try {
-          await deleteSupplier(row.id);
+          await deleteSupplier(row.id, row.version);
           message.success(t('common.deleteSuccess'));
           handleSuccess();
         } catch (error) {

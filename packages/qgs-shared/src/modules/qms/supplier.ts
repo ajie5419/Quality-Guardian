@@ -77,6 +77,7 @@ export interface SupplierItem {
   totalAfterSalesLoss?: number;
   totalEngineeringLoss?: number;
   updatedAt?: string;
+  version?: number; // Optimistic-lock version (OPTIMISTIC-LOCK-001)
   warningReasons?: string[];
 }
 

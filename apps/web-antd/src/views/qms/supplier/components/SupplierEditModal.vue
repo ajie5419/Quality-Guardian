@@ -46,6 +46,8 @@ const { handleApiError } = useErrorHandler();
 
 const isUpdate = ref(false);
 const recordId = ref<null | string>(null);
+// OPTIMISTIC-LOCK-001: version read from the record is echoed back on update.
+const currentVersion = ref<number | undefined>(undefined);
 const currentCategory = ref<'Outsourcing' | 'Supplier'>('Supplier');
 const admissionFileList = ref<UploadFile[]>([]);
 
@@ -86,6 +88,7 @@ async function handleSubmit() {
     const payload = {
       ...values,
       admissionDocuments,
+      ...(isUpdate.value ? { version: currentVersion.value } : {}),
     };
     modalApi.setState({ confirmLoading: true });
 
@@ -168,6 +171,7 @@ async function open(options: OpenOptions) {
   isUpdate.value = update;
   currentCategory.value = category;
   recordId.value = record?.id || null;
+  currentVersion.value = record?.version ?? undefined;
 
   // Update schema based on category. Dictionary options take priority with local fallback.
   await loadSupplierStatusOptions();
