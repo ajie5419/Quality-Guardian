@@ -9,6 +9,9 @@ import {
 vi.mock('~/utils/prisma', () => ({
   default: {
     $queryRaw: vi.fn(),
+    departments: {
+      findMany: vi.fn(),
+    },
     dictionaries: {
       findMany: vi.fn(),
     },
@@ -68,49 +71,142 @@ describe('pass-rate quantity rule', () => {
     expect(summary.passRate).toBe(92.5);
   });
 
+  it('propagates the DEPT scope into the raw SQL aggregate', async () => {
+    (prisma.$queryRaw as any).mockResolvedValue([
+      { passCount: 50n, totalCount: 60n },
+    ]);
+    (prisma.departments.findMany as any).mockResolvedValue([
+      { name: 'Department A' },
+    ]);
+
+    const summary = await getNetPassRateSummaryByRange(
+      new Date('2026-01-01'),
+      new Date('2026-12-31'),
+      'inspection',
+      {
+        dataScope: {
+          deptIds: ['dept-a'],
+          module: 'inspection',
+          scopeType: 'DEPT' as const,
+        },
+        user: { userId: 'u-dept-a', username: 'user-a' },
+      },
+    );
+
+    expect(summary.totalCount).toBe(60);
+    const call = (prisma.$queryRaw as any).mock.calls[0];
+    const sqlFragments = call
+      .slice(1)
+      .filter(
+        (value: unknown) =>
+          typeof value === 'object' &&
+          value !== null &&
+          'text' in (value as { text?: string }),
+      ) as Array<{ text: string; values: unknown[] }>;
+    expect(
+      sqlFragments.some((fragment) =>
+        fragment.text.includes('responsibleDepartment IN'),
+      ),
+    ).toBe(true);
+    expect(sqlFragments.flatMap((fragment) => fragment.values)).toEqual(
+      expect.arrayContaining(['Department A']),
+    );
+  });
+
+  it('leaves the raw SQL aggregate unscoped for an ALL scope', async () => {
+    (prisma.$queryRaw as any).mockResolvedValue([
+      { passCount: 5n, totalCount: 10n },
+    ]);
+
+    const summary = await getNetPassRateSummaryByRange(
+      new Date('2026-01-01'),
+      new Date('2026-12-31'),
+      'inspection',
+      {
+        dataScope: {
+          deptIds: [],
+          module: 'inspection',
+          scopeType: 'ALL' as const,
+        },
+        user: { userId: 'u-all', username: 'admin' },
+      },
+    );
+
+    expect(summary.totalCount).toBe(10);
+    const call = (prisma.$queryRaw as any).mock.calls[0];
+    const sqlFragments = call
+      .slice(1)
+      .filter(
+        (value: unknown) =>
+          typeof value === 'object' &&
+          value !== null &&
+          'text' in (value as { text?: string }),
+      ) as Array<{ text: string }>;
+    expect(
+      sqlFragments.some((fragment) =>
+        fragment.text.includes('responsibleDepartment'),
+      ),
+    ).toBe(false);
+  });
+
   it('deducts legacy issue rows from issue-source drilldown buckets', async () => {
-    (prisma.inspections.findMany as any).mockResolvedValue([
-      {
-        category: 'PROCESS',
-        incomingType: null,
-        processId: 'process-weld',
-        processName: '焊接',
-        qualifiedQuantity: 100,
-        quantity: 100,
-        result: 'PASS',
-        team: '外协结构',
-        teamId: 'team-outsourcing-structure',
-        unqualifiedQuantity: 0,
-      },
-      {
-        category: 'INCOMING',
-        incomingType: '外购件',
-        processId: null,
-        processName: null,
-        qualifiedQuantity: 200,
-        quantity: 200,
-        result: 'PASS',
-        team: null,
-        teamId: null,
-        unqualifiedQuantity: 0,
-      },
-    ]);
-    (prisma.quality_records.findMany as any).mockResolvedValue([
-      {
-        category: null,
-        inspection: null,
-        processName: '焊接',
-        quantity: 3,
-        responsibleDepartment: '外协结构',
-      },
-      {
-        category: '成品检验',
-        inspection: null,
-        processName: '成品检验',
-        quantity: 5,
-        responsibleDepartment: '采购部',
-      },
-    ]);
+    (prisma.$queryRaw as any)
+      .mockResolvedValueOnce([
+        {
+          category: 'PROCESS',
+          incomingType: null,
+          incomingTypeId: null,
+          processId: 'process-weld',
+          processName: '焊接',
+          quantity: 100,
+          unqualifiedQuantity: 0,
+          team: '外协结构',
+          teamId: 'team-outsourcing-structure',
+        },
+        {
+          category: 'INCOMING',
+          incomingType: '外购件',
+          incomingTypeId: null,
+          processId: null,
+          processName: null,
+          quantity: 200,
+          unqualifiedQuantity: 0,
+          team: null,
+          teamId: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          category: null,
+          inspectionCategory: null,
+          inspectionIncomingType: null,
+          inspectionIncomingTypeId: null,
+          inspectionProcessId: null,
+          inspectionProcessName: null,
+          inspectionTeam: null,
+          inspectionTeamId: null,
+          processId: null,
+          processName: '焊接',
+          quantity: 3,
+          responsibleDepartment: '外协结构',
+          responsibleDepartmentId: null,
+        },
+        {
+          category: '成品检验',
+          inspectionCategory: null,
+          inspectionIncomingType: null,
+          inspectionIncomingTypeId: null,
+          inspectionProcessId: null,
+          inspectionProcessName: null,
+          inspectionTeam: null,
+          inspectionTeamId: null,
+          processId: null,
+          processName: '成品检验',
+          quantity: 5,
+          responsibleDepartment: '采购部',
+          responsibleDepartmentId: null,
+        },
+      ]);
 
     const drillDown = await getPassRateDrillDownByRange(
       new Date('2026-04-01'),
@@ -146,19 +242,17 @@ describe('pass-rate quantity rule', () => {
         teamIds: { 'team-assembly': '组装BU' },
       }),
     });
-    (prisma.inspections.findMany as any).mockResolvedValue([
+    (prisma.$queryRaw as any).mockResolvedValue([
       {
         category: 'PROCESS',
         incomingType: null,
-        process: { name: 'Renamed Paint Process' },
+        incomingTypeId: null,
         processId: 'process-paint',
-        processName: 'Legacy Paint Process',
-        qualifiedQuantity: 10,
+        processName: 'Renamed Paint Process',
         quantity: 10,
-        result: 'PASS',
+        unqualifiedQuantity: 0,
         team: 'Legacy Assembly Team',
         teamId: 'team-assembly',
-        unqualifiedQuantity: 0,
       },
     ]);
 
@@ -181,20 +275,17 @@ describe('pass-rate quantity rule', () => {
     (prisma.dictionaries.findMany as any).mockResolvedValue([
       { dictKey: '机加成品件-外协', id: 'dict-1' },
     ]);
-    (prisma.inspections.findMany as any).mockResolvedValue([
+    (prisma.$queryRaw as any).mockResolvedValue([
       {
         category: 'INCOMING',
         incomingType: '机加成品件',
         incomingTypeId: 'dict-1',
-        process: null,
         processId: null,
         processName: null,
-        qualifiedQuantity: 90,
         quantity: 100,
-        result: 'PASS',
+        unqualifiedQuantity: 10,
         team: null,
         teamId: null,
-        unqualifiedQuantity: 10,
       },
     ]);
 

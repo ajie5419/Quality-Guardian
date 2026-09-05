@@ -1,14 +1,32 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
 import { roundPercent } from '~/modules/report/pass-rate-process';
+import {
+  buildScopedInspectionWhere,
+  buildScopedIssueWhere,
+} from '~/modules/report/pass-rate-scope';
 import prisma from '~/utils/prisma';
 
-export async function getIssuePassRateSummaryByRange(start: Date, end: Date) {
+export async function getIssuePassRateSummaryByRange(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
+  const inspectionWhere = await buildScopedInspectionWhere(
+    { isDeleted: false, inspectionDate: { gte: start, lte: end } },
+    access,
+  );
+  const issueWhere = await buildScopedIssueWhere(
+    { isDeleted: false, date: { gte: start, lte: end } },
+    access,
+  );
   const [inspectionSummary, issueSummary] = await Promise.all([
     prisma.inspections.aggregate({
-      where: { isDeleted: false, inspectionDate: { gte: start, lte: end } },
+      where: inspectionWhere,
       _sum: { quantity: true },
     }),
     prisma.quality_records.aggregate({
-      where: { isDeleted: false, date: { gte: start, lte: end } },
+      where: issueWhere,
       _sum: { quantity: true },
     }),
   ]);

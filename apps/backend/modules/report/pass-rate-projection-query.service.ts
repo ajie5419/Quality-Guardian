@@ -53,6 +53,7 @@ function passQuantityExpression() {
 }
 
 export async function capturePassRateFactSnapshot(): Promise<PassRateFactSnapshot> {
+  // qms-arch-allow R-SCOPE-AGG: projection boundary snapshot reads only id/createdAt maxima for feature-flag freshness, no row data exposure
   const boundary = await prisma.inspections.findFirst({
     where: { isDeleted: false },
     orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
@@ -86,6 +87,7 @@ export async function capturePassRateProjectionSnapshot(
 }
 
 async function capturePassRateFactChangeBoundary(): Promise<PassRateFactChangeBoundary> {
+  // qms-arch-allow R-SCOPE-AGG: projection change-boundary snapshot reads only id/updatedAt maxima for reconciliation diagnostics
   const boundary = await prisma.inspections.findFirst({
     where: { isDeleted: false },
     orderBy: [{ updatedAt: 'desc' }, { id: 'desc' }],
@@ -123,6 +125,8 @@ async function capturePassRateProjectionChangeBoundary(
 export async function getPassRateProjectionFreshness(
   generationId: string,
 ): Promise<PassRateProjectionFreshness> {
+  // qms-arch-allow R-SCOPE-AGG: projection freshness check counts and boundary rows system-wide for feature-flag gating, not user-facing
+  // qms-arch-allow R-SCOPE-RAW: projection freshness stale-row probe, maintenance diagnostics only, no user-facing row data
   const [
     sourceSnapshot,
     projectionSnapshot,
@@ -187,6 +191,7 @@ export async function getProjectedPassRateSummaryByRange(
   end: Date,
   snapshot: PassRateFactSnapshot,
 ): Promise<ProjectedPassRateSummary> {
+  // qms-arch-allow R-SCOPE-RAW: projected summary reads the materialized projection table, reachable only for ALL-scope reads
   const [summary] = await prisma.$queryRaw<
     Array<{ passCount: bigint | null; totalCount: bigint | null }>
   >`
@@ -208,6 +213,33 @@ export async function getProjectedPassRateSummaryByRange(
   };
 }
 
+export async function getProjectedPassRateMonthlyByRange(
+  generationId: string,
+  start: Date,
+  end: Date,
+  snapshot: PassRateFactSnapshot,
+): Promise<
+  Array<{
+    inspectionDate: Date;
+    passCount: bigint | null;
+    totalCount: bigint | null;
+  }>
+> {
+  // qms-arch-allow R-SCOPE-RAW: projected monthly trend reads the materialized projection table, reachable only for ALL-scope reads
+  return prisma.$queryRaw`
+    SELECT
+      p.inspectionDate AS inspectionDate,
+      SUM(p.quantity) AS totalCount,
+      SUM(${passQuantityExpression()}) AS passCount
+    FROM pass_rate_process_identity_projection p
+    WHERE p.generationId = ${generationId}
+      AND p.inspectionDate >= ${start}
+      AND p.inspectionDate <= ${end}
+      ${snapshotCondition(snapshot)}
+    GROUP BY p.inspectionDate
+  `;
+}
+
 export async function getProjectedPassRateDrillDownByRange(
   generationId: string,
   start: Date,
@@ -215,6 +247,7 @@ export async function getProjectedPassRateDrillDownByRange(
   snapshot: PassRateFactSnapshot,
   getTargetPassRate: (name?: string) => number,
 ) {
+  // qms-arch-allow R-SCOPE-RAW: projected drill-down reads the materialized projection table, reachable only for ALL-scope reads
   const [processBuckets, incomingBuckets] = await Promise.all([
     prisma.$queryRaw<ProjectedBucket[]>`
       SELECT

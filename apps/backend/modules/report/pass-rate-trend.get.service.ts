@@ -1,3 +1,4 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 import type { PassRateSource } from '~/modules/report/pass-rate';
 
 import {
@@ -11,6 +12,7 @@ import {
   getPassRateDrillDownByRange,
 } from '~/modules/report/pass-rate';
 import { logApiError } from '~/utils/api-logger';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -23,13 +25,20 @@ export default defineEventHandler(async (event) => {
   const source = parsePassRateSource(query.source);
 
   try {
+    const access: AnalyticsAccessContext = getAnalyticsAccessContext(event);
     const getTargetPassRate = await createPassRateTargetResolver();
 
     if (period)
       return useResponseSuccess(
-        await getDrillDownData(period, granularity, getTargetPassRate, source),
+        await getDrillDownData(
+          period,
+          granularity,
+          getTargetPassRate,
+          source,
+          access,
+        ),
       );
-    return useResponseSuccess(await getTrendData(granularity, source));
+    return useResponseSuccess(await getTrendData(granularity, source, access));
   } catch (error) {
     logApiError('pass-rate-trend', error, undefined, event);
     return internalServerErrorResponse(
@@ -43,7 +52,11 @@ function parsePassRateSource(queryValue: unknown): PassRateSource {
   return String(queryValue || '').trim() === 'issue' ? 'issue' : 'inspection';
 }
 
-async function getTrendData(granularity: string, source: PassRateSource) {
+async function getTrendData(
+  granularity: string,
+  source: PassRateSource,
+  access?: AnalyticsAccessContext,
+) {
   const now = new Date();
   interface Period {
     end: Date;
@@ -114,6 +127,7 @@ async function getTrendData(granularity: string, source: PassRateSource) {
         p.start,
         p.end,
         source,
+        access,
       );
 
       const emptyPeriodPassRate: null | number = 100;
@@ -137,6 +151,7 @@ async function getDrillDownData(
   granularity: string,
   getTargetPassRate: (name?: string) => number,
   source: PassRateSource,
+  access?: AnalyticsAccessContext,
 ) {
   const range = getPeriodRangeFromTrend(period, granularity);
   if (!range) return { drillDown: [], period };
@@ -145,6 +160,7 @@ async function getDrillDownData(
     range.end,
     getTargetPassRate,
     source,
+    access,
   );
   return { drillDown, period };
 }

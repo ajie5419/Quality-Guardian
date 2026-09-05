@@ -1,7 +1,10 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 import type {
   InspectionQuantitySource,
   IssuePassRateBucketInput,
 } from '~/modules/report/pass-rate-process';
+
+import type { IssuePassRateRow } from './pass-rate-rows';
 
 import { Prisma } from '@prisma/client';
 import { getTargetPassRate as getTargetPassRateByStd } from '~/modules/inspection/quality-standards';
@@ -25,9 +28,18 @@ import {
 import { getIssuePassRateSummaryByRange } from './pass-rate-issue-summary.service';
 import {
   getProjectedPassRateDrillDownByRange,
+  getProjectedPassRateMonthlyByRange,
   getProjectedPassRateSummaryByRange,
 } from './pass-rate-projection-query.service';
 import { PassRateProjectionService } from './pass-rate-projection.service';
+import {
+  getInspectionPassRateRows,
+  getIssuePassRateRows,
+} from './pass-rate-rows';
+import {
+  buildInspectionRawScopeSql,
+  resolveInspectionScope,
+} from './pass-rate-scope';
 
 const logger = createModuleLogger('ReportPassRate');
 
@@ -57,68 +69,7 @@ export type PassRateFactSnapshot = {
 
 export type PassRateSource = 'inspection' | 'issue';
 
-type IssuePassRateRow = {
-  category: null | string;
-  incomingType: null | string;
-  inspectionCategory: null | string;
-  inspectionIncomingType: null | string;
-  inspectionIncomingTypeId: null | string;
-  inspectionProcessId: null | string;
-  inspectionProcessName: null | string;
-  inspectionTeam: null | string;
-  inspectionTeamId: null | string;
-  processId: null | string;
-  processName: null | string;
-  quantity: number;
-  responsibleDepartment: string;
-  responsibleDepartmentId: null | string;
-};
-
 const GLOBAL_DEFAULT_TARGET = 99.85;
-
-async function getInspectionPassRateRows(
-  start: Date,
-  end: Date,
-  snapshot?: PassRateFactSnapshot,
-) {
-  return prisma.inspections.findMany({
-    where: {
-      AND: snapshot
-        ? [
-            {
-              OR: [
-                { createdAt: { lt: snapshot.createdAtCutoff } },
-                {
-                  createdAt: snapshot.createdAtCutoff,
-                  id: { lte: snapshot.idCutoff },
-                },
-              ],
-            },
-          ]
-        : undefined,
-      isDeleted: false,
-      inspectionDate: { gte: start, lte: end },
-    },
-    select: {
-      category: true,
-      incomingType: true,
-      incomingTypeId: true,
-      process: {
-        select: {
-          name: true,
-        },
-      },
-      processId: true,
-      processName: true,
-      quantity: true,
-      qualifiedQuantity: true,
-      unqualifiedQuantity: true,
-      result: true,
-      team: true,
-      teamId: true,
-    },
-  });
-}
 
 async function createPassRateBucketResolver() {
   const setting = await prisma.system_settings.findUnique({
@@ -177,13 +128,18 @@ export async function getNetPassRateSummaryByRange(
   start: Date,
   end: Date,
   source: PassRateSource = 'inspection',
+  access?: AnalyticsAccessContext,
 ): Promise<NetPassRateSummary> {
   if (source === 'issue') {
-    return getIssuePassRateSummaryByRange(start, end);
+    return getIssuePassRateSummaryByRange(start, end, access);
   }
 
   const active = await getActivePassRateGeneration();
-  if (active?.activeGenerationId) {
+  const scope = await resolveInspectionScope(access);
+  // The projection table carries no department identity, so it is only safe
+  // for ALL-scope (or system) reads; DEPT/SELF callers fall back to the
+  // scoped legacy path.
+  if (active?.activeGenerationId && (!scope || scope.scopeType === 'ALL')) {
     return getProjectedPassRateSummaryByRange(
       active.activeGenerationId,
       start,
@@ -192,14 +148,21 @@ export async function getNetPassRateSummaryByRange(
     );
   }
 
-  return getLegacyInspectionPassRateSummaryByRange(start, end);
+  return getLegacyInspectionPassRateSummaryByRange(
+    start,
+    end,
+    undefined,
+    access,
+  );
 }
 
 export async function getLegacyInspectionPassRateSummaryByRange(
   start: Date,
   end: Date,
   snapshot?: PassRateFactSnapshot,
+  access?: AnalyticsAccessContext,
 ): Promise<NetPassRateSummary> {
+  const scopeSql = await buildInspectionRawScopeSql(access);
   const [summary] = await prisma.$queryRaw<
     Array<{ passCount: bigint | null; totalCount: bigint | null }>
   >`
@@ -216,6 +179,7 @@ export async function getLegacyInspectionPassRateSummaryByRange(
     WHERE isDeleted = 0
       AND inspectionDate >= ${start}
       AND inspectionDate <= ${end}
+      ${scopeSql}
       ${
         snapshot
           ? Prisma.sql`
@@ -238,59 +202,74 @@ export async function getLegacyInspectionPassRateSummaryByRange(
   };
 }
 
-async function getIssuePassRateRows(start: Date, end: Date) {
-  const issues = await prisma.quality_records.findMany({
-    where: { isDeleted: false, date: { gte: start, lte: end } },
-    select: {
-      category: true,
-      process: {
-        select: {
-          name: true,
-        },
-      },
-      processId: true,
-      processName: true,
-      quantity: true,
-      responsibleDepartment: true,
-      responsibleDepartmentId: true,
-      inspection: {
-        select: {
-          category: true,
-          incomingType: true,
-          incomingTypeId: true,
-          process: {
-            select: {
-              name: true,
-            },
-          },
-          processId: true,
-          processName: true,
-          team: true,
-          teamId: true,
-        },
-      },
-    },
-  });
+export type PassRateMonthlyPoint = {
+  month: number;
+  passCount: number;
+  totalCount: number;
+};
 
-  return issues.map<IssuePassRateRow>((item) => ({
-    category: item.category,
-    incomingType: null,
-    inspectionCategory: item.inspection?.category || null,
-    inspectionIncomingType: item.inspection?.incomingType || null,
-    inspectionIncomingTypeId: item.inspection?.incomingTypeId || null,
-    inspectionProcessId: item.inspection?.processId || null,
-    inspectionProcessName: resolveCanonicalProcessName({
-      process: item.inspection?.process,
-      processName: item.inspection?.processName,
-    }),
-    inspectionTeam: item.inspection?.team || null,
-    inspectionTeamId: item.inspection?.teamId || null,
-    processId: item.processId,
-    processName: resolveCanonicalProcessName(item),
-    quantity: item.quantity,
-    responsibleDepartment: item.responsibleDepartment,
-    responsibleDepartmentId: item.responsibleDepartmentId,
+async function getLegacyPassRateMonthlyByRange(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+): Promise<PassRateMonthlyPoint[]> {
+  const scopeSql = await buildInspectionRawScopeSql(access);
+  const rows = await prisma.$queryRaw<
+    Array<{
+      inspectionDate: Date;
+      passCount: bigint | null;
+      totalCount: bigint | null;
+    }>
+  >`
+    SELECT
+      inspections.inspectionDate AS inspectionDate,
+      SUM(quantity) AS totalCount,
+      SUM(
+        CASE
+          WHEN unqualifiedQuantity IS NULL OR unqualifiedQuantity <= 0 THEN quantity
+          WHEN unqualifiedQuantity >= quantity THEN 0
+          ELSE quantity - unqualifiedQuantity
+        END
+      ) AS passCount
+    FROM inspections
+    WHERE isDeleted = 0
+      AND inspectionDate >= ${start}
+      AND inspectionDate <= ${end}
+      ${scopeSql}
+    GROUP BY inspections.inspectionDate
+  `;
+  return rows.map((row) => ({
+    // The legacy monthly trend bucketed each inspection by its local month
+    // (range [firstDay, lastDay] of the month). Grouping by exact date and
+    // deriving the local month in Node keeps that semantics identical while
+    // bounding the row set to at most one row per day.
+    month: new Date(row.inspectionDate).getMonth(),
+    passCount: Number(row.passCount || 0),
+    totalCount: Number(row.totalCount || 0),
   }));
+}
+
+export async function getPassRateMonthlyTrend(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+): Promise<PassRateMonthlyPoint[]> {
+  const active = await getActivePassRateGeneration();
+  const scope = await resolveInspectionScope(access);
+  if (active?.activeGenerationId && (!scope || scope.scopeType === 'ALL')) {
+    const rows = await getProjectedPassRateMonthlyByRange(
+      active.activeGenerationId,
+      start,
+      end,
+      active.snapshot,
+    );
+    return rows.map((row) => ({
+      month: new Date(row.inspectionDate).getMonth(),
+      passCount: Number(row.passCount || 0),
+      totalCount: Number(row.totalCount || 0),
+    }));
+  }
+  return getLegacyPassRateMonthlyByRange(start, end, access);
 }
 
 function resolveIssueProcessBucketByIdentity(
@@ -325,10 +304,12 @@ export async function getPassRateDrillDownByRange(
   end: Date,
   getTargetPassRate: (name?: string) => number,
   source: PassRateSource = 'inspection',
+  access?: AnalyticsAccessContext,
 ): Promise<DrillDownItem[]> {
   if (source === 'inspection') {
+    const scope = await resolveInspectionScope(access);
     const active = await getActivePassRateGeneration();
-    if (active?.activeGenerationId) {
+    if (active?.activeGenerationId && (!scope || scope.scopeType === 'ALL')) {
       return getProjectedPassRateDrillDownByRange(
         active.activeGenerationId,
         start,
@@ -343,6 +324,8 @@ export async function getPassRateDrillDownByRange(
     end,
     getTargetPassRate,
     source,
+    undefined,
+    access,
   );
 }
 
@@ -352,11 +335,17 @@ export async function getLegacyPassRateDrillDownByRange(
   getTargetPassRate: (name?: string) => number,
   source: PassRateSource = 'inspection',
   snapshot?: PassRateFactSnapshot,
+  access?: AnalyticsAccessContext,
 ): Promise<DrillDownItem[]> {
   const drillDown: DrillDownItem[] = [];
-  const inspections = await getInspectionPassRateRows(start, end, snapshot);
+  const inspections = await getInspectionPassRateRows(
+    start,
+    end,
+    snapshot,
+    access,
+  );
   const issueRows =
-    source === 'issue' ? await getIssuePassRateRows(start, end) : [];
+    source === 'issue' ? await getIssuePassRateRows(start, end, access) : [];
   const resolveBucket = await createPassRateBucketResolver();
   const incomingTypeIds = inspections.map((item) =>
     item.category === 'INCOMING' ? item.incomingTypeId : null,
