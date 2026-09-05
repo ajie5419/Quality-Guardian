@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3';
 import { DashboardRouteService } from '~/modules/dashboard/dashboard-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -9,7 +10,9 @@ import {
 export default defineEventHandler(async (event) => {
   try {
     return useResponseSuccess(
-      await DashboardRouteService.getWorkspaceSummary(),
+      await DashboardRouteService.getWorkspaceSummary(
+        getAnalyticsAccessContext(event),
+      ),
     );
   } catch (error) {
     logApiError('workspace', error, undefined, event);

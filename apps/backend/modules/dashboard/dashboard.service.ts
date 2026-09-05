@@ -1,12 +1,18 @@
 import type { DashboardChartItem, DashboardStats } from '@qgs/shared';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
+import process from 'node:process';
 
 import { AfterSalesAPI } from '~/modules/after-sales';
+import { requireAnalyticsUser } from '~/modules/data-scope';
 import { InspectionService } from '~/modules/inspection';
+import { getFirstPassYieldDashboardTrend } from '~/modules/metric-governance';
 import { QualityLossService } from '~/modules/quality-loss';
-import { getNetPassRateSummaryByRange } from '~/modules/report/pass-rate';
+import { getPassRateMonthlyTrend } from '~/modules/report/pass-rate';
 import {
   buildCanonicalProcessPassRateTargets,
   PROCESS_PASS_RATE_TARGET_ORDER,
+  roundPercent,
 } from '~/modules/report/pass-rate-process';
 import { SystemService } from '~/modules/system';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning';
@@ -19,12 +25,6 @@ const DASHBOARD_STATS_CACHE_TTL_MS = 60_000;
 const DASHBOARD_TREND_CACHE_TTL_MS = 3_600_000;
 
 type DashboardStatsResult = DashboardStats;
-
-type DashboardStatsParams = {
-  granularity?: string;
-  scope?: string;
-  userId?: string;
-};
 
 const dashboardStatsCache = new Map<
   string,
@@ -56,13 +56,8 @@ const getStartOfWeek = (date: Date = new Date()): Date => {
   return start;
 };
 
-function buildDashboardStatsCacheKey(params: DashboardStatsParams = {}) {
-  return [
-    'qms:dashboard:stats',
-    params.userId || 'anonymous',
-    params.scope || 'default',
-    params.granularity || 'default',
-  ].join(':');
+function buildDashboardStatsCacheKey(userId: string) {
+  return `qms:dashboard:stats:${userId || 'anonymous'}`;
 }
 
 function getCachedDashboardStats(cacheKey: string) {
@@ -106,13 +101,9 @@ function setCachedDashboardTrend(
 }
 
 export const DashboardService = {
-  invalidateStatsCache(params?: DashboardStatsParams) {
-    if (!params) {
-      dashboardStatsCache.clear();
-      dashboardTrendCache.clear();
-      return;
-    }
-    dashboardStatsCache.delete(buildDashboardStatsCacheKey(params));
+  invalidateStatsCache() {
+    dashboardStatsCache.clear();
+    dashboardTrendCache.clear();
   },
 
   async getPassRateTargets() {
@@ -137,9 +128,12 @@ export const DashboardService = {
    * 获取仪表盘核心统计数据 (包含年度总计和本周新增)
    */
   async getStats(
-    params: DashboardStatsParams = {},
+    access: AnalyticsAccessContext,
   ): Promise<DashboardStatsResult> {
-    const cacheKey = buildDashboardStatsCacheKey(params);
+    const user = requireAnalyticsUser(access);
+    // Scope derives from the user's roles/department, so keying the shared
+    // in-memory cache by userId keeps DEPT/SELF/ALL aggregates isolated.
+    const cacheKey = buildDashboardStatsCacheKey(user.userId);
     const cached = getCachedDashboardStats(cacheKey);
     if (cached) {
       return cached;
@@ -151,14 +145,29 @@ export const DashboardService = {
         const weekStart = getStartOfWeek();
         const [afterSales, inspection, commissioning, workOrder, qualityLoss] =
           await Promise.all([
-            AfterSalesAPI.getStatsForDashboard({ weekStart, yearStart }),
-            InspectionService.getStatsForDashboard({ weekStart, yearStart }),
+            AfterSalesAPI.getStatsForDashboard(
+              { weekStart, yearStart },
+              access,
+            ),
+            InspectionService.getStatsForDashboard(
+              { weekStart, yearStart },
+              access,
+            ),
+            // vehicle-commissioning has no DataScope declaration (not one of
+            // the six protected modules); tracked as LEGACY in
+            // docs/permission-module.md until a dedicated scope is defined.
             VehicleCommissioningService.getStatsForDashboard({
               weekStart,
               yearStart,
             }),
-            WorkOrderService.getStatsForDashboard({ weekStart, yearStart }),
-            QualityLossService.getStatsForDashboard({ weekStart, yearStart }),
+            WorkOrderService.getStatsForDashboard(
+              { weekStart, yearStart },
+              access,
+            ),
+            QualityLossService.getStatsForDashboard(
+              { weekStart, yearStart },
+              access,
+            ),
           ]);
 
         return {
@@ -220,8 +229,11 @@ export const DashboardService = {
   /**
    * 获取月度质量趋势 (合格率 & 缺陷数)
    */
-  async getMonthlyTrend(): Promise<DashboardChartItem[]> {
-    const cacheKey = 'qms:dashboard:trend';
+  async getMonthlyTrend(
+    access: AnalyticsAccessContext,
+  ): Promise<DashboardChartItem[]> {
+    const user = requireAnalyticsUser(access);
+    const cacheKey = `qms:dashboard:trend:${user.userId}`;
     const cached = getCachedDashboardTrend(cacheKey);
     if (cached) {
       return cached;
@@ -245,26 +257,53 @@ export const DashboardService = {
           '12月',
         ];
         const currentMonthIndex = new Date().getMonth();
-        return await Promise.all(
-          months.map(async (m, idx) => {
-            const start = new Date(currentYear, idx, 1);
-            const end = new Date(currentYear, idx + 1, 0, 23, 59, 59, 999);
-            const summary = await getNetPassRateSummaryByRange(start, end);
+        const start = new Date(currentYear, 0, 1);
+        const end = new Date(currentYear, 11, 31, 23, 59, 59, 999);
+        const useCanonical =
+          process.env.METRIC_FIRST_PASS_DASHBOARD_CANONICAL !== 'false';
+        const canonicalPoints = useCanonical
+          ? await getFirstPassYieldDashboardTrend({
+              start,
+              end,
+              access,
+              useCanonical,
+            })
+          : null;
+        const points =
+          canonicalPoints && canonicalPoints.length > 0
+            ? canonicalPoints
+            : await getPassRateMonthlyTrend(start, end, access);
+        const summaryByMonth = new Map<
+          number,
+          { passCount: number; totalCount: number }
+        >();
+        for (const point of points) {
+          const current = summaryByMonth.get(point.month) || {
+            passCount: 0,
+            totalCount: 0,
+          };
+          current.passCount += point.passCount;
+          current.totalCount += point.totalCount;
+          summaryByMonth.set(point.month, current);
+        }
 
-            let passRate: null | number = 100;
-            if (summary.totalCount > 0) {
-              passRate = summary.passRate;
-            } else if (idx > currentMonthIndex) {
-              passRate = null;
-            }
+        return months.map((m, idx) => {
+          const summary = summaryByMonth.get(idx);
+          let passRate: null | number = 100;
+          if (summary && summary.totalCount > 0) {
+            passRate = roundPercent(
+              (summary.passCount / summary.totalCount) * 100,
+            );
+          } else if (idx > currentMonthIndex) {
+            passRate = null;
+          }
 
-            return {
-              month: m,
-              value: passRate === null ? 0 : passRate,
-              rate: passRate ?? 0,
-            };
-          }),
-        );
+          return {
+            month: m,
+            value: passRate === null ? 0 : passRate,
+            rate: passRate ?? 0,
+          };
+        });
       } catch (error) {
         logger.error({ err: error }, 'getMonthlyTrend 执行失败');
         return [];
@@ -278,12 +317,18 @@ export const DashboardService = {
   /**
    * 获取缺陷类型分布
    */
-  async getIssueDistribution(): Promise<DashboardChartItem[]> {
+  async getIssueDistribution(
+    access: AnalyticsAccessContext,
+  ): Promise<DashboardChartItem[]> {
     try {
-      const stats = await InspectionService.getStatsForDashboard({
-        weekStart: getStartOfWeek(),
-        yearStart: getStartOfYear(),
-      });
+      requireAnalyticsUser(access);
+      const stats = await InspectionService.getStatsForDashboard(
+        {
+          weekStart: getStartOfWeek(),
+          yearStart: getStartOfYear(),
+        },
+        access,
+      );
       return stats.issueDistribution;
     } catch (error) {
       logger.error({ err: error }, 'getIssueDistribution 执行失败');

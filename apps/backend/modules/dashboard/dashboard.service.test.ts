@@ -8,6 +8,14 @@ import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/veh
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import prisma from '~/utils/prisma';
 
+const testAccess = { user: { userId: 'u1', username: 'u1' } };
+const { getPassRateMonthlyTrend, getFirstPassYieldDashboardTrend } = vi.hoisted(
+  () => ({
+    getFirstPassYieldDashboardTrend: vi.fn(),
+    getPassRateMonthlyTrend: vi.fn(),
+  }),
+);
+
 // Mock prisma and logger
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -64,6 +72,10 @@ vi.mock(
 vi.mock('~/modules/work-order/work-order.service', () => ({
   WorkOrderService: { getStatsForDashboard: vi.fn() },
 }));
+vi.mock('~/modules/report/pass-rate', () => ({ getPassRateMonthlyTrend }));
+vi.mock('~/modules/metric-governance', () => ({
+  getFirstPassYieldDashboardTrend,
+}));
 
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({
@@ -77,6 +89,7 @@ describe('dashboardService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     DashboardService.invalidateStatsCache();
+    getFirstPassYieldDashboardTrend.mockResolvedValue([]);
   });
 
   describe('pass rate targets', () => {
@@ -169,7 +182,7 @@ describe('dashboardService', () => {
         weeklyLoss: 300,
       });
 
-      const stats = await DashboardService.getStats();
+      const stats = await DashboardService.getStats(testAccess);
       const ql = stats.overview.qualityLoss as {
         total: number;
         weekly: number;
@@ -190,7 +203,7 @@ describe('dashboardService', () => {
         new Error('DB Error'),
       );
 
-      const stats = await DashboardService.getStats();
+      const stats = await DashboardService.getStats(testAccess);
       const ql = stats.overview.qualityLoss as {
         total: number;
         weekly: number;
@@ -231,25 +244,84 @@ describe('dashboardService', () => {
         weeklyLoss: 0,
       });
 
-      await DashboardService.getStats({ userId: 'u1', scope: 'all' });
-      await DashboardService.getStats({ userId: 'u1', scope: 'all' });
+      await DashboardService.getStats(testAccess);
+      await DashboardService.getStats(testAccess);
 
       expect(AfterSalesAPI.getStatsForDashboard).toHaveBeenCalledTimes(1);
 
-      DashboardService.invalidateStatsCache({ userId: 'u1', scope: 'all' });
-      await DashboardService.getStats({ userId: 'u1', scope: 'all' });
+      DashboardService.invalidateStatsCache();
+      await DashboardService.getStats(testAccess);
 
+      expect(AfterSalesAPI.getStatsForDashboard).toHaveBeenCalledTimes(2);
+    });
+
+    it('fails closed when the access context is missing a user', async () => {
+      await expect(DashboardService.getStats(undefined)).rejects.toThrow(
+        'Analytics access context is missing a user',
+      );
+      await expect(DashboardService.getStats({} as any)).rejects.toThrow(
+        'Analytics access context is missing a user',
+      );
+      await expect(
+        DashboardService.getStats({ user: {} } as any),
+      ).rejects.toThrow('Analytics access context is missing a user');
+      expect(AfterSalesAPI.getStatsForDashboard).not.toHaveBeenCalled();
+      expect(InspectionService.getStatsForDashboard).not.toHaveBeenCalled();
+      expect(WorkOrderService.getStatsForDashboard).not.toHaveBeenCalled();
+      expect(QualityLossService.getStatsForDashboard).not.toHaveBeenCalled();
+    });
+
+    it('keeps the in-memory stats cache isolated per user', async () => {
+      (AfterSalesAPI.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 10,
+        totalLoss: 1500,
+        weeklyCount: 2,
+        weeklyLoss: 150,
+      });
+      (InspectionService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 5,
+        totalLoss: 2000,
+        weeklyCount: 3,
+        weeklyLoss: 200,
+        issueDistribution: [],
+      });
+      (
+        VehicleCommissioningService.getStatsForDashboard as any
+      ).mockResolvedValue({
+        totalCount: 2,
+        totalLoss: 700,
+        weeklyCount: 1,
+        weeklyLoss: 70,
+      });
+      (WorkOrderService.getStatsForDashboard as any).mockResolvedValue({
+        totalCount: 20,
+        weeklyCount: 4,
+        recentWorkOrders: [],
+      });
+      (QualityLossService.getStatsForDashboard as any).mockResolvedValue({
+        totalLoss: 3000,
+        weeklyLoss: 300,
+      });
+
+      // Different users must not share a cached aggregate (their DEPT/SELF
+      // scopes differ even when the shape is identical).
+      await DashboardService.getStats({ user: { userId: 'u1' } });
+      await DashboardService.getStats({ user: { userId: 'u2' } });
+      expect(AfterSalesAPI.getStatsForDashboard).toHaveBeenCalledTimes(2);
+
+      // Same user again hits the per-user cache.
+      await DashboardService.getStats({ user: { userId: 'u1' } });
       expect(AfterSalesAPI.getStatsForDashboard).toHaveBeenCalledTimes(2);
     });
   });
 
   describe('getMonthlyTrend', () => {
     it('should calculate pass rate correctly from inspection quantities only', async () => {
-      (prisma.$queryRaw as any)
-        .mockResolvedValueOnce([{ passCount: 92n, totalCount: 100n }])
-        .mockResolvedValue([{ passCount: 0n, totalCount: 0n }]);
+      getPassRateMonthlyTrend.mockResolvedValue([
+        { month: 0, passCount: 92, totalCount: 100 },
+      ]);
 
-      const trend = await DashboardService.getMonthlyTrend();
+      const trend = await DashboardService.getMonthlyTrend(testAccess);
       const jan = trend[0];
 
       expect(jan.month).toBe('1月');
@@ -257,12 +329,17 @@ describe('dashboardService', () => {
     });
 
     it('should handle zero total quantity', async () => {
-      (prisma.$queryRaw as any).mockResolvedValue([
-        { passCount: 0n, totalCount: 0n },
-      ]);
+      getPassRateMonthlyTrend.mockResolvedValue([]);
 
-      const trend = await DashboardService.getMonthlyTrend();
+      const trend = await DashboardService.getMonthlyTrend(testAccess);
       expect(trend[0].rate).toBe(100); // Default for no activity
+    });
+
+    it('fails closed when the access context is missing a user', async () => {
+      await expect(DashboardService.getMonthlyTrend(undefined)).rejects.toThrow(
+        'Analytics access context is missing a user',
+      );
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
     });
   });
 
@@ -275,7 +352,7 @@ describe('dashboardService', () => {
         ],
       });
 
-      const dist = await DashboardService.getIssueDistribution();
+      const dist = await DashboardService.getIssueDistribution(testAccess);
       expect(dist).toHaveLength(2);
       expect(dist[0]).toEqual({ type: 'Minor', value: 10 });
     });

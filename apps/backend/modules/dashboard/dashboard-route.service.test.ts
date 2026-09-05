@@ -127,7 +127,9 @@ describe('dashboardRouteService', () => {
       ]),
     );
 
-    const result = await DashboardRouteService.getWorkspaceSummary();
+    const result = await DashboardRouteService.getWorkspaceSummary({
+      user: { userId: 'u1', username: 'u1' },
+    });
 
     expect(
       WorkOrderRequirementService.getSummaryByWorkOrderNumbers,
@@ -212,7 +214,9 @@ describe('dashboardRouteService', () => {
       WorkOrderRequirementService.getSummaryByWorkOrderNumbers as any
     ).mockResolvedValue(new Map());
 
-    const result = await DashboardRouteService.getWorkspaceSummary();
+    const result = await DashboardRouteService.getWorkspaceSummary({
+      user: { userId: 'u1', username: 'u1' },
+    });
 
     expect(result.projectItems).toEqual([
       {
@@ -229,5 +233,43 @@ describe('dashboardRouteService', () => {
         url: '/qms/work-order',
       },
     ]);
+  });
+
+  it('propagates the analytics access to every workspace source', async () => {
+    (WorkOrderService.getWorkspaceWorkOrders as any).mockResolvedValue([]);
+    (WorkOrderService.countCreatedSince as any).mockResolvedValue(0);
+    (InspectionService.getWorkspaceIssueSummary as any).mockResolvedValue({
+      openIssues: [],
+      openIssuesCount: 0,
+      recentIssues: [],
+      todayInspections: 0,
+      todayIssues: 0,
+    });
+    (
+      WorkOrderRequirementService.getSummaryByWorkOrderNumbers as any
+    ).mockResolvedValue(new Map());
+
+    const access = { user: { userId: 'u-dept-a', username: 'user-a' } };
+    await DashboardRouteService.getWorkspaceSummary(access);
+
+    expect(WorkOrderService.getWorkspaceWorkOrders).toHaveBeenCalledWith(
+      access,
+    );
+    expect(WorkOrderService.countCreatedSince).toHaveBeenCalledWith(
+      expect.any(Date),
+      access,
+    );
+    expect(InspectionService.getWorkspaceIssueSummary).toHaveBeenCalledWith(
+      { today: expect.any(Date) },
+      access,
+    );
+  });
+
+  it('fails closed when the analytics access context is missing a user', async () => {
+    await expect(
+      DashboardRouteService.getWorkspaceSummary({} as any),
+    ).rejects.toThrow('Analytics access context is missing a user');
+    expect(WorkOrderService.getWorkspaceWorkOrders).not.toHaveBeenCalled();
+    expect(InspectionService.getWorkspaceIssueSummary).not.toHaveBeenCalled();
   });
 });

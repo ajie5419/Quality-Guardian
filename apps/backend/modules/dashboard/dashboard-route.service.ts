@@ -1,3 +1,6 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
+import { requireAnalyticsUser } from '~/modules/data-scope';
 import { InspectionService } from '~/modules/inspection';
 import { WorkOrderService } from '~/modules/work-order';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
@@ -17,13 +20,14 @@ function formatRelativeTime(date: Date | string): string {
 }
 
 export const DashboardRouteService = {
-  async getWorkspaceSummary() {
+  async getWorkspaceSummary(access: AnalyticsAccessContext) {
+    requireAnalyticsUser(access);
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const [workOrders, todayWorkOrders, issueSummary] = await Promise.all([
-      WorkOrderService.getWorkspaceWorkOrders(),
-      WorkOrderService.countCreatedSince(today),
-      InspectionService.getWorkspaceIssueSummary({ today }),
+      WorkOrderService.getWorkspaceWorkOrders(access),
+      WorkOrderService.countCreatedSince(today, access),
+      InspectionService.getWorkspaceIssueSummary({ today }, access),
     ]);
     const workOrderNumbers = workOrders
       .map((item) => String(item.workOrderNumber || '').trim())
