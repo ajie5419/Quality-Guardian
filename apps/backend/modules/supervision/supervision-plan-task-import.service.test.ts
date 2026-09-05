@@ -13,9 +13,16 @@ vi.mock('~/utils/prisma', () => ({
       create: vi.fn(),
     },
     supervision_projects: {
-      update: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({ status: 'PLANNED' }),
+      updateMany: vi.fn(),
     },
     $transaction: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: {
+    auditLog: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -34,6 +41,17 @@ vi.mock('~/modules/supervision/supervision-plan-task-progress', () => ({
   syncSupervisionProjectProgress: vi.fn(),
 }));
 
+const context = {
+  isAdmin: false,
+  userId: 'user-1',
+  user: {
+    id: 'user-1',
+    realName: 'User One',
+    roles: [],
+    username: 'user1',
+  },
+};
+
 describe('supervisionPlanTaskImportService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -45,6 +63,7 @@ describe('supervisionPlanTaskImportService', () => {
         'project-1',
         {},
         vi.fn(),
+        context,
       ),
     ).rejects.toThrow('计划文件不能为空');
 
@@ -53,6 +72,7 @@ describe('supervisionPlanTaskImportService', () => {
         'project-1',
         { fileUrl: '/uploads/plan.txt' },
         vi.fn(),
+        context,
       ),
     ).rejects.toThrow('仅支持 .xls 或 .xlsx 计划文件');
 
@@ -64,6 +84,7 @@ describe('supervisionPlanTaskImportService', () => {
         'project-1',
         { fileUrl: '/uploads/abc-plan.xlsx' },
         vi.fn(),
+        context,
       ),
     ).rejects.toThrow('未找到上传的计划文件');
   });
@@ -79,6 +100,7 @@ describe('supervisionPlanTaskImportService', () => {
         'project-1',
         { fileUrl: '/uploads/abc-plan.xlsx' },
         vi.fn(),
+        context,
       ),
     ).rejects.toThrow('计划文件没有工作表');
 
@@ -92,6 +114,7 @@ describe('supervisionPlanTaskImportService', () => {
         'project-1',
         { fileUrl: '/uploads/abc-plan.xlsx' },
         vi.fn(),
+        context,
       ),
     ).rejects.toThrow('未识别到任务计划数据');
   });
@@ -135,7 +158,7 @@ describe('supervisionPlanTaskImportService', () => {
           .mockResolvedValueOnce({ id: 'child-id' }),
       },
       supervision_projects: {
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
@@ -152,6 +175,7 @@ describe('supervisionPlanTaskImportService', () => {
         fileUrl: '/uploads/abc-plan.xlsx',
       },
       listPlanTasks,
+      context,
     );
 
     expect(result.items).toHaveLength(2);
@@ -160,7 +184,10 @@ describe('supervisionPlanTaskImportService', () => {
     );
     expect(tx.supervision_plan_tasks.updateMany).toHaveBeenCalledWith({
       data: { isDeleted: true },
-      where: { projectId: 'project-1' },
+      where: {
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(tx.supervision_plan_tasks.create).toHaveBeenNthCalledWith(1, {
       data: expect.objectContaining({
@@ -186,9 +213,14 @@ describe('supervisionPlanTaskImportService', () => {
         taskNo: '1.1',
       }),
     });
-    expect(tx.supervision_projects.update).toHaveBeenCalledWith({
+    expect(tx.supervision_projects.updateMany).toHaveBeenCalledWith({
       data: { status: 'IN_PROGRESS' },
-      where: { id: 'project-1' },
+      where: {
+        id: 'project-1',
+        isDeleted: false,
+        status: { not: 'COMPLETED' },
+        createdBy: 'user-1',
+      },
     });
     expect(listPlanTasks).toHaveBeenCalledWith('project-1');
   });

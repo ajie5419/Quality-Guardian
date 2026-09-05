@@ -1,11 +1,15 @@
 import type {
   DeadlineBoardResult,
-  DeadlineBoardTask,
   SupervisionPlanTaskImportResult,
 } from '@qgs/shared';
 
-import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
+import type { SupervisionAccessContext } from './supervision-access';
 
+import { BusinessError } from '~/utils/business-error';
+
+import { buildSupervisionAccessWhere } from './supervision-access';
+import { auditSupervisionWrite } from './supervision-audit';
+import { SupervisionDeadlineBoardService } from './supervision-deadline-board.service';
 import { SupervisionPlanTaskImportService } from './supervision-plan-task-import.service';
 import { syncSupervisionProjectProgress } from './supervision-plan-task-progress';
 import {
@@ -20,198 +24,14 @@ import {
   rollupSummaryTasks,
   summarizePlanTasks,
 } from './supervision-shared';
+import { throwSupervisionConflict } from './supervision-state';
 
 export const SupervisionPlanTaskService = {
   async deadlineBoard(params?: {
     dueSoonDays?: number;
     projectId?: string;
   }): Promise<DeadlineBoardResult> {
-    const dueSoonDays = params?.dueSoonDays ?? 7;
-    const now = new Date();
-    const projectWhere: any = {
-      isDeleted: false,
-      status: { in: ['PLANNED', 'IN_PROGRESS'] },
-    };
-    if (params?.projectId) projectWhere.id = params.projectId;
-
-    // governance-allow-direct-name-id: select projection for read-only board aggregation.
-    const projects = await prisma.supervision_projects.findMany({
-      select: {
-        id: true,
-        projectId: true,
-        projectName: true,
-        supplierId: true,
-        supplierName: true,
-      },
-      where: projectWhere,
-    });
-    const [projectNameById, supplierNameById] = await Promise.all([
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'projectName',
-        canonicalIds: projects.map((item) => item.projectId),
-      }),
-      MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
-        configKey: 'supplierName',
-        canonicalIds: projects.map((item) => item.supplierId),
-      }),
-    ]);
-    const projectIds = projects.map((p) => p.id);
-    if (projectIds.length === 0) {
-      return {
-        byProject: [],
-        delayed: [],
-        dueSoon: [],
-        risk: [],
-        summary: {
-          delayedCount: 0,
-          dueSoonCount: 0,
-          healthyPercent: 100,
-          riskCount: 0,
-          totalProjects: 0,
-        },
-      };
-    }
-
-    const tasks = await prisma.supervision_plan_tasks.findMany({
-      where: {
-        isDeleted: false,
-        isSummary: false,
-        projectId: { in: projectIds },
-        status: { notIn: ['DONE'] },
-      },
-      orderBy: { plannedEndAt: 'asc' },
-    });
-
-    const projectMap = new Map(projects.map((p) => [p.id, p]));
-    const delayed: DeadlineBoardTask[] = [];
-    const dueSoon: DeadlineBoardTask[] = [];
-    const risk: DeadlineBoardTask[] = [];
-
-    for (const row of tasks) {
-      const mapped = mapPlanTask(row);
-      const project = projectMap.get(row.projectId);
-      const canonicalProjectName = projectNameById.get(
-        String(project?.projectId || ''),
-      );
-      const canonicalSupplierName = supplierNameById.get(
-        String(project?.supplierId || ''),
-      );
-      // governance-allow-direct-name-id: canonical names are resolved above via governance kernel.
-      const task: DeadlineBoardTask = {
-        ...mapped,
-        projectName: canonicalProjectName || project?.projectName || '',
-        supplierName: canonicalSupplierName || project?.supplierName || '',
-      };
-
-      const endAt = row.plannedEndAt ? new Date(row.plannedEndAt) : null;
-      if (endAt) {
-        const endOfDay = new Date(endAt);
-        endOfDay.setHours(23, 59, 59, 999);
-        if (endOfDay < now) {
-          delayed.push(task);
-          continue;
-        }
-        const diffMs = endOfDay.getTime() - now.getTime();
-        const diffDays = diffMs / (24 * 60 * 60 * 1000);
-        if (diffDays <= dueSoonDays) {
-          dueSoon.push(task);
-          continue;
-        }
-      }
-
-      const isRiskFlag = (row.riskLevel || '').toUpperCase() === 'RISK';
-      if (isRiskFlag) {
-        risk.push(task);
-        continue;
-      }
-
-      const startAt = row.plannedStartAt ? new Date(row.plannedStartAt) : null;
-      if (startAt && endAt && startAt < now) {
-        const totalDuration = endAt.getTime() - startAt.getTime();
-        const elapsed = now.getTime() - startAt.getTime();
-        if (totalDuration > 0) {
-          const expectedProgress = (elapsed / totalDuration) * 100;
-          const actualProgress = mapPlanTask(row).progressPercent;
-          if (actualProgress < expectedProgress * 0.7) {
-            risk.push(task);
-          }
-        }
-      }
-    }
-
-    const byProjectMap = new Map<
-      string,
-      { delayed: number; dueSoon: number; risk: number }
-    >();
-    for (const t of delayed) {
-      const s = byProjectMap.get(t.projectId) ?? {
-        delayed: 0,
-        dueSoon: 0,
-        risk: 0,
-      };
-      s.delayed++;
-      byProjectMap.set(t.projectId, s);
-    }
-    for (const t of dueSoon) {
-      const s = byProjectMap.get(t.projectId) ?? {
-        delayed: 0,
-        dueSoon: 0,
-        risk: 0,
-      };
-      s.dueSoon++;
-      byProjectMap.set(t.projectId, s);
-    }
-    for (const t of risk) {
-      const s = byProjectMap.get(t.projectId) ?? {
-        delayed: 0,
-        dueSoon: 0,
-        risk: 0,
-      };
-      s.risk++;
-      byProjectMap.set(t.projectId, s);
-    }
-
-    const totalLeafTasks = tasks.length;
-    const problemCount = delayed.length + dueSoon.length + risk.length;
-    const healthyPercent =
-      totalLeafTasks > 0
-        ? Math.round(((totalLeafTasks - problemCount) / totalLeafTasks) * 100)
-        : 100;
-
-    return {
-      byProject: projects
-        .map((p) => {
-          const s = byProjectMap.get(p.id) ?? {
-            delayed: 0,
-            dueSoon: 0,
-            risk: 0,
-          };
-          const projectLeafTasks = tasks.filter((t) => t.projectId === p.id);
-          const projectItems = projectLeafTasks.map((t) => mapPlanTask(t));
-          const overallProgress =
-            summarizePlanTasks(projectItems).progressPercent;
-          return {
-            delayedCount: s.delayed,
-            dueSoonCount: s.dueSoon,
-            overallProgress,
-            projectId: p.id,
-            projectName: p.projectName,
-            riskCount: s.risk,
-            supplierName: p.supplierName || '',
-          };
-        })
-        .filter((p) => p.delayedCount + p.dueSoonCount + p.riskCount > 0),
-      delayed,
-      dueSoon,
-      risk,
-      summary: {
-        delayedCount: delayed.length,
-        dueSoonCount: dueSoon.length,
-        healthyPercent,
-        riskCount: risk.length,
-        totalProjects: projects.length,
-      },
-    };
+    return SupervisionDeadlineBoardService.deadlineBoard(params);
   },
 
   async listPlanTasks(
@@ -233,11 +53,13 @@ export const SupervisionPlanTaskService = {
   async importPlanTasks(
     projectId: string,
     payload: Record<string, unknown>,
+    context: SupervisionAccessContext,
   ): Promise<SupervisionPlanTaskImportResult> {
     return SupervisionPlanTaskImportService.importPlanTasks(
       projectId,
       payload,
       this.listPlanTasks.bind(this),
+      context,
     );
   },
 
@@ -256,7 +78,19 @@ export const SupervisionPlanTaskService = {
       taskNo: string;
       weight?: number;
     },
+    context: SupervisionAccessContext,
   ): Promise<SupervisionPlanTaskImportResult> {
+    const project = await prisma.supervision_projects.findFirst({
+      select: { id: true },
+      where: {
+        id: projectId,
+        isDeleted: false,
+        ...buildSupervisionAccessWhere('project', context),
+      },
+    });
+    if (!project) {
+      throw new BusinessError('NOT_FOUND', '监造项目不存在', 404);
+    }
     const parentId = payload.parentId || null;
     let outlineLevel = 1;
     if (parentId) {
@@ -268,7 +102,11 @@ export const SupervisionPlanTaskService = {
         if (!parent.isSummary) {
           await prisma.supervision_plan_tasks.update({
             data: { isSummary: true },
-            where: { id: parentId },
+            where: {
+              id: parentId,
+              projectId,
+              ...buildSupervisionAccessWhere('task', context),
+            },
           });
         }
       }
@@ -283,7 +121,7 @@ export const SupervisionPlanTaskService = {
     const plannedEndAt = payload.plannedEndAt
       ? normalizeDate(payload.plannedEndAt)
       : undefined;
-    await prisma.supervision_plan_tasks.create({
+    const created = await prisma.supervision_plan_tasks.create({
       data: {
         durationDays: payload.durationDays ?? null,
         isSummary: false,
@@ -304,6 +142,12 @@ export const SupervisionPlanTaskService = {
         weight: payload.weight ?? 1,
       },
     });
+    await auditSupervisionWrite({
+      action: 'task-create',
+      context,
+      detailsVariables: { taskNo: String(payload.taskNo ?? '') },
+      targetId: created.id,
+    });
     await syncSupervisionProjectProgress(projectId);
     return this.listPlanTasks(projectId);
   },
@@ -312,7 +156,30 @@ export const SupervisionPlanTaskService = {
     projectId: string,
     taskId: string,
     payload: Record<string, unknown>,
+    context: SupervisionAccessContext,
   ): Promise<SupervisionPlanTaskImportResult> {
+    const accessWhere = buildSupervisionAccessWhere('task', context);
+    const current = await prisma.supervision_plan_tasks.findFirst({
+      select: {
+        actualEndAt: true,
+        actualStartAt: true,
+        id: true,
+        plannedEndAt: true,
+        plannedStartAt: true,
+        progressPercent: true,
+        riskLevel: true,
+        status: true,
+      },
+      where: {
+        id: taskId,
+        isDeleted: false,
+        projectId,
+        ...accessWhere,
+      },
+    });
+    if (!current) {
+      throw new BusinessError('NOT_FOUND', '监造任务不存在', 404);
+    }
     const data: any = {};
     if (payload.taskName !== undefined)
       data.taskName = normalizeText(payload.taskName);
@@ -360,7 +227,11 @@ export const SupervisionPlanTaskService = {
         if (parent && !parent.isSummary) {
           await prisma.supervision_plan_tasks.update({
             data: { isSummary: true },
-            where: { id: newParentId },
+            where: {
+              id: newParentId,
+              projectId,
+              ...buildSupervisionAccessWhere('task', context),
+            },
           });
         }
       } else {
@@ -368,9 +239,54 @@ export const SupervisionPlanTaskService = {
       }
     }
 
-    await prisma.supervision_plan_tasks.update({
+    const nextProgress =
+      payload.progressPercent === undefined
+        ? current.progressPercent
+        : normalizePercent(payload.progressPercent);
+    if (payload.progressPercent !== undefined) {
+      // Task status is derived; recalc it so progress and status cannot drift.
+      data.status = calculatePlanTaskStatus({
+        actualEndAt:
+          payload.actualEndAt === undefined
+            ? current.actualEndAt
+            : normalizeDate(payload.actualEndAt) || null,
+        actualStartAt:
+          payload.actualStartAt === undefined
+            ? current.actualStartAt
+            : normalizeDate(payload.actualStartAt) || null,
+        plannedEndAt:
+          payload.plannedEndAt === undefined
+            ? current.plannedEndAt
+            : normalizeDate(payload.plannedEndAt) || null,
+        plannedStartAt:
+          payload.plannedStartAt === undefined
+            ? current.plannedStartAt
+            : normalizeDate(payload.plannedStartAt) || null,
+        progressPercent: nextProgress,
+        riskLevel: current.riskLevel,
+      });
+    }
+    const result = await prisma.supervision_plan_tasks.updateMany({
       data,
-      where: { id: taskId, projectId },
+      where: {
+        id: taskId,
+        isDeleted: false,
+        projectId,
+        status: current.status,
+        ...accessWhere,
+      },
+    });
+    if (result.count !== 1) {
+      throwSupervisionConflict('监造任务状态已变化，请刷新后重试');
+    }
+    await auditSupervisionWrite({
+      action: 'task-update',
+      context,
+      detailsVariables: {
+        progressPercent: String(nextProgress ?? ''),
+        taskNo: String(payload.taskNo ?? ''),
+      },
+      targetId: taskId,
     });
     await syncSupervisionProjectProgress(projectId);
     return this.listPlanTasks(projectId);
@@ -379,31 +295,60 @@ export const SupervisionPlanTaskService = {
   async deleteTask(
     projectId: string,
     taskId: string,
+    context: SupervisionAccessContext,
   ): Promise<SupervisionPlanTaskImportResult> {
     await prisma.$transaction(async (tx) => {
+      const accessWhere = buildSupervisionAccessWhere('task', context);
       const task = await tx.supervision_plan_tasks.findFirst({
-        where: { id: taskId, isDeleted: false, projectId },
+        select: { id: true, outlineLevel: true, parentId: true, status: true },
+        where: { id: taskId, isDeleted: false, projectId, ...accessWhere },
       });
-      if (!task) throw new Error('任务不存在');
+      if (!task) throw new BusinessError('NOT_FOUND', '监造任务不存在', 404);
+      if (task.status === 'DONE') {
+        throwSupervisionConflict('已完成监造任务不可删除');
+      }
       await tx.supervision_plan_tasks.updateMany({
         data: { outlineLevel: task.outlineLevel, parentId: task.parentId },
-        where: { isDeleted: false, parentId: taskId, projectId },
+        where: {
+          isDeleted: false,
+          parentId: taskId,
+          projectId,
+          ...accessWhere,
+        },
       });
-      await tx.supervision_plan_tasks.update({
+      const deleted = await tx.supervision_plan_tasks.updateMany({
         data: { isDeleted: true },
-        where: { id: taskId },
+        where: { id: taskId, isDeleted: false, projectId, ...accessWhere },
       });
+      if (deleted.count !== 1) {
+        throwSupervisionConflict('监造任务状态已变化，请刷新后重试');
+      }
       if (task.parentId) {
         const siblingCount = await tx.supervision_plan_tasks.count({
-          where: { isDeleted: false, parentId: task.parentId, projectId },
+          where: {
+            isDeleted: false,
+            parentId: task.parentId,
+            projectId,
+            ...accessWhere,
+          },
         });
         if (siblingCount === 0) {
           await tx.supervision_plan_tasks.update({
             data: { isSummary: false },
-            where: { id: task.parentId },
+            where: {
+              id: task.parentId,
+              projectId,
+              ...accessWhere,
+            },
           });
         }
       }
+    });
+    await auditSupervisionWrite({
+      action: 'task-delete',
+      context,
+      detailsVariables: { taskNo: '' },
+      targetId: taskId,
     });
     await syncSupervisionProjectProgress(projectId);
     return this.listPlanTasks(projectId);
@@ -417,8 +362,10 @@ export const SupervisionPlanTaskService = {
       parentId?: null | string;
       sortOrder: number;
     }>,
+    context: SupervisionAccessContext,
   ): Promise<SupervisionPlanTaskImportResult> {
     await prisma.$transaction(async (tx) => {
+      const accessWhere = buildSupervisionAccessWhere('task', context);
       for (const item of items) {
         const data: any = { sortOrder: item.sortOrder };
         if (item.parentId !== undefined) data.parentId = item.parentId || null;
@@ -426,12 +373,12 @@ export const SupervisionPlanTaskService = {
           data.outlineLevel = item.outlineLevel;
         await tx.supervision_plan_tasks.update({
           data,
-          where: { id: item.id, projectId },
+          where: { id: item.id, projectId, ...accessWhere },
         });
       }
       const allTasks = await tx.supervision_plan_tasks.findMany({
         select: { id: true, parentId: true },
-        where: { isDeleted: false, projectId },
+        where: { isDeleted: false, projectId, ...accessWhere },
       });
       const parentIds = new Set(
         allTasks.map((t) => t.parentId).filter(Boolean) as string[],
@@ -440,7 +387,7 @@ export const SupervisionPlanTaskService = {
         const shouldBeSummary = parentIds.has(task.id);
         await tx.supervision_plan_tasks.update({
           data: { isSummary: shouldBeSummary },
-          where: { id: task.id },
+          where: { id: task.id, projectId, ...accessWhere },
         });
       }
     });

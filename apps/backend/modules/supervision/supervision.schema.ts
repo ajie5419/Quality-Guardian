@@ -1,5 +1,31 @@
 import { z } from 'zod';
 
+/**
+ * Parsed create-plan-task payload. Declared explicitly because the runtime
+ * defaulted/optional shape cannot be inferred from `z.object` output in the
+ * route handler without widening required business fields.
+ */
+export interface PlanTaskCreatePayload {
+  durationDays?: number;
+  parentId?: string;
+  plannedEndAt?: string;
+  plannedQuantity: number;
+  plannedStartAt?: string;
+  predecessorText?: string;
+  quantityUnit: string;
+  resourceName?: string;
+  taskName: string;
+  taskNo: string;
+  weight: number;
+}
+
+export interface PlanTaskReorderItem {
+  id: string;
+  outlineLevel?: number;
+  parentId?: null | string;
+  sortOrder: number;
+}
+
 export const createPlanTaskSchema = z.object({
   durationDays: z.number().int().min(0).optional(),
   parentId: z.string().optional(),

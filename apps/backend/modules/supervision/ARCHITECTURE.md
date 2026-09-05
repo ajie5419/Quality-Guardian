@@ -9,8 +9,14 @@
 - `supervision.service.ts` — 监督主服务（项目级操作）
 - `supervision-project.service.ts` — 监督项目 CRUD
 - `supervision-plan-task.service.ts` — 计划任务分配与执行
+- `supervision-deadline-board.service.ts` — 纳期看板只读聚合
+- `supervision-plan-task-import.service.ts` — 计划 Excel 导入（覆盖导入）
+- `supervision-plan-task-progress.ts` — 项目进度/状态派生重算（系统维护写）
 - `supervision-issue.service.ts` — 问题记录与整改跟踪
 - `supervision-report.service.ts` — 监督报告生成
+- `supervision-access.ts` — 对象级访问上下文（SEC-SUPERVISION-001）
+- `supervision-state.ts` — 显式状态转换矩阵 + 409 helper（SEC-SUPERVISION-001）
+- `supervision-audit.ts` — 审计写辅助（复用 SystemLogService）
 - `supervision-shared.ts` — 模块内共享工具函数
 
 ## 对外接口
@@ -25,7 +31,24 @@
 ## 特殊约束
 
 - 子服务之间有调用关系（issue 关联 plan-task，report 汇总 issue）
-- 监督项目有状态流转：草稿 → 进行中 → 已完成
+- 监督项目有状态流转：`PLANNED / IN_PROGRESS / PAUSED / COMPLETED`（COMPLETED 仅可 → IN_PROGRESS）
+- 问题状态流转：`OPEN / IN_PROGRESS / VERIFYING / CLOSED`（CLOSED 仅可 → OPEN）
+
+## 权限模型（SEC-SUPERVISION-001）
+
+调用链：`Authentication → RBAC → Object Authorization → Domain Service → Scoped Write → Audit`。
+
+- 无部门维度：对象边界为 **creator 所有权**——普通用户只能写自己创建的项目/问题/日报；系统管理员（super/admin）为 ALL。`createdBy` 列（迁移 `20260820150000_add_supervision_created_by`）记录创建者；无 creator 的存量行仅管理员可写（fail-closed，不扩权）。
+- 计划任务继承父项目范围：`task` 的 where 追加 `{ project: { createdBy } }`，不允许只凭任务 ID 操作他人项目的任务。
+- 所有 update/delete 使用 `updateMany({ where: { id, ...accessWhere, 状态条件 } })` + `count !== 1 → 404/409`，禁止 `find → 判断 → update` 的 TOCTOU 模式。
+- 状态转换必须经过 `supervision-state.ts` 显式矩阵；CAS 以当前 `status` 作为原子锚点。
+- 用户型写成功路径记录审计（`auditSupervisionWrite`，动作在 `supervisionModule.audit` 声明）。
+
+## 并发（CAS）
+
+- 项目/问题状态写：`where` 携带当前 `status`；进度变化时由 `syncSupervisionProjectProgress` 按叶子任务重算派生进度与状态（系统维护写，Guard marker 豁免）。
+- 任务删除：`status !== 'DONE'` 才可删；导入仅在项目非 `COMPLETED` 时可覆盖。
+- 竞争/并发状态变更 → `409 CONFLICT`；越权/不存在 → `404 NOT_FOUND`。
 
 ## 供应商身份契约与治理阶段
 

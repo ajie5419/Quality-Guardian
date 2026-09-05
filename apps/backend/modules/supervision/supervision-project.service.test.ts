@@ -18,6 +18,12 @@ vi.mock('~/utils/governed-write', () => ({
   ),
 }));
 
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: {
+    auditLog: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock('~/utils/query-helpers', () => ({
   buildKeywordOr: vi.fn().mockReturnValue(null),
 }));
@@ -57,7 +63,30 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
           updatedAt: new Date(),
           workOrderNumber: null,
         }),
+        findFirst: vi.fn().mockResolvedValue({
+          actualEndAt: null,
+          actualStartAt: null,
+          createdAt: new Date(),
+          id: 'sp-1',
+          location: null,
+          participants: null,
+          plannedEndAt: null,
+          plannedStartAt: null,
+          progressPercent: 0,
+          projectName: 'Test Project',
+          projectType: 'QUALITY',
+          riskLevel: 'LOW',
+          stage: null,
+          status: 'PLANNED',
+          summary: null,
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
+          supervisor: null,
+          updatedAt: new Date(),
+          workOrderNumber: null,
+        }),
         findMany: vi.fn().mockResolvedValue([]),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         update: vi.fn().mockResolvedValue({
           actualEndAt: null,
           actualStartAt: null,
@@ -81,9 +110,23 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
           workOrderNumber: null,
         }),
       },
+      supervision_plan_tasks: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
     },
   };
 });
+
+const context = {
+  isAdmin: false,
+  userId: 'user-1',
+  user: {
+    id: 'user-1',
+    realName: 'User One',
+    roles: [],
+    username: 'user1',
+  },
+};
 
 describe('supervisionProjectService', () => {
   beforeEach(() => {
@@ -92,10 +135,13 @@ describe('supervisionProjectService', () => {
 
   describe('createProject', () => {
     it('should create a project and return mapped result', async () => {
-      const result = await SupervisionProjectService.createProject({
-        projectName: 'Test Project',
-        projectType: 'QUALITY',
-      });
+      const result = await SupervisionProjectService.createProject(
+        {
+          projectName: 'Test Project',
+          projectType: 'QUALITY',
+        },
+        context,
+      );
 
       expect(result).toHaveProperty('id', 'sp-1');
       expect(result).toHaveProperty('projectName', 'Test Project');
@@ -104,19 +150,25 @@ describe('supervisionProjectService', () => {
     });
 
     it('should default status to PLANNED', async () => {
-      const result = await SupervisionProjectService.createProject({
-        projectName: 'New Project',
-      });
+      const result = await SupervisionProjectService.createProject(
+        {
+          projectName: 'New Project',
+        },
+        context,
+      );
 
       expect(result.status).toBe('PLANNED');
     });
 
     it('should validate and write explicit supplier identity', async () => {
-      await SupervisionProjectService.createProject({
-        projectName: 'Supplier Project',
-        supplierId: 'supplier-1',
-        supplierName: 'Supplier A',
-      });
+      await SupervisionProjectService.createProject(
+        {
+          projectName: 'Supplier Project',
+          supplierId: 'supplier-1',
+          supplierName: 'Supplier A',
+        },
+        context,
+      );
 
       expect(buildGovernedWriteFieldsForTable).toHaveBeenCalledWith(
         'supervision_projects',
@@ -162,19 +214,27 @@ describe('supervisionProjectService', () => {
 
   describe('updateProject', () => {
     it('should update project and return mapped result', async () => {
-      const result = await SupervisionProjectService.updateProject('sp-1', {
-        projectName: 'Updated Project',
-      });
+      const result = await SupervisionProjectService.updateProject(
+        'sp-1',
+        {
+          projectName: 'Updated Project',
+        },
+        context,
+      );
 
       expect(result).toHaveProperty('id');
       expect(result).toHaveProperty('projectName');
     });
 
     it('should validate and update explicit supplier identity', async () => {
-      await SupervisionProjectService.updateProject('sp-1', {
-        supplierId: 'supplier-2',
-        supplierName: 'Supplier B',
-      });
+      await SupervisionProjectService.updateProject(
+        'sp-1',
+        {
+          supplierId: 'supplier-2',
+          supplierName: 'Supplier B',
+        },
+        context,
+      );
 
       expect(buildGovernedCanonicalWritePairForTable).toHaveBeenCalledWith(
         'supervision_projects',
@@ -186,29 +246,39 @@ describe('supervisionProjectService', () => {
       const { prisma: mockPrisma } = await import(
         '~/modules/supervision/supervision-shared'
       );
-      expect(mockPrisma.supervision_projects.update).toHaveBeenCalledWith({
+      expect(mockPrisma.supervision_projects.updateMany).toHaveBeenCalledWith({
         data: expect.objectContaining({
           supplierId: 'supplier-2',
           supplierName: 'Supplier B',
         }),
-        where: { id: 'sp-1' },
+        where: {
+          id: 'sp-1',
+          isDeleted: false,
+          status: 'PLANNED',
+          createdBy: 'user-1',
+        },
       });
     });
   });
 
   describe('deleteProject', () => {
     it('should soft delete a project', async () => {
-      await SupervisionProjectService.deleteProject('sp-1');
+      await SupervisionProjectService.deleteProject('sp-1', context);
 
       const { prisma: mockPrisma } = await import(
         '~/modules/supervision/supervision-shared'
       );
 
       expect(
-        (mockPrisma as any).supervision_projects.update,
+        (mockPrisma as any).supervision_projects.updateMany,
       ).toHaveBeenCalledWith({
         data: { isDeleted: true },
-        where: { id: 'sp-1' },
+        where: {
+          id: 'sp-1',
+          isDeleted: false,
+          status: { not: 'COMPLETED' },
+          createdBy: 'user-1',
+        },
       });
     });
   });

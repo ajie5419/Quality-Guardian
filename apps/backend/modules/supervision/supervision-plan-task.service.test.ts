@@ -12,11 +12,19 @@ vi.mock('~/utils/prisma', () => ({
       findFirst: vi.fn(),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     supervision_projects: {
+      findFirst: vi.fn().mockResolvedValue({ id: 'project-1' }),
       findMany: vi.fn(),
     },
     $transaction: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: {
+    auditLog: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -64,6 +72,7 @@ function task(overrides: Record<string, unknown>) {
     riskLevel: 'NORMAL',
     riskReason: null,
     sortOrder: 1,
+    status: 'NOT_STARTED',
     sourceFileName: null,
     sourceFileUrl: null,
     taskName: 'Task',
@@ -73,6 +82,17 @@ function task(overrides: Record<string, unknown>) {
     ...overrides,
   };
 }
+
+const context = {
+  isAdmin: false,
+  userId: 'user-1',
+  user: {
+    id: 'user-1',
+    realName: 'User One',
+    roles: [],
+    username: 'user1',
+  },
+};
 
 describe('supervisionPlanTaskService', () => {
   beforeEach(() => {
@@ -144,16 +164,24 @@ describe('supervisionPlanTaskService', () => {
       task({ id: 'parent', isSummary: false, outlineLevel: 1 }) as never,
     );
 
-    const result = await SupervisionPlanTaskService.createTask('project-1', {
-      parentId: 'parent',
-      plannedQuantity: 3,
-      taskName: 'Child',
-      taskNo: '1.1',
-    });
+    const result = await SupervisionPlanTaskService.createTask(
+      'project-1',
+      {
+        parentId: 'parent',
+        plannedQuantity: 3,
+        taskName: 'Child',
+        taskNo: '1.1',
+      },
+      context,
+    );
 
     expect(prisma.supervision_plan_tasks.update).toHaveBeenCalledWith({
       data: { isSummary: true },
-      where: { id: 'parent' },
+      where: {
+        id: 'parent',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(prisma.supervision_plan_tasks.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -216,13 +244,22 @@ describe('supervisionPlanTaskService', () => {
       tree: [],
     } as never);
 
-    await SupervisionPlanTaskService.importPlanTasks('project-1', {
-      rows: [],
-    });
+    await SupervisionPlanTaskService.importPlanTasks(
+      'project-1',
+      {
+        rows: [],
+      },
+      context,
+    );
 
     expect(
       SupervisionPlanTaskImportService.importPlanTasks,
-    ).toHaveBeenCalledWith('project-1', { rows: [] }, expect.any(Function));
+    ).toHaveBeenCalledWith(
+      'project-1',
+      { rows: [] },
+      expect.any(Function),
+      context,
+    );
   });
 
   it('updates task fields, promotes new parent, syncs progress, and returns refreshed list', async () => {
@@ -236,21 +273,36 @@ describe('supervisionPlanTaskService', () => {
       task({ id: 'task-1', parentId: 'parent', taskName: 'Updated' }),
     ] as never);
 
-    await SupervisionPlanTaskService.updateTask('project-1', 'task-1', {
-      parentId: 'parent',
-      progressPercent: 120,
-      quantityUnit: '',
-      riskLevel: ' risk ',
-      taskName: ' Updated ',
-      weight: 0,
-    });
+    await SupervisionPlanTaskService.updateTask(
+      'project-1',
+      'task-1',
+      {
+        parentId: 'parent',
+        progressPercent: 120,
+        quantityUnit: '',
+        riskLevel: ' risk ',
+        taskName: ' Updated ',
+        weight: 0,
+      },
+      context,
+    );
 
     expect(prisma.supervision_plan_tasks.update).toHaveBeenCalledWith({
       data: { isSummary: true },
-      where: { id: 'parent' },
+      where: {
+        id: 'parent',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
-    expect(prisma.supervision_plan_tasks.update).toHaveBeenCalledWith({
-      where: { id: 'task-1', projectId: 'project-1' },
+    expect(prisma.supervision_plan_tasks.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'task-1',
+        isDeleted: false,
+        projectId: 'project-1',
+        status: 'NOT_STARTED',
+        project: { createdBy: 'user-1' },
+      },
       data: expect.objectContaining({
         outlineLevel: 2,
         parentId: 'parent',
@@ -277,7 +329,7 @@ describe('supervisionPlanTaskService', () => {
         ),
         findMany: vi.fn().mockResolvedValue([]),
         update: vi.fn(),
-        updateMany: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
@@ -285,19 +337,33 @@ describe('supervisionPlanTaskService', () => {
       [] as never,
     );
 
-    await SupervisionPlanTaskService.deleteTask('project-1', 'child');
+    await SupervisionPlanTaskService.deleteTask('project-1', 'child', context);
 
     expect(tx.supervision_plan_tasks.updateMany).toHaveBeenCalledWith({
       data: { outlineLevel: 2, parentId: 'parent' },
-      where: { isDeleted: false, parentId: 'child', projectId: 'project-1' },
+      where: {
+        isDeleted: false,
+        parentId: 'child',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
-    expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
+    expect(tx.supervision_plan_tasks.updateMany).toHaveBeenCalledWith({
       data: { isDeleted: true },
-      where: { id: 'child' },
+      where: {
+        id: 'child',
+        isDeleted: false,
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
       data: { isSummary: false },
-      where: { id: 'parent' },
+      where: {
+        id: 'parent',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
   });
 
@@ -317,21 +383,35 @@ describe('supervisionPlanTaskService', () => {
       [] as never,
     );
 
-    await SupervisionPlanTaskService.reorderTasks('project-1', [
-      { id: 'child', outlineLevel: 2, parentId: 'parent', sortOrder: 1 },
-    ]);
+    await SupervisionPlanTaskService.reorderTasks(
+      'project-1',
+      [{ id: 'child', outlineLevel: 2, parentId: 'parent', sortOrder: 1 }],
+      context,
+    );
 
     expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
       data: { sortOrder: 1, parentId: 'parent', outlineLevel: 2 },
-      where: { id: 'child', projectId: 'project-1' },
+      where: {
+        id: 'child',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
       data: { isSummary: true },
-      where: { id: 'parent' },
+      where: {
+        id: 'parent',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
       data: { isSummary: false },
-      where: { id: 'orphan' },
+      where: {
+        id: 'orphan',
+        projectId: 'project-1',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(syncSupervisionProjectProgress).toHaveBeenCalledWith('project-1');
   });

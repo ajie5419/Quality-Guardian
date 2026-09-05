@@ -1,8 +1,11 @@
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildSupervisionAccessContext } from '~/modules/supervision/supervision-access';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -15,6 +18,8 @@ const importPlanTasksBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
+  const userinfo = getCurrentUser(event);
+  const context = buildSupervisionAccessContext(userinfo);
   const projectId = getRouterParam(event, 'id');
   if (!projectId) return badRequestResponse(event, '监造项目不能为空');
 
@@ -23,7 +28,11 @@ export default defineEventHandler(async (event) => {
     if (!String(body.fileUrl || '').trim()) {
       return badRequestResponse(event, '计划文件不能为空');
     }
-    const data = await SupervisionService.importPlanTasks(projectId, body);
+    const data = await SupervisionService.importPlanTasks(
+      projectId,
+      body,
+      context,
+    );
     try {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: [String(body.fileUrl)],
@@ -37,6 +46,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('supervision-plan-tasks-import', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     return internalServerErrorResponse(
       event,
       error instanceof Error

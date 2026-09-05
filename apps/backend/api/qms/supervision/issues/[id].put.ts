@@ -3,8 +3,10 @@ import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { authorizeWrite } from '~/modules/rbac';
+import { buildSupervisionAccessContext } from '~/modules/supervision/supervision-access';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
   badRequestResponse,
@@ -15,15 +17,16 @@ import {
 const updateIssueBodySchema = z
   .object({ photos: z.array(z.any()).optional() })
   .passthrough();
-
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT);
+  const context = buildSupervisionAccessContext(
+    await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT),
+  );
   const id = getRouterParam(event, 'id');
   if (!id) return badRequestResponse(event, '无效监造问题ID');
 
   try {
     const body = updateIssueBodySchema.parse(await readBody(event));
-    const data = await SupervisionService.updateIssue(id, body);
+    const data = await SupervisionService.updateIssue(id, body, context);
     try {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: Array.isArray(body.photos) ? body.photos : [],
@@ -38,6 +41,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('supervision-issues-update', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     return internalServerErrorResponse(
       event,
       'Failed to update supervision issue',

@@ -32,6 +32,9 @@ export async function syncSupervisionProjectProgress(
   });
   const items = rows.map((row) => mapPlanTask(row));
   const progress = summarizePlanTasks(items).progressPercent;
+  // qms-arch-allow R-SCOPE: system-derived write - progressPercent/status are
+  // recalculated from the project's leaf tasks, never user-supplied; the id is
+  // the internal project key already authorized by the calling write path.
   await client.supervision_projects.update({
     data: {
       progressPercent: progress,

@@ -4,8 +4,13 @@ import type {
   SupervisionReportTaskUpdate,
 } from '@qgs/shared';
 
-import { formatDate } from '@qgs/shared';
+import type { SupervisionAccessContext } from './supervision-access';
 
+import { formatDate } from '@qgs/shared';
+import { BusinessError } from '~/utils/business-error';
+
+import { buildSupervisionAccessWhere } from './supervision-access';
+import { auditSupervisionWrite } from './supervision-audit';
 import { syncSupervisionProjectProgress } from './supervision-plan-task-progress';
 import {
   calculatePlanTaskStatus,
@@ -19,6 +24,7 @@ import {
   prisma,
   stringifyList,
 } from './supervision-shared';
+import { throwSupervisionConflict } from './supervision-state';
 
 /**
  * Summarize a task field (workContent or nextPlan) into a multi-line string.
@@ -104,9 +110,31 @@ function mapReportTaskUpdate(row: any) {
 }
 
 export const SupervisionReportService = {
-  async createReport(payload: Record<string, unknown>) {
+  async createReport(
+    payload: Record<string, unknown>,
+    context: SupervisionAccessContext,
+  ) {
     const progressPercent = normalizePercent(payload.progressPercent);
     const projectId = normalizeText(payload.projectId);
+    const project = await prisma.supervision_projects.findFirst({
+      select: { id: true },
+      where: {
+        id: projectId,
+        isDeleted: false,
+        ...buildSupervisionAccessWhere('project', context),
+      },
+    });
+    if (!project) {
+      throw new BusinessError('NOT_FOUND', '监造项目不存在', 404);
+    }
+    // Reporter and creator always derive from the authenticated user; the
+    // client-supplied reporter field can no longer impersonate someone else.
+    const reporter = String(
+      context.user.realName || context.user.username || '',
+    ).trim();
+    if (!reporter) {
+      throw new BusinessError('FORBIDDEN', '缺少监造人员身份', 403);
+    }
     const taskUpdates = Array.isArray(payload.taskUpdates)
       ? (payload.taskUpdates as Array<Record<string, unknown>>)
       : [];
@@ -122,13 +150,14 @@ export const SupervisionReportService = {
           attachments: stringifyList(payload.attachments),
           completedMilestone: completedMilestone || null,
           coordinationNeeded: normalizeText(payload.coordinationNeeded) || null,
+          createdBy: context.userId || null,
           issueSummary: normalizeText(payload.issueSummary) || null,
           location: normalizeText(payload.location) || null,
           manpower: normalizeText(payload.manpower) || null,
           progressPercent,
           projectId,
           reportDate,
-          reporter: normalizeText(payload.reporter),
+          reporter,
           tomorrowPlan: tomorrowPlan || null,
           weather: normalizeText(payload.weather) || null,
           workContent: normalizeText(payload.workContent) || null,
@@ -139,7 +168,12 @@ export const SupervisionReportService = {
         const taskId = normalizeText(item.taskId);
         if (!taskId) continue;
         const task = await tx.supervision_plan_tasks.findFirst({
-          where: { id: taskId, isDeleted: false, projectId },
+          where: {
+            id: taskId,
+            isDeleted: false,
+            projectId,
+            ...buildSupervisionAccessWhere('task', context),
+          },
         });
         if (!task) continue;
         const plannedQuantity = normalizePositiveQuantity(
@@ -202,7 +236,7 @@ export const SupervisionReportService = {
         }
         const actualEndAt = isDone ? reportDate : undefined;
         const riskLevel = updateStatus === 'RISK' ? 'RISK' : 'NORMAL';
-        await tx.supervision_plan_tasks.update({
+        const taskUpdate = await tx.supervision_plan_tasks.updateMany({
           data: {
             actualEndAt,
             actualStartAt,
@@ -222,21 +256,36 @@ export const SupervisionReportService = {
               riskLevel,
             }),
           },
-          where: { id: taskId },
+          where: {
+            id: taskId,
+            projectId,
+            status: task.status,
+            ...buildSupervisionAccessWhere('task', context),
+          },
         });
+        if (taskUpdate.count !== 1) {
+          throwSupervisionConflict('监造任务状态已变化，请刷新后重试');
+        }
       }
 
       // Sync project progressPercent and status from leaf tasks (isSummary: false).
       // Uses the shared helper so both code paths stay consistent.
       await syncSupervisionProjectProgress(projectId, tx);
       // Update location/stage from the report payload separately.
-      await tx.supervision_projects.update({
+      const projectUpdate = await tx.supervision_projects.updateMany({
         data: {
           location: normalizeText(payload.location) || undefined,
           stage: normalizeText(payload.completedMilestone) || undefined,
         },
-        where: { id: projectId },
+        where: {
+          id: projectId,
+          isDeleted: false,
+          ...buildSupervisionAccessWhere('project', context),
+        },
       });
+      if (projectUpdate.count !== 1) {
+        throwSupervisionConflict('监造项目状态已变化，请刷新后重试');
+      }
 
       return tx.supervision_daily_reports.findUniqueOrThrow({
         include: {
@@ -258,6 +307,14 @@ export const SupervisionReportService = {
         },
         where: { id: report.id },
       });
+    });
+    await auditSupervisionWrite({
+      action: 'report-create',
+      context,
+      detailsVariables: {
+        reportDate: String(payload.reportDate ?? reportDate.toISOString()),
+      },
+      targetId: row.id,
     });
     return mapReport(row);
   },
@@ -296,12 +353,14 @@ export const SupervisionReportService = {
     return { items: items.map((item) => mapReport(item)), total };
   },
 
-  async updateReport(id: string, payload: Record<string, unknown>) {
+  async updateReport(
+    id: string,
+    payload: Record<string, unknown>,
+    context: SupervisionAccessContext,
+  ) {
     const data: any = {};
     if (payload.workContent !== undefined)
       data.workContent = normalizeText(payload.workContent) || null;
-    if (payload.reporter !== undefined)
-      data.reporter = normalizeText(payload.reporter);
     if (payload.reportDate !== undefined)
       data.reportDate = normalizeDate(payload.reportDate);
     if (payload.location !== undefined)
@@ -320,8 +379,15 @@ export const SupervisionReportService = {
     if (payload.progressPercent !== undefined)
       data.progressPercent = normalizePercent(payload.progressPercent);
 
-    const row = await prisma.supervision_daily_reports.update({
+    const accessWhere = buildSupervisionAccessWhere('report', context);
+    const result = await prisma.supervision_daily_reports.updateMany({
       data,
+      where: { id, isDeleted: false, ...accessWhere },
+    });
+    if (result.count !== 1) {
+      throwSupervisionConflict('监造日报不存在或无权修改');
+    }
+    const row = await prisma.supervision_daily_reports.findFirst({
       include: {
         project: { select: { projectName: true, workOrderNumber: true } },
         taskUpdates: {
@@ -339,15 +405,34 @@ export const SupervisionReportService = {
           },
         },
       },
-      where: { id, isDeleted: false },
+      where: { id, isDeleted: false, ...accessWhere },
+    });
+    if (!row) {
+      throw new BusinessError('NOT_FOUND', '监造日报不存在', 404);
+    }
+    await auditSupervisionWrite({
+      action: 'report-update',
+      context,
+      detailsVariables: { id },
+      targetId: id,
     });
     return mapReport(row);
   },
 
-  async deleteReport(id: string) {
-    await prisma.supervision_daily_reports.update({
+  async deleteReport(id: string, context: SupervisionAccessContext) {
+    const accessWhere = buildSupervisionAccessWhere('report', context);
+    const result = await prisma.supervision_daily_reports.updateMany({
       data: { isDeleted: true },
-      where: { id },
+      where: { id, isDeleted: false, ...accessWhere },
+    });
+    if (result.count !== 1) {
+      throwSupervisionConflict('监造日报不存在或无权删除');
+    }
+    await auditSupervisionWrite({
+      action: 'report-delete',
+      context,
+      detailsVariables: { id },
+      targetId: id,
     });
   },
 };

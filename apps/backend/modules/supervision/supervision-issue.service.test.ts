@@ -6,6 +6,12 @@ vi.mock('~/utils/governed-write', () => ({
   buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
 }));
 
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: {
+    auditLog: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
 vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
   const actual = (await orig()) as any;
   return {
@@ -49,7 +55,12 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
           updatedAt: new Date(),
           verifyResult: null,
         }),
+        findFirst: vi.fn().mockResolvedValue({
+          id: 'iss-1',
+          status: 'OPEN',
+        }),
         findMany: vi.fn().mockResolvedValue([]),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         update: vi.fn().mockResolvedValue({
           affectsProgress: false,
           closedAt: null,
@@ -75,6 +86,12 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
           verifyResult: null,
         }),
       },
+      supervision_projects: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'proj-1' }),
+      },
+      supervision_plan_tasks: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'task-1' }),
+      },
       $transaction: vi.fn().mockImplementation(async (cb: any) => {
         const tx = {
           supervision_issue_actions: {
@@ -89,6 +106,11 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
             }),
           },
           supervision_issues: {
+            findFirst: vi.fn().mockResolvedValue({
+              id: 'iss-1',
+              status: 'OPEN',
+            }),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
             update: vi.fn().mockResolvedValue({}),
           },
         };
@@ -98,6 +120,17 @@ vi.mock('~/modules/supervision/supervision-shared', async (orig) => {
   };
 });
 
+const context = {
+  isAdmin: false,
+  userId: 'user-1',
+  user: {
+    id: 'user-1',
+    realName: 'User One',
+    roles: [],
+    username: 'user1',
+  },
+};
+
 describe('supervisionIssueService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,10 +138,13 @@ describe('supervisionIssueService', () => {
 
   describe('createIssue', () => {
     it('should create an issue and return mapped result', async () => {
-      const result = await SupervisionIssueService.createIssue({
-        description: 'Test issue',
-        projectId: 'proj-1',
-      });
+      const result = await SupervisionIssueService.createIssue(
+        {
+          description: 'Test issue',
+          projectId: 'proj-1',
+        },
+        context,
+      );
 
       expect(result).toHaveProperty('id', 'iss-1');
       expect(result).toHaveProperty('description', 'Test issue');
@@ -120,13 +156,35 @@ describe('supervisionIssueService', () => {
         '~/modules/supervision/supervision-shared'
       ).then((m: any) => m.prisma);
 
-      await SupervisionIssueService.createIssue({
-        description: 'Test',
-        projectId: 'proj-1',
-      });
+      await SupervisionIssueService.createIssue(
+        {
+          description: 'Test',
+          projectId: 'proj-1',
+        },
+        context,
+      );
 
       const createData = supervision_issues.create.mock.calls[0][0].data;
       expect(createData.issueType).toBe('QUALITY');
+    });
+
+    it('rejects a task outside the authorized project before creating an issue', async () => {
+      const { supervision_issues, supervision_plan_tasks } = await import(
+        '~/modules/supervision/supervision-shared'
+      ).then((m: any) => m.prisma);
+      supervision_plan_tasks.findFirst.mockResolvedValueOnce(null);
+
+      await expect(
+        SupervisionIssueService.createIssue(
+          {
+            description: 'Cross-project issue',
+            projectId: 'proj-1',
+            taskId: 'task-from-another-project',
+          },
+          context,
+        ),
+      ).rejects.toMatchObject({ httpStatus: 404 });
+      expect(supervision_issues.create).not.toHaveBeenCalled();
     });
   });
 
@@ -151,38 +209,51 @@ describe('supervisionIssueService', () => {
 
   describe('updateIssue', () => {
     it('should update issue and return mapped result', async () => {
-      const result = await SupervisionIssueService.updateIssue('iss-1', {
-        description: 'Updated',
-      });
+      const result = await SupervisionIssueService.updateIssue(
+        'iss-1',
+        {
+          description: 'Updated',
+        },
+        context,
+      );
 
       expect(result).toHaveProperty('id');
     });
 
     it('should set closedAt when status is CLOSED', async () => {
-      await SupervisionIssueService.updateIssue('iss-1', {
-        status: 'CLOSED',
-      });
+      await SupervisionIssueService.updateIssue(
+        'iss-1',
+        {
+          status: 'CLOSED',
+        },
+        context,
+      );
 
       const { supervision_issues } = await import(
         '~/modules/supervision/supervision-shared'
       ).then((m: any) => m.prisma);
 
-      const updateData = supervision_issues.update.mock.calls[0][0].data;
+      const updateData = supervision_issues.updateMany.mock.calls[0][0].data;
       expect(updateData.closedAt).toBeInstanceOf(Date);
     });
   });
 
   describe('deleteIssue', () => {
     it('should soft delete an issue', async () => {
-      await SupervisionIssueService.deleteIssue('iss-1');
+      await SupervisionIssueService.deleteIssue('iss-1', context);
 
       const { supervision_issues } = await import(
         '~/modules/supervision/supervision-shared'
       ).then((m: any) => m.prisma);
 
-      expect(supervision_issues.update).toHaveBeenCalledWith({
+      expect(supervision_issues.updateMany).toHaveBeenCalledWith({
         data: { isDeleted: true },
-        where: { id: 'iss-1' },
+        where: {
+          id: 'iss-1',
+          isDeleted: false,
+          status: { not: 'CLOSED' },
+          createdBy: 'user-1',
+        },
       });
     });
   });
@@ -192,7 +263,7 @@ describe('supervisionIssueService', () => {
       const result = await SupervisionIssueService.createIssueAction(
         'iss-1',
         { description: 'Follow up' },
-        'user-1',
+        context,
       );
 
       expect(result).toHaveProperty('id', 'ia-1');
@@ -203,7 +274,7 @@ describe('supervisionIssueService', () => {
       await SupervisionIssueService.createIssueAction(
         'iss-1',
         { description: 'Closing', status: 'CLOSED' },
-        'user-1',
+        context,
       );
 
       const { $transaction } = await import(

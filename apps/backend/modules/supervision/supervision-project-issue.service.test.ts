@@ -15,15 +15,42 @@ vi.mock('~/utils/prisma', () => ({
     supervision_issues: {
       count: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({ id: 'issue-1', status: 'OPEN' }),
       findMany: vi.fn(),
       groupBy: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     supervision_projects: {
       count: vi.fn(),
       create: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({
+        actualEndAt: null,
+        actualStartAt: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        id: 'project-1',
+        location: 'Plant',
+        participants: '["Alice","Bob"]',
+        plannedEndAt: new Date('2026-02-01T00:00:00.000Z'),
+        plannedStartAt: new Date('2026-01-01T00:00:00.000Z'),
+        progressPercent: 20,
+        projectName: 'Project A',
+        projectType: 'FIRST_ARTICLE',
+        riskLevel: 'LOW',
+        stage: 'Stage',
+        status: 'IN_PROGRESS',
+        summary: 'Summary',
+        supplierName: 'Supplier',
+        supervisor: 'Lead',
+        updatedAt: new Date('2026-01-02T00:00:00.000Z'),
+        workOrderNumber: 'WO-1',
+      }),
       findMany: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    supervision_plan_tasks: {
+      findMany: vi.fn().mockResolvedValue([]),
     },
     $transaction: vi.fn(),
   },
@@ -38,6 +65,23 @@ vi.mock('~/utils/governed-write', () => ({
     canonicalId: 'canon-1',
   })),
 }));
+
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: {
+    auditLog: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+
+const context = {
+  isAdmin: false,
+  userId: 'user-1',
+  user: {
+    id: 'user-1',
+    realName: 'User One',
+    roles: [],
+    username: 'user1',
+  },
+};
 
 const projectRow = {
   actualEndAt: null,
@@ -96,13 +140,16 @@ describe('supervisionProjectService', () => {
       projectRow as never,
     );
 
-    const result = await SupervisionProjectService.createProject({
-      participants: ['Alice', 'Bob'],
-      progressPercent: 20,
-      projectName: 'Project A',
-      projectType: 'first_article',
-      supplierName: 'Supplier',
-    });
+    const result = await SupervisionProjectService.createProject(
+      {
+        participants: ['Alice', 'Bob'],
+        progressPercent: 20,
+        projectName: 'Project A',
+        projectType: 'first_article',
+        supplierName: 'Supplier',
+      },
+      context,
+    );
 
     expect(result).toEqual(
       expect.objectContaining({
@@ -167,15 +214,24 @@ describe('supervisionProjectService', () => {
       projectRow as never,
     );
 
-    await SupervisionProjectService.updateProject('project-1', {
-      participants: ['Carol'],
-      progressPercent: 100,
-      status: 'completed',
-    });
-    await SupervisionProjectService.deleteProject('project-1');
+    await SupervisionProjectService.updateProject(
+      'project-1',
+      {
+        participants: ['Carol'],
+        progressPercent: 100,
+        status: 'completed',
+      },
+      context,
+    );
+    await SupervisionProjectService.deleteProject('project-1', context);
 
-    expect(prisma.supervision_projects.update).toHaveBeenCalledWith({
-      where: { id: 'project-1' },
+    expect(prisma.supervision_projects.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'project-1',
+        isDeleted: false,
+        status: 'IN_PROGRESS',
+        createdBy: 'user-1',
+      },
       data: expect.objectContaining({
         canonicalId: 'canon-1',
         participants: '["Carol"]',
@@ -183,9 +239,14 @@ describe('supervisionProjectService', () => {
         status: 'COMPLETED',
       }),
     });
-    expect(prisma.supervision_projects.update).toHaveBeenCalledWith({
+    expect(prisma.supervision_projects.updateMany).toHaveBeenCalledWith({
       data: { isDeleted: true },
-      where: { id: 'project-1' },
+      where: {
+        id: 'project-1',
+        isDeleted: false,
+        status: { not: 'COMPLETED' },
+        createdBy: 'user-1',
+      },
     });
   });
 });
@@ -211,7 +272,7 @@ describe('supervisionIssueService', () => {
         projectId: 'project-1',
         status: 'open',
       },
-      'admin',
+      context,
     );
 
     expect(result).toEqual(
@@ -225,7 +286,7 @@ describe('supervisionIssueService', () => {
       expect.objectContaining({
         data: expect.objectContaining({
           canonicalId: 'canon-1',
-          createdBy: 'admin',
+          createdBy: 'user-1',
           issueType: 'QUALITY',
           photos: '["/a.png"]',
         }),
@@ -246,7 +307,10 @@ describe('supervisionIssueService', () => {
           issueId: 'issue-1',
         }),
       },
-      supervision_issues: { update: vi.fn() },
+      supervision_issues: {
+        findFirst: vi.fn().mockResolvedValue({ id: 'issue-1', status: 'OPEN' }),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
 
@@ -259,19 +323,24 @@ describe('supervisionIssueService', () => {
         status: 'closed',
         verifyResult: 'ok',
       },
-      'admin',
+      context,
     );
 
     expect(result).toEqual(
       expect.objectContaining({ actionType: 'CLOSE', attachments: ['/a.png'] }),
     );
-    expect(tx.supervision_issues.update).toHaveBeenCalledWith({
+    expect(tx.supervision_issues.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
         closedAt: expect.any(Date),
         status: 'CLOSED',
         verifyResult: 'ok',
       }),
-      where: { id: 'issue-1' },
+      where: {
+        id: 'issue-1',
+        isDeleted: false,
+        status: 'OPEN',
+        createdBy: 'user-1',
+      },
     });
   });
 
@@ -324,16 +393,25 @@ describe('supervisionIssueService', () => {
       closedAt: new Date('2026-01-03T00:00:00.000Z'),
     } as never);
 
-    await SupervisionIssueService.updateIssue('issue-1', {
-      issueType: 'quality',
-      photos: ['/b.png'],
-      status: 'closed',
-    });
-    await SupervisionIssueService.deleteIssue('issue-1');
+    await SupervisionIssueService.updateIssue(
+      'issue-1',
+      {
+        issueType: 'quality',
+        photos: ['/b.png'],
+        status: 'closed',
+      },
+      context,
+    );
+    await SupervisionIssueService.deleteIssue('issue-1', context);
 
-    expect(prisma.supervision_issues.update).toHaveBeenCalledWith(
+    expect(prisma.supervision_issues.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'issue-1' },
+        where: {
+          id: 'issue-1',
+          isDeleted: false,
+          status: 'OPEN',
+          createdBy: 'user-1',
+        },
         data: expect.objectContaining({
           canonicalId: 'canon-1',
           closedAt: expect.any(Date),
@@ -342,9 +420,14 @@ describe('supervisionIssueService', () => {
         }),
       }),
     );
-    expect(prisma.supervision_issues.update).toHaveBeenCalledWith({
+    expect(prisma.supervision_issues.updateMany).toHaveBeenCalledWith({
       data: { isDeleted: true },
-      where: { id: 'issue-1' },
+      where: {
+        id: 'issue-1',
+        isDeleted: false,
+        status: { not: 'CLOSED' },
+        createdBy: 'user-1',
+      },
     });
   });
 });

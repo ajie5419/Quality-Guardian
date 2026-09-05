@@ -1,10 +1,15 @@
 import type { SupervisionPlanTaskImportResult } from '@qgs/shared';
 
+import type { SupervisionAccessContext } from './supervision-access';
+
 import { extname } from 'node:path';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { BusinessError } from '~/utils/business-error';
 import { parseSheet, parseWorkbook } from '~/utils/excel-parser';
 
+import { buildSupervisionAccessWhere } from './supervision-access';
+import { auditSupervisionWrite } from './supervision-audit';
 import { syncSupervisionProjectProgress } from './supervision-plan-task-progress';
 import {
   calculatePlanTaskStatus,
@@ -18,6 +23,7 @@ import {
   normalizeText,
   prisma,
 } from './supervision-shared';
+import { throwSupervisionConflict } from './supervision-state';
 
 function normalizeSourceFileName(fileUrl: string, fileName?: string) {
   const provided = normalizeText(fileName);
@@ -194,7 +200,22 @@ export const SupervisionPlanTaskImportService = {
     listPlanTasks: (
       projectId: string,
     ) => Promise<SupervisionPlanTaskImportResult>,
+    context: SupervisionAccessContext,
   ): Promise<SupervisionPlanTaskImportResult> {
+    const project = await prisma.supervision_projects.findFirst({
+      select: { status: true },
+      where: {
+        id: projectId,
+        isDeleted: false,
+        ...buildSupervisionAccessWhere('project', context),
+      },
+    });
+    if (!project) {
+      throw new BusinessError('NOT_FOUND', '监造项目不存在', 404);
+    }
+    if (project.status === 'COMPLETED') {
+      throwSupervisionConflict('已完成监造项目不可覆盖导入计划');
+    }
     const fileUrl = normalizeText(payload.fileUrl);
     if (!fileUrl) throw new Error('计划文件不能为空');
     const { sourceFileName, workbook } = await readUploadedWorkbook(
@@ -205,9 +226,14 @@ export const SupervisionPlanTaskImportService = {
     const tasks = await parseWorkbookTasks(workbook, sourceFileName, fileUrl);
 
     await prisma.$transaction(async (tx) => {
+      const taskAccessWhere = buildSupervisionAccessWhere('task', context);
+      const projectAccessWhere = buildSupervisionAccessWhere(
+        'project',
+        context,
+      );
       await tx.supervision_plan_tasks.updateMany({
         data: { isDeleted: true },
-        where: { projectId },
+        where: { projectId, ...taskAccessWhere },
       });
       const idByTaskNo = new Map<string, string>();
       for (const task of tasks) {
@@ -264,13 +290,27 @@ export const SupervisionPlanTaskImportService = {
         });
         idByTaskNo.set(String(task.taskNo), created.id);
       }
-      await tx.supervision_projects.update({
+      const projectUpdate = await tx.supervision_projects.updateMany({
         data: { status: 'IN_PROGRESS' },
-        where: { id: projectId },
+        where: {
+          id: projectId,
+          isDeleted: false,
+          status: { not: 'COMPLETED' },
+          ...projectAccessWhere,
+        },
       });
+      if (projectUpdate.count !== 1) {
+        throwSupervisionConflict('监造项目状态已变化，请刷新后重试');
+      }
     });
 
     await syncSupervisionProjectProgress(projectId);
+    await auditSupervisionWrite({
+      action: 'task-import',
+      context,
+      detailsVariables: { projectId },
+      targetId: projectId,
+    });
     return listPlanTasks(projectId);
   },
 };
