@@ -2,6 +2,7 @@ import { SUPERVISION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { z } from 'zod';
 import { authorizeWrite } from '~/modules/rbac';
+import { buildSupervisionAccessContext } from '~/modules/supervision/supervision-access';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
@@ -14,13 +15,17 @@ import {
 const updateProjectBodySchema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT);
+  const userinfo = await authorizeWrite(
+    event,
+    SUPERVISION_PERMISSION_CODES.EDIT,
+  );
+  const context = buildSupervisionAccessContext(userinfo);
   const id = getRouterParam(event, 'id');
   if (!id) return badRequestResponse(event, '无效监造项目ID');
 
   try {
     const body = updateProjectBodySchema.parse(await readBody(event));
-    const data = await SupervisionService.updateProject(id, body);
+    const data = await SupervisionService.updateProject(id, body, context);
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('supervision-projects-update', error, undefined, event);

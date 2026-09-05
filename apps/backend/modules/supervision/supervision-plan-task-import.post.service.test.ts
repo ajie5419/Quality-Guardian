@@ -22,6 +22,15 @@ vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
 }));
 
+vi.mock('~/utils/current-user', () => ({
+  getCurrentUser: vi.fn().mockReturnValue({
+    id: 'u1',
+    realName: 'User One',
+    roles: ['super'],
+    username: 'user1',
+  }),
+}));
+
 vi.mock('~/utils/prisma-error', () => ({
   isPrismaSchemaMismatchError: vi.fn().mockReturnValue(false),
 }));
@@ -68,6 +77,7 @@ describe('supervision-plan-task-import.post.service', () => {
     expect(SupervisionService.importPlanTasks).toHaveBeenCalledWith(
       'proj-1',
       expect.any(Object),
+      expect.objectContaining({ isAdmin: true, userId: 'u1' }),
     );
     expect(useResponseSuccess).toHaveBeenCalled();
     expect(result).toEqual({ _success: true, data: { imported: 5 } });

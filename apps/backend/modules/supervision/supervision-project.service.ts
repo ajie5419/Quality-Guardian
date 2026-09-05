@@ -4,13 +4,19 @@ import type {
   SupervisionProjectType,
 } from '@qgs/shared';
 
+import type { SupervisionAccessContext } from './supervision-access';
+
 import { formatDate } from '@qgs/shared';
+import { BusinessError } from '~/utils/business-error';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
+import { buildSupervisionAccessWhere } from './supervision-access';
+import { auditSupervisionWrite } from './supervision-audit';
+import { syncSupervisionProjectProgress } from './supervision-plan-task-progress';
 import {
   normalizeDate,
   normalizePercent,
@@ -21,6 +27,10 @@ import {
   prisma,
   stringifyList,
 } from './supervision-shared';
+import {
+  assertSupervisionProjectTransition,
+  throwSupervisionConflict,
+} from './supervision-state';
 
 function mapProject(row: any, extras?: Partial<SupervisionProject>) {
   return {
@@ -51,7 +61,10 @@ function mapProject(row: any, extras?: Partial<SupervisionProject>) {
 }
 
 export const SupervisionProjectService = {
-  async createProject(payload: Record<string, unknown>) {
+  async createProject(
+    payload: Record<string, unknown>,
+    context: SupervisionAccessContext,
+  ) {
     const normalizedParticipants = stringifyList(payload.participants);
     const normalizedProjectType = normalizeProjectType(payload.projectType);
     const normalizedSupplierId =
@@ -86,6 +99,7 @@ export const SupervisionProjectService = {
         plannedStartAt: normalizeDate(payload.plannedStartAt),
         progressPercent: normalizePercent(payload.progressPercent),
         projectName: normalizeText(payload.projectName),
+        createdBy: context.userId || null,
         riskLevel: normalizeText(payload.riskLevel).toUpperCase() || 'LOW',
         stage: normalizeText(payload.stage) || null,
         status: normalizeProjectStatus(payload.status),
@@ -94,6 +108,12 @@ export const SupervisionProjectService = {
         supervisor: normalizeText(payload.supervisor) || null,
         workOrderNumber: normalizeText(payload.workOrderNumber) || null,
       },
+    });
+    await auditSupervisionWrite({
+      action: 'project-create',
+      context,
+      detailsVariables: { projectName: row.projectName },
+      targetId: row.id,
     });
     return mapProject(row);
   },
@@ -177,7 +197,11 @@ export const SupervisionProjectService = {
     };
   },
 
-  async updateProject(id: string, payload: Record<string, unknown>) {
+  async updateProject(
+    id: string,
+    payload: Record<string, unknown>,
+    context: SupervisionAccessContext,
+  ) {
     const normalizedParticipants =
       payload.participants === undefined
         ? undefined
@@ -212,71 +236,138 @@ export const SupervisionProjectService = {
       ...governedFields,
       ...governedCanonicalIds,
     };
-    const row = await prisma.supervision_projects.update({
-      data: {
-        actualEndAt:
-          payload.actualEndAt === undefined
-            ? undefined
-            : normalizeDate(payload.actualEndAt) || null,
-        actualStartAt:
-          payload.actualStartAt === undefined
-            ? undefined
-            : normalizeDate(payload.actualStartAt) || null,
-        location:
-          payload.location === undefined
-            ? undefined
-            : normalizeText(payload.location) || null,
-        plannedEndAt:
-          payload.plannedEndAt === undefined
-            ? undefined
-            : normalizeDate(payload.plannedEndAt) || null,
-        plannedStartAt:
-          payload.plannedStartAt === undefined
-            ? undefined
-            : normalizeDate(payload.plannedStartAt) || null,
-        progressPercent:
-          payload.progressPercent === undefined
-            ? undefined
-            : normalizePercent(payload.progressPercent),
-        projectName:
-          payload.projectName === undefined
-            ? undefined
-            : normalizeText(payload.projectName),
-        riskLevel:
-          payload.riskLevel === undefined
-            ? undefined
-            : normalizeText(payload.riskLevel).toUpperCase() || 'LOW',
-        stage:
-          payload.stage === undefined
-            ? undefined
-            : normalizeText(payload.stage) || null,
-        status:
-          payload.status === undefined
-            ? undefined
-            : normalizeProjectStatus(payload.status),
-        summary:
-          payload.summary === undefined
-            ? undefined
-            : normalizeText(payload.summary) || null,
-        ...normalizedGovernedFields,
-        supervisor:
-          payload.supervisor === undefined
-            ? undefined
-            : normalizeText(payload.supervisor) || null,
-        workOrderNumber:
-          payload.workOrderNumber === undefined
-            ? undefined
-            : normalizeText(payload.workOrderNumber) || null,
+    const accessWhere = buildSupervisionAccessWhere('project', context);
+    const current = await prisma.supervision_projects.findFirst({
+      select: { id: true, progressPercent: true, status: true },
+      where: { id, isDeleted: false, ...accessWhere },
+    });
+    if (!current) {
+      throw new BusinessError('NOT_FOUND', '监造项目不存在', 404);
+    }
+
+    const nextStatus =
+      payload.status === undefined
+        ? undefined
+        : normalizeProjectStatus(payload.status);
+    if (nextStatus !== undefined) {
+      assertSupervisionProjectTransition(current.status, nextStatus);
+    }
+
+    const data = {
+      actualEndAt:
+        payload.actualEndAt === undefined
+          ? undefined
+          : normalizeDate(payload.actualEndAt) || null,
+      actualStartAt:
+        payload.actualStartAt === undefined
+          ? undefined
+          : normalizeDate(payload.actualStartAt) || null,
+      location:
+        payload.location === undefined
+          ? undefined
+          : normalizeText(payload.location) || null,
+      plannedEndAt:
+        payload.plannedEndAt === undefined
+          ? undefined
+          : normalizeDate(payload.plannedEndAt) || null,
+      plannedStartAt:
+        payload.plannedStartAt === undefined
+          ? undefined
+          : normalizeDate(payload.plannedStartAt) || null,
+      progressPercent:
+        payload.progressPercent === undefined
+          ? undefined
+          : normalizePercent(payload.progressPercent),
+      projectName:
+        payload.projectName === undefined
+          ? undefined
+          : normalizeText(payload.projectName),
+      riskLevel:
+        payload.riskLevel === undefined
+          ? undefined
+          : normalizeText(payload.riskLevel).toUpperCase() || 'LOW',
+      stage:
+        payload.stage === undefined
+          ? undefined
+          : normalizeText(payload.stage) || null,
+      status: payload.status === undefined ? undefined : nextStatus,
+      summary:
+        payload.summary === undefined
+          ? undefined
+          : normalizeText(payload.summary) || null,
+      ...normalizedGovernedFields,
+      supervisor:
+        payload.supervisor === undefined
+          ? undefined
+          : normalizeText(payload.supervisor) || null,
+      workOrderNumber:
+        payload.workOrderNumber === undefined
+          ? undefined
+          : normalizeText(payload.workOrderNumber) || null,
+    };
+    const result = await prisma.supervision_projects.updateMany({
+      data,
+      // CAS on the current status so two concurrent editors cannot both pass
+      // their pre-read transition check.
+      where: { id, isDeleted: false, status: current.status, ...accessWhere },
+    });
+    if (result.count !== 1) {
+      throwSupervisionConflict('监造项目状态已变化，请刷新后重试');
+    }
+    const progressChanged =
+      payload.progressPercent !== undefined &&
+      normalizePercent(payload.progressPercent) !== current.progressPercent;
+    if (progressChanged) {
+      // Progress and status are coupled: recalc the derived status so
+      // `progress=100 / status=PLANNED` contradictions cannot persist.
+      await syncSupervisionProjectProgress(id);
+    }
+    const row = await prisma.supervision_projects.findFirst({
+      where: { id, isDeleted: false, ...accessWhere },
+    });
+    if (!row) {
+      throw new BusinessError('NOT_FOUND', '监造项目不存在', 404);
+    }
+    await auditSupervisionWrite({
+      action: 'project-update',
+      context,
+      detailsVariables: {
+        projectName: String(payload.projectName ?? current.id ?? ''),
+        status: String(nextStatus ?? ''),
       },
-      where: { id },
+      targetId: id,
     });
     return mapProject(row);
   },
 
-  async deleteProject(id: string) {
-    await prisma.supervision_projects.update({
+  async deleteProject(id: string, context: SupervisionAccessContext) {
+    const accessWhere = buildSupervisionAccessWhere('project', context);
+    const current = await prisma.supervision_projects.findFirst({
+      select: { status: true },
+      where: { id, isDeleted: false, ...accessWhere },
+    });
+    if (!current) {
+      throw new BusinessError('NOT_FOUND', '监造项目不存在', 404);
+    }
+    const result = await prisma.supervision_projects.updateMany({
       data: { isDeleted: true },
-      where: { id },
+      // Completed projects are immutable business records and must not be
+      // soft-deleted; the status guard also acts as a CAS on the delete.
+      where: {
+        id,
+        isDeleted: false,
+        status: { not: 'COMPLETED' },
+        ...accessWhere,
+      },
+    });
+    if (result.count !== 1) {
+      throwSupervisionConflict('已完成监造项目不可删除');
+    }
+    await auditSupervisionWrite({
+      action: 'project-delete',
+      context,
+      detailsVariables: { projectName: '' },
+      targetId: id,
     });
   },
 };

@@ -1,9 +1,13 @@
+import type { PlanTaskCreatePayload } from '~/modules/supervision/supervision.schema';
+
 import { SUPERVISION_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, getRouterParam, readBody } from 'h3';
 import { authorizeWrite } from '~/modules/rbac';
+import { buildSupervisionAccessContext } from '~/modules/supervision/supervision-access';
 import { SupervisionPlanTaskService } from '~/modules/supervision/supervision-plan-task.service';
 import { createPlanTaskSchema } from '~/modules/supervision/supervision.schema';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -11,28 +15,19 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.CREATE);
+  const context = buildSupervisionAccessContext(
+    await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.CREATE),
+  );
   const projectId = getRouterParam(event, 'id');
   if (!projectId) return badRequestResponse(event, '监造项目不能为空');
 
   try {
     const body = await readBody(event);
-    const payload = createPlanTaskSchema.parse(body) as {
-      durationDays?: number;
-      parentId?: string;
-      plannedEndAt?: string;
-      plannedQuantity: number;
-      plannedStartAt?: string;
-      predecessorText?: string;
-      quantityUnit: string;
-      resourceName?: string;
-      taskName: string;
-      taskNo: string;
-      weight: number;
-    };
+    const payload = createPlanTaskSchema.parse(body) as PlanTaskCreatePayload;
     const data = await SupervisionPlanTaskService.createTask(
       projectId,
       payload,
+      context,
     );
     return useResponseSuccess(data);
   } catch (error: any) {
@@ -43,6 +38,7 @@ export default defineEventHandler(async (event) => {
       );
     }
     logApiError('supervision-plan-task-create', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     return internalServerErrorResponse(event, '创建甘特任务失败');
   }
 });

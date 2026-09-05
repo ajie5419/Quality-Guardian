@@ -7,20 +7,43 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     supervision_daily_reports: {
       count: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    supervision_plan_tasks: {
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     supervision_projects: {
-      update: vi.fn(),
+      findFirst: vi.fn().mockResolvedValue({ id: 'project-1' }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     $transaction: vi.fn(),
+  },
+}));
+
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: {
+    auditLog: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
 vi.mock('~/modules/supervision/supervision-plan-task-progress', () => ({
   syncSupervisionProjectProgress: vi.fn(),
 }));
+
+const context = {
+  isAdmin: false,
+  userId: 'user-1',
+  user: {
+    id: 'user-1',
+    realName: 'User One',
+    roles: [],
+    username: 'user1',
+  },
+};
 
 function reportRow(overrides: Record<string, unknown> = {}) {
   return {
@@ -59,6 +82,7 @@ function taskRow(overrides: Record<string, unknown> = {}) {
     projectId: 'project-1',
     quantityUnit: 'set',
     riskLevel: 'NORMAL',
+    status: 'IN_PROGRESS',
     taskName: 'Task A',
     taskNo: '1',
     ...overrides,
@@ -110,10 +134,10 @@ describe('supervisionReportService', () => {
       },
       supervision_plan_tasks: {
         findFirst: vi.fn().mockResolvedValue(taskRow()),
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       supervision_projects: {
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       supervision_report_task_updates: {
         create: vi.fn(),
@@ -121,26 +145,29 @@ describe('supervisionReportService', () => {
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
 
-    const result = await SupervisionReportService.createReport({
-      attachments: ['/report.png'],
-      completedMilestone: 'Stage from payload',
-      location: 'Plant',
-      progressPercent: 50,
-      projectId: 'project-1',
-      reportDate: '2026-01-02',
-      reporter: 'Alice',
-      taskUpdates: [
-        {
-          dailyQuantity: 3,
-          nextPlan: 'Next step',
-          photos: ['/task.png'],
-          status: 'in_progress',
-          taskId: 'task-1',
-          taskName: 'Task A',
-          workContent: 'Done today',
-        },
-      ],
-    });
+    const result = await SupervisionReportService.createReport(
+      {
+        attachments: ['/report.png'],
+        completedMilestone: 'Stage from payload',
+        location: 'Plant',
+        progressPercent: 50,
+        projectId: 'project-1',
+        reportDate: '2026-01-02',
+        reporter: 'Alice',
+        taskUpdates: [
+          {
+            dailyQuantity: 3,
+            nextPlan: 'Next step',
+            photos: ['/task.png'],
+            status: 'in_progress',
+            taskId: 'task-1',
+            taskName: 'Task A',
+            workContent: 'Done today',
+          },
+        ],
+      },
+      context,
+    );
 
     expect(result.taskUpdates[0]).toEqual(
       expect.objectContaining({
@@ -166,22 +193,31 @@ describe('supervisionReportService', () => {
         status: 'IN_PROGRESS',
       }),
     });
-    expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
+    expect(tx.supervision_plan_tasks.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
         completedQuantity: 5,
         lastReportId: 'report-1',
         progressPercent: 50,
         status: 'DELAYED',
       }),
-      where: { id: 'task-1' },
+      where: {
+        id: 'task-1',
+        projectId: 'project-1',
+        status: 'IN_PROGRESS',
+        project: { createdBy: 'user-1' },
+      },
     });
     expect(syncSupervisionProjectProgress).toHaveBeenCalledWith(
       'project-1',
       tx,
     );
-    expect(tx.supervision_projects.update).toHaveBeenCalledWith({
+    expect(tx.supervision_projects.updateMany).toHaveBeenCalledWith({
       data: { location: 'Plant', stage: 'Stage from payload' },
-      where: { id: 'project-1' },
+      where: {
+        id: 'project-1',
+        isDeleted: false,
+        createdBy: 'user-1',
+      },
     });
   });
 
@@ -193,10 +229,10 @@ describe('supervisionReportService', () => {
       },
       supervision_plan_tasks: {
         findFirst: vi.fn().mockResolvedValue(taskRow({ completedQuantity: 9 })),
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       supervision_projects: {
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
       supervision_report_task_updates: {
         create: vi.fn(),
@@ -204,12 +240,15 @@ describe('supervisionReportService', () => {
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
 
-    await SupervisionReportService.createReport({
-      projectId: 'project-1',
-      reportDate: '2026-01-02',
-      reporter: 'Alice',
-      taskUpdates: [{ dailyQuantity: 5, status: 'done', taskId: 'task-1' }],
-    });
+    await SupervisionReportService.createReport(
+      {
+        projectId: 'project-1',
+        reportDate: '2026-01-02',
+        reporter: 'Alice',
+        taskUpdates: [{ dailyQuantity: 5, status: 'done', taskId: 'task-1' }],
+      },
+      context,
+    );
 
     expect(tx.supervision_report_task_updates.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
@@ -218,14 +257,19 @@ describe('supervisionReportService', () => {
         status: 'DONE',
       }),
     });
-    expect(tx.supervision_plan_tasks.update).toHaveBeenCalledWith({
+    expect(tx.supervision_plan_tasks.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
         actualEndAt: new Date('2026-01-02T00:00:00.000Z'),
         completedQuantity: 10,
         progressPercent: 100,
         status: 'DONE',
       }),
-      where: { id: 'task-1' },
+      where: {
+        id: 'task-1',
+        projectId: 'project-1',
+        status: 'IN_PROGRESS',
+        project: { createdBy: 'user-1' },
+      },
     });
   });
 
@@ -281,35 +325,44 @@ describe('supervisionReportService', () => {
   });
 
   it('updates report scalar fields and soft deletes reports', async () => {
-    vi.mocked(prisma.supervision_daily_reports.update).mockResolvedValue(
+    vi.mocked(prisma.supervision_daily_reports.findFirst).mockResolvedValue(
       reportRow({ attachments: '["/new.png"]' }) as never,
     );
 
-    const result = await SupervisionReportService.updateReport('report-1', {
-      attachments: ['/new.png'],
-      coordinationNeeded: '',
-      progressPercent: 120,
-      reportDate: '2026-01-04',
-      reporter: 'Bob',
-      workContent: 'Updated',
-    });
-    await SupervisionReportService.deleteReport('report-1');
+    const result = await SupervisionReportService.updateReport(
+      'report-1',
+      {
+        attachments: ['/new.png'],
+        coordinationNeeded: '',
+        progressPercent: 120,
+        reportDate: '2026-01-04',
+        workContent: 'Updated',
+      },
+      context,
+    );
+    await SupervisionReportService.deleteReport('report-1', context);
 
     expect(result.attachments).toEqual(['/new.png']);
-    expect(prisma.supervision_daily_reports.update).toHaveBeenCalledWith({
+    expect(prisma.supervision_daily_reports.updateMany).toHaveBeenCalledWith({
       data: expect.objectContaining({
         attachments: '["/new.png"]',
         coordinationNeeded: null,
         progressPercent: 100,
-        reporter: 'Bob',
         workContent: 'Updated',
       }),
-      include: expect.any(Object),
-      where: { id: 'report-1', isDeleted: false },
+      where: {
+        id: 'report-1',
+        isDeleted: false,
+        createdBy: 'user-1',
+      },
     });
-    expect(prisma.supervision_daily_reports.update).toHaveBeenCalledWith({
+    expect(prisma.supervision_daily_reports.updateMany).toHaveBeenCalledWith({
       data: { isDeleted: true },
-      where: { id: 'report-1' },
+      where: {
+        id: 'report-1',
+        isDeleted: false,
+        createdBy: 'user-1',
+      },
     });
   });
 });

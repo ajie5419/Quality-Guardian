@@ -1,8 +1,10 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
+import { buildSupervisionAccessContext } from '~/modules/supervision/supervision-access';
 import { SupervisionService } from '~/modules/supervision/supervision.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import {
@@ -21,6 +23,7 @@ const createIssueBodySchema = z
 
 export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
+  const context = buildSupervisionAccessContext(userinfo);
   try {
     const body = createIssueBodySchema.parse(await readBody(event));
     if (!String(body.projectId || '').trim()) {
@@ -29,10 +32,7 @@ export default defineEventHandler(async (event) => {
     if (!String(body.description || '').trim()) {
       return badRequestResponse(event, '问题描述不能为空');
     }
-    const data = await SupervisionService.createIssue(
-      body,
-      String(userinfo.id),
-    );
+    const data = await SupervisionService.createIssue(body, context);
     try {
       await FileStorageService.registerReferencesFromAttachments({
         attachments: Array.isArray(body.photos) ? body.photos : [],
@@ -46,6 +46,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(data);
   } catch (error) {
     logApiError('supervision-issues-create', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     return internalServerErrorResponse(
       event,
       'Failed to create supervision issue',

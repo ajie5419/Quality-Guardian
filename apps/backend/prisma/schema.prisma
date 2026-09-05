@@ -920,6 +920,7 @@ model supervision_projects {
   projectId         String?
   projectType       String                            @default("MOLD")
   projectTypeId     String?
+  createdBy         String?
   workOrderNumber   String?
   supplierName      String?
   supplierId        String?
@@ -1011,6 +1012,7 @@ model supervision_daily_reports {
   projectId          String
   reportDate         DateTime
   reporter           String
+  createdBy          String?
   location           String?
   progressPercent    Int                               @default(0)
   completedMilestone String?

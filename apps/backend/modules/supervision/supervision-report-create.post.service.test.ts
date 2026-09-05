@@ -21,6 +21,15 @@ vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
 }));
 
+vi.mock('~/utils/current-user', () => ({
+  getCurrentUser: vi.fn().mockReturnValue({
+    id: 'u1',
+    realName: 'User One',
+    roles: ['super'],
+    username: 'user1',
+  }),
+}));
+
 vi.mock('~/utils/prisma-error', () => ({
   isPrismaSchemaMismatchError: vi.fn().mockReturnValue(false),
 }));
@@ -87,8 +96,10 @@ describe('supervision-report-create.post.service', () => {
     expect(badRequestResponse).toHaveBeenCalledWith(event, '监造项目不能为空');
   });
 
-  it('should return bad request when reporter is missing', async () => {
-    const { badRequestResponse } = await import('~/utils/response');
+  it('derives the reporter from the authenticated user instead of the payload', async () => {
+    const { SupervisionService } = await import(
+      '~/modules/supervision/supervision.service'
+    );
 
     const handlerModule = await import(
       '~/modules/supervision/supervision-report-create.post.service'
@@ -103,7 +114,14 @@ describe('supervision-report-create.post.service', () => {
 
     await handler(event);
 
-    expect(badRequestResponse).toHaveBeenCalledWith(event, '监造人员不能为空');
+    expect(SupervisionService.createReport).toHaveBeenCalledWith(
+      expect.objectContaining({ projectId: 'proj-1' }),
+      expect.objectContaining({
+        isAdmin: true,
+        userId: 'u1',
+        user: expect.objectContaining({ realName: 'User One' }),
+      }),
+    );
   });
 
   it('should return internal server error on unexpected error', async () => {
