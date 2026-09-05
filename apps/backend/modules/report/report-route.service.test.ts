@@ -1,16 +1,31 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReportRouteService } from '~/modules/report/report-route.service';
+import { ReportWriteService } from '~/modules/report/report-write.service';
 import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
     reports: {
-      create: vi.fn(),
-      delete: vi.fn(),
       findMany: vi.fn(),
-      update: vi.fn(),
     },
+  },
+}));
+
+vi.mock('~/modules/report/report-write.service', () => ({
+  buildReportOwnershipWhere: vi.fn(
+    (userinfo: { realName?: string; username?: string }) => ({
+      OR: [
+        ...(userinfo.realName ? [{ author: userinfo.realName }] : []),
+        ...(userinfo.username ? [{ author: userinfo.username }] : []),
+      ],
+    }),
+  ),
+  ReportWriteService: {
+    createReport: vi.fn(),
+    deleteReport: vi.fn(),
+    saveDailySummary: vi.fn(),
+    updateReport: vi.fn(),
   },
 }));
 
@@ -20,24 +35,19 @@ vi.mock('~/modules/vehicle-commissioning/daily-report-storage.service', () => ({
     createDailyReport: vi.fn(),
     findDailyReportById: vi.fn(),
     findDailyReports: vi.fn(),
-    upsertDailySummary: vi.fn(),
   },
 }));
+
+const userinfo = {
+  id: 1,
+  realName: 'Alice',
+  roles: ['quality'],
+  username: 'alice',
+} as any;
 
 describe('reportRouteService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-  });
-
-  it('deletes a report by id', async () => {
-    (prisma.reports.delete as any).mockResolvedValue({ id: 'r-1' });
-
-    const result = await ReportRouteService.deleteById('r-1');
-
-    expect(result).toEqual({ message: 'Deleted' });
-    expect(prisma.reports.delete).toHaveBeenCalledWith({
-      where: { id: 'r-1' },
-    });
   });
 
   it('returns list of reports ordered by date desc', async () => {
@@ -46,146 +56,94 @@ describe('reportRouteService', () => {
       { date: new Date('2026-01-01'), id: 'r-1' },
     ]);
 
-    const result = await ReportRouteService.getList();
+    const result = await ReportRouteService.getList(userinfo);
 
     expect(result).toHaveLength(2);
     expect(result[0].id).toBe('r-2');
     expect(prisma.reports.findMany).toHaveBeenCalledWith({
       orderBy: { date: 'desc' },
+      where: { OR: [{ author: 'Alice' }, { author: 'alice' }] },
     });
   });
 
-  it('creates a report with parsed fields', async () => {
-    const mockCreated = {
-      author: 'admin',
+  it('delegates deleteById to ReportWriteService', async () => {
+    (ReportWriteService.deleteReport as any).mockResolvedValue({
+      message: 'Deleted',
+    });
+
+    const result = await ReportRouteService.deleteById('r-1', userinfo);
+
+    expect(result).toEqual({ message: 'Deleted' });
+    expect(ReportWriteService.deleteReport).toHaveBeenCalledWith({
+      audit: undefined,
+      id: 'r-1',
+      userinfo,
+    });
+  });
+
+  it('delegates updateById to ReportWriteService', async () => {
+    (ReportWriteService.updateReport as any).mockResolvedValue({
+      date: new Date('2026-05-01'),
+      id: 'r-5',
+      status: 'Published',
+    });
+
+    const result = await ReportRouteService.updateById(
+      'r-5',
+      { status: 'Published' },
+      userinfo,
+    );
+
+    expect(result.status).toBe('Published');
+    expect(ReportWriteService.updateReport).toHaveBeenCalledWith({
+      audit: undefined,
+      body: { status: 'Published' },
+      id: 'r-5',
+      userinfo,
+    });
+  });
+
+  it('delegates create to ReportWriteService', async () => {
+    (ReportWriteService.createReport as any).mockResolvedValue({
+      author: 'Alice',
       date: new Date('2026-03-01'),
       id: 'r-3',
-      majorDefects: 2,
-      minorDefects: 5,
-      passRate: 95,
-      status: 'DRAFT',
-      totalInspections: 100,
-    };
-    (prisma.reports.create as any).mockResolvedValue(mockCreated);
+    });
 
     const result = await ReportRouteService.create({
-      body: {
-        author: 'admin',
-        date: '2026-03-01',
-        majorDefects: '2',
-        minorDefects: '5',
-        passRate: 95,
-        status: 'draft',
-        totalInspections: '100',
-      },
-      fallbackAuthor: 'fallback',
+      body: { date: '2026-03-01' },
+      userinfo,
     });
 
     expect(result.id).toBe('r-3');
-    expect(result.status).toBe('DRAFT');
-    expect(prisma.reports.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        author: 'admin',
-        majorDefects: 2,
-        minorDefects: 5,
-        passRate: 95,
-        status: 'draft',
-        totalInspections: 100,
-      }),
+    expect(ReportWriteService.createReport).toHaveBeenCalledWith({
+      audit: undefined,
+      body: { date: '2026-03-01' },
+      userinfo,
     });
   });
 
-  it('throws INVALID_DATE when create body has invalid date', async () => {
-    await expect(
-      ReportRouteService.create({
-        body: { date: 'not-a-date' },
-        fallbackAuthor: 'admin',
-      }),
-    ).rejects.toThrow('INVALID_DATE');
-  });
-
-  it('uses fallbackAuthor when body author is empty', async () => {
-    (prisma.reports.create as any).mockResolvedValue({
-      author: 'fallback',
-      date: new Date('2026-04-01'),
-      id: 'r-4',
-    });
-
-    const result = await ReportRouteService.create({
-      body: { date: '2026-04-01' },
-      fallbackAuthor: 'fallback',
-    });
-
-    expect(result.author).toBe('fallback');
-  });
-
-  it('updates report fields by id', async () => {
-    (prisma.reports.update as any).mockResolvedValue({
-      date: new Date('2026-05-01'),
-      id: 'r-5',
-      status: 'PUBLISHED',
-    });
-
-    const result = await ReportRouteService.updateById('r-5', {
-      status: 'published',
-      totalInspections: '200',
-    });
-
-    expect(result.status).toBe('PUBLISHED');
-    expect(prisma.reports.update).toHaveBeenCalledWith({
-      where: { id: 'r-5' },
-      data: expect.objectContaining({
-        status: 'published',
-        totalInspections: 200,
-      }),
-    });
-  });
-
-  it('throws INVALID_DATE when update body has invalid date', async () => {
-    await expect(
-      ReportRouteService.updateById('r-5', { date: 'bad-date' }),
-    ).rejects.toThrow('INVALID_DATE');
-  });
-
-  it('saves daily summary via storage service', async () => {
-    (
-      VehicleCommissioningDailyReportStorageService.upsertDailySummary as any
-    ).mockResolvedValue({
-      date: new Date('2026-06-15'),
-      reporter: 'Alice',
-      summary: '{"summary":"test"}',
-    });
-
-    const result = await ReportRouteService.saveDailySummary({
+  it('delegates saveDailySummary to ReportWriteService', async () => {
+    (ReportWriteService.saveDailySummary as any).mockResolvedValue({
       date: '2026-06-15',
-      reporter: 'Alice',
-      summary: 'test',
-    });
-
-    expect(result).toEqual({
-      date: expect.any(String),
       documentItems: [],
       reporter: 'Alice',
       summary: 'test',
     });
-    expect(
-      VehicleCommissioningDailyReportStorageService.upsertDailySummary,
-    ).toHaveBeenCalledWith({
-      date: expect.any(Date),
-      reporter: 'Alice',
-      reportText: 'test',
-      summary: JSON.stringify({ summary: 'test' }),
-    });
-  });
 
-  it('throws INVALID_DATE when saving daily summary with bad date', async () => {
-    await expect(
-      ReportRouteService.saveDailySummary({
-        date: 'invalid',
-        reporter: 'Alice',
-        summary: 'test',
-      }),
-    ).rejects.toThrow('INVALID_DATE');
+    const result = await ReportRouteService.saveDailySummary({
+      date: '2026-06-15',
+      summary: 'test',
+      userinfo,
+    });
+
+    expect(result.reporter).toBe('Alice');
+    expect(ReportWriteService.saveDailySummary).toHaveBeenCalledWith({
+      audit: undefined,
+      date: '2026-06-15',
+      summary: 'test',
+      userinfo,
+    });
   });
 
   it('delegates createDailyReport to storage service', async () => {
@@ -249,33 +207,5 @@ describe('reportRouteService', () => {
     expect(
       VehicleCommissioningDailyReportStorageService.findDailyReports,
     ).toHaveBeenCalledWith({ skip: 0, take: 10 });
-  });
-
-  it('updates only provided fields in updateById', async () => {
-    (prisma.reports.update as any).mockResolvedValue({
-      date: new Date('2026-08-01'),
-      id: 'r-6',
-    });
-
-    await ReportRouteService.updateById('r-6', { passRate: '88.5' });
-
-    expect(prisma.reports.update).toHaveBeenCalledWith({
-      where: { id: 'r-6' },
-      data: { passRate: 88.5 },
-    });
-  });
-
-  it('normalizes report status to uppercase in updateById', async () => {
-    (prisma.reports.update as any).mockResolvedValue({
-      date: new Date('2026-09-01'),
-      id: 'r-7',
-    });
-
-    await ReportRouteService.updateById('r-7', { status: 'published' });
-
-    expect(prisma.reports.update).toHaveBeenCalledWith({
-      where: { id: 'r-7' },
-      data: { status: 'published' },
-    });
   });
 });

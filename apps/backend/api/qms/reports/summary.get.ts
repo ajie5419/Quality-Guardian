@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { ReportSummaryService } from '~/modules/report/report-summary.service';
 import { logApiError } from '~/utils/api-logger';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -19,6 +20,7 @@ export default defineEventHandler(async (event) => {
     const data = await ReportSummaryService.getSummaryFromQuery(
       query.type,
       query.date,
+      getAnalyticsAccessContext(event),
     );
     return useResponseSuccess(data);
   } catch (error: unknown) {

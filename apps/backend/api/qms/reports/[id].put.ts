@@ -1,5 +1,10 @@
 import { REPORTS_PERMISSION_CODES } from '@qgs/shared';
-import { defineEventHandler, readBody } from 'h3';
+import {
+  defineEventHandler,
+  getRequestHeader,
+  getRequestIP,
+  readBody,
+} from 'h3';
 import { z } from 'zod';
 import { authorizeWrite } from '~/modules/rbac';
 import { ReportRouteService } from '~/modules/report/report-route.service';
@@ -13,7 +18,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const bodySchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, REPORTS_PERMISSION_CODES.EDIT);
+  const userinfo = await authorizeWrite(event, REPORTS_PERMISSION_CODES.EDIT);
   const id = getRequiredRouterParam(event, 'id', 'id required');
   if (typeof id !== 'string') {
     return id;
@@ -24,6 +29,11 @@ export default defineEventHandler(async (event) => {
       await ReportRouteService.updateById(
         id,
         bodySchema.parse(await readBody(event)),
+        userinfo,
+        {
+          ipAddress: getRequestIP(event) ?? undefined,
+          userAgent: getRequestHeader(event, 'user-agent') ?? undefined,
+        },
       ),
     );
   } catch (error: unknown) {

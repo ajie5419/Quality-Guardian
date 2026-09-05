@@ -1,8 +1,11 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
 import {
   createIdentityAggregateItem,
   mapInspectionArchiveStatusLabel,
   parseDailySummaryContent,
 } from '@qgs/shared';
+import { requireAnalyticsUser } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { InspectionService } from '~/modules/inspection';
 import {
@@ -38,34 +41,47 @@ type ArchiveTaskRow = Awaited<
 >['tasks'][number];
 
 export const ReportDailySummaryService = {
-  async getDailySummaryFromQuery(input: {
-    date?: string;
-    realName?: string;
-    user?: string;
-    username: string;
-  }) {
+  async getDailySummaryFromQuery(
+    input: {
+      date?: string;
+      realName?: string;
+      user?: string;
+      username: string;
+    },
+    access?: AnalyticsAccessContext,
+  ) {
+    requireAnalyticsUser(access);
     const { date: parsedQueryDate, valid: isDateValid } =
       resolveReportQueryDate(input.date);
     if (!isDateValid) {
       throw new ReportQueryValidationError('Invalid date parameter');
     }
     const queryDate = formatReportDate(parsedQueryDate);
-    const queryUser = input.user || input.username;
+    // The legacy `user` query parameter could address an arbitrary username
+    // (cross-user daily report read). Row filters now always derive from the
+    // current user; the param is kept only for API-shape compatibility.
+    const queryUser = input.username;
     const reporter = input.realName || queryUser;
     const { end: endDate, start: startDate } = getReportDayRange(
       new Date(queryDate),
     );
-    const inspections = await InspectionService.getDailyReportInspections({
-      end: endDate,
-      realName: input.realName,
-      start: startDate,
-      username: queryUser,
-    });
-    const issues = await InspectionService.getDailyReportIssues({
-      end: endDate,
-      start: startDate,
-      username: queryUser,
-    });
+    const inspections = await InspectionService.getDailyReportInspections(
+      {
+        end: endDate,
+        realName: input.realName,
+        start: startDate,
+        username: queryUser,
+      },
+      access,
+    );
+    const issues = await InspectionService.getDailyReportIssues(
+      {
+        end: endDate,
+        start: startDate,
+        username: queryUser,
+      },
+      access,
+    );
     const departmentNames = await DeptService.resolveActiveNamesByIds(
       issues.map((item) => item.responsibleDepartmentId),
     );

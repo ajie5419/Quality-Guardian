@@ -1,3 +1,5 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
 import {
   createIdentityAggregateItem,
   parseReportPeriodType,
@@ -7,6 +9,7 @@ import {
   shiftReportAnchorDate,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
+import { requireAnalyticsUser } from '~/modules/data-scope';
 import { InspectionService } from '~/modules/inspection';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { QualityLossService } from '~/modules/quality-loss';
@@ -24,7 +27,12 @@ export const ReportSummaryService = {
   isValidationError(error: unknown): error is ReportQueryValidationError {
     return error instanceof ReportQueryValidationError;
   },
-  async getSummary(type: 'monthly' | 'weekly', targetDate: Date) {
+  async getSummary(
+    type: 'monthly' | 'weekly',
+    targetDate: Date,
+    access?: AnalyticsAccessContext,
+  ) {
+    requireAnalyticsUser(access);
     const historyCount = 6;
     const periods = Array.from({ length: historyCount })
       .map(
@@ -41,12 +49,14 @@ export const ReportSummaryService = {
       majorEvents,
       processPassRates,
     ] = await Promise.all([
-      Promise.all(periods.map((p) => fetchPeriodMetrics(p.start, p.end))),
-      fetchDefectDistribution(currentPeriod.start, currentPeriod.end),
-      fetchTopRiskProjects(currentPeriod.start, currentPeriod.end),
-      fetchSupplierPerformance(currentPeriod.start, currentPeriod.end),
-      fetchMajorEvents(currentPeriod.start, currentPeriod.end),
-      fetchProcessPassRates(currentPeriod.start, currentPeriod.end),
+      Promise.all(
+        periods.map((p) => fetchPeriodMetrics(p.start, p.end, access)),
+      ),
+      fetchDefectDistribution(currentPeriod.start, currentPeriod.end, access),
+      fetchTopRiskProjects(currentPeriod.start, currentPeriod.end, access),
+      fetchSupplierPerformance(currentPeriod.start, currentPeriod.end, access),
+      fetchMajorEvents(currentPeriod.start, currentPeriod.end, access),
+      fetchProcessPassRates(currentPeriod.start, currentPeriod.end, access),
     ]);
     const currData = historyMetrics[historyCount - 1];
     const prevData = historyMetrics[historyCount - 2];
@@ -119,7 +129,11 @@ export const ReportSummaryService = {
       })),
     };
   },
-  async getSummaryFromQuery(rawType?: string, rawDate?: string) {
+  async getSummaryFromQuery(
+    rawType?: string,
+    rawDate?: string,
+    access?: AnalyticsAccessContext,
+  ) {
     const type = parseReportPeriodType(rawType);
     if (!type) {
       throw new ReportQueryValidationError('Invalid type parameter');
@@ -129,29 +143,36 @@ export const ReportSummaryService = {
     if (!isDateValid) {
       throw new ReportQueryValidationError('Invalid date parameter');
     }
-    return this.getSummary(type, targetDate);
+    return this.getSummary(type, targetDate, access);
   },
-  async getDailySummaryFromQuery(input: {
-    date?: string;
-    realName?: string;
-    user?: string;
-    username: string;
-  }) {
-    return ReportDailySummaryService.getDailySummaryFromQuery(input);
+  async getDailySummaryFromQuery(
+    input: {
+      date?: string;
+      realName?: string;
+      user?: string;
+      username: string;
+    },
+    access?: AnalyticsAccessContext,
+  ) {
+    return ReportDailySummaryService.getDailySummaryFromQuery(input, access);
   },
 };
 
-async function fetchPeriodMetrics(start: Date, end: Date) {
+async function fetchPeriodMetrics(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
   const [
     passRateSummary,
     inspectionMetrics,
     afterSalesMetrics,
     qualityLossMetrics,
   ] = await Promise.all([
-    getNetPassRateSummaryByRange(start, end),
-    InspectionService.getReportPeriodMetrics({ start, end }),
-    AfterSalesAPI.getReportPeriodMetrics({ start, end }),
-    QualityLossService.getReportPeriodMetrics({ start, end }),
+    getNetPassRateSummaryByRange(start, end, 'inspection', access),
+    InspectionService.getReportPeriodMetrics({ start, end }, access),
+    AfterSalesAPI.getReportPeriodMetrics({ start, end }, access),
+    QualityLossService.getReportPeriodMetrics({ start, end }, access),
   ]);
   const closingRate =
     inspectionMetrics.newIssues > 0
@@ -172,12 +193,18 @@ async function fetchPeriodMetrics(start: Date, end: Date) {
   };
 }
 
-async function fetchProcessPassRates(start: Date, end: Date) {
+async function fetchProcessPassRates(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
   const getTargetPassRate = await createPassRateTargetResolver();
   const drillDown = await getPassRateDrillDownByRange(
     start,
     end,
     getTargetPassRate,
+    'inspection',
+    access,
   );
   return drillDown.map((row) => ({
     processName: row.process,
@@ -189,8 +216,15 @@ async function fetchProcessPassRates(start: Date, end: Date) {
   }));
 }
 
-async function fetchDefectDistribution(start: Date, end: Date) {
-  const rows = await InspectionService.getReportDefectRows({ start, end });
+async function fetchDefectDistribution(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
+  const rows = await InspectionService.getReportDefectRows(
+    { start, end },
+    access,
+  );
   const groups = new Map<
     string,
     { id: null | string; rawName: null | string; value: number }
@@ -224,22 +258,34 @@ async function fetchDefectDistribution(start: Date, end: Date) {
     .slice(0, 5);
 }
 
-async function fetchTopRiskProjects(start: Date, end: Date) {
-  return InspectionService.getReportTopRiskProjects({ start, end });
+async function fetchTopRiskProjects(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
+  return InspectionService.getReportTopRiskProjects({ start, end }, access);
 }
 
-async function fetchSupplierPerformance(start: Date, end: Date) {
-  const stats = await InspectionService.getReportSupplierPerformance({
-    start,
-    end,
-  });
+async function fetchSupplierPerformance(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
+  const stats = await InspectionService.getReportSupplierPerformance(
+    { start, end },
+    access,
+  );
   return stats
     .map((s) => ({ name: s.supplierName, issues: s._count }))
     .sort((a, b) => a.issues - b.issues);
 }
 
-async function fetchMajorEvents(start: Date, end: Date) {
-  return InspectionService.getReportMajorEvents({ start, end });
+async function fetchMajorEvents(
+  start: Date,
+  end: Date,
+  access?: AnalyticsAccessContext,
+) {
+  return InspectionService.getReportMajorEvents({ start, end }, access);
 }
 
 function getReportPeriods(date: Date, type: string) {

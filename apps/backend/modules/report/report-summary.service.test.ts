@@ -64,6 +64,8 @@ vi.mock('~/modules/vehicle-commissioning/daily-report-storage.service', () => ({
   },
 }));
 
+const testAccess = { user: { userId: 'u1', username: 'admin' } };
+
 describe('reportSummaryService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -91,10 +93,13 @@ describe('reportSummaryService', () => {
   });
 
   it('delegates getDailySummaryFromQuery to ReportDailySummaryService', async () => {
-    const result = await ReportSummaryService.getDailySummaryFromQuery({
-      date: '2026-06-15',
-      username: 'admin',
-    });
+    const result = await ReportSummaryService.getDailySummaryFromQuery(
+      {
+        date: '2026-06-15',
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result).toBeDefined();
     expect(result).toHaveProperty('date');
@@ -102,10 +107,74 @@ describe('reportSummaryService', () => {
     expect(result).toHaveProperty('issues');
   });
 
+  it('propagates the same analytics access to every KPI and drill-down source', async () => {
+    const { getNetPassRateSummaryByRange, getPassRateDrillDownByRange } =
+      await import('~/modules/report/pass-rate');
+    const { InspectionService } = await import('~/modules/inspection');
+    const { AfterSalesAPI } = await import('~/modules/after-sales');
+    const { QualityLossService } = await import('~/modules/quality-loss');
+
+    const access = { user: { userId: 'u-dept-a', username: 'user-a' } };
+    await ReportSummaryService.getSummary(
+      'weekly',
+      new Date('2026-03-15'),
+      access,
+    );
+
+    expect(getNetPassRateSummaryByRange).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.any(Date),
+      'inspection',
+      access,
+    );
+    expect(getPassRateDrillDownByRange).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.any(Date),
+      expect.any(Function),
+      'inspection',
+      access,
+    );
+    expect(InspectionService.getReportPeriodMetrics).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+    expect(AfterSalesAPI.getReportPeriodMetrics).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+    expect(QualityLossService.getReportPeriodMetrics).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+    expect(InspectionService.getReportDefectRows).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+    expect(InspectionService.getReportTopRiskProjects).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+    expect(InspectionService.getReportSupplierPerformance).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+    expect(InspectionService.getReportMajorEvents).toHaveBeenCalledWith(
+      expect.anything(),
+      access,
+    );
+  });
+
+  it('fails closed when the analytics access context is missing a user', async () => {
+    await expect(
+      ReportSummaryService.getSummary('monthly', new Date('2026-03-15')),
+    ).rejects.toThrow('Analytics access context is missing a user');
+  });
+
   it('returns summary structure with correct metric labels for monthly type', async () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.title).toBe('月度质量分析报告');
@@ -125,6 +194,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'weekly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.title).toBe('周度质量分析报告');
@@ -148,6 +218,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
     const externalKpi = result.metrics.find((m) => m.label === '售后损失');
     expect(externalKpi?.value).toBe(70);
@@ -158,6 +229,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.defects).toEqual([]);
@@ -178,6 +250,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.defects).toEqual([
@@ -210,6 +283,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.majorEvents).toEqual([]);
@@ -219,6 +293,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.topProjects).toEqual([]);
@@ -228,6 +303,7 @@ describe('reportSummaryService', () => {
     const result = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(result.suppliers.best).toEqual([]);
@@ -238,10 +314,12 @@ describe('reportSummaryService', () => {
     const monthlyResult = await ReportSummaryService.getSummary(
       'monthly',
       new Date('2026-03-15'),
+      testAccess,
     );
     const weeklyResult = await ReportSummaryService.getSummary(
       'weekly',
       new Date('2026-03-15'),
+      testAccess,
     );
 
     expect(monthlyResult.historyLabels).toHaveLength(6);

@@ -38,6 +38,8 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
+const testAccess = { user: { userId: 'u1', username: 'u1' } };
+
 describe('reportService', () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -137,6 +139,7 @@ describe('reportService', () => {
         role: 'manager',
         leader: '李四',
       },
+      testAccess,
     );
 
     expect(result.author).toEqual({
@@ -177,6 +180,8 @@ describe('reportService', () => {
     const result = await ReportService.getWeeklyReport(
       '2026-01-01',
       '2026-01-07',
+      undefined,
+      testAccess,
     );
     expect(result.trackingIssues[0]?.respDept).toBe(
       '主数据已失效：Legacy Department',
@@ -227,6 +232,8 @@ describe('reportService', () => {
     const result = await ReportService.getWeeklyReport(
       '2026-01-01',
       '2026-01-07',
+      undefined,
+      testAccess,
     );
 
     expect(result.externalIssues[0]).toMatchObject({
@@ -264,6 +271,8 @@ describe('reportService', () => {
     const result = await ReportService.getWeeklyReport(
       '2026-01-01',
       '2026-01-07',
+      undefined,
+      testAccess,
     );
 
     expect(result.externalIssues[0]).toMatchObject({
@@ -275,7 +284,12 @@ describe('reportService', () => {
 
   it('throws when date arguments are invalid', async () => {
     await expect(
-      ReportService.getWeeklyReport('invalid-date', '2026-01-07'),
+      ReportService.getWeeklyReport(
+        'invalid-date',
+        '2026-01-07',
+        undefined,
+        testAccess,
+      ),
     ).rejects.toThrow('Invalid startDate or endDate');
   });
 });
