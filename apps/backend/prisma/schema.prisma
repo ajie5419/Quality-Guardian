@@ -1526,6 +1526,192 @@ model supplier_score_snapshots {
   @@index([finalStatus])
 }
 
+// @module metric-governance
+// This is governance metadata only. It never stores executable formulas or
+// calculated metric values; source systems remain the sole value authorities.
+model metric_definitions {
+  id               String                       @id @default(cuid())
+  metricCode       String                       @unique
+  metricName       String
+  domain           String
+  category         metric_definition_category
+  ownerDeptId      String?
+  ownerStatus      metric_owner_status          @default(UNCONFIRMED)
+  status           metric_definition_status     @default(DRAFT)
+  currentVersion   Int                          @default(1)
+  revision         Int                          @default(1)
+  createdBy        String?
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  versions         metric_definition_versions[]
+  ownerAssignments metric_owner_assignments[]
+  legacyMappings   metric_canonical_mappings[]  @relation("metric_canonical_mapping_legacy")
+
+  @@index([category, status])
+  @@index([ownerDeptId])
+}
+
+// @module metric-governance
+// Versions are append-only to make every metric-definition change auditable.
+model metric_definition_versions {
+  id                    String                       @id @default(cuid())
+  metricDefinitionId    String
+  version               Int
+  businessDefinition    String                       @db.Text
+  numeratorDefinition   String?                      @db.Text
+  denominatorDefinition String?                      @db.Text
+  formulaType           String
+  sourceModel           Json
+  sourceFields          Json
+  dimensions            Json
+  exclusions            Json
+  scopePolicy           metric_scope_policy
+  refreshPolicy         String
+  unit                  String
+  precision             Int
+  // A DRAFT definition has no approved effective date. It must remain null
+  // until the business decision and Phase-2 readiness evidence are complete.
+  effectiveFromAt       DateTime?
+  effectiveToAt         DateTime?
+  changeReason          String?                      @db.Text
+  createdBy             String?
+  createdAt             DateTime                     @default(now())
+  conflictStatus        metric_conflict_status       @default(BUSINESS_DECISION_REQUIRED)
+  decisionHistoryId     String?
+  approvalEvidence      String?                      @db.Text
+  sourceDocument        String?
+  metricDefinition      metric_definitions           @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+  approvalEvidences     metric_approval_evidences[]
+  shadowEvidences       metric_shadow_validation_evidences[]
+  activationEvidences    metric_activation_approval_evidences[]
+  canonicalMappings     metric_canonical_mappings[]
+  policyDependencies    metric_policy_dependencies[]
+
+  @@unique([metricDefinitionId, version], map: "metric_definition_version_key")
+  @@index([metricDefinitionId, createdAt])
+  @@index([conflictStatus])
+}
+
+// @module metric-governance
+// One version can carry more than one business decision. Evidence is retained
+// as rows so an approval cannot be overwritten by later version metadata.
+model metric_approval_evidences {
+  id                        String                     @id @default(cuid())
+  metricDefinitionVersionId String
+  decisionHistoryId         String
+  decisionStatus            metric_decision_status
+  approvedOption            String
+  approvedDefinition        String                     @db.Text
+  decisionSource            String
+  decisionBy                String
+  decisionNote              String?                    @db.Text
+  sourceDocument            String
+  recordedAt                DateTime                   @default(now())
+  metricDefinitionVersion   metric_definition_versions @relation(fields: [metricDefinitionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([metricDefinitionVersionId, decisionHistoryId], map: "metric_approval_evidence_key")
+  @@index([decisionStatus])
+}
+
+// @module metric-governance
+// Append-only, reproducible Shadow Validation evidence linked to an immutable version.
+model metric_shadow_validation_evidences {
+  id                        String                       @id @default(cuid())
+  metricDefinitionVersionId String
+  metricCode                String
+  version                   Int
+  executionWindowStartAt   DateTime
+  executionWindowEndAt     DateTime
+  scope                     String
+  result                    Json
+  classification            String
+  sourceDocument            String
+  recordedAt                DateTime                   @default(now())
+  metricDefinitionVersion   metric_definition_versions @relation(fields: [metricDefinitionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([metricDefinitionVersionId, executionWindowStartAt, executionWindowEndAt, scope], map: "metric_shadow_evidence_key")
+  @@index([metricCode, version])
+}
+
+// @module metric-governance
+// Append-only human approval for activation; does not mutate the Version.
+model metric_activation_approval_evidences {
+  id                              String                       @id @default(cuid())
+  metricDefinitionVersionId      String
+  metricCode                      String
+  version                         Int
+  decision                        String
+  effectiveFromAt                 DateTime
+  decisionBy                      String
+  activationNote                  String                       @db.Text
+  scopeConfirmation               String                       @db.Text
+  historicalCalculationConfirmation String                     @db.Text
+  sourceDocument                  String
+  recordedAt                      DateTime                     @default(now())
+  metricDefinitionVersion        metric_definition_versions   @relation(fields: [metricDefinitionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([metricDefinitionVersionId, effectiveFromAt, decisionBy], map: "metric_activation_approval_key")
+  @@index([metricCode, version])
+}
+
+// @module metric-governance
+// This is an append-only semantic lineage between a legacy display metric and
+// its approved canonical successor. It does not alter historical metric data.
+model metric_canonical_mappings {
+  id                                 String                        @id @default(cuid())
+  legacyMetricDefinitionId           String
+  canonicalMetricDefinitionVersionId String
+  decisionHistoryId                  String
+  mappingType                        metric_canonical_mapping_type
+  sourceDocument                     String
+  createdAt                          DateTime                      @default(now())
+  legacyMetricDefinition             metric_definitions            @relation("metric_canonical_mapping_legacy", fields: [legacyMetricDefinitionId], references: [id], onDelete: Restrict)
+  canonicalMetricDefinitionVersion   metric_definition_versions    @relation(fields: [canonicalMetricDefinitionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([legacyMetricDefinitionId, canonicalMetricDefinitionVersionId], map: "metric_canonical_mapping_key")
+  @@index([canonicalMetricDefinitionVersionId])
+}
+
+// @module metric-governance
+// Owner assignments preserve the approved business responsibility even when no
+// canonical department ID exists. ownerLabel is an accountable business label,
+// not a technical module name and never implies a fabricated ownerDeptId.
+model metric_owner_assignments {
+  id                 String              @id @default(cuid())
+  metricDefinitionId String
+  ownerRole          metric_owner_role
+  ownerLabel         String
+  ownerDeptId        String?
+  ownerStatus        metric_owner_status @default(UNCONFIRMED)
+  decisionHistoryId  String?
+  approvalEvidence   String?             @db.Text
+  sourceDocument     String?
+  createdAt          DateTime            @default(now())
+  metricDefinition   metric_definitions  @relation(fields: [metricDefinitionId], references: [id], onDelete: Restrict)
+
+  @@unique([metricDefinitionId, ownerRole, ownerLabel], map: "metric_owner_assignment_key")
+  @@index([ownerRole, ownerStatus])
+  @@index([ownerDeptId])
+}
+
+// @module metric-governance
+// Policy dependencies are governance records, never executable policy rules.
+// A PENDING dependency prevents its metric version from becoming ACTIVE.
+model metric_policy_dependencies {
+  id                        String                     @id @default(cuid())
+  metricDefinitionVersionId String
+  policyCode                String
+  status                    metric_policy_status       @default(PENDING)
+  decisionHistoryId         String
+  pendingPolicy             String                     @db.Text
+  sourceDocument            String
+  createdAt                 DateTime                   @default(now())
+  metricDefinitionVersion   metric_definition_versions @relation(fields: [metricDefinitionVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([metricDefinitionVersionId, policyCode], map: "metric_policy_dependency_key")
+  @@index([status])
+}
+
 // @module metric-refresh
 model metric_refresh_jobs {
   id          String                @id @default(cuid())
@@ -2184,6 +2370,60 @@ enum metric_refresh_status {
   PROCESSING
   COMPLETED
   FAILED
+}
+
+enum metric_definition_category {
+  A
+  B
+  C
+  D
+}
+
+enum metric_owner_status {
+  UNCONFIRMED
+  CONFIRMED
+  CONFIRMED_FROM_APPROVAL
+}
+
+enum metric_definition_status {
+  DRAFT
+  ACTIVE
+  DEPRECATED
+}
+
+enum metric_scope_policy {
+  ALL
+  DEPT
+  SELF
+  SOURCE_INHERITED
+  NOT_APPLICABLE
+}
+
+enum metric_conflict_status {
+  NO_CONFLICT
+  CANONICAL_CANDIDATE
+  BUSINESS_DECISION_REQUIRED
+}
+
+enum metric_canonical_mapping_type {
+  SPLIT_TO
+  REPLACED_BY
+}
+
+enum metric_policy_status {
+  PENDING
+  APPROVED
+}
+
+enum metric_decision_status {
+  APPROVED
+  APPROVED_WITH_POLICY_PENDING
+}
+
+enum metric_owner_role {
+  BUSINESS
+  POLICY
+  DATA
 }
 
 enum quality_loss_index_source {
