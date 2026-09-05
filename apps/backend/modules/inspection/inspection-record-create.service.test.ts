@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { InspectionRecordCreateService } from '~/modules/inspection/inspection-record-create.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
@@ -307,6 +308,11 @@ describe('inspectionRecordCreateService', () => {
         },
         'inspection.created',
       );
+      // CLOSE-EFFECTS-INTEGRITY-001: file references must be registered on the
+      // caller's transaction client, never the global prisma instance.
+      expect(
+        FileStorageService.registerReferencesFromAttachments,
+      ).toHaveBeenCalledWith(expect.objectContaining({ tx }));
     });
 
     it('rejects a process inspection without a canonical TEAM identity', async () => {
