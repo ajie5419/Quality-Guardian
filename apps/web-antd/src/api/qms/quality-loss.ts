@@ -49,10 +49,19 @@ export async function getQualityLossExportList(
 }
 
 /**
- * Create Quality Loss record
+ * Create Quality Loss record.
+ *
+ * `idempotencyKey` (IDEMPOTENCY-KEY-001 / PHASE-1): one UUID per
+ * user-initiated create attempt. Network / button retries of the same attempt
+ * must reuse the same key; a genuinely new create gets a fresh key.
  */
-export async function createQualityLoss(data: Partial<QualityLossItem>) {
-  return requestClient.post<QualityLossItem>('/qms/quality-loss', data);
+export async function createQualityLoss(
+  data: Partial<QualityLossItem>,
+  idempotencyKey?: string,
+) {
+  return requestClient.post<QualityLossItem>('/qms/quality-loss', data, {
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  });
 }
 
 export async function updateQualityLoss(

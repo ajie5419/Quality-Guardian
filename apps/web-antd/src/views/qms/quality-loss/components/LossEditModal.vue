@@ -24,6 +24,10 @@ import {
 } from 'ant-design-vue';
 
 import { createQualityLoss, updateQualityLoss } from '#/api/qms/quality-loss';
+import {
+  isIdempotencyReusedError,
+  useCreateOperationId,
+} from '#/composables/useCreateOperationId';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { useInvalidateQmsQueries } from '#/hooks/useQmsQueries';
@@ -55,6 +59,8 @@ const { t } = useI18n();
 const { invalidateQualityLoss } = useInvalidateQmsQueries();
 const { handleApiError } = useErrorHandler();
 const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
+const { acquire: acquireOperationId, reset: resetOperationId } =
+  useCreateOperationId();
 
 const formRef = ref<{ validate: () => Promise<void> }>();
 const formState = reactive<Partial<QmsQualityLossApi.QualityLossItem>>({});
@@ -136,6 +142,9 @@ watch(
       }
       Object.assign(formState, props.initialData);
     }
+    if (!val) {
+      resetOperationId();
+    }
   },
 );
 
@@ -152,7 +161,22 @@ async function handleOk() {
     }
     await (props.isEditMode && formState.id
       ? updateQualityLoss(formState.id, payload)
-      : createQualityLoss(payload));
+      : (() => {
+          return createQualityLoss(payload, acquireOperationId())
+            .then(() => {
+              resetOperationId();
+            })
+            .catch((error: unknown) => {
+              // Same key with a changed payload means the user edited the
+              // form after the previous attempt; reset the key so the next
+              // explicit save counts as a new create attempt.
+              if (isIdempotencyReusedError(error)) {
+                resetOperationId();
+                message.warning('检测到重复提交，请重新点击保存');
+              }
+              throw error;
+            });
+        })());
     message.success(t('common.saveSuccess'));
     emit('success');
     emit('update:open', false);
