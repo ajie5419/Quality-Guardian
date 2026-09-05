@@ -18,7 +18,7 @@ vi.mock('~/modules/quality-loss/quality-loss-query', () => ({
 
 vi.mock('~/modules/quality-loss/quality-loss.service', () => ({
   QualityLossService: {
-    getLossSummary: vi.fn(),
+    getExportRows: vi.fn(),
   },
 }));
 
@@ -56,6 +56,12 @@ vi.mock('~/utils/define-validated-handler', () => ({
 }));
 
 describe('quality-loss-export.get.service', () => {
+  const authenticatedEvent = (query: Record<string, unknown> = {}) =>
+    ({
+      context: { user: { id: 'user-1', username: 'admin' } },
+      query,
+    }) as any;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -65,7 +71,7 @@ describe('quality-loss-export.get.service', () => {
       '~/modules/quality-loss/quality-loss.service'
     );
 
-    vi.mocked(QualityLossService.getLossSummary).mockResolvedValue([
+    vi.mocked(QualityLossService.getExportRows).mockResolvedValue([
       { id: 'ql-1', amount: 100 },
       { id: 'ql-2', amount: 200 },
     ] as never);
@@ -75,7 +81,7 @@ describe('quality-loss-export.get.service', () => {
     );
     const handler = handlerModule.default;
 
-    const result = await handler({ query: {} } as any);
+    const result = await handler(authenticatedEvent());
 
     expect(result).toEqual({
       data: {
@@ -97,7 +103,7 @@ describe('quality-loss-export.get.service', () => {
     const largeList = Array.from({ length: 20_001 }, (_, i) => ({
       id: `ql-${i}`,
     }));
-    vi.mocked(QualityLossService.getLossSummary).mockResolvedValue(
+    vi.mocked(QualityLossService.getExportRows).mockResolvedValue(
       largeList as never,
     );
 
@@ -106,7 +112,7 @@ describe('quality-loss-export.get.service', () => {
     );
     const handler = handlerModule.default;
 
-    const result = await handler({ query: {} } as any);
+    const result = await handler(authenticatedEvent());
 
     expect(result).toEqual(expect.objectContaining({ error: true }));
   });
@@ -116,7 +122,7 @@ describe('quality-loss-export.get.service', () => {
       '~/modules/quality-loss/quality-loss.service'
     );
 
-    vi.mocked(QualityLossService.getLossSummary).mockRejectedValue(
+    vi.mocked(QualityLossService.getExportRows).mockRejectedValue(
       new Error('db error'),
     );
 
@@ -125,7 +131,7 @@ describe('quality-loss-export.get.service', () => {
     );
     const handler = handlerModule.default;
 
-    const result = await handler({ query: {} } as any);
+    const result = await handler(authenticatedEvent());
 
     expect(result).toEqual({
       error: true,

@@ -22,6 +22,21 @@
 - 部门图表按 `respDeptId` 聚合后再解析 canonical 名称。缺失 ID 和无效 ID 保持显式未解析状态，不回退名称归并。
 - 在线创建和编辑只接受 `responsibleDepartmentId`；后端在同一事务内根据启用部门重建 `respDeptId + respDept`。缺失 ID 时保留历史名称快照，无效 ID 拒绝写入。
 
+## 手工质量损失状态机约束（STATE-MACHINE-001）
+
+- 手工质量损失状态使用统一桶 `Pending / Processing / Confirmed / Resolved`，转换矩阵 `QUALITY_LOSS_TRANSITIONS`： `Pending → Processing/Confirmed/Resolved`、`Processing → Pending/Confirmed/Resolved`、 `Confirmed → Processing/Resolved`、`Resolved → Pending`。
+- 写路径严格解析 `parseQualityLossUpdateStatus`：非字符串 / 未知文本 → null → 400（fail closed），不把未知文本静默归一为 `Pending`。
+- 仅 `QUALITY_LOSS_SOURCE.MANUAL` 来源的状态变更走状态机断言 + `tx.updateMany({ where: { ...target.where, status: <期望当前状态> }, data: { status } })` CAS（`count !== 1` → 404/409，409 作为业务错误向上抛）；内部/外部/调试验收来源的状态更新仍回对应业务页处理，不属于用户状态推进。
+- 状态更新成功后在事务内追加 `quality_loss_index_jobs` 信号，索引物化语义不变。
+
+## 手工质量损失创建幂等（IDEMPOTENCY-KEY-001 / PHASE-1 Pilot）
+
+- `POST /qms/quality-loss` 强制 `Idempotency-Key` 请求头（8～128 字符，`[A-Za-z0-9._~-]`），缺失返回 400 且不占用 key。
+- 幂等 identity = `userId + qms.quality-loss.create + Idempotency-Key`；claim 行与 `quality_losses.create` 在同一事务（`withRequestIdempotency`）——业务失败整体回滚，key 不产生 COMPLETED zombie。
+- fingerprint 取创建语义稳定字段（工单/部件、类型、金额、日期、责任部门），字段顺序无关；同 key + 不同 fingerprint → 409 `IDEMPOTENCY_KEY_REUSED`。
+- Replay 返回第一次成功结果，不重新生成 `lossId`、不重复 enqueue、不重复写 `quality-loss` CREATE 审计；replay 前经 `resourceGuard` 复查资源存在性。
+- 窗口 `QUALITY_LOSS_IDEMPOTENCY_WINDOW_MS = 5 分钟`；`lossId @unique` 仅防编号冲突，不替代请求幂等；`quality_loss_index` 的 `(source, sourcePk)` unique 继续防副作用重复。
+
 ## 对外入口
 
 - `QualityLossService`：列表、统计、图表、更新与删除。

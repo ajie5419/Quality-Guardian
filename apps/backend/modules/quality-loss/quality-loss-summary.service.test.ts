@@ -12,6 +12,9 @@ import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    after_sales: {
+      findUnique: vi.fn().mockResolvedValue({ createdBy: 'u-1' }),
+    },
     quality_loss_index: {
       count: vi.fn(),
       findMany: vi.fn(),
@@ -43,6 +46,8 @@ vi.mock('~/modules/system-log/system-log.service', () => ({
 
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
+    buildQualityLossIndexWhere: vi.fn(async (baseWhere: unknown) => baseWhere),
+    buildQualityLossWhere: vi.fn(async (baseWhere: unknown) => baseWhere),
     getDeptCandidates: vi.fn(),
     getScopeForModule: vi.fn(),
   },
@@ -250,7 +255,9 @@ describe('quality-loss core services', () => {
       count: 1,
     } as never);
     vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'u-1',
       id: 'ql-1',
+      respDept: null,
     } as never);
     vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
       count: 1,
@@ -276,8 +283,8 @@ describe('quality-loss core services', () => {
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
 
     vi.mocked(prisma.quality_losses.findMany).mockResolvedValueOnce([
-      { id: 'ql-1' },
-      { id: 'ql-2' },
+      { createdBy: 'u-1', id: 'ql-1', respDept: null },
+      { createdBy: 'u-1', id: 'ql-2', respDept: null },
     ] as never);
     vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
       count: 2,
@@ -332,9 +339,19 @@ describe('quality-loss core services', () => {
   });
 
   it('updates quality loss route targets for manual and external records and handles failures', async () => {
+    vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'u-1',
+      id: 'ql-1',
+      respDept: null,
+    } as never);
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) =>
       cb({
-        quality_losses: { update: vi.fn().mockResolvedValue({ id: 'ql-1' }) },
+        quality_losses: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'ql-1', status: 'Pending' }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
         quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
@@ -404,10 +421,14 @@ describe('quality-loss core services', () => {
       .mockResolvedValueOnce({ _sum: { amount: 20 } } as never);
     vi.mocked(prisma.quality_losses.findMany)
       .mockResolvedValueOnce([{ id: 'weekly' }] as never)
-      .mockResolvedValueOnce([{ id: 'ql-1' }] as never)
+      .mockResolvedValueOnce([
+        { createdBy: 'u-1', id: 'ql-1', respDept: null },
+      ] as never)
       .mockResolvedValueOnce([{ id: 'manual' }] as never);
     vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'u-1',
       id: 'ql-1',
+      respDept: null,
     } as never);
     vi.mocked(prisma.quality_losses.update).mockResolvedValue({} as never);
     vi.mocked(prisma.quality_losses.updateMany).mockResolvedValue({
