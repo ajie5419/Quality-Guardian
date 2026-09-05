@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3';
 import { DashboardService } from '~/modules/dashboard/dashboard.service';
 import { logApiError } from '~/utils/api-logger';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -8,10 +9,11 @@ import {
 
 export default defineEventHandler(async (event) => {
   try {
+    const access = getAnalyticsAccessContext(event);
     const [stats, monthlyQuality, issueDistribution] = await Promise.all([
-      DashboardService.getStats(),
-      DashboardService.getMonthlyTrend(),
-      DashboardService.getIssueDistribution(),
+      DashboardService.getStats(access),
+      DashboardService.getMonthlyTrend(access),
+      DashboardService.getIssueDistribution(access),
     ]);
 
     return useResponseSuccess({
