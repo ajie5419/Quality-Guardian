@@ -33,11 +33,13 @@ backend_tests="$(find "$BACKEND_DIR" -name '*.test.ts' | wc -l | tr -d ' ')"
 stamp="$(date '+%Y-%m-%d %H:%M')"
 
 block="<!-- docs:sync-start -->
+
 - 最后同步时间: $stamp
 - 版本: $version
 - 后端模块数: $module_count
 - 模块 TS 文件数: $module_ts
 - 后端测试文件数: $backend_tests
+
 <!-- docs:sync-end -->"
 
 if [[ ! -f "$STATE_FILE" ]]; then

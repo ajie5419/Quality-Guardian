@@ -52,6 +52,24 @@ Rules:
   R1: no direct requestClient usage under apps/web-antd/src/views/qms
   R2: no bare axios/fetch usage under apps/web-antd/src/views/qms
   R3: index.vue must not exceed the line threshold
+  R-GET: GET routes must not execute seed or other write side effects
+  R-SCOPE: protected modules/models must not write records keyed by bare business
+           identifiers (id/workOrderNumber/lossId/...) without a scope condition;
+           raw SQL must embed a scoped SQL helper or carry an explicit allow marker
+           (R-SCOPE-RAW). See docs/permission-module.md for LEGACY classifications.
+  R-SCOPE-AGG: Dashboard/Report analytics modules must not aggregate protected
+           business rows (findMany/count/aggregate/groupBy) without a DataScope
+           anchor; raw SQL KPI queries must embed a named raw-scope helper or an
+           explicit allow marker (R-SCOPE-RAW).
+  R-SM: state-machine protected models (qms_task_dispatches, quality_losses,
+           vehicle_commissioning_issues) must not write `status` without a CAS
+           anchor (expected current status in the where clause), a scope
+           condition, or an explicit allow marker with a reason.
+  R-CLOSE-EFFECT: inspection-request-close-effects must anchor inspection
+           documents writes on the documents/selfCheckDocuments snapshot
+           columns (optimistic CAS) or a scoped spread; bare-id or
+           unrelated-CAS writes would let the find -> merge -> update
+           lost-update pattern return.
   B-D1: backend legacy architecture directories must not exist
   B-R1: api/ files must not import prisma directly
   B-R2: api/ files must stay thin

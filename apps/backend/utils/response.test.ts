@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  methodNotAllowedResponse,
   useListResponseSuccess,
   usePageResponseSuccess,
   useResponseSuccess,
@@ -49,6 +50,16 @@ describe('response utils', () => {
       },
       error: null,
       message: 'ok',
+    });
+  });
+
+  it('returns a standard 405 envelope for disabled write-on-GET routes', () => {
+    const event = { node: { res: {} } } as never;
+    expect(methodNotAllowedResponse(event, 'Use POST')).toEqual({
+      code: -1,
+      data: null,
+      error: null,
+      message: 'Use POST',
     });
   });
 });
