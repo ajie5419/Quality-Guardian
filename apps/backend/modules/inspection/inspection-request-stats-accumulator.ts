@@ -99,3 +99,7 @@ export function createInspectionRequestStatsAccumulator(
     teamReinspectionMap,
   };
 }
+
+export type InspectionRequestStatsAccumulator = ReturnType<
+  typeof createInspectionRequestStatsAccumulator
+>;

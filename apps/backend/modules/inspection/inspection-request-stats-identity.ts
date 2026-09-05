@@ -21,15 +21,16 @@ export function incrementReinspectionCounts(
   key: string,
   hasInspectionResult: boolean,
   hasReinspection: boolean,
+  count = 1,
 ) {
   const stat = counts.get(key) || {
     inspectedCount: 0,
     reinspectionCount: 0,
     submittedCount: 0,
   };
-  stat.submittedCount += 1;
-  if (hasInspectionResult) stat.inspectedCount += 1;
-  if (hasReinspection) stat.reinspectionCount += 1;
+  stat.submittedCount += count;
+  if (hasInspectionResult) stat.inspectedCount += count;
+  if (hasReinspection) stat.reinspectionCount += count;
   counts.set(key, stat);
 }
 
