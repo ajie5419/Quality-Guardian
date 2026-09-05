@@ -568,7 +568,7 @@ describe('workOrderRequirementRouteService', () => {
 
       expect(
         WorkOrderAggregateService.getWorkOrderAggregate,
-      ).toHaveBeenCalledWith('WO-001');
+      ).toHaveBeenCalledWith('WO-001', undefined);
     });
   });
 });

@@ -1,10 +1,14 @@
 import type { IdentityResolutionStatus } from '@qgs/shared';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 
 import type {
   AggregateIdentity,
   DimensionStats,
 } from './work-order-aggregate-identity';
+import type { ProcessProgressGroup } from './work-order-aggregate-utils';
 
+import { Prisma } from '@prisma/client';
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import { InspectionService } from '~/modules/inspection';
 import { WorkOrderRequirementService } from '~/modules/work-order-requirement/work-order-requirement.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
@@ -18,6 +22,12 @@ import {
   normalizeAggregateLabel,
   resolveAggregateIdentity,
 } from './work-order-aggregate-identity';
+import {
+  compactAggregateAttachments,
+  getTodayRange,
+  parseRequirementItems,
+  resolveRequirementPoints,
+} from './work-order-aggregate-utils';
 import { parseRequirementAttachments } from './work-order-requirement-attachments';
 
 type GroupStats = {
@@ -26,53 +36,25 @@ type GroupStats = {
   plannedPoints: number;
   process: AggregateIdentity;
 };
-type AggregateAttachment = { name?: string; type?: string; url: string };
-type ProcessProgressGroup = {
-  latestDate: Date;
-  part: AggregateIdentity;
-  processStats: Map<
-    string,
-    {
-      completedQuantity: number;
-      latestDate: Date;
-      process: AggregateIdentity;
-    }
-  >;
-  teams: Map<string, AggregateIdentity>;
-  totalQuantity: number;
-};
-
-function getTodayRange() {
-  const start = new Date();
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(start);
-  end.setHours(23, 59, 59, 999);
-  return { end, start };
-}
-function parseRequirementItems(raw: unknown): unknown[] {
-  if (Array.isArray(raw)) return raw;
-  if (typeof raw !== 'string' || !raw.trim()) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
-function resolveRequirementPoints(requirementItems: unknown) {
-  const parsed = parseRequirementItems(requirementItems);
-  return parsed.length > 0 ? parsed.length : 1;
-}
-function compactAggregateAttachments(
-  attachments: Array<AggregateAttachment & { thumbUrl?: string }>,
-): AggregateAttachment[] {
-  return attachments.map(({ name, type, url }) => ({ name, type, url }));
-}
 export const WorkOrderAggregateService = {
-  async getWorkOrderAggregate(workOrderNumber: string) {
+  async getWorkOrderAggregate(
+    workOrderNumber: string,
+    access?: AnalyticsAccessContext,
+  ) {
+    const baseWhere: Prisma.work_ordersWhereInput = {
+      isDeleted: false,
+      workOrderNumber,
+    };
+    const scopedWorkOrderWhere = access
+      ? await DataScopeService.buildWorkOrderWhere(
+          baseWhere,
+          requireAnalyticsUser(access),
+          access.dataScope,
+        )
+      : baseWhere;
     const [workOrder, requirements, inspections] = await Promise.all([
       prisma.work_orders.findFirst({
-        where: { isDeleted: false, workOrderNumber },
+        where: scopedWorkOrderWhere,
         select: {
           customerName: true,
           division: true,
@@ -83,8 +65,12 @@ export const WorkOrderAggregateService = {
         },
       }),
       WorkOrderRequirementService.findActiveForAggregate(workOrderNumber),
-      InspectionService.getWorkOrderAggregateInspections(workOrderNumber),
+      InspectionService.getWorkOrderAggregateInspections(
+        workOrderNumber,
+        access,
+      ),
     ]);
+    if (!workOrder) return null;
     const [partNames, processNames, teamNames] = await Promise.all([
       MasterDataGovernanceKernel.resolveCanonicalNamesByIds({
         canonicalIds: [
