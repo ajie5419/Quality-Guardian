@@ -13,9 +13,11 @@
 - **dept/** — 部门组织架构 CRUD
 - **dictionary/** — 系统字典数据维护（枚举值、下拉选项）
 - **file-storage/** — QMS 文件中心：文档上传、存储与分类
+- **idempotency/** — 请求级幂等：Idempotency-Key 校验、稳定 fingerprint、MySQL 同事务 claim/replay / logical reclaim（IDEMPOTENCY-KEY-001 PHASE-1 Pilot + PHASE-2 五入口迁移，`withRequestIdempotency` + `IDEMPOTENCY_PROTECTED_CREATE_OPERATIONS` Guard）
 - **inspection/** — 检验域核心：检验记录、不合格品、报检任务、模板、归档同步
 - **knowledge/** — 质量知识库：文档分类与知识条目
 - **master-data-governance/** — 主数据治理：受控主数据清单、处置闭环与统计门禁
+- **metric-governance/** — 业务指标定义治理：Metric Code、版本、生命周期、Owner、审计与 Definition bootstrap；不计算指标值
 - **metric-refresh/** — 派生指标刷新任务与重试
 - **master-data-identity/** — 历史身份决策、投影与对账基线
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
@@ -65,6 +67,7 @@
 - **inspection/** — 检验记录、不合格品、模板与报检
 - **knowledge/** — 知识库分类与条目
 - **metrology/** — 计量器具台账、借用、检定计划
+- **metric-governance/** — 指标定义与版本治理接口（不返回或计算业务指标值）
 - **planning/** — BOM/DFMEA/ITP/项目文档
 - **public/** — 无鉴权公开接口（如计量借用、扫码报检）
 - **quality-loss/** — 质量损失记录

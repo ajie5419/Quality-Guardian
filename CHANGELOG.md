@@ -17,11 +17,701 @@
 - 本工作区未启动前端 dev/build/start/serve，未执行完整发布；生产 overlay 未替代源码发布，仍需按正式发布链路纳入此源码改动。
 - 生产 overlay 回滚：保留备份 `/opt/qms/nginx.before-report-title-blue-20260905.conf`，可运行 `bash /opt/qms/rollback-report-title-blue-20260905.sh`（配置发生后续变更时拒绝覆盖）；源码发布后仅删除 `qms-report-title-blue-20260905` 的 `sub_filter` 块。该 selector 精确依赖原 `bg-gray-800` 类，源码移除此类后 overlay 自然不再匹配。没有前端/后端镜像变更或数据库操作。
 
+### 2026-09-05 工作树专项切片全部收口
+
+- 提交 `4767308`：Dashboard analytics 统一透传 DataScope，并接入 Canonical First Pass Yield consumer 与按用户缓存。
+- 提交 `5af2487`：Report 查询、写入、日报和汇总统一接入对象范围、状态/CAS 与审计契约，补齐写入服务测试。
+- 提交 `5902d58`：Vehicle commissioning issue 创建、状态流转、指纹幂等、前端版本契约与对象范围完成收口。
+- 提交 `ac87160`：架构、CI、pre-push、文档漂移和响应工具门禁切片落地。
+- 验证：Dashboard 20/20、Report 140/140、Vehicle commissioning 49/49、治理工具 67 项 Vitest 与 pre-push 13/13 通过；各切片 Prettier/ESLint、TypeScript、QMS architecture 和 diff check 通过。
+
+### 2026-09-05 Optimistic-lock guard dependency
+
+- 提交 `b4ad1ae`：补齐售后、供应商、工单等已提交写入口引用的 `optimistic-lock` 版本校验工具；缺失或非法 version 统一以 400 fail-closed。
+- 验证：4 个相关入口定向测试 37/37、Prettier/ESLint、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
+
+### 2026-09-05 Quality-loss state contract
+
+- 提交 `b5a3a74`：补齐已提交质量损失更新服务依赖的统一状态机、严格状态解析与转换矩阵，并新增 6 项状态契约测试；未知状态 fail-closed，非法转换返回业务冲突。
+- 验证：目标测试 6/6、Prettier/ESLint、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
+
+### 2026-09-05 After-sales delete version guard test
+
+- 提交 `7fa5ecd`：新增售后删除入口的 version 必填、DataScope 透传与成功响应回归测试，覆盖并发编辑契约；未改业务实现。
+- 验证：目标测试 2/2、Prettier/ESLint、`pnpm run check:qms-arch` 通过。
+
+### 2026-09-05 Shared QMS contract exports
+
+- 提交 `cafb8e1`：公开质量损失日期/数值解析函数，补充 `OPTIMISTIC_LOCK_CONFLICT` 与 `EXPORT_LIMIT_EXCEEDED` 错误码及 UX 等级映射，闭合前后端幂等/导出契约依赖。
+- 验证：目标文件 Prettier、`@qgs/shared` build、`pnpm run check:type` 通过。
+
+### 2026-09-05 QMS maintenance scope gate annotations
+
+- 提交 `4f30dbb`：为检验材料请求 CAS、NC 序列生成及 pass-rate projection/shadow 后台维护写入补充现有 scope/owned-job 约束注释；无运行时行为变化。
+- 验证：目标文件 Prettier/ESLint、`pnpm run check:qms-arch` 通过。
+
+### 2026-09-05 After-sales serial transaction dependency
+
+- 提交 `601a85c`：`getNextAfterSalesSerialNumber` 支持注入 Prisma transaction client，默认仍使用全局 client，为后续售后创建事务切片提供无行为变化的事务传播基础。
+- 验证：目标文件 Prettier/ESLint、after-sales core 10/10、`pnpm run check:type`、`pnpm run check:qms-arch` 通过。
+
+### 2026-09-05 Inspection 报表统计范围切片
+
+- 提交 `3db0167`：InspectionReportStatisticsService 的缺陷分布、风险项目、供应商绩效聚合统一接受 AnalyticsAccessContext，并通过 DataScopeService 构造检验问题范围；缺失上下文用户时 fail-closed，未改变既有无上下文调用的兼容行为。
+- 验证：目标文件 Prettier/ESLint、inspection reporting 定向测试 25/25、`pnpm run check:qms-arch`、`pnpm run check:type` 通过；未混入报表写入、Dashboard consumer 或指标切换改动。
+
+### 2026-09-05 CI-GATE：接入现有增量与治理检查
+
+- 原 QMS Architecture Check 任务保留全量检查，增加基于 PR base SHA / main push before SHA 的增量检查；拉取完整历史，非法、未知或非祖先基准直接失败。接入独立 docs-drift 与 metric-governance，不新增任务、依赖或发布步骤。
+- 新增 `scripts/ci-gate.test.ts`，执行工作流实际 shell 块和真实架构脚本，验证缺失基准阻断、origin/main 已等于 HEAD 时仍能发现 B-MAP1/B-GF 违规，以及补齐登记后通过；同步项目规则、约束索引和状态待办。
+- 验证：actionlint 1.7.12 工作流语法检查（未启用本机缺失的 ShellCheck/Pyflakes）、5 项定向 Vitest、测试文件 ESLint、目标文件 Prettier/diff 空白检查、docs-drift、metric-governance 通过。架构 changed 与 all 最后一次运行均为 0 violations。
+- 验证边界：架构 all 首轮曾报告 2 条违规，复测通过；期间其他工作将 HEAD 从 `4c6f0d9` 推进至 `7834fc5`，不将不同快照合并宣称一次全绿。本轮未修改架构脚本或扩大 baseline，未运行全量业务测试。
+- 本轮未开子代理，未操作暂存区、提交、推送或发布；未改业务代码与文档缺失阻断策略。CI 配置仅在工作区落地，GitHub 实际运行仍待授权提交/推送后验收。
+
+### 2026-09-05 DataScope/Object Authorization 与 Metric Governance 专项切片（Inspection 收尾）
+
+- 提交 `be9ef0b`：检验记录创建时将附件引用登记纳入同一事务，避免主记录成功而 canonical file reference 丢失。
+- 提交 `4c6f0d9`：检验记录更新改用对象范围仓储与乐观 CAS，越权或并发失效均 fail-closed。
+- 提交 `d31b80d`：报检请求创建入口接入幂等 claim/replay，保持既有业务冲突重试语义。
+- 提交 `7834fc5`：报检请求派发读取与状态 CAS 更新带请求对象 DataScope，并由 HTTP 路由透传 middleware scope。
+- 提交 `777bdea5`：HTTP 事件缺失 scope 时派发 fail-closed；Telegram/system 仅通过 `event === null` 保留受信路径，补齐 dispatch 测试夹具的部门查询 mock。
+- 提交 `8df2b47`：补充 HTTP 缺失 scope 必须构造空集查询并返回 404 的回归测试。
+- 提交 `31a46d35`：补齐 Technical Aggregation Registry 的 69 个实现点，并明确其与业务 Metric Registry 的边界；不涉及消费者切换或业务口径变更。
+- 提交 `473e21c5`：Inspection Request Stats 的 DB 分组结果按 `requestCount` 正确折算计数，补齐 accumulator 类型契约并登记系统级 workload 聚合口径。
+- 提交 `2daaa9b8`、`a51fb50c`、`c8ade72c`：Supplier、After-sales、Work-order 前端补齐共享 `version` 类型、编辑回传和删除参数，接通后端乐观锁。
+- 提交 `298e2139`、`4921df06`、`2ee3c9df`：Quality-loss 与 Inspection 前端创建入口透传幂等键，统一复用操作 ID；匿名公开报检保持无 key。
+- 验证：派发 service/adversarial/API 3 files / 41 tests、后端 TypeScript、`check:qms-arch`、diff check 通过。未执行 migration deploy、生产数据库或端到端验证；未进行 Metric Governance consumer cutover 或历史回算。
+
+### 2026-09-05 AGENT-RULES：轻量默认配置与推送检查落地
+
+- Sol 默认 Low、规划模式 High；默认子代理及 terra-executor 均为 Low，并发子代理上限为 1，不强制委派。配置已持久化，不宣称当前运行会话已切换。
+- 治理约束改为完整覆盖授权范围，允许单文件解决；项目档案同步实际配置与推送检查行为。
+- pre-push 使用 Node 标准库读取真实推送范围：说明文档白名单走 docs-drift，其余保留 typecheck、qms-arch、docs-drift；删除、改名、多目标基准、未知输入与代码 WIP 不漏入轻量路径。未增加依赖，CI 与发布流程未改。
+- 验证：`node --test scripts/test-pre-push.mjs` 13/13 通过，包含临时仓库中的真实 Lefthook 输入传递与失败拦截；两份脚本 ESLint、TOML 配置解析和 docs-drift 通过。未运行全量业务测试或执行真实推送。
+- 本轮未开子代理，未改业务代码，未暂存、提交或发布；已有 CI 执行缺口仍按项目档案记录，不在本轮中宣称修复。
+
+### 2026-09-05 AGENT-RULES：收敛轻量执行的例外与记录要求
+
+- 治理优先复用基础能力与现有检查，只有已证实的不足才新增；默认轻量，复杂实现有证据时局部升级 High。
+- 文档与执行性变更按实际风险选择提交前验证；保留现有 hook/CI，不声称自动门禁已按文档分流。仅项目进度实际变化时更新状态日报。
+- 本轮仅修改项目档案、治理纲领及本条记录；未改业务代码、模型配置或 CI，未开子代理、未提交。
+- 验证：两个规则文件 Prettier 检查、目标文件 diff 空白检查通过；已核对旧强制条款移除及相关引用仍一致。未运行与本轮无关的业务测试。
+
+### 2026-09-05 AGENT-RULES：写入轻量执行准则
+
+- 写入“规划可高，执行要轻，约束先行”；High 仅作必要规划，Low / Luna / Terra 落地，默认单 Agent，不套用重型技能流程。
+- 替换强制 Terra 执行的旧路由；补充安全 Git 回滚边界，以及必要测试、小范围 diff、无多余抽象的验收要求。
+- 本轮仅改项目档案、入口及状态/执行记录；未开子代理，未改模型配置、业务代码或 CI，未提交。
+- 验证：AGENTS.md 与项目档案 Prettier 检查、四个目标文件 diff 空白检查、docs-drift 均通过；已核对新准则替代旧强制路由，未运行无关业务测试。
+
+### 2026-09-05 DataScope/Object Authorization 与 Metric Governance 专项切片（第三批）
+
+- 提交 `cdfb1c4`：Scheduler jobKey 唯一化、空/非法注册表禁用与分钟边界执行 CAS。
+- 提交 `11eb695`：Idempotency core（事务 claim/replay、唯一迁移、错误码）独立落地。
+- 提交 `bcd62e3`：售后、质量损失、检验请求/问题/记录创建入口接入幂等，并在五类 replay guard 中复核当前 DataScope。
+- 提交 `fba34cc`：Metrology 公共借还在凭证未配置时 fail-closed 为 403。
+- 定向门禁：Scheduler 2 files / 20 tests；Idempotency core 3 files / 26 tests；创建入口 10 files / 45 tests；Metrology 16 files / 224 tests；各自 tsc、`check:qms-arch`、diff check 通过。
+- 未执行 migration deploy、生产数据库或端到端验证；其余消费者/前端与混合 guard 脚本仍留在工作树，未混入本批提交。
+
+### 2026-09-05 DataScope/Object Authorization 与 Metric Governance 专项切片（续）
+
+- 提交 `a3ae702`：Supervision Object Authorization 基座，覆盖写入口、`createdBy` migration，以及任务关联校验与日报/任务状态 CAS。
+- 提交 `f794d6a`：Task Dispatch 父任务 scope、状态规范化和 seed POST + CREATE 权限；依赖 `1fd63d5` DataScope foundation。
+- 定向门禁：Supervision 13 files / 74 tests；Task Dispatch + DataScope 4 files / 65 tests；后端 TypeScript、`check:qms-arch`、`check:metric-governance`、`check:docs-drift` 通过；全局 `pnpm run check` 通过。
+- 全量 `pnpm lint` 仍被 8 个既有跨专项文件阻塞（dashboard test、metric governance docs、治理快照）；未把这些无关格式改动混入提交。
+- 未执行 migration deploy、生产数据库或端到端验证；治理快照目录与 `qms-allow-output.txt` 保持未跟踪、未提交。
+
+### 2026-09-05 AGENT-RULES：项目规则与任务边界收敛
+
+**执行内容：**
+
+- AGENTS.md、CLAUDE.md、qg-project 统一路由至项目档案，去除重复技术清单和旧状态入口；保留既有领域安全规则与 Sol/Terra 配置。
+- 明确只读/实现/专项治理/外部操作边界，使用开工基线保护已有重构，取消按内部步骤强制提交及整个工作区文件数量停止阈值。
+- 验证按风险与任务类型选择；强制提交、CI 和发布门禁不被结果复用规则豁免。记录当前 CI 与 docs-drift 的真实覆盖和未接入项，未修改门禁实现。
+- 同步修正 /Users/zhaoxiaojie/AGENTS.md 与 /Users/zhaoxiaojie/.codex/AGENTS.md 中的无关 vault 前置条件、错误命令、失效工具映射与重复门禁清单；未访问或更新知识库内容。
+
+**验证：** 8 份核心/全局规则文件通过 Prettier 检查；6 份项目规则的 8 个本地 Markdown 引用及技能路由存在性通过；生成状态段、原有 CHANGELOG 内容和技术/安全基线保留检查通过；`rtk git diff --no-compact --check` 与 `pnpm run check:docs-drift` 通过。独立代理完成 6 个只读行为场景复核，并据此明确执行待办不自动成为当前专项范围。未运行后端全量测试或前端构建；本结论不代表新会话实际加载或 CI 缺口已修复。
+
+**提交/发布：** 本任务未提交、未推送、未发布；本任务没有写入业务代码或操作暂存区。工作期间其他任务更新了指标治理文件并在本日志末尾追加提交记录，已保留，未归入本轮成果。CI 执行缺口列入 PROJECT_STATE 待办，本次没有声称修复。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-6 REAL METRIC MIGRATION EXECUTION
+
+**执行内容：**
+- 注册四项真实 Adapter，并执行固定窗口 `2025-08-01..2026-07-31` 的 ALL/DEPT/SELF Shadow Run。
+- 实际输出 12 条 `BLOCKED` Evidence；未伪造结果，未执行 Consumer Cutover 或 Historical Backfill。
+- 阻塞原因：Shadow Database 缺失、DEPT/SELF Identity 缺失及部分业务 Policy 未批准。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-6：Core Business Metrics Migration
+
+**执行内容：**
+- 为四项核心业务指标建立统一迁移矩阵和逐指标执行要求。
+- 复用 Policy/Version/Consumer/Backfill 分层治理，不重复建设能力。
+- 明确 Shadow、Dual Run、业务批准、Rollback 和 Exception Queue 门禁；未执行消费者迁移或历史回算。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5：Enterprise Governance Capability Implementation
+
+**执行内容：**
+- 汇总 Metric Policy、Version、Consumer Cutover、Historical Backfill 分层审批体系。
+- 定义 Batch Backfill Job、Evidence、Validation Summary、Exception Queue 和异常人工复核。
+- 定义 ACTIVE、DEPRECATED、ARCHIVED 生命周期和批量治理运行模型。
+- 未修改业务指标结果、历史数据或自动批准任何业务规则。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5H.1：Approval Granularity Optimization
+
+**执行内容：**
+- 设计 Metric Policy、Version、Consumer Cutover、Historical Backfill 四层审批。
+- 新增 Historical Recalculation Governance：Batch Job Evidence、Validation Summary、Exception Queue、异常人工复核。
+- 未批准现有业务容差，未执行消费者切换或历史回算。
+
+**验证：**docs drift / git diff check 待本轮完成。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5H：BM-GROSS-QUALITY-LOSS Human Approval Import
+
+**执行内容：**
+- 校验 PHASE-5G Human Decision Template。
+- 因人工 Decision、Decision By、Effective Date、Tolerance、Scope 和 Rollback Confirmation 均为空，导入结果为 BLOCKED。
+- 未创建 Approval Evidence，未修改 Registry/Version，未执行 Consumer Cutover。
+
+**验证：**docs drift / git diff check 待本轮完成。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5G：BM-GROSS-QUALITY-LOSS Human Decision Recording
+
+**执行内容：**
+- 生成 Gross Quality Loss Tolerance Decision Form。
+- 生成 Cutover Approval Form。
+- 生成保留原始审批内容的 append-only Decision Evidence Record 模板。
+- 未自动填写负责人、日期、容差或批准结果，未执行消费者切换。
+
+**验证：**docs drift / git diff check 待本轮完成。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5F：BM-GROSS-QUALITY-LOSS Business Tolerance Approval
+
+**执行内容：**
+- 生成 Gross Quality Loss Diff Tolerance Policy。
+- 生成 Gross/Net/Claim Recovery、财务规则和历史回算 Business Review Checklist。
+- 生成 Final Cutover Approval Template；未自动批准容差、负责人或日期，未切换消费者。
+
+**验证：**docs drift / git diff check 待本轮完成。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5E：BM-GROSS-QUALITY-LOSS Consumer Cutover Readiness
+
+**执行内容：**
+- 补充 Dashboard、Analytics API、Quality Loss Summary 的最终 Cutover Gate。
+- 明确 Evidence、Scope、MATCH、MINOR_DIFF 容差、业务复核关闭和 Rollback 条件。
+- 定义 Consumer Cutover Audit 字段；当前保持 `PHASE5E_READY_FOR_CUTOVER=false`，未执行切换。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5D：BM-GROSS-QUALITY-LOSS Consumer Dual Run
+
+**执行内容：**
+- 新增 Dashboard、Analytics API、Quality Loss Summary 的消费者级 Dual Run 封装。
+- 验证 `SUM(amount)`、`occurDate`、`isDeleted=false`、ALL/DEPT/SELF 和 Gross/Net/Claim 边界。
+- 保留 Legacy 输出、Legacy Query、Rollback Path，未执行消费者切换。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5C：BM-GROSS-QUALITY-LOSS Consumer Cutover Readiness
+
+**执行内容：**
+- 建立 Quality Loss Dashboard、Analytics API、Report、Export、Quality Loss Summary 的 Consumer Mapping。
+- 定义 Evidence、MATCH、DataScope、Rollback 切换门禁及 Forward/Rollback Adapter 设计。
+- 未执行任何消费者切换，保留 Legacy Calculation。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5B：BM-GROSS-QUALITY-LOSS Dual Run Implementation
+
+**执行内容：**
+- 新增 Gross Quality Loss Legacy/Canonical 双轨执行入口及 Evidence 持久化。
+- 覆盖 ALL/DEPT/SELF、`SUM(amount)`、`occurDate`、`isDeleted`、DataScope 与 Net/Claim 边界。
+- 未切换 Dashboard、Report 或其他消费者。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-5A：BM-GROSS-QUALITY-LOSS Consumer Migration Preparation
+
+**执行内容：**
+- 扫描 Quality Loss Dashboard、Analytics API、Report、Export、Scheduled Jobs、Quality Loss Summary。
+- 登记 Legacy 公式、数据源、Canonical Target、迁移策略及风险。
+- 明确 Gross Loss、Net Loss、Claim Recovery 与 Finance/Quality 数据边界；未执行消费者切换。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4H：First Pass Yield Report Consumer Cutover
+
+**执行内容：**
+- ReportSummaryService/Quality Summary 启用 BM-FIRST-PASS-YIELD Canonical Adapter。
+- 保留 Legacy Calculation 与 Dual Run Evidence，支持 `METRIC_FIRST_PASS_REPORT_CANONICAL=false` 回滚。
+- 写入 Report Consumer Cutover Audit，并保留历史报告、Definition 与 ACTIVE Version 不变。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4G：First Pass Yield Report Canonical Cutover
+
+**执行内容：**
+- 扫描 Report Service、Scheduled Report、Export Report 与 Quality Summary，登记 Legacy 计算、Canonical 目标、风险和回滚路径。
+- 新增 Report Adapter，支持 Canonical Forward 与 Legacy Rollback；报告消费者默认仍使用 Legacy，不切换历史输出。
+- 补充 ALL/DEPT/SELF 双轨结果、差异分类和切换门禁文档。
+
+**验证：**待本轮门禁完成后补充。
+
+### 2026-08-21 PERF-QMS-001 / PHASE-2A：Inspection Request Stats 聚合下推治理
+
+**执行内容：**
+- `GET /qms/inspection/requests/stats` 的 `periodRequests` 段由「scoped `findMany`
+  全量 O(N) → Node 逐行 submitted/closed 双桶聚合」下推为「2× scoped raw SQL
+  `GROUP BY` 预聚合（COUNT + 时长 SUM，O(groups)）→ Node 纯函数组合」，业务口径
+  与 DataScope 完全一致（submitted 桶：submittedAt 区间 + 非 CANCELLED；closed 桶：
+  closedAt 区间 + CLOSED；`hasLinkedIssue` 由 SQL 计算；上海 +08:00 日期分桶与
+  `formatInspectionRequestStatsDate` 等价；closed 时长 = `FLOOR(TIMESTAMPDIFF
+  (MICROSECOND, COALESCE(dispatchedAt, submittedAt), closedAt)/60000000)` 钳 0，
+  与 JS `durationMinutes` 一致）。
+- 新增 `modules/inspection/inspection-request-stats-period.ts` 纯函数核心：
+  `classifyPeriodSubmittedRow / classifyPeriodClosedRow / applyPeriodSubmittedGroup /
+  applyPeriodClosedGroup`（count 乘子 + 时长 SUM 输入）+ `accumulatePeriodRequestRows`
+  逐行 oracle（仅测试使用，生产不运行）。
+- `inspection-request-stats-data.ts` 重写：新增 `loadSubmittedPeriodGroups /
+  loadClosedPeriodGroups`（均内嵌 `buildRequestHistoryRawScopeSql`，DEPT/SELF/ALL/
+  空候选 fail-closed 与 request 列表/历史一致），`loadInspectionRequestStatsData`
+  并行 6 查询；移除 `periodRequestSelect / InspectionRequestStatsPeriodRequest`。
+- `inspection-request-stats.service.ts` 重写：身份映射（supplier/team canonical/
+  process→department/责任部门名称）改从 submitted+closed 分组并集收集（与旧全量行
+  等价）；inspector 完成排行与 `inspectorNamesById` 改从 closed 分组（含 name 快照）；
+  submitted/closed 聚合改 `applyPeriod*Group`；API 响应 shape 不变（Breaking Change
+  无，仅测试 mock 契约变化）。
+- Guard（PERF-QMS-001 / PHASE-2A 增量）：`DB_AGGREGATION_INVARIANTS` 新增
+  `inspection-request-stats.service.ts#getRequestStats` 与
+  `inspection-request-stats-data.ts#loadInspectionRequestStatsData` 的
+  `qms_inspection_requests.findMany` 拦截（防回归全量聚合）；Guard fixture 新增
+  db-aggregation-003（拦裸 findMany / 放行 scoped raw GROUP BY 路径，R-SCOPE-RAW
+  与 R-SCOPE-AGG 均验证）。
+- 测试：`inspection-request-stats.service.test.ts` 重写为按 SQL 内容路由
+  `$queryRaw` 分组 mock（33 例全绿，含 DEPT/SELF/ALL/fail-closed raw SQL 断言）；
+  新增 `inspection-request-stats-period.test.ts` 7 例（分组路径 ≡ 逐行 oracle、
+  count 乘子、时长 SUM、跨日/边界/负时长/未解析身份/零负乘子）。
+- 文档：`docs/performance.md` §5.1 增补 period 下推行、§5.2 PERF LEGACY 清零、
+  §5.5 INDEX CANDIDATES 登记 `qms_inspection_requests(isDeleted, submittedAt, status)`
+  与 `(isDeleted, closedAt, status)`（PERF-QMS-001 / PHASE-2B 索引专项，本专项未建
+  索引）；`docs/metrics-registry.md` + `apps/backend/utils/metrics-registry.ts`
+  M-D04 口径更新（DB 预聚合 + 3 个 implementation points）。
+
+**验证：** lint / check:type / 40 例 stats 相关用例 / Guard fixture db-aggregation-003 /
+check:qms-arch:all 0 violations / docs-drift 全绿。
+
+### 2026-08-20 IDEMPOTENCY-KEY-001 / PHASE-2：P1 创建入口请求级幂等迁移
+
+**执行内容：**
+- Utility 升级（`modules/idempotency/request-idempotency.ts`）：
+  - P2002 严格区分：claim 唯一键冲突（`meta.target` 含 idempotencyKey/actorKey）才进
+    replay；业务 P2002（requestNo/serial/NC 号）原样抛出，由模块 retry wrapper 重启
+    整个 claim 事务（业务失败整体回滚，无 COMPLETED zombie）。
+  - 过期语义改为 Logical Reclaim：过期 PROCESSING/COMPLETED 行 CAS
+    `updateMany({ where: {...claimWhere, expiresAt <= now, status IN (...) } })`
+    原子抢占，count≠1 读取解析新 claim；内置 `MAX_CLAIM_RECURSION_DEPTH=3` 护栏。
+  - 新增 `isClaimUniqueConflict()` 判定；物理清理登记 `IDEMPOTENCY-RETENTION-001`。
+- 五个 P1 创建入口迁移（均强制 `Idempotency-Key`，缺失 400，窗口 5 分钟）：
+  - `POST /qms/inspection/requests/v2`（`qms.inspection-request.create`）：service 拆
+    `prepareCreateRequest`（事务外读）/`createRequestInTransaction`（requestNo 事务内
+    生成）/`applyCreateRequestPostCommitEffects`（文件引用+审计+SSE/Redis+Wx+Telegram
+    仅首次）；public v2 已登录分支共用同一 operationKey+actorKey（跨 web/public 重试
+    replay），匿名分支登记 PUBLIC IDEMPOTENCY IDENTITY GAP 不强制 key。
+  - `POST /qms/after-sales`（`qms.after-sales.create`）：新增
+    `after-sales-create.post.service.ts` + `after-sales-id.ts` 序列号支持 tx，
+    `applyCreatePostCommit`（文件引用+审计）仅首次。
+  - `POST /qms/inspection/issues`（`qms.inspection-nc.create`）：新增
+    `inspection-issue-create.post.service.ts`（claim 事务内创建，NC 指纹非去重键，
+    不同 key + 相同 payload 允许第二条 NC）；import/批处理仍走旧 `createIssue`。
+  - `POST /qms/inspection/records`（`qms.inspection-record.create`）：handler 内
+    `withRequestIdempotency`，serial P2002 内层 for 循环重启整个 claim，
+    `syncLinkedIssuePostCommitEffects`/audit 仅首次。
+  - `POST /qms/vehicle-commissioning/issues`
+    （`qms.vehicle-commissioning-issue.create`）：`createIssueFromBody` 支持 tx，
+    post-commit 拆 `applyIssueCreatePostCommit`（照片引用 + QualityLossIndex signal
+    audit 部分）仅首次。
+- 稳定 fingerprint 5 个（inspection-request / after-sales / inspection-issue /
+  inspection-record / vehicle-commissioning-issue），字段排序无关，附件/照片排序稳定。
+- Guard：`R-IDEMPOTENCY` 由单文件 Pilot 规则升级为配置式
+  `IDEMPOTENCY_PROTECTED_CREATE_OPERATIONS`（六入口 filePattern → operationKey）；
+  要求 protected create 文件调用 `withRequestIdempotency` 且引用注册 operationKey
+  （drift → violation）；Guard fixture 覆盖六入口合规/裸写/operationKey drift。
+- 文件拆分满足 500 行门禁：`inspection-request-create-payload.ts`
+  （inspection-request-create.service.ts 540→291 行）、
+  `vehicle-commissioning-issue-create-effects.service.ts` +
+  `vehicle-commissioning-issue-create-payload.ts`
+  （vehicle-commissioning.service.ts 516→444 行）。
+- 前端：新增 `#/composables/useCreateOperationId.ts`
+  （`acquire`/`reset` + `isIdempotencyReusedError`）；6 个 api 函数透传
+  `Idempotency-Key` header；5 个视图接入（inspection/requests/entry public v2 匿名不传
+  key / after-sales form / IssueEditModal / inspection-record / vehicle-commissioning）。
+- 测试：utility 15 例（claim/business P2002/expired reclaim/并发 reclaim 单主）+
+  fingerprint 17 例 + 5 个 handler 24 例 + Guard fixture 六入口 + 前端 14 例适配。
+- 文档：`docs/idempotency.md`（§2 PHASE-2 表、§8 Logical Reclaim、§13 PUBLIC
+  IDEMPOTENCY IDENTITY GAP、§14 IDEMPOTENCY-RETENTION-001）、inspection /
+  after-sales / vehicle-commissioning 三模块 ARCHITECTURE.md、CHANGELOG、PROJECT_STATE。
+
+**验证：** lint / check:type / 受影响模块 105 文件 951 用例全绿 / check:qms-arch
+（changed+all 0 violations，baseline 未增）/ docs-drift 待最终门禁。
+
+**Breaking Change：** 五个认证创建入口（inspection-request v2 / after-sales / NC /
+inspection-record / vehicle-commissioning-issue）强制 `Idempotency-Key`（缺失 400）；
+public v2 匿名扫码入口不变；其余 API 契约不变。
+
+**commit:** 未提交
+
+### 2026-08-20 IDEMPOTENCY-KEY-001 / PHASE-1：请求级幂等最小基线 + Quality Loss Pilot
+
+**执行内容：**
+- 新增 `idempotency_requests` 表（正式 migration `20260820220000_add_idempotency_requests`）：
+  `@@unique([actorKey, operationKey, idempotencyKey])` 并发抢占、`expiresAt` 索引、
+  状态最小化 `PROCESSING/COMPLETED`（业务失败整体回滚，无 COMPLETED zombie，无 FAILED
+  持久化），不用 isDeleted 建模。
+- 新增 `modules/idempotency/` 最小 Utility（非 middleware）：`withRequestIdempotency`
+  （claim → 业务 run → COMPLETED 同事务；P2002 败者读已落定记录：同 fingerprint →
+  replay 首次结果 / 不同 fingerprint → 409 `IDEMPOTENCY_KEY_REUSED` / 仍 PROCESSING →
+  409 `IDEMPOTENCY_REQUEST_IN_PROGRESS` / 无落定记录 → 重 claim；`resourceGuard` 复查
+  资源存在性）+ `request-fingerprint`（canonical 键序 + 剔除 undefined → SHA-256，仅用于
+  同 key 不同 payload 检测）+ `idempotency-key`（Header 8～128 字符 `[A-Za-z0-9._~-]`）。
+- Quality Loss Pilot：`POST /qms/quality-loss` 强制 `Idempotency-Key`（缺失 400 不占 key）；
+  fingerprint 取创建语义稳定字段（工单/部件/类型/金额/日期/责任部门，排除 UI 噪声）；
+  首次成功正常 audit + enqueue，replay 不重复 audit/enqueue/不重新生成 lossId；
+  窗口 5 分钟（`QUALITY_LOSS_IDEMPOTENCY_WINDOW_MS`）。
+- 前端：`createQualityLoss` 支持 `Idempotency-Key` header；LossEditModal 每次创建操作
+  生成一个 UUID，网络/按钮重试复用同 key，成功或 409 REUSED 后清空（新操作新 key）。
+- Guard：新增 `R-IDEMPOTENCY` 窄规则（Pilot 文件必须调用 `withRequestIdempotency`，
+  fixture 拦裸 quality_losses.create / 放行 helper 包裹）；`DECLARED_ERROR_CODES` 同步
+  新增两个错误码；code_map.md 登记 idempotency 模块。
+- 测试：utility 10 例（claim/同 key replay/REUSED/IN_PROGRESS/重 claim/失败回滚/跨用户/
+  跨 operation/resourceGuard/expiresAt）+ key 6 例 + fingerprint 5 例 + Pilot 指纹 6 例 +
+  Pilot 服务 5 例（缺 key 400/首次创建+audit/replay 不创建不审计/REUSED 409/失败无
+  COMPLETED）+ Guard fixture 2 例。
+- 文档：`docs/idempotency.md`（Unique Number/CAS/Business Key 三者区分、Key Contract、
+  actor/operation 绑定、事务边界、replay/安全/副作用）、quality-loss ARCHITECTURE.md
+  Pilot 登记、CHANGELOG、PROJECT_STATE。
+
+**验证：** lint / check:type / 新增 32 用例全绿 / check:qms-arch（changed+all 0 violations，
+baseline/marker 未增）/ docs-drift 全绿 / check:prisma-migration。
+
+**commit:** 未提交
+
+### 2026-08-20 CLOSE-EFFECTS-RECONCILE-001：Inspection 附件历史一致性审计与受控修复
+
+**执行内容：**
+- 新增共享漂移核心 `apps/backend/scripts/inspection-document-drift-core.ts`（audit 与
+  reconcile 共用）：四类漂移（json_without_reference / reference_without_json /
+  duplicate_json_id / invalid_file_id）按「drift × asset 状态」权威表决策——
+  ACTIVE json 无 canonical → REPAIR_REFERENCE（createMany + skipDuplicates）；
+  死资产且无 canonical → REMOVE_INVALID_SNAPSHOT（只删 JSON 项）；
+  ACTIVE canonical 缺 JSON → REBUILD_SNAPSHOT；重复 fileId → DEDUPE_SNAPSHOT；
+  UNKNOWN / 非 ACTIVE / invalid_file_id 带 canonical → MANUAL_REVIEW（fail-closed，
+  不猜测修复）。
+- 受控修复工具 `apps/backend/scripts/reconcile-inspection-document-drift.ts`：
+  默认 dry-run 只输出 plan；`--apply` 必须配 `--plan-file`（audit→plan→review→apply
+  强制），apply 前逐条按 live 行重算（计划不脱手）；事务内
+  `updateMany({ where: { id, documents, selfCheckDocuments } })` 双列快照 CAS，
+  count=0 → SKIPPED_CONCURRENT_CHANGE 不覆盖并发用户改动；已一致 → ALREADY_CONSISTENT
+  幂等；报告携带 rollback（snapshot CAS where/data + createdReferences）；
+  分页游标 `--after-id/--batch-size/--limit` 可断点续跑；不触碰 OSS/local storage。
+- 审计脚本 `apps/backend/scripts/audit-inspection-document-drift.ts` 升级：复用 core
+  分类器（只读分页），新增 `--json/--limit/--after-id/--batch-size/--output-file`，
+  记录含 inspectionId/driftType/fileId/url/canonicalReference/snapshotValue/detectedAt。
+- 生产 SOP：只审计报告 + 人工 review plan + 受控 apply；禁止自动修生产数据；禁止删除
+  合法 canonical 适配 JSON；零 migration、零 schema 变更。
+- 测试：`reconcile-inspection-document-drift.test.ts` 24 例（权威表全分支、apply 幂等、
+  CAS 并发 SKIPPED、rollback 结构、批处理参数、reconcile 入口校验）。
+- 文档：docs/data-integrity.md §3.1（SOP/权威表/范式）+ §4 专项登记。
+
+**验证：** lint（4 个脚本文件 0 error）/ check:type / 新增 24 用例全绿 /
+check:qms-arch（changed+all 0 violations，baseline/marker 未增）/ docs-drift 全绿。
+
+**commit:** 未提交
+
+### 2026-08-20 CLOSE-EFFECTS-INTEGRITY-001：Inspection Request Close Effects 一致性治理
+
+**执行内容：**
+- 严格关单 CAS：主事务守卫由 `status: { not: CLOSED }` 改为锚定预读状态
+  `updateMany({ where: { id, isDeleted: false, status: request.status }, data: { status: INSPECTING } })`
+  ——并发同请求 close 只有一个成功（原 `not: CLOSED` 会让并发 FAIL 关单双过），败者抛业务错误且不触发
+  close-effects。
+- 附件合并 Lost Update 修复（方案 B）：`syncCloseAttachments` 的
+  `findUnique → JS merge → update({where:{id}})` 改为 `mergeInspectionDocumentsWithCas`——
+  读快照列 → 按 fileId/url 去重合并 → `updateMany({ where: { id, documents, selfCheckDocuments } })`
+  CAS（count=0 重读重合并，最多 3 次，超限抛错）；成功后才登记 `file_references`；按检验记录逐个
+  隔离失败，一条失败不吞掉其它记录。
+- tx 传播修复：`inspection-record-create/update` 事务内两处
+  `FileStorageService.registerReferencesFromAttachments` 补传 `tx`（原内部走 global prisma，
+  引用登记逃出事务）。
+- 失败恢复上下文：`runClosePostCommitTask(label, task, context?)` 失败日志携带
+  `effectName/requestId/inspectionId`；close/issue-effects/审计调用点全部补上下文。
+- Guard：新增窄规则 `R-CLOSE-EFFECT`（close-effects 文件内 `inspections.update/updateMany`
+  必须锚定 documents/selfCheckDocuments 快照列或 opaque spread；裸 `{id}`、无关列 CAS、
+  单列锚点均拦截；marker 带 reason 豁免）；移除 baseline
+  `R-SCOPE|...close-effects.service.ts|bare-id-write-inspections.update` 1 条。
+- 存量漂移审计：新增只读脚本 `apps/backend/scripts/audit-inspection-document-drift.ts`
+  （`pnpm --dir apps/backend run audit:inspection-document-drift`），比对 JSON 快照 ↔
+  `file_references`（json_without_reference / reference_without_json / duplicate_json_id /
+  invalid_file_id），只报告不修复，有漂移则登记 CLOSE-EFFECTS-RECONCILE-001。
+- 测试：close-effects 重写 9 例（CAS 锚点断言/重试保留 A+B/有限重试+上下文日志/逐项隔离/
+  幂等去重）；close.service 新增严格 CAS where 断言与并发 guard count=0 不触发 effects；
+  adversarial 守卫断言更新；record-create/update 新增 tx 传播断言；Guard fixture
+  （拦裸写/无关列 CAS/tx 裸写，放行双列快照 CAS/spread/marker）。
+
+**验证：** lint / check:type / inspection 模块 74 文件 760 用例 / check:qms-arch
+（changed+all 0 violations，baseline 减 1）/ docs-drift 全绿。
+
+**commit:** 未提交
+
+### 2026-08-20 STATE-MACHINE-001：核心业务状态转换一致性治理
+
+**执行内容：**
+- 三模块新增独立显式状态矩阵（不建全局万能状态机）：task-dispatch
+  （`task-dispatch-state.ts`：PENDING→DISPATCHED/PROCESSING/COMPLETED/CANCELLED、
+  DISPATCHED→PROCESSING/COMPLETED/CANCELLED、PROCESSING→COMPLETED/CANCELLED，
+  COMPLETED/CANCELLED 终态）；vehicle-commissioning（`vehicle-commissioning-state.ts`：
+  OPEN/IN_PROGRESS/RESOLVED 可互转+CLOSED、CLOSED 仅重开回 OPEN，closedAt 随状态同步）；
+  quality-loss（`quality-loss-state.ts`：Pending/Processing/Confirmed/Resolved 统一桶，
+  前向推进 + 显式纠偏边）。
+- 统一 CAS 范式：`findAccessible/事务内 tx.findFirst` 读当前状态 → `assert*Transition`
+  断言（未知状态文本 400 fail-closed、非法跳转 409）→
+  `updateMany/updateAccessible({ where: { id, status: <期望当前状态>, ...scope } })` →
+  `count !== 1` 只读复查区分 404（不存在/无权限，不泄露对象存在）与 409（并发状态已变化）。
+- 写路径严格解析：vehicle-commissioning 新增 `assertVehicleCommissioningIssueStatus`
+  （未知文本 400，杜绝静默归一为 OPEN 导致意外重开 CLOSED，读路径保留宽松别名解析）；
+  quality-loss 新增 `parseQualityLossUpdateStatus`（非 string/未知 → null → 400，
+  不静默归一 Pending）；仅 MANUAL 来源状态变更走状态机，其余来源保持回对应业务页语义。
+- 路由错误映射：task-dispatch `status.put.ts`、vehicle-commissioning `issues/[id].put.ts`
+  统一 `businessErrorResponse`（409/404/400 生效）；quality-loss `[id].put.ts` 保持
+  服务层抛 409、路由顶层映射（文件 49 行，B-R2 通过）。
+- Architecture Guard 新增 R-SM：`STATE_MACHINE_PROTECTED_MODELS =
+  { qms_task_dispatches, quality_losses, vehicle_commissioning_issues }` 模型级保护，
+  `analyzeStateMachineStatusWrite` 检测保护模型 `data.status` 写必须带 CAS 锚点
+  （where 含 status/scope/OR/AND/spread），`{id}`/`{id,isDeleted}` 变形、updateMany、
+  `tx.*` 事务客户端、跨模块 helper 裸写均拦截；marker 需带 reason 才豁免；
+  `check-qms-architecture.sh` usage 补 R-SM 说明。
+- 测试：三模块新增 `*-state.test.ts`（矩阵/严格解析/非法跳转/unknown 400）；
+  task-dispatch / vehicle-commissioning / quality-loss-route-update service 测试改 CAS
+  断言并新增非法跳转 409、CAS 竞争 409、unknown 400；quality-loss-summary 测试适配
+  `findFirst+updateMany` 事务 mock；Guard fixture 固化 R-SM 拦/放矩阵。
+
+**验证：** lint / check:type / 全量 426 文件 3595 用例 / check:qms-arch（changed+all 0 violations）/
+docs-drift 全绿；baseline 未增加。
+
+**commit:** 未提交
+
+### 2026-08-20 OPTIMISTIC-LOCK-001：关键业务记录乐观锁统一治理
+
+**执行内容：**
+- 公共基线：`@qgs/shared` `ErrorCode` 新增 `OPTIMISTIC_LOCK_CONFLICT`（409，UX warning 桶）；
+  scoped-repository 新增 `updateAccessibleVersioned(args, ctx, expectedVersion)`（where 合并
+  `version: expectedVersion` + DataScope，data 强制 `version: { increment: 1 }`，调用方无法伪造
+  version 列）与 `assertVersionedWriteAffected(count, exists, label)`（count=0 → 只读 scoped 存在性
+  复查 → 不存在/无权限 404 不泄露 / 版本过期 409，消除 find→判断→update 的 TOCTOU）。
+- after-sales：`PUT /qms/after-sales/:id` 事务内 `findAccessible` → `updateAccessibleVersioned` →
+  count=0 分类 404/409，审计带 oldVersion/newVersion，queue 副作用保留事务内；`deleteRecord` 提取至
+  `after-sales-delete.service.ts`（用户删除带 version，系统清理省略 version 走非版本化 scoped 软删）。
+- supplier：`SupplierMutationService.update/delete` 版本化（`{ id, version, ...scopeWhere }` +
+  increment），返回 `{...current, version: expectedVersion + 1}`；create/restore/import/batchUpsert
+  属 PRODUCT_DECISION 不强制用户 version。
+- work-order：`update`/`deleteById` 版本化写提取至 `work-order-versioned-write.service.ts`
+  （`{ workOrderNumber, version, ...scopeWhere }` + increment，主键为 workOrderNumber 无 id 列），
+  冲突分类 404/409，审计带 oldVersion/newVersion；import upsert / create-restore 不逐行要求 version。
+- API Contract：列表/详情全行映射已随响应返回 `version`；用户 PUT/DELETE 强制 version（body/query），
+  缺失或非法 400，统一 `utils/optimistic-lock.ts#requireExpectedVersionBody/Query`。
+- 路由治理（B-R2/B-S1）：4 个写路由（after-sales/supplier DELETE、work-order PUT/DELETE）按既有 PUT
+  范式下沉为模块级 handler service，api 路由变薄封装；after-sales.service（528→441 行）、
+  work-order-route.service（519→381 行）回到门禁限制内，无 marker 豁免。
+- 前端：shared 类型 `AfterSalesItem/SupplierItem/WorkOrderItem` 加 `version?`；删除调用传 `row.version`
+  （query params）；WorkOrder/Supplier 编辑弹窗提交 body 携带 `version`；409 提示刷新（不自动覆盖提交）。
+- Architecture Guard：`DECLARED_ERROR_CODES` 补 `OPTIMISTIC_LOCK_CONFLICT`；fixture 固化语义——
+  `{ id, version }` / `{ workOrderNumber, version, isDeleted }` 无 scope 条件仍拦截（version 不是授权
+  条件），scoped repository `updateAccessibleVersioned` / 不透明 scoped where / `{ id, version, status }`
+  CAS+version 并发签名放行。
+- 测试：三模块 43 文件 419 用例全绿——新增 stale 409（updateMany count=0 + findFirst 存在）、缺
+  version 400、冲突不覆盖（updateMany 仅一次）、DataScope 无权限 404 不泄露、delete stale 409、
+  系统删除 force-delete、合法 version 透传；新增 4 个模块级 handler 测试文件（after-sales/supplier
+  DELETE、work-order PUT/DELETE）。
+- 文档：三模块 `ARCHITECTURE.md` 乐观锁契约（OPTIMISTIC_LOCK_REQUIRED）、
+  `docs/permission-module.md` §16（写类型分类/统一能力/冲突语义/API Contract/Guard/LEGACY）。
+
+**验证：** lint / check:type / 三模块 43 文件 419 用例 / check:qms-arch（changed+all 0 violations）/
+docs-drift 全绿。
+
+**commit:** 未提交
+
+### 2026-08-20 SCHEDULER-INTEGRITY-001：Scheduler 多实例一致性治理
+
+**执行内容：**
+- Schema：`cron_jobs.jobKey` 加 `@unique`（唯一任务身份）。迁移
+  `20260820160000_add_cron_jobs_jobkey_unique` 先对历史重复 jobKey 做一次性
+  reconcile（保留 `MIN(id)` 行为 canonical，合并 `enabled`（任一启用则启用）/
+  `lastRunAt`（取最近一次运行，避免提前重跑）／`lastStatus`/`lastError`（取自最近运行的重复行），
+  再删除其余重复行、`CREATE UNIQUE INDEX cron_jobs_jobKey_key`）。本地 `migrate deploy`
+  验证通过：5 行保留、唯一索引生效，无数据丢失。
+- `syncCronJobDefinitions` 重写：删除 find→create 竞态，改为原子
+  `upsert({ where: { jobKey }, create, update: { cronExpr, description, enabled: true, isDeleted: false } })`——
+  不存在创建、存在更新同一行、软删行原地复活；非法 cron 表达式跳过（不创建/不启用）。
+  注册表移除的 job 由 `updateMany({ where: { enabled: true, isDeleted: false, jobKey: { notIn } } })`
+  置 `enabled = false`（registry 为 definition 唯一来源，不物理删除，历史可查/可人工恢复）。
+- tick CAS 复核：保留 `updateMany({ where: { id, isDeleted: false, lastRunAt: null | 早于本分钟 } })`
+  抢占（count=1 唯一执行），补 `enabled: true` 锚点，防止 find→claim 窗口内被 sync 禁用。
+- 失败语义：claim 成功即写 `lastRunAt`；handler 失败仅记 `lastStatus = 'error'`，不回滚
+  `lastRunAt`。RETRY POLICY = NEXT SCHEDULE（at-most-once per minute），本专项不引入重试队列。
+- Guard：不扩大 Architecture Guard；以窄 invariant 单测固化（upsert by unique jobKey + 禁止回退
+  find→create）。
+- 测试：重写 sync 2 例为 upsert 断言 + 新增 6 例（重复 sync 幂等单行/软删复活/cronExpr 同行更新/
+  invalid cron 跳过不建行/registry 移除禁用），tick 2 例强化（CAS where 含 enabled、失败不回滚
+  lastRunAt）；scheduler 模块 17 用例全绿。
+- 文档：`docs/scheduler-design.md` §2.2/§2.4（唯一身份/原子 upsert/执行抢占/失败与重试语义）、
+  `modules/scheduler/ARCHITECTURE.md` 特殊约束、`PROJECT_STATE.md`。
+
+**验证：** lint / check:type / scheduler 17 用例 / check:qms-arch（changed+all 0 violations）/
+check:prisma-migration / docs-drift 全绿。
+
+**commit:** 未提交
+
+**遗留问题：**
+- 多实例下 crash-between-run-and-record 仍可能偶发重跑：handler 幂等契约不变（registry 注释已注明）。
+- 历史重复数据的 reconcile 为一次性迁移行为；生产库如存在重复会在部署时自动收敛为单行。
+- 非 Breaking Change：无接口变化；有 schema 变更（jobKey 唯一索引，含 migration）。
+
+---
+
+### 2026-08-20 SEC-SUPERVISION-001：Supervision 域权限与数据完整性联合治理
+
+**执行内容：**
+- 对象授权基线：新增 `modules/supervision/supervision-access.ts`
+  （`SupervisionAccessContext` + `buildSupervisionAccessContext` + `buildSupervisionAccessWhere`）——
+  admin（super/admin）ALL、普通用户 creator-only、计划任务继承父项目范围
+  `{ project: { createdBy } }`；无 creator 的存量行仅管理员可写（fail-closed）。
+- Schema：`supervision_projects.createdBy` / `supervision_daily_reports.createdBy`
+  （迁移 `20260820150000_add_supervision_created_by`）。
+- 状态机：新增 `modules/supervision/supervision-state.ts`——项目
+  `PLANNED/IN_PROGRESS/PAUSED/COMPLETED`（COMPLETED 仅可 → IN_PROGRESS）、问题
+  `OPEN/IN_PROGRESS/VERIFYING/CLOSED`（CLOSED 仅可 → OPEN）；非法跳转 409。
+- 服务迁移（全部消除 find→判断→update 的 TOCTOU）：项目/问题/日报/任务的 update/delete 改为
+  `updateMany({ where: { id, ...accessWhere, CAS 锚点 } })` + `count !== 1 → 409` + 回查返回；
+  `createIssueAction` 事务内先 find(access) + 状态机断言 + `updateMany` CAS；`createReport`
+  reporter 恒取当前登录用户（忽略 payload.reporter，删除 `reports/index.post` reporter 必填校验）、
+  任务/项目写带 accessWhere+CAS；`deleteProject`/`deleteIssue`/`deleteTask` 禁删
+  COMPLETED/CLOSED/DONE；`importPlanTasks` 禁覆盖 COMPLETED 项目 + 事务内任务删写/项目状态 CAS；
+  父任务 `isSummary` 派生写与 `reorderTasks` 维护写补 accessWhere。
+- 路由：14 个路由 + 3 个 upstream handler 统一 `authorizeWrite → buildSupervisionAccessContext` 透传，
+  catch 统一 `businessErrorResponse` 映射（404/409/400）。
+- Audit：`supervisionModule.audit` 声明 13 个审计动作（project/issue/task/report create/update/delete +
+  task-import），成功写路径经 `supervision-audit.ts` → `SystemLogService.auditLog` 落 `audit_logs`。
+- Architecture Guard：新增窄范围 `SUPERVISION_STATE_MODELS`（`supervision_projects`/`supervision_issues`/
+  `supervision_plan_tasks`/`supervision_daily_reports`）+ `SUPERVISION_FILE_PATTERN` +
+  `analyzeSupervisionStateWrite`（`...accessWhere` spread / 显式 `createdBy` / `project` 嵌套放行；
+  `{id}`、`{id, isDeleted:false}`、业务主键裸写拦截）；保护范围不泛化到其它模块。
+- 门禁适配：拆分 `supervision-deadline-board.service.ts`（plan-task 服务 550→358 行，B-S1）；
+  `plan-tasks/index.post.ts` 路由瘦身（去除冗余类型断言，B-R2）。
+- 测试：新增 `supervision-access.test.ts` 10 例（A/B 用户矩阵：A 删 B 404、CAS 竞争 409、admin ALL、
+  状态机合法/非法跳转 409、缺 userId fail-closed、task 继承 project scope）；Guard fixture 新增 1 例
+  （拦域内裸写 / 放行 scoped CAS / 放行 marker / 放行域外写）；既有 8 个 supervision 测试文件适配
+  新签名（补 ctx、`updateMany`/`findFirst`/`~/modules/system-log` mock）。
+
+**验证结果：**
+- lint / check:type：通过
+- vitest：supervision 模块 13 文件 73 用例 + Guard fixture 24 例全绿
+- check:qms-arch / check:qms-arch:all：0 violations（baseline 未新增）
+- check:docs-drift：PASSED（后续全量跑）
+
+**commit:** 未提交
+
+**遗留问题：**
+- 列表/看板读路径（`listProjects`/`listIssues`/`listReports`/`deadlineBoard`）仍为登录级可见
+  （写路径已对象级收口）：PRODUCT_DECISION，如产品要求可见性收缩再定义读侧 scope（§15.7）。
+- `syncSupervisionProjectProgress` 系统派生写保留 marker（SYSTEM_MAINTENANCE，§15.7）。
+- 无 DB 唯一约束新增：CAS on status + 事务已保证互斥，保持最小复杂度。
+- 非 Breaking Change：路由响应结构不变；越权/不存在返回 404、并发/非法状态返回 409（前端可预期）；
+  有 schema 变更（新增 2 列，含 migration）。
+
+---
+
+### 2026-08-20 METROLOGY-BORROW-001：计量器具借用并发一致性治理
+
+**执行内容：**
+- `MetrologyBorrowService.borrow` 消除 TOCTOU：移除事务外 `findFirst` 检查 borrowStatus，改为事务内 CAS——`updateMany({where:{id, isDeleted:false, borrowStatus:'AVAILABLE'}, data:{borrowStatus:'BORROWED'}})`，`count !== 1 → 409`（该量具当前不可借用或已被其他用户借出）；CAS 成功后创建借用记录，并做存量漂移防御检查（存在 active 借用记录 → 409）；任一步失败整事务回滚。
+- `MetrologyBorrowReturnService.requestReturn/confirmReturn` 改为双表 CAS 状态机：requestReturn（record `BORROWED/OVERDUE → RETURN_PENDING` + instrument `BORROWED → RETURN_PENDING`）、confirmReturn（record `RETURN_PENDING → RETURNED` + instrument `RETURN_PENDING → AVAILABLE`）；删除原 confirmReturn sibling 状态恢复逻辑（新范式保证单 active record）；修复 confirmReturn 误用 `instrumentId` 作为 instrument where 字段导致 CAS 永失配的 bug（测试抓出）。
+- 状态模型：`measuring_instruments.borrowStatus` 为权威互斥源（AVAILABLE/BORROWED/RETURN_PENDING），OVERDUE 只属于借用记录流程状态，消除双表状态漂移；新增 `metrology-borrow-state.ts`（状态常量 + `throwBorrowConflict` 409 helper）。
+- 路由：内部/公开扫码 4 个借用路由统一映射 `BusinessError`（409/404/400）→ HTTP 状态码；新增 `metrology-borrow-route-error.ts` 共享错误 helper，路由瘦身至 <50 行（B-R2 门禁）；扫码入口与普通入口共用同一 `MetrologyBorrowService.borrow/requestReturn`。
+- Architecture Guard：新增窄范围 `METROLOGY_BORROW_STATE_MODELS`（`measuring_instruments`/`metrology_borrow_records`）+ 借用域文件匹配 + `analyzeBorrowStateWrite` 专用判定（where 含 status/borrowStatus 即 CAS 放行）；借用域外仪器 CRUD/校准计划不受影响；0 baseline 新增。
+- 测试：借用域 15 例全绿（重写旧 4 例 + 新增并发竞争 409、CAS count=0 不建记录、重复 requestReturn/confirmReturn 409、非法状态跳转 409、record 创建失败回滚、confirmReturn 后 instrument=AVAILABLE/record=RETURNED 断言、存量漂移 409）；Guard fixture 新增 1 例（拦裸借用域状态写 / 放行 CAS 转换 / 放行域外仪器 CRUD）。
+
+**验证结果：**
+- lint / check:type：通过
+- vitest：metrology 模块 16 文件 224 用例 + Guard fixture 24 例全绿
+- check:qms-arch:all：0 violations（无 baseline 变化）
+- check:docs-drift：PASSED（后续全量跑）
+
+**commit:** 未提交
+
+**遗留问题：**
+- 存量漂移数据（instrument=AVAILABLE 但存在 active 借用记录）不会自动修复：下次 borrow 会被 409 拦截，需管理员人工关闭/清理（见报告）。
+- 未增加 DB constraint：CAS on instrument 已保证互斥，保持最小复杂度（如未来需要第二层兜底，可评估 `active_borrow` 独立表或 generated key）。
+- 非 Breaking Change：路由响应结构不变；CAS 冲突返回 409（原 400）为前端可预期行为；无数据库 / migration 变化。
+
+---
+
+### 2026-08-20 SEC-REPORT-WRITE-001：Report 写路径治理
+
+**执行内容：**
+- 新增 `apps/backend/modules/report/report-write.service.ts`：`ReportWriteService` 统一 reports 用户写（update/delete/create/saveDailySummary）——对象授权（author 所有权，`updateMany/deleteMany({where:{id,status,...buildReportOwnershipWhere(userinfo)}})`，`count!==1 → 409`，消除 TOCTOU；`isSystemAdmin` 为 ALL）；显式状态机（`Draft→Published/Archived`、`Published→Archived`、`Archived→Draft`，非法跳转 409，未知状态值 400，Published 禁删，新报告仅 Draft）；CAS（写 where 携带当前 status，并发变更 409）；`body.author` 拒绝改绑（403）。
+- 路由迁移：`api/qms/reports/[id].put.ts` / `[id].delete.ts` / `index.post.ts` / `daily-summary.put.ts` 透传 `userinfo` + `ipAddress/userAgent` 审计上下文；`daily-summary.put.ts` 移除 `body.user`，reporter 恒取当前登录用户（修复跨用户报告人冒充写）。
+- Audit：`report.module.ts` 声明 `create/update/delete/daily-summary` 审计动作，成功写后经 `SystemLogService.auditLog('report', ...)` 落 `audit_logs`。
+- Architecture Guard：`reports` 加入 `PROTECTED_PRISMA_MODELS`（任意文件裸 `reports.update/delete/updateMany/deleteMany` → R-SCOPE 拦截；create/upsert 不受影响）；移除 4 条 report R-SCOPE baseline（rollout×2/reconciliation×1/reports.delete/reports.update）；新增 1 条 B-M1 baseline（report-write 深路径导入 vehicle-commissioning 存储，与既有 report LEGACY 同源）；系统维护写加 3 处显式 marker（投影 rebuild 完成/失败 finalizer、对账失败 finalizer，均带 reason）。
+- 测试：新增 `report-write.service.test.ts` 17 例（A 用户改/删 B 报告 403、admin ALL、状态机合法/非法跳转、CAS 冲突 409、audit 断言、daily-summary reporter 恒为当前用户、create 仅 Draft）；重写 `report-route.service.test.ts` 为委托测试；Guard fixture 新增（拦裸 reports 写 / 放行 owner-scoped 写）。
+- 并发缺口登记：`reports` 无 `version` 列，非状态字段并发编辑仅 CAS 状态保护 → CONCURRENCY GAP 记 DATA-INTEGRITY-001（本专项不加 schema）。
+
+**验证结果：**
+- lint / check:type：通过
+- vitest：report 模块 139 用例 + Guard fixture 23 例全绿
+- check:qms-arch / check:qms-arch:all：0 violations（R-SCOPE baseline -4，B-M1 baseline +1，净 -3）
+- check:docs-drift：PASSED
+
+**commit:** 未提交
+
+**遗留问题（见 docs/permission-module.md §14.8）：**
+- supervision 日报写（裸 id update/delete、reporter 可来自 payload）为 OUT_OF_SCOPE，待 supervision 权限专项。
+- `reports` 无 version 列（DATA-INTEGRITY-001）。
+- report→vehicle-commissioning 存储深路径耦合保持 3 条 B-M1 baseline（DESIGN_EXCEPTION）。
+- 非 Breaking Change：路由响应结构不变；`saveDailySummary` 不再接受 `user` 字段（前端本就传当前用户）；无数据库 / migration 变化。
+
+---
+
+### 2026-08-20 SEC-INSPECTION-REQUEST-ANALYTICS-001：inspection-request-stats 聚合 DataScope 收口
+
+**执行内容：**
+- 新增 `apps/backend/modules/inspection/inspection-request-scope.ts#buildScopedInspectionRequestWhere`：request 域统一 scope where（与列表/历史查询语义一致）——ALL 原样返回；SELF → `inspectorId = userId OR reporterId = userId`（沿用既有个人归属规则，禁止另立新规则）；DEPT → `responsibleDepartment IN (deptId + 部门名候选)`（复用 `DataScopeService.getDeptCandidates`）；空部门候选 → `{ id: '__none__' }`（fail-closed，不退化为全量）；缺 user → `requireAnalyticsUser` 抛 403。
+- `inspection-request-stats.service.getRequestStats(query, access)`：4 个 `qms_inspection_requests` 查询点（2×findMany + 2×count）全部经 `buildScopedInspectionRequestWhere`；JS 聚合保留（权限正确优先，改动最小），记 PERF-QMS-001（数据库聚合下推候选）。
+- 路由 `api/qms/inspection/requests/stats.get.ts`：改用 `getAnalyticsAccessContext(event)` + `dataScope: event.context.dataScope`，`inspection-route.service.getRequestStats` 透传 access。
+- Architecture Guard：新增 R-SCOPE-AGG stats 文件规则——`STATS_AGGREGATE_READ_GUARD = { inspection → [qms_inspection_requests] }`，protected 模块内文件名含 `stats/statistics` 的文件对清单模型做 `findMany/count/aggregate/groupBy` 等聚合读必须带 scope anchor（`buildScoped*Where` 等）或显式 `qms-arch-allow R-SCOPE-AGG: <reason>` marker；普通 list/CRUD 服务不受影响；M-G08 `inspection-request-stats-workload.ts`（全系统在办量，系统级指标、无业务行暴露）加 1 处带 reason marker。
+- 测试：`inspection-request-stats.service.test.ts` 新增 5 例 scope 回归（DEPT where 传播 + 结果不含 B、SELF 归属、ALL 不变、缺 user 403、空候选 fail-closed）；`check-qms-architecture.test.ts` 新增 2 例 fixture（拦裸 stats 聚合读 / 放行 scoped + 显式 marker）。
+
+**验证结果：**
+- lint / check:type：通过
+- vitest：inspection-request-stats 33 例全绿 + Guard fixture 22 例全绿
+- check:qms-arch / check:qms-arch:all：0 violations（baseline 未增加）
+- check:docs-drift：PASSED
+
+**commit:** 未提交
+
+**遗留问题：**
+- 无权限遗留：§13.6「inspection-request-stats 全量 JS 聚合」权限 LEGACY 已清除，仅保留 PERF LEGACY（PERF-QMS-001：大区间性能，数据库聚合下推候选）。
+- 非 Breaking Change：query 参数不变，service 追加 access 参数；无数据库 / migration 变化。
+
 ---
 
 ### 2026-08-20 报检任务列表视图筛选调整：已完成仅 3 天 + 我的检验仅未完成
 
 **执行内容：**
+<<<<<<< HEAD
 - `apps/backend/modules/inspection/inspection-request-query.service.ts`：`closed` scope 增加 `closedAt >= now - 3 天` 过滤（常量 `REQUEST_LIST_CLOSED_WINDOW_DAYS = 3`）；`my-inspection` scope 由"近 7 天窗口"改为只返回分派给当前检验员且未完成的检验单（`status in [DISPATCHED, INSPECTING]`），移除 `sinceDays` 参数（后端 normalize 与前端 API 类型同步删除）。
 - 为满足模块 ≤500 行门禁（B-S1），列表查询辅助逻辑拆出至新文件 `apps/backend/modules/inspection/inspection-request-list-query.ts`，服务文件 510→361 行，无跨模块 API 变化。
 - 更新测试：closed scope 3 天窗口（派单/非派单权限 2 例）、my-inspection 状态过滤无时间窗口。
@@ -35,6 +725,53 @@
 
 **遗留问题：**
 - 无（纯查询层调整，无 migration、无数据变更）
+=======
+- `apps/backend/modules/inspection/inspection-request-query.service.ts`：`closed` scope 增加 `closedAt >= now - 3 天` 过滤（新增常量 `REQUEST_LIST_CLOSED_WINDOW_DAYS = 3`）；`my-inspection` scope 由"近 7 天窗口"改为只返回分派给当前检验员且未完成的检验单（`status in [DISPATCHED, INSPECTING]`），移除 `sinceDays` 参数（后端 normalize 与前端 API 类型同步删除）。
+- 为满足模块 ≤500 行门禁（B-S1），将列表查询辅助逻辑拆出至新文件 `apps/backend/modules/inspection/inspection-request-list-query.ts`（`normalizeRequestListQuery / buildRequestListScopeWhere / buildMyRelatedRequestWhere / getRequestListStatusWhere / getRequestListScopeFromQuery` + `RequestListQuery` 类型），服务文件 510→~361 行，无跨模块 API 变化。
+- 更新测试 `inspection-request-query.service.test.ts`：closed scope 断言 3 天窗口（无派单权限 + 派单权限各 1 例）；my-inspection 断言状态过滤且无时间窗口。
+
+**验证结果：**
+- eslint / prettier（本次改动 4 文件）: 通过
+- typecheck（turbo run typecheck，backend + web-antd）: 通过
+- vitest: inspection 模块 748/748 通过（含 query service 20 例）
+- check:qms-arch: 本次改动文件 0 violations
+- check:docs-drift: PASSED
+
+**commit:** 未提交
+
+**遗留问题：**
+- 工作区既有未提交改动（SEC-DATASCOPE-001 批次）存在 2 项与本改动无关的门禁红灯：`scripts/check-qms-source-rules.mjs` prettier 格式问题（819 行风格差异，疑似进行中工作，未代跑 prettier 以免污染 diff）；`R-SCOPE` 在 `task-dispatch.service.ts:86` 仍有 1 处违规。均由该批次负责人处理。
+
+---
+
+### 2026-08-20 SEC-ANALYTICS-SCOPE-001：Dashboard / Report / Workspace 聚合 DataScope 收口
+
+**执行内容：**
+- 统一 Analytics Access Context：新增 `apps/backend/modules/data-scope/analytics-access-context.ts`（`AnalyticsAccessContext { user, dataScope? }` + `requireAnalyticsUser` fail-closed 403）；路由统一 `getAnalyticsAccessContext(event)`（`apps/backend/utils/current-user.ts`），6 个 analytics 路由（dashboard / workspace / workspace work-order-aggregate / reports summary / weekly / daily-summary）移除手写 access 复制粘贴。
+- Dashboard：`dashboard.service.getStats / getMonthlyTrend / getIssueDistribution` 接 access，in-memory 缓存按 userId 隔离；vehicle-commissioning 保持无 scope（LEGACY，注释说明）。
+- Workspace：`dashboard-route.service.getWorkspaceSummary` 接 access；`work-order-aggregate.service.getWorkOrderAggregate` 双层 scope（工单 division + 明细 inspection），未命中返回 null → 路由 404。
+- Report：`report-summary` / `report.service` / `report-daily-summary` / `pass-rate`（summary / weekly / daily-summary / trend / drill-down）全链路 access 透传，KPI 与 drill-down 同 scope；修复 daily-summary 任意 `user` query 参数跨用户读 IDOR（服务端忽略，保留兼容 shape）；`buildInspectionRawScopeSql`（DEPT 候选 / SELF inspector / 空候选 `AND 1 = 0` / ALL 无片段）与 `buildScopedInspectionWhere / buildScopedIssueWhere` 落于 `apps/backend/modules/report/pass-rate-scope.ts`；投影物化路径仅在 ALL 或空 scope 使用，DEPT/SELF 回落 scoped legacy 路径。
+- 六模块 reporting 服务全部追加 access：inspection-reporting / inspection-report-statistics / after-sales-integration / quality-loss-reporting / work-order.service / inspection-score-data，各自走模块 scoped builder（禁止统一 department where 套所有模块）。
+- Architecture Guard：新增 `R-SCOPE-AGG`（`ANALYTICS_SCOPE_MODULES = dashboard/report` 内 protected 业务表 `findMany/findFirst/findUnique/count/aggregate/groupBy` 无 scope anchor → CI fail；`requireAnalyticsUser` 单独不构成 anchor）+ `R-SCOPE-RAW` 扩展覆盖 dashboard/report；投影系统维护读 8 处显式 marker（5×R-SCOPE-AGG + 3×R-SCOPE-RAW，带 reason）。
+- 新增测试：dashboard fail-closed + 缓存按用户隔离；report-summary access 传播（KPI/drill-down 同 scope）；pass-rate raw scope SQL 传播（DEPT 含 responsibleDepartment 候选、ALL 无片段）；`pass-rate-scope.test.ts`（DEPT/SELF/ALL/空候选 fail-closed/缺 user 403）；inspection / quality-loss / work-order 聚合 DEPT 断言；Guard fixture（拦裸聚合读 + 放 scoped/marker）。
+- 门禁合规：为满足 B-S1/B-R2 拆分 `work-order-aggregate-utils.ts`（service 517→481 行）、`weekly.get.ts` 53→49 行；新增 utils catch 补 logger（B-E2 合规）。
+
+**验证结果：**
+- lint（prettier + eslint）: 通过
+- check:type: 通过
+- vitest: 全量 417 文件 / 3505 用例通过
+- check:qms-arch（changed + all）: 0 violations
+- check:docs-drift: PASSED
+
+**commit:** 未提交（分支 codex/remove-dept-rank）
+
+**遗留问题（记 docs/permission-module.md §13.6）：**
+- `inspection-request-stats.service.ts` 全量 JS 聚合（`qms_inspection_requests.findMany` 无 access）未收口，TEMPORARY。
+- report 写路径 / 投影 rollout / 对账 / vehicle-failure-rate-manual 为 OUT_OF_SCOPE（独立 report-write 专项），8 处投影 marker 待专项复核。
+- vehicle-commissioning 聚合无 DataScope 声明（OUT_OF_SCOPE）。
+- daily-summary `user` query 参数为前端兼容保留（服务端已忽略），前端移除后清理。
+- 非 Breaking Change；无数据库 / migration 变化。
+>>>>>>> d993f1bf (docs(project): finalize governance baseline)
 
 ---
 
@@ -63,6 +800,7 @@
 
 ---
 
+<<<<<<< HEAD
 ## [0.29.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.2...qgs-v0.29.0) (2026-08-20)
 
 
@@ -70,6 +808,106 @@
 
 * **@qgs/backend:** restrict completed view to 3 days and my-inspecti… ([98188eb](https://github.com/ajie5419/Quality-Guardian/commit/98188eb7b572efa07ff8ed758f74505a4c2dbde6))
 * **@qgs/backend:** restrict completed view to 3 days and my-inspection to open requests ([6bebf46](https://github.com/ajie5419/Quality-Guardian/commit/6bebf461a3ebc66dae98a892985e2713659c7b7d))
+=======
+### 2026-08-20 SEC-DATASCOPE-002 DataScope Architecture Guard 固化
+
+**执行内容：**
+- R-SCOPE v2 四轨检测（`scripts/check-qms-source-rules.mjs`）：① 模块级 `PROTECTED_SCOPE_MODULES` 补 `quality-loss`，`report` 评估后转 OUT_OF_SCOPE 独立观察；② 模型级 `PROTECTED_PRISMA_MODELS`（7 张表）任何文件（helper/utils/跨模块）危险写都拦；③ 配置式 `RESOURCE_IDENTIFIER_FIELDS` 按模型定义业务主键（id/workOrderNumber/lossId/…），识别 where 变形（`{id, isDeleted:false}`）、业务主键裸写、`updateMany/deleteMany`、批量 `{id:{in}}`，CAS/ownership/命名 scope helper 豁免；④ R-SCOPE-RAW 覆盖 `$queryRaw/$executeRaw/$queryRawUnsafe/$executeRawUnsafe` 的 Call 与 TaggedTemplate 双形态，要求命名 scoped SQL helper 或显式 `qms-arch-allow R-SCOPE-RAW: <reason>`（reason 必填）。
+- 存量 17 处写点 + 1 处 raw SQL 加显式 allow marker（均带原因注释，不改变业务行为）；`inspection-issue-stats.service.ts` 提取命名 helper `buildIssueTrendOwnershipRawFilter`；人工移除 1 条过期 baseline（`task-dispatch` 裸 `.update` 已迁移 `updateAccessible`，条目所指代码不存在）。
+- 新增 Guard fixture 测试：应拦 7 形态（裸 id / id+isDeleted / workOrderNumber / tx 裸写 / updateMany id-in / helper 文件裸写 / raw SQL 无 helper）+ 应放 6 类（scoped helper / CAS 守卫 / lease / marker 写 / marker raw / updateAccessible），`scripts/check-qms-architecture.test.ts` 18 用例全绿。
+- `docs/permission-module.md` 新增 §12（Protected Modules / Protected Models / Identifier Fields / Raw SQL 范式）+ LEGACY 分类表（TEMPORARY / DESIGN_EXCEPTION / PRODUCT_DECISION / OUT_OF_SCOPE，含 owner / risk / 目标专项 / review 条件）。
+
+**验证结果：**
+- `check:qms-arch:all`: 0 violations（baseline 未新增，净减 1 条过期条目）
+- Guard fixture tests（vitest）: 18/18 通过
+- lint / typecheck / 全量单测：见门禁结果（下文）
+
+**commit:** 未提交
+
+**遗留问题：**
+- 关闭流派生写（13 处 marker）、archive/close-effects（2 条 baseline）→ SEC-DATASCOPE-003（inspection/archive 域收口）
+- `after-sales.service.ts:149` b168 遗留（当前调用方仅测试）→ b168 专项
+- work-order / supplier create-restore（PRODUCT_DECISION）→ 等待产品确认恢复语义
+- report 模块（OUT_OF_SCOPE，4 条 baseline 已失效待新 Guard 组）→ Dashboard/Report 权限专项
+
+### 2026-08-20 SEC-DATASCOPE-001 收口：最终验收审计 + 2 处跨模块旁路修复
+
+**执行内容：**
+- 全仓扫描六个核心模块（inspection/after-sales/quality-loss/supplier/work-order/task-dispatch）共 175 处数据访问点 + 8 处 `$queryRaw`，逐点分类为 A（已收口）/ B（合法例外）/ C（LEGACY 基线）/ D（新发现未受控）。
+- 修复 2 处 D 类跨模块读旁路：`GET /api/qms/supplier/[id]/quality-issues`（供应商→NC 明细，仅按 supplierId 过滤）、`GET /api/qms/supplier/[id]/history-projects`（供应商→报检历史，raw SQL 无任何 scope）。按已收口的 `getInspectionHistory` 同构范式整改：supplier 本体走 `buildSupplierWhere`；NC 明细在 `findSupplierIssues` 合并 inspection DataScope；报检历史 raw SQL 新增 `buildRequestHistoryRawScopeSql`（DEPT 按 responsibleDepartment 候选集 / SELF 按 inspectorId OR reporterId，空候选 fail-closed `AND 1 = 0`）。
+- 新增 3 例安全回归测试：supplier 历史项目/质量问题的双层 scope 继承断言 + request-history raw SQL scope 传播（DEPT/SELF）。
+
+**验证结果：**
+- lint: 通过
+- typecheck: 通过
+- vitest: 3479/3479 通过（416 文件，新增 3 例）
+- check:qms-arch:all: 0 violations
+- check:docs-drift: PASSED
+
+**commit:** 未提交（codex/remove-dept-rank 分支，与上轮 SEC-DATASCOPE-001 改动同批）
+
+**遗留问题：**
+- 详见验收报告：R-SCOPE 规则盲区（quality-loss 未在 PROTECTED_SCOPE_MODULES、`where:{id,isDeleted:false}` 变形可绕过、updateMany/deleteMany/raw SQL/业务主键/tx 客户端不拦截）；`DATA_SCOPE_V2` 默认 false（生产隔离未启用，属产品决策）；dashboard/report/workspace 聚合读为文档化 LEGACY。
+
+### 2026-08-19 SEC-DATASCOPE-001：Row-Level Authorization / DataScope 六模块收口
+
+**执行内容：**
+- 新增 `apps/backend/modules/data-scope/scoped-repository.ts`：统一 Scoped Repository 工厂 `createScopedRepository(module, delegate)`，提供 `findAccessible / findManyAccessible / countAccessible / aggregateAccessible / groupByAccessible / updateAccessible / deleteAccessible / exportAccessible` + `assertScopedWriteAffected`（count≠1 → 404），scope 一律合并进 where，缺省/异常 fail-closed。
+- `DataScopeService` 改 fail-closed：模块无策略/scopeType 缺失 → 403；`isIdentityField` 补 `createdBy/updatedBy`；`buildFieldFilter` 支持嵌套点路径（task-dispatch 部门关系字段）。
+- 迁移存量：inspection（detail/update/delete/batchDelete/export/findSupplierHistory）、after-sales（update/delete/batchDelete/stats）、quality-loss（trend/drilldown/删除/批量删除）、supplier（update/delete/batchDelete/inspection-history 双层 scope）、work-order（update/delete/batchDelete/export）、task-dispatch（status update）全部接入 scoped 范式；写操作改为事务内 scoped find → updateMany/deleteMany + where 合并（消除 find→judge→update TOCTOU）。
+- 修复跨部门统计泄露：after-sales `getStats` 趋势原始 SQL 补齐 `${rawScopeSql}`（此前仅 avgDays 带 scope）。
+- 新增安全回归：`scoped-repository.test.ts`（33 例：fail-closed / 六模块跨部门 GET/UPDATE/DELETE 矩阵 / ALL 全通 / SELF 身份字段 / 跨模块 scope 继承 / quality-loss 趋势 SQL scope）；after-sales analytics 与 supplier 测试补 scope 断言。
+- 架构门禁 R-SCOPE 挂入 `check:qms-arch`（敏感模块裸 `prisma.xxx.update/delete({where:{id}})` 增量拦截，存量基线化）。
+
+**验证结果：**
+- lint: 通过（prettier + perfectionist）
+- typecheck: 通过（3/3 task）
+- vitest: 416 文件 / 3476 用例全通过
+- check:qms-arch: 通过（changed + all 均为 0 violations）
+- check:docs-drift: 通过
+
+**commit:** 未提交（本专项完成即停止，等待用户审阅）
+
+**遗留问题（LEGACY，详见 docs/permission-module.md §11）：**
+- inspection_archive_tasks 状态更新按用户传入 id 裸 update（R-SCOPE 基线化，待迁移 scoped 范式）
+- inspection 检验表单模板按 id 裸 update（共享配置、RBAC 门控，基线化）
+- inspection-request-close-effects 关闭后置副作用裸 update（id 来自已授权关闭流，基线化）
+- work-order create 恢复已删工单路径按 workOrderNumber 裸写（未带 scope，需产品决策跨部门恢复语义）
+- report 模块裸写（基线化，不在本专项六模块范围）
+- inspection issues/requests 等非六模块读路径尚未接入数据范围
+
+---
+
+### 2026-08-19 阶段0：治理总纲领落盘并接入必读链路
+
+**执行内容：**
+- 新增 `docs/governance-charter.md`：用户下达的《治理总纲领》原样保存（角色定位、五层处理、项目治理基线、15 条禁止事项、七阶段专项流程、修改原则、输出规则），并标注维护规则。
+- 接入必读链路：`AGENTS.md`「会话启动必读」、`CLAUDE.md` session startup、`.dsh/skills/qg-project.md`「开工必读」、`docs/PROJECT_GUIDE.md` §9 文档地图，确保每个会话/治理任务都能读到。
+
+**验证结果：**
+- check:docs-drift: 通过
+
+**commit:** 未提交（本次仅文档落盘，未改动业务代码）
+
+**遗留问题：**
+- 无
+
+### 2026-08-19 阶段0：技术治理基线整改计划成文
+
+**执行内容：**
+- 依据《Quality-Guardian_技术治理基线与整改规范.docx》（Baseline v1.0）制定落地路线图，新增 `docs/baseline-remediation-plan.md`。
+- 对照文档 §19 核实仓库现状（DataScope / seed GET / jobKey 唯一约束 / AI baseUrl 等），计划分 Phase 0-5 收口 P0/P1。
+
+**验证结果：**
+- check:docs-drift: 通过
+
+**commit:** 未提交（本次仅计划成文，未改动业务代码）
+
+**遗留问题：**
+- 待确认决策点：DataScope 生产启用时机、Lifecycle 分层方式、新增 CI 门禁失败策略。
+
+---
+>>>>>>> d993f1bf (docs(project): finalize governance baseline)
 
 ## [0.28.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.1...qgs-v0.28.2) (2026-08-19)
 
@@ -8055,3 +8893,439 @@
 
 - 后端定向 Vitest：`6/6` 文件、`48/48` 用例通过，覆盖配置 ID 改名后解析、首次唯一 bootstrap、零/多候选拒绝、停用 ID 拒绝、并发 create 竞争回读及 release-maintenance 接线。
 - `pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`rtk git diff --check`：通过。
+### 2026-08-21 PERF-QMS-001 / PHASE-1A：Bounded Read / Export / List DTO 性能治理
+
+**执行内容：**
+- 统一 Bounded Read 契约（`utils/export-constants.ts`）：`INTERACTIVE_PAGE_SIZE_MAX=100`
+  / `EXPORT_ROWS_MAX=20000` / `EXPORT_QUERY_TAKE=20001`；`isExportLimitExceeded` 容忍
+  undefined（防御性）；超限统一 `EXPORT_LIMIT_EXCEEDED` 错误码 + maxRows。
+- after-sales 列表：DB 分页（skip/take）+ 同一 scoped where 的 count + 稳定排序
+  （createdAt desc, id desc），删除 Node slice 伪分页；新增 ListDTO
+  `AFTER_SALES_LIST_SELECT`（`after-sales-list-dto.ts`），不再读取
+  `actualSolution`/`remarks`/`feedbackDept` 等未消费长文本，保留
+  `photos`/`solution`/`issueDescription`/`version`（列表缩略图/详情/编辑/乐观锁契约）。
+- inspection 列表/导出：`findAll` 移除 `items: true` 全量 include（ListDTO 瘦身）；
+  导出拆独立 `findAllForExport`（DataScope + filters + `take: EXPORT_QUERY_TAKE`，
+  不再全表 include items）。
+- quality-loss 导出：独立 `getExportRows`（同一 scope builder + `take: EXPORT_QUERY_TAKE`），
+  删除 `loadAllScopedItems` 全量加载后判断 20k 的路径。
+- supplier / work-order 导出：拆独立 `findAllForExport` / `getListForExport`
+  （`take: EXPORT_QUERY_TAKE`），修复「pageSize=MAX+1 被 parsePagination cap 100
+  截断导致只能导出约 100 条」的功能 Bug；普通 list 仍 cap 100。
+- Guard：新增窄规则 **R-BOUNDED-READ**（file + function 双维度定位 after-sales
+  getList / inspection findAllForExport / quality-loss getExportRows，要求 DB 分页或
+  EXPORT_QUERY_TAKE），Guard fixture bounded-read-001/002；修复
+  `inspection-record-query.service.ts` findAllForExport catch 新增 B-E2 违规
+  （改 logApiWarn）并移除该文件 1 条过期 baseline。
+- 文件拆分满足 500 行门禁：`after-sales-list-dto.ts` / `inspection-record-list-query.ts`
+  / `work-order-list-dto.ts`（after-sales.service 517→434、inspection-record-query
+  595→333、work-order.service 521→437）。
+- 测试：after-sales ListDTO query-shape（select 含 photos/solution/version、不含
+  actualSolution/remarks）、导出 bounded take、超限拒绝、修复 5 个过时 export/route
+  测试（getLossSummary→getExportRows、findAll→findAllForExport、getList→getListForExport）。
+- 文档：新增 `docs/performance.md`（Bounded Read 原则 / PHASE-1A 落地清单 / DataScope
+  约束 / R-BOUNDED-READ / PHASE-1B 范围外登记）。
+
+**验证：** lint / check:type / 受影响 143 文件 1346 用例 / check:qms-arch（changed+all
+0 violations，baseline -1）/ docs-drift 全绿。
+
+### 2026-08-21 PERF-QMS-001 / PHASE-1B：Database Aggregation 性能治理
+
+**执行内容：**
+- 统一范式：DB 负责 `filter / aggregate / group / count / sum / avg / top-N`，Node.js 只做
+  轻量结果组合、格式化与展示层转换；禁止 `findMany` 大量业务行 → Node reduce/map/group。
+  无法下推的业务算法登记 PERF LEGACY（docs/performance.md §5.2）。
+- quality-loss：`getDashboardSummary` 由 `loadAllScopedItems()` 全量加载 + Node SUM 改为
+  3 个并行 DB 查询（2×aggregate + 1×groupBy occurDate 推年份）；`getYearlyCharts` 改
+  2×groupBy（respDeptId/respDept 部门分布 + occurDate 趋势），Node 仅展示层分桶；
+  `getTrendData` 由 `WHERE YEAR(occurDate)=?` 非 sargable 改为
+  `occurDate >= yearStart AND occurDate < nextYearStart`（上海 +08:00 窗口）；删除
+  `loadAllScopedItems`。
+- inspection issue chart：findMany 18 字段 → Node 分桶，改为 `groupBy`
+  （维度 + snapshot 字段 + `_count/_sum`）。
+- after-sales `getReportMonthAggregation`：findMany 全量 → `groupBy(['occurDate'])`
+  + `_count/_sum`（≤366 行/年）。
+- work-order `getDashboardStats`：findMany 5 字段 → Node reduce，改为 3 个并行 groupBy
+  （status / divisionId / warranty，warranty 用 `deliveryDate >= now-1y` 等价转换）。
+- pass-rate legacy drilldown：`inspections.findMany` + `quality_records.findMany` 全量
+  → scoped raw SQL 预聚合（新增 `modules/report/pass-rate-rows.ts`：LEFT JOIN processes、
+  GROUP BY 身份列、per-row 钳制 SUM 与 `normalizeInspectionQuantitySummary` 等价、
+  issue 用 CTE 包 scope 片段消歧义）；`getLegacyPassRateDrillDownByRange` 改消费聚合行。
+- dashboard `getMonthlyTrend`：12× `getNetPassRateSummaryByRange` fanout →
+  `getPassRateMonthlyTrend` 1 次全年聚合（legacy `GROUP BY inspectionDate` / projection
+  月度 `GROUP BY inspectionDate`），Node 本地月分桶语义与旧实现一致。
+- inspection-request-stats active 在办聚合下推：导出 `buildRequestHistoryRawScopeSql`，
+  scoped raw SQL `GROUP BY inspectorId`（COUNT + MIN(COALESCE(dispatchedAt, submittedAt))），
+  Node 只做时长换算；periodRequests 复杂身份/复检/时长算法保留 JS 聚合登记 PERF LEGACY。
+- Guard：新增窄规则 **R-DB-AGGREGATION**（`DB_AGGREGATION_INVARIANTS`
+  file+function+model 三维度定位已下推入口，findMany 全量聚合回归即拦截；dashboard
+  `getMonthlyTrend` 额外拦截 `getNetPassRateSummaryByRange` 12 次 fanout 回归；
+  `getNamedEnclosingFunctionName` 支持 FunctionDeclaration/嵌套闭包），fixture
+  db-aggregation-001/002；不泛化为「全仓禁止 findMany」。
+- B-MF 登记新增聚合点：M-A01/M-A02（pass-rate-rows + 月度）、M-B06
+  （getDashboardSummary/getYearlyCharts）、M-C05（getReportMonthAggregation）、M-D03
+  （getIssueChartAggregation）、M-D04（loadActiveInspectorRequestAggregates）、M-F01
+  （getDashboardStats）、M-F02（月度趋势），metrics-registry 59→69 点 + docs 同步。
+- 金额/空数据口径：DB SUM（Decimal）→ `Number(value || 0)`，金额展示沿用 `toFixed(2)`；
+  DB 聚合无行 → 保持 0 / `[]`。
+- typecheck 修复 Prisma 6 groupBy 泛型 TS2615 递归（内联 `_count/_sum` 双条件 spread
+  模式）与 quality-loss 测试类型。
+- 本专项未创建任何索引（schema/migration 不变）；INDEX CANDIDATES 登记
+  docs/performance.md §5.5（inspections(inspectionDate,isDeleted) /
+  quality_loss_index(isDeleted,occurDate) /
+  pass_rate_process_identity_projection(generationId,inspectionDate)）。
+- 文档：docs/performance.md §5-§7（DB Aggregation 统一范式 / 已下推入口表 / PERF LEGACY /
+  时区口径 / 金额与空数据 / INDEX CANDIDATES）。
+- 收口修复：`quality-loss.service.ts`（531→395 行）与 `inspection-issue-stats.service.ts`
+  （520→495 行）满足 500 行门禁，聚合逻辑拆至 `quality-loss-yearly-charts.ts` /
+  `inspection-issue-chart-metric.ts`；B-ID8 修复（部门分布 groupBy 仅 `respDeptId`，
+  `_max.respDept` 保留 rawName 回退）；两处 B-T2 double assertion 清除；修正
+  `after-sales-core.test.ts` 过时 reportMonth 断言（改 mock groupBy）；docs:sync 硬数据
+  751→753。
+
+**验证：** lint / check:type / quality-loss、after-sales、inspection、work-order、
+dashboard、pass-rate、inspection-request-stats 目标单测全绿（含 sargable SQL、
+Decimal/oracle 对比、空数据、scope 传播、并发 active 聚合）/ check:qms-arch
+（changed+all 0 violations，baseline 未增）/ docs-drift 全绿。全仓 `pnpm test:unit`
+438 文件 / 3674 用例 exit 0（Guard fixture 套件 34 例单独通过；整仓并行时 vitest
+worker RPC `onTaskUpdate` 超时为既有基础设施 flake，非代码失败）。
+### 2026-08-21 PERF-QMS-001 / PHASE-2B：Query Plan & Index Validation
+
+**执行内容：**
+- 本地 scratch 验证库（MySQL 8.4.6，非生产）加载约 244 万行合成数据（7 张目标表
+  + 主数据表，3.5 年跨度，isDeleted/status/category 分布对齐生产形状），全部结论
+  标注 `LOCAL_PLAN_ONLY`。
+- 采集 7 表基数分布 + Index Manifest（含冗余候选），提取 8 组真实查询形状（inspection
+  list/supplier history/export/items detail、quality_records stats、after_sales
+  list/analytics、quality_loss_index list/trend/dashboard、inspection-request-stats
+  两个 PHASE-2A raw SQL、work_orders list/dashboard/countCreatedSince），逐查询
+  `EXPLAIN FORMAT=JSON` baseline + 17 个候选索引单变量实验（create → ANALYZE →
+  EXPLAIN → drop），关键候选 `EXPLAIN ANALYZE` 实测。
+- 决策：**CREATE（2）**——`quality_loss_index(respDeptId, isDeleted, occurDate)`
+  （yearly trend 12.1→3.76ms，3.2x）、`work_orders(isDeleted, createdAt)`（列表
+  Sort 全表 9.1ms → 覆盖索引 0.014ms，~650x）；**REJECT（15）**——inspections 3 种
+  复合、inspection_items(inspectionId, order)、quality_records 4 种、after_sales 2
+  种、qms_inspection_requests 6 种（其中 `(isDeleted,status,submittedAt)` 实测反而
+  变慢 119ms vs 53.5ms，全部给出本地证据）；**KEEP**——qli(isDeleted,occurDate)、
+  qir(submittedAt)/status 等现有索引。
+- Redundant Index Matrix：`qli(respDeptId)`（被新复合覆盖）、`quality_records(status)`
+  （被 (status,isDeleted) 覆盖）、`quality_records(serialNumber)`（与 unique key 重复）
+  登记 DROP CANDIDATE，本专项不实施删除。
+- SCOPE_PERFORMANCE_GAP 登记：after_sales DEPT 三列 OR scope、qir DEPT 名称列 scope
+  （不改权限模型）。
+- 文档：`docs/performance.md` §5.5 候选清单升级为 §8 正式决策（Decision Matrix /
+  KEEP / DROP CANDIDATE / SCOPE_PERFORMANCE_GAP / Production Validation Required）。
+- 未创建任何索引、未改 schema/migration、未改业务代码（仅文档与状态文件）。
+
+**验证：** lint / check:type / check:qms-arch（changed+all）/ check:docs-drift 全绿
+（详见下方验证命令输出；本专项为只读验证 + 文档，无新增测试）。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-0：指标治理普查
+
+**执行内容：**
+- 只读扫描 `apps/backend` 全模块、`apps/web-antd` Dashboard/Report/Analytics 页面和 `packages/qgs-shared`，覆盖聚合、趋势、评分、投影、Worker、前端派生与共享 DTO。
+- 新增 `docs/metrics/metric-inventory.md`：65 个资产（A 核心经营 21、B 过程 30、C 技术 7、D 临时分析 7），每项记录来源表/字段、计算位置、公式、刷新方式、权限范围、消费者、技术归属与业务 Owner/Version 缺口。
+- 新增 `docs/metrics/metric-conflict-report.md`：15 组重复实现、9 项高风险口径冲突、硬编码评分权重/阈值、Dashboard 自算、无定义/Owner/Version 和第一批 Registry 建议。
+
+**验证：** `pnpm run check:docs-drift` PASSED；文档 `git diff --check` PASSED。未运行代码测试（本阶段禁止代码修改）。
+
+**Commit：** 未提交（遵循当前工作树交接规则）。
+
+**遗留问题：** 业务 Owner、公式版本、生效日期和权限范围需要 PHASE-1 业务确认；本阶段不自动进入 Registry 迁移或门禁改造。
+
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-1.6B：Human Decision Recording & Approval Evidence
+
+**执行内容：**
+- 将业务负责人提供的 D01-D14 决策写入 docs/metrics/metric-approval-sheet.md §9，Decision By 记录为 Human Business Approval，不伪造个人姓名。
+- 更新 docs/metrics/metric-business-decisions.md，标记 APPROVED 与 APPROVED_WITH_POLICY_PENDING；新增 docs/metrics/metric-decision-history.md，记录 timeline、proposal、final decision、impact 与 remaining policy pending。
+- 不修改 Registry 数据、Definition Version、Owner ID、业务代码、Dashboard、Report、Projection、DataScope 或消费者；不进入 PHASE-1.7/PHASE-2。
+
+**验证：** 待执行文档漂移、diff 和 Prettier 文档检查。
+
+**Commit：** 未提交（遵循当前工作树交接规则）。
+
+**遗留问题：** D06 request revision、D10 calendar、D12 Risk Band threshold 仍为 Policy Pending；Effective Date、正式 Version、历史回算与 DataScope 验证留待后续阶段。
+
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-1.6：Business Decision Approval Sheet
+
+**执行内容：**
+- 重新读取指标 inventory、conflict report、registry、PHASE-1.5 business decisions 及首批 10 项真实实现。
+- 新增 `docs/metrics/metric-approval-sheet.md`：Approval Matrix、proposed split code、推荐 canonical definitions、Supplier Score/Reinspection/Work-order Completion/Archive Timeliness Decision Card、Suggested Owner Matrix、PHASE-2 Readiness Gate、14 条 HUMAN DECISIONS REQUIRED。
+- 所有 Decision 保持 `PENDING`；未修改业务计算、Dashboard、Report、Projection、DataScope；未确认 Owner、未创建 Metric Version、未激活 Metric、未进入 PHASE-2。
+
+**验证：** 待执行文档漂移、diff 和 Prettier 文档检查。
+
+**Commit：** 未提交（遵循当前工作树交接规则）。
+
+**遗留问题：** 等业务负责人逐项批准公式、Scope Policy、Owner、生效日期和历史可计算性。
+
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-1：Metric Governance Registry
+
+**执行内容：**
+- 新增业务 Definition Registry：`metric_definitions`（稳定 `metricCode`、domain/category、Owner 状态、生命周期、`currentVersion`、`revision`）和 `metric_definition_versions`（业务定义、分子分母、结构化来源/维度/排除、scope/refresh、单位/精度、生效区间、冲突状态）；正式 Prisma migration 仅建表/约束，不植入业务 Definition 数据。
+- 新增 `metric-governance` 模块与最小 API：列表、详情/版本历史、创建、草稿更新、激活、新版本、废止。所有写操作走认证/RBAC、状态机和 `status + revision` CAS；Definition Version append-only，禁止物理删除和 `ACTIVE` 直接覆盖；审计复用 `SystemLogService.auditLog`，覆盖 CREATE、UPDATE_DRAFT、ACTIVATE、NEW_VERSION、DEPRECATE、OWNER_CHANGE。
+- 新增幂等 bootstrap：首批 10 个 `BM-*` 指标仅创建缺失的 `DRAFT/v1`，全部 Owner 为 `UNCONFIRMED/null`；`BUSINESS_DECISION_REQUIRED` 不自动激活。未迁移 Dashboard、Report、Projection、Worker 或现有值查询。
+- 新增 [docs/metrics/metric-registry.md](docs/metrics/metric-registry.md)：明确 Technical Aggregation Registry 与 Business Metric Governance Registry 的边界，登记模型、生命周期、版本、Owner、DataScope、审计/API/Bootstrap 契约；补 10 份 Canonical Definition Sheet 和冲突决策矩阵。同步 `metric-inventory.md`、`metric-conflict-report.md` 与技术 registry 边界说明。
+- 新增 `pnpm run check:metric-governance`：只检查 metric-governance 的 Prisma 模型和 TypeScript AST，拦截 Code/Version 唯一性缺口、可执行字段、Version 原地改写、物理删除与无 `status + revision` CAS 的 Definition 变更；不使用宽泛全仓正则。
+
+**验证：** `pnpm exec vitest run apps/backend/modules/metric-governance/metric-governance.service.test.ts apps/backend/api/qms/metric-governance/definitions/index.get.test.ts scripts/check-metric-governance.test.ts`（21/21） 、`pnpm run check:metric-governance`、`pnpm run docs:sync`、`pnpm run check:docs-drift` 已通过；backend `tsc --noEmit` 已通过。其余仓库级门禁见本次最终验收记录。
+
+**Commit：** 未提交（遵循当前混合工作树交接规则）。
+
+**遗留问题：** 65 个业务 Owner 均待确认；首批 10 项中 8 项为 `BUSINESS_DECISION_REQUIRED`，另 2 项为 `CANONICAL_CANDIDATE`，均保持 DRAFT。业务确认后才评估 PHASE-2 消费者迁移，当前不建议提前切换 Dashboard 或投影。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-1.7B：Registry Finalization Engineering Closure
+
+**执行内容：**
+- 将 Metric Registry finalization 按 canonical definitions、approval evidence、owner/policy validation 与 orchestration 拆分；所有相关 TypeScript 文件均低于 500 行，保持原有导出契约。
+- 新增正式 Prisma migration `20260821021000_add_metric_approval_and_owner_assignments`，补齐 approval evidence、owner assignment，并固化 canonical lineage；未修改历史 migration。
+- 仅完成 Registry 治理模型落库与 readiness 计算，未激活指标、未迁移 Dashboard/Report/Projection/消费者、未修改业务计算或历史数据。
+
+**验证：** `pnpm test:unit`（443 files / 3742 tests）通过；`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check` 通过；`pnpm lint` 仍被既有 `AGENTS.md` Prettier 漂移阻断。
+
+**遗留问题：** `prisma migrate dev --create-only` 的历史 shadow replay 仍受 `20250521000000_add_processes_table_and_processId` 缺少 `inspections` 表影响；正式 `prisma migrate deploy` 已成功应用本阶段 migration。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-2A：Shadow Metric Validation Foundation
+
+**执行内容：**
+- 新增 `metric-shadow-validation` 只读框架，统一封装 Canonical Metric Code、Calculation Adapter、Source Query、Result Snapshot 与字段级 Diff Report。
+- 登记首批五项 Canonical Metric：`BM-FIRST-PASS-YIELD`、`BM-FINAL-PASS-RATE`、`BM-GROSS-QUALITY-LOSS`、`BM-NET-QUALITY-LOSS`、`BM-PROBLEM-CLOSURE-RATE`。
+- 激活前置校验新增 `SHADOW_VALIDATION_MISSING`；没有影子验证证据不得进入 ACTIVE。
+- 未修改 Dashboard、Report、Projection、现有指标输出、业务计算逻辑或历史数据。
+
+**验证：** `pnpm test:unit`（444 files / 3744 tests）、`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、定向影子测试均通过。
+
+**遗留问题：** 全量 `pnpm lint` 仍受工作树既有 `AGENTS.md` Prettier 漂移阻断；本阶段新增文件已完成格式化。实际 Shadow Snapshot 需在后续受控任务中接入各业务查询并由业务负责人处理差异。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-2B：Real Calculation Adapter & Shadow Evidence
+
+**执行内容：**
+- 新增真实 Calculation Adapter Registry，接入质量损失、检验合格率和问题关闭率现有服务入口。
+- Adapter 输出 Current Calculation、Canonical Shadow Calculation，并生成带 metricCode/version/calculatedAt/source/result/diff 的 Shadow Evidence。
+- 新增 Diff 分类 `MATCH`、`MINOR_DIFF`、`BUSINESS_REVIEW_REQUIRED`、`BLOCKED` 及 Evidence 报告文档。
+- 未修改 Dashboard、Report、Projection、现有指标输出、业务计算逻辑或指标激活状态。
+
+**验证：** 定向测试、`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:prisma-migration` 已通过；全量单元测试与文档门禁待本次最终核验。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-2C：Controlled Shadow Execution & Business Reconciliation
+
+**执行内容：**
+- 新增固定最近 12 个月窗口和可配置日期范围的 Controlled Shadow Execution Runner。
+- 对首批三项指标支持 ALL、DEPT、SELF 三类 DataScope，并在范围/数据源不可用时 fail-closed 为 `BLOCKED`。
+- 新增执行结果结构与业务差异记录文档；ACTIVE 前继续要求 Approval Evidence 与 Shadow Execution Evidence。
+- 本地环境未提供 `DATABASE_URL`，未伪造真实数值，三项本轮结果记录为 `BLOCKED`；未修改 Dashboard、Report、Projection、业务逻辑或历史数据。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-2C.1：Shadow Execution Environment Enablement
+
+**执行内容：**
+- 新增独立 `DATABASE_URL_SHADOW`、只读账号、运行窗口与 DataScope 安全边界文档。
+- 新增运行前校验：Shadow Database、DataScope Identity、Metric Adapter、日期窗口；任一缺失均 `BLOCKED`，禁止生成结果。
+- 覆盖 ALL/DEPT/SELF、无数据库、无身份和无 Adapter 测试。
+- 未激活 Metric，未修改 Dashboard、Report、Projection、指标输出或业务计算逻辑。
+
+**验证：** 定向测试、`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check` 通过。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-2C.2：Real Shadow Execution Run
+
+**执行内容：**
+- 按 `2025-08-01` 至 `2026-07-31` 固定窗口准备三项指标的 ALL/DEPT/SELF Shadow Run Evidence。
+- 当前进程未提供 `DATABASE_URL_SHADOW`，九条 Evidence 均按 fail-closed 规则记录为 `BLOCKED`，未执行数据库查询，未猜测 Current/Canonical 数值。
+- 未激活 Metric，未修改 Dashboard、Report、Projection、业务计算或历史数据。
+### 2026-08-21 METRIC-GOVERNANCE-001 / PHASE-2C.3：Shadow Data Environment Provisioning
+
+**执行内容：**
+- 新增 Shadow Database 身份、连接、只读权限、可用表和 Adapter 可访问性验证器。
+- 严格要求独立 `DATABASE_URL_SHADOW`，禁止 fallback 到 `DATABASE_URL`。
+- 当前环境未提供 Shadow 连接，验证结果为 `BLOCKED`；未连接生产、未执行写操作、migration、seed 或指标激活。
+- 新增环境验证报告与测试，覆盖缺失连接、非只读权限和成功只读连接。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2C.4：Shadow Environment Provisioning & Real Run Preparation
+
+**执行内容：**
+- 新增 Shadow Environment 正式运行手册，覆盖架构、连接配置、只读账号、依赖表、Adapter 和 DataScope Identity。
+- 固化 READY/BLOCKED 状态与执行前 Preflight Checklist。
+- 明确禁止 fallback 到 `DATABASE_URL`、生产连接、自动建库、seed、migration 和生产写操作。
+- 未激活 Metric，未修改 Dashboard、Report、Projection、业务计算或历史数据。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2C.5：Shadow Database Provisioning Validation
+
+**执行内容：**
+- 验证 `DATABASE_URL_SHADOW` 存在性；当前不可用，因此连接、Identity、只读权限、依赖表和 Scope Identity 均按规则记录为 `BLOCKED`。
+- 未 fallback 到 `DATABASE_URL`，未访问生产数据库，未执行任何写操作、migration 或 seed。
+- 新增环境 provisioning validation 报告，保留三项指标、三类 Scope 和 Adapter 状态。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check` 通过。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2D：Real Shadow Evidence Production Run
+
+**执行内容：**
+- 重新执行 Shadow Environment Validation；`DATABASE_URL_SHADOW` 仍不可用，Shadow Environment 未达到 READY。
+- 未启动任何指标查询；三项指标 ALL/DEPT/SELF 共九条 Evidence 按 fail-closed 规则记录为 `BLOCKED`。
+- 未 fallback 到 `DATABASE_URL`，未访问生产数据库，未执行写操作、migration、seed 或 Metric activation。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2D：Real Shadow Evidence Production Run
+
+**执行内容：**
+- 使用本地隔离数据库 `quality_guard_local_test`（`qms-container-mysql`，`127.0.0.1:3307`）完成固定窗口 `2025-08-01..2026-07-31` 的真实 Shadow Run。
+- 三个 Canonical Metric 分别执行 `ALL` / `DEPT` / `SELF`，共生成 9 条 Evidence：6 条 `MATCH`、1 条 `MINOR_DIFF`、2 条 `BUSINESS_REVIEW_REQUIRED`。
+- Shadow 账号仅具备 `SELECT` 权限；未使用生产连接、未写业务表、未迁移/seed、未激活 Metric。
+- `BM-FIRST-PASS-YIELD` 的空分母语义（`0` 与 `null`）及 ALL 精度差异保留业务复核，不擅自改口径。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2E：Shadow Diff Resolution
+
+**执行内容：**
+- 建立 `BM-FIRST-PASS-YIELD` Zero Denominator Policy：分母为 0 时结果为 `NULL`，禁止以 0 表示无样本。
+- 建立两位小数 Display Precision Policy；保留原始计算值，比较与展示按两位小数判定。
+- 在本地只读 Shadow 数据库重新执行 `ALL` / `DEPT` / `SELF`，三条结果全部 `MATCH`。
+- 未修改底层业务计算、Dashboard、Report、Projection、历史数据或 Metric 状态。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3A：Canonical Metric Activation Gate
+
+**执行结果：**
+- 对 `BM-FIRST-PASS-YIELD`、`BM-GROSS-QUALITY-LOSS`、`BM-PROBLEM-CLOSURE-RATE` 执行 Activation Readiness 检查。
+- 本地 Registry 表结构存在，但三个候选 Code 均无 Definition/Version 实际记录，无法关联 Approval Evidence、Owner Assignment、Policy Dependency 和 Shadow Evidence。
+- 三项均保持 `DRAFT`，未调用激活 CAS、未写入审计、未修改任何消费者或历史数据；禁止凭文档摘要伪造激活证据。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2F：Canonical Metric Materialization
+
+**执行结果：**
+- 通过现有幂等 Registry Finalization 服务创建三个 Canonical Metric 的 `DRAFT/v1` Definition、Version、Approval Evidence、Business Owner Assignment 和 Policy 记录。
+- `BM-FIRST-PASS-YIELD`、`BM-GROSS-QUALITY-LOSS`、`BM-PROBLEM-CLOSURE-RATE` 均保持 DRAFT，未激活、未改业务计算、未迁移消费者、未改历史数据。
+- 本地 Registry 缺少对应 Legacy Definition 行，因此未猜测或伪造 lineage；遗留映射待 Legacy Registry 实体化后补建。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3A.1：Activation Readiness Final Validation
+
+**执行结果：**
+- 只读核验三个 Canonical Metric 的 Definition、immutable v1、Approval Evidence、Owner、Policy、DataScope 与 CAS 条件。
+- 三项均 `BLOCKED`：`effectiveFromAt` 未设置，且 Shadow Evidence 尚未持久化关联到当前 Version 的 `shadowValidationEvidence` 追踪字段。
+- 未激活 Metric，未修改状态、Version、Evidence、Owner、Policy 或消费者。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-2G：Activation Metadata Completion
+
+**执行结果：**
+- 新增 append-only `metric_shadow_validation_evidences` 模型与正式 Prisma migration。
+- 为三个 Canonical Metric 的 v1 Version 持久化 `ALL/DEPT/SELF` 共 9 条 Shadow Evidence，包含窗口、scope、结果和 classification，并建立 Version 外键关联。
+- 未发现人工批准的 `effectiveFromAt`；三项继续 `DRAFT / BLOCKED`，未激活、未修改消费者或业务数据。
+
+**验证：** `prisma migrate deploy`（本地 Shadow DB）、`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3A.2：Effective Date & Final Activation Approval Preparation
+
+**执行结果：**
+- 只读检查三个 v1 的人工批准日期、Decision By 与 Activation Note。
+- 现有 Decision By 为 `Human Business Approval`，但仅对应业务定义批准；未发现 activation-specific `effectiveFromAt` 或 Activation Note。
+- 三项继续 `BLOCKED`，未自动生成日期、未猜测负责人、未激活 Metric、未修改 Version 或消费者。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3A.3：Activation Approval Evidence Injection
+
+**执行结果：**
+- 只读检查三个 Canonical Metric 是否存在 activation decision、effectiveFromAt、Decision By 和 Activation Note。
+- 仅存在 D01/D03/D04 的业务定义批准，不存在 activation-specific 人工批准输入。
+- 未追加证据、未生成日期、未猜测审批人、未激活 Metric；三项继续 `DRAFT / BLOCKED`。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3A.ACTIVATION-HUMAN：Activation Approval Input Preparation
+
+**执行结果：**
+- 新增三项 Canonical Metric 的人工 Activation Approval 输入模板。
+- Requested Effective Date、Decision、Decision By、Activation Note、Scope Confirmation 和 Historical Calculation Confirmation 均保持空白。
+- 未修改 Registry、Metric 状态、Evidence 或任何消费者。
+
+**验证：** `check:docs-drift`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3B：Metric Activation Execution
+
+**执行结果：**
+- Activation Approval Form 仍为空白模板，执行请求未提供 Metric Code 或 activation-specific 人工批准信息。
+- 三项候选指标均 `BLOCKED`；未调用 CAS、未追加 Activation Evidence、未写入激活审计记录、未改变 ACTIVE 状态。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3B.1：Activation Approval Evidence Import
+
+**执行结果：**
+- 校验并导入三项指标的人工 Activation Approval：Decision、2026-09-01 生效日、Decision By、Activation Note、Scope Confirmation 和历史计算确认均保留原文。
+- 新增 append-only Activation Approval Evidence 并关联 immutable v1；未修改 Version 的 `effectiveFromAt`，未激活 Metric。
+
+**验证：** `prisma migrate deploy`（本地 Shadow DB）、`check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-3B.2：Canonical Metric Activation Execution
+
+**执行结果：**
+- `BM-FIRST-PASS-YIELD`、`BM-GROSS-QUALITY-LOSS`、`BM-PROBLEM-CLOSURE-RATE` 均通过 Definition、v1、Approval、Owner、Policy、Shadow 和 Activation Approval Evidence 校验。
+- 使用现有 CAS 激活流程从 `DRAFT` → `ACTIVE`，Revision `1` → `2`；按人工批准日期写入 `effectiveFromAt = 2026-09-01`，保留 v1 不可变。
+- 三项均写入 Activation Audit Record；未迁移消费者、未修改业务计算或历史数据。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4A：Canonical Metric Consumer Discovery
+
+**执行结果：**
+- 只读扫描 Dashboard、Report、Projection、Analytics API、Scheduled Jobs、Export 和 Frontend Metric Display。
+- 识别出 pass-rate、quality-loss、problem-closure 的直接旧计算、前端展示和导出依赖；当前除治理 API 外没有消费者引用 Metric Registry。
+- 未修改 Dashboard、Report、Projection、Analytics 查询、业务计算、历史数据或消费者。
+
+**验证：** `check:docs-drift`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4B：Canonical Metric Consumer Migration Planning
+
+**执行结果：**
+- 基于 PHASE-4A Mapping 为 Dashboard、Report、Projection、Analytics API、Frontend KPI、Export 与源物化 Job 制定逐消费者迁移策略。
+- 登记 `DIRECT_REPLACE`、`ADAPTER_LAYER`、`DUAL_RUN_REQUIRED`、`LEGACY_KEEP`，并为每项补充风险与回滚方案。
+- 仅修改治理文档，未修改业务代码、消费者、查询、历史数据或 Metric 状态。
+
+**验证：** `check:docs-drift`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4C：Canonical Metric Dual Run Implementation
+
+**执行结果：**
+- 新增 First Pass Yield Dual Run 服务，支持 Legacy/Canonical 结果、差异分类和证据持久化。
+- 对 Dashboard KPI、Analytics API、Report 的 `ALL/DEPT/SELF` 执行验证；三范围均 `MATCH`，用户界面继续使用 Legacy Result。
+- 未切换展示、未删除旧逻辑、未修改 ACTIVE 状态、消费者或历史数据。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4D：First Pass Yield Consumer Cutover Preparation
+
+**执行结果：**
+- 汇总 PHASE-4C `ALL/DEPT/SELF` Dual Run Observation，三范围均 MATCH。
+- 定义 MATCH、MINOR_DIFF、BUSINESS_REVIEW_REQUIRED、BLOCKED 的 Cutover Readiness Gate。
+- 设计 Dashboard、Analytics API、Report 的 Adapter 接入与回滚方案；未执行消费者切换。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`git diff --check`。
+### 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-4E：First Pass Yield Consumer Cutover Execution
+
+**执行结果：**
+- 新增 Analytics API 的 `BM-FIRST-PASS-YIELD` Canonical Adapter，支持 Forward 到 Canonical 与单开关 Rollback 到 Legacy。
+- 保留 Legacy Calculation 与 Dual Run Evidence；Dashboard、Report 未切换，用户输出保持 Legacy。
+- 未修改 ACTIVE Version、指标定义、历史数据或其他消费者。
+
+**验证：** `check:type`、`check:qms-arch`、`check:qms-arch:all`、`check:docs-drift`、`check:prisma-migration`、`git diff --check`。
+# 2026-08-22 METRIC-GOVERNANCE-001 / PHASE-6.2.1
+
+- 修复 Dashboard 月度趋势测试与 Canonical Trend → Legacy fallback 设计之间的契约漂移。
+- 保留 92% 与零活动率断言；全量单元测试 448 文件、3753 测试通过。
+# 2026-08-22 QMS Baseline v1.0 / P0 DataScope-Object Authorization
+
+- 移除 Task Dispatch 与 DFMEA seed GET 写副作用，改为受权限保护的 POST 路由。
+- 新增统一 405 响应助手与单元测试，删除对应 R-GET 历史 baseline 豁免。
+- 全量单元测试 448 文件、3754 测试通过；架构门禁与类型检查通过。
+### 2026-09-05 DataScope/Object Authorization 与 Metric Governance 专项切片
+
+**执行内容：**
+
+- 将 DataScope 基础、analytics context、Scoped Repository 与 DFMEA seed 写入口授权提交为 `1fd63d5`。
+- 将检验统计/历史查询的缺失 DataScope fail-closed 修复及回归测试提交为 `ddd8291`。
+- 将 Metric Governance registry、Prisma migration、append-only Version 修复及真实 Shadow/Dual Run 前置条件提交为 `a898727`。
+- 未暂存或提交其他跨专项 WIP；`qms-allow-output.txt` 与治理快照保持排除。
+
+**验证：**
+
+- DataScope/Metric 定向 Vitest：12 个文件、92 个测试通过。
+- `pnpm --dir apps/backend exec tsc --noEmit`、`pnpm run check:qms-arch`、`pnpm run check:metric-governance`、`pnpm run check:docs-drift` 通过。
+- 全局 `pnpm lint` 仍被未纳入本专项的快照/文档及其他 WIP 文件格式问题阻塞；未以局部结果冒充全局通过。
+### 2026-09-05 DataScope/Object Authorization 与 Metric Governance 专项切片（收尾批）
+
+- 提交 `4be920c`：Supplier 导出、画像、单条/批量写入统一复用对象 DataScope，版本写入使用 CAS。
+- 提交 `1a3d28d`：After-sales 删除/更新、统计与报表聚合要求当前用户 AnalyticsAccessContext，缺失身份 fail-closed；提交 `a8201a8` 修复统计路由行数架构门禁。
+- 提交 `77f3ec9`：Quality-loss 删除、报表/趋势聚合、状态转换与索引队列执行上下文加入 scope/CAS/fail-closed。
+- 提交 `d91972a`：Work-order 删除/更新与聚合读取加入对象 scope、版本 CAS 和访问上下文。
+- 定向验证：Supplier 16 files / 223 tests；After-sales 授权子集 5 files / 30 tests；Quality-loss 20 files / 145 tests；Work-order 13 files / 107 tests；对应 tsc、`check:qms-arch`、暂存 diff check 通过。
+- 未执行 migration deploy、生产数据库或端到端验证；After-sales 分页/groupBy 性能、Inspection/Report 及 Metric Governance consumer cutover 等混合改动继续留在工作树，未混入上述提交。
+### 2026-09-05 DataScope/Object Authorization 与 Metric Governance 专项切片（Inspection 续批）
+
+- 提交 `820ee43`：Inspection issue 列表、统计及原始趋势查询统一使用对象 DataScope，空范围 fail-closed，并保留 canonical identity 聚合。
+- 提交 `3c8473a`：Inspection record/request 删除及 request close 后置派生写入增加对象范围、CAS 事务证明和 bounded retry。
+- 提交 `f56c4f0`：Inspection issue 创建/更新、批量删除统一接入对象范围、CAS 与幂等创建边界。
+- 提交 `eb8464c`：Inspection record/request 详情、列表、导出与请求统计统一接入范围化读取、导出上限和数据库聚合；Inspection 模块索引导出 issue stats 服务补充提交 `4917182`。
+- 提交 `20f4723`：Report pass-rate legacy analytics 的对象范围、原始 SQL fail-closed 与趋势/下钻访问上下文。
+- 提交 `853dd07`：统一导出行数上限常量与超限错误，供已提交的 Inspection 导出入口使用。
+- 定向验证：问题范围 4 files / 60 tests；删除与关闭效果 5 files / 63 tests、5 files / 82 tests；查询/导出/统计 5 files / 88 tests；pass-rate 3 files / 26 tests；对应 tsc、`check:qms-arch`、diff check 通过。
+- 未执行 migration deploy、生产数据库或端到端验证；Inspection 创建/更新其余混合改动、Quality-loss 导出服务、Report/Dashboard consumer、文档漂移和性能混合改动保持未提交。
