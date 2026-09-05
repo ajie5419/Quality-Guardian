@@ -19,6 +19,14 @@
 
 ---
 
+## [0.29.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.29.0...qgs-v0.29.1) (2026-09-05)
+
+
+### Bug Fixes
+
+* **@qgs/web-antd:** use blue daily report section headings ([d9f977b](https://github.com/ajie5419/Quality-Guardian/commit/d9f977ba58b601cfd4780591e0c564b6baaccbbe))
+* **@qgs/web-antd:** use blue daily report section headings ([3b5e118](https://github.com/ajie5419/Quality-Guardian/commit/3b5e118cfa452474c2aa369ec2c7e7ad7d129e87))
+
 ### 2026-08-20 报检任务列表视图筛选调整：已完成仅 3 天 + 我的检验仅未完成
 
 **执行内容：**
