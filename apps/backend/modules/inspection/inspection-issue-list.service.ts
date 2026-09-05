@@ -1,5 +1,6 @@
 import type { quality_records_status } from '@prisma/client';
 import type { InspectionIssue } from '@qgs/shared';
+import type { AccessScope } from '~/modules/data-scope';
 
 import type { InspectionIssueDateMode } from './inspection-issue';
 import type { InspectionIssueUserContext } from './inspection-issue-access.service';
@@ -11,6 +12,7 @@ import {
   normalizeInspectionIssueResponsibilityType,
   tryParsePhotos,
 } from '@qgs/shared';
+import { DataScopeService } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { findDeptSubtree } from '~/modules/dept/dept-tree';
 import { toQualityRecordStatus } from '~/modules/quality-loss/quality-loss-status';
@@ -23,7 +25,7 @@ import {
 } from '~/utils/process-resolver';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
-import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
+import { buildInspectionIssueScopeWhere } from './inspection-issue-access.service';
 import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
 
 type QualityRecordOrderField = keyof Pick<
@@ -199,7 +201,7 @@ export const InspectionIssueListService = {
     id: string;
     userContext: InspectionIssueUserContext;
   }): Promise<InspectionIssue | null> {
-    const where = applyInspectionIssueReadOwnership(
+    const where = await buildInspectionIssueScopeWhere(
       { id: params.id, isDeleted: false },
       params.userContext,
     );
@@ -218,13 +220,23 @@ export const InspectionIssueListService = {
   },
 
   async findSupplierIssues(params: {
+    dataScope?: AccessScope;
     page?: number;
     pageSize?: number;
     supplierId: string;
+    userContext?: { userId: string; username?: string };
   }): Promise<{ items: InspectionIssue[]; total: number }> {
-    const where = buildSupplierEngineeringIssueWhere({
+    let where = buildSupplierEngineeringIssueWhere({
       supplierIds: [params.supplierId],
     });
+    if (params.userContext?.userId) {
+      where = await DataScopeService.buildScopedWhere(
+        'inspection',
+        where,
+        params.userContext,
+        params.dataScope,
+      );
+    }
     const page = Math.max(Number(params.page) || 1, 1);
     const pageSize = Math.min(Math.max(Number(params.pageSize) || 20, 1), 100);
     const [total, issues] = await Promise.all([
@@ -253,6 +265,7 @@ export const InspectionIssueListService = {
   },
 
   async getIssues(params: {
+    dataScope?: AccessScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     defectCategoryId?: string | string[];
@@ -395,7 +408,10 @@ export const InspectionIssueListService = {
     }
 
     if (params.userContext?.userId) {
-      where = applyInspectionIssueReadOwnership(where, params.userContext);
+      where = await buildInspectionIssueScopeWhere(where, {
+        ...params.userContext,
+        dataScope: params.dataScope,
+      });
     }
 
     const {

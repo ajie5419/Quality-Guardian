@@ -2,10 +2,15 @@ import type {
   IdentityAggregateItem,
   IdentityResolutionStatus,
 } from '@qgs/shared';
+import type { AccessScope } from '~/modules/data-scope';
 
 import type { InspectionIssueDateMode } from './inspection-issue';
 import type { InspectionIssueUserContext } from './inspection-issue-access.service';
-import type { InspectionIssueStatisticsIdentity } from './inspection-issue-statistics-identity';
+import type { InspectionIssueChartMetric } from './inspection-issue-chart-metric';
+import type {
+  InspectionIssueStatisticsIdentity,
+  InspectionIssueStatisticsRow,
+} from './inspection-issue-statistics-identity';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -21,12 +26,14 @@ import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 
 import { buildInspectionIssueDateRange } from './inspection-issue';
-import { applyInspectionIssueReadOwnership } from './inspection-issue-access.service';
+import { buildInspectionIssueScopeWhere } from './inspection-issue-access.service';
+import { getIssueChartMetricValue } from './inspection-issue-chart-metric';
 import {
   getInspectionIssueStatisticsIdentityKey,
   getInspectionIssueStatisticsSnapshotFields,
   resolveInspectionIssueStatisticsIdentity,
 } from './inspection-issue-statistics-identity';
+import { buildIssueTrendOwnershipRawFilter } from './inspection-issue-stats-scope';
 
 const logger = createModuleLogger('InspectionService');
 
@@ -71,7 +78,21 @@ type InspectionIssueChartDimension =
   | 'status'
   | 'supplierName';
 
-type InspectionIssueChartMetric = 'count' | 'lossAmount' | 'quantity';
+const CHART_GROUP_BY_FIELDS: Record<
+  InspectionIssueChartDimension,
+  Prisma.Quality_recordsScalarFieldEnum[]
+> = {
+  claim: ['isClaim'],
+  defectSubtype: ['defectSubcategoryId', 'defectType', 'defectSubtype'],
+  defectType: ['defectCategoryId', 'defectType'],
+  division: ['divisionId', 'division'],
+  projectName: ['projectId', 'projectName'],
+  reportMonth: ['date'],
+  responsibleDepartment: ['responsibleDepartmentId', 'responsibleDepartment'],
+  severity: ['severity'],
+  status: ['status'],
+  supplierName: ['supplierId', 'supplierName'],
+};
 
 const CONTROLLED_DIMENSION_CONFIG_KEYS: Partial<
   Record<InspectionIssueChartDimension, string>
@@ -82,8 +103,14 @@ const CONTROLLED_DIMENSION_CONFIG_KEYS: Partial<
   supplierName: 'supplierName',
 };
 
+/**
+ * Derives the raw-SQL ownership fragment for trend queries from the resolved
+ * DataScope where input (SELF scope pins `createdBy`). Kept as a named helper
+ * so R-SCOPE-RAW can prove the SQL is permission-filtered.
+ */
 export const InspectionIssueStatsService = {
   async getIssueStats(params: {
+    dataScope?: AccessScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     userContext?: InspectionIssueUserContext;
@@ -100,7 +127,10 @@ export const InspectionIssueStatsService = {
       date: { gte: start, lt: end },
     };
     if (params.userContext?.userId) {
-      where = applyInspectionIssueReadOwnership(where, params.userContext);
+      where = await buildInspectionIssueScopeWhere(where, {
+        ...params.userContext,
+        dataScope: params.dataScope,
+      });
     }
 
     try {
@@ -206,6 +236,7 @@ export const InspectionIssueStatsService = {
     }
   },
   async getIssueChartAggregation(params: {
+    dataScope?: AccessScope;
     dateMode?: InspectionIssueDateMode;
     dateValue?: string;
     dimension: InspectionIssueChartDimension;
@@ -225,31 +256,23 @@ export const InspectionIssueStatsService = {
       date: { gte: start, lt: end },
     };
     if (params.userContext?.userId) {
-      where = applyInspectionIssueReadOwnership(where, params.userContext);
+      where = await buildInspectionIssueScopeWhere(where, {
+        ...params.userContext,
+        dataScope: params.dataScope,
+      });
     }
 
-    const rows = await prisma.quality_records.findMany({
+    const sumPayload: Record<string, true> = {};
+    if (params.metric === 'lossAmount') {
+      sumPayload.lossAmount = true;
+    } else if (params.metric !== 'count') {
+      sumPayload.quantity = true;
+    }
+    const grouped = await prisma.quality_records.groupBy({
+      by: CHART_GROUP_BY_FIELDS[params.dimension],
       where,
-      select: {
-        date: true,
-        defectCategoryId: true,
-        defectSubcategoryId: true,
-        defectSubtype: true,
-        defectType: true,
-        division: true,
-        divisionId: true, // governance-allow-direct-name-id
-        isClaim: true,
-        lossAmount: true,
-        projectId: true, // governance-allow-direct-name-id
-        projectName: true,
-        quantity: true,
-        responsibleDepartment: true,
-        responsibleDepartmentId: true, // governance-allow-direct-name-id
-        severity: true,
-        status: true,
-        supplierId: true, // governance-allow-direct-name-id
-        supplierName: true,
-      },
+      ...(params.metric === 'count' ? { _count: { id: true } } : {}),
+      ...(params.metric === 'count' ? {} : { _sum: sumPayload }),
     });
 
     const controlledConfigKey =
@@ -264,12 +287,13 @@ export const InspectionIssueStatsService = {
         value: number;
       }
     >();
-    for (const row of rows) {
+    for (const group of grouped) {
+      const row = group as Record<string, unknown>;
       let canonicalId: null | string = null;
       let name = '未分类';
       const identity = resolveInspectionIssueStatisticsIdentity(
         params.dimension,
-        row,
+        row as InspectionIssueStatisticsRow,
       );
       switch (params.dimension) {
         case 'claim': {
@@ -277,49 +301,44 @@ export const InspectionIssueStatsService = {
           break;
         }
         case 'defectSubtype': {
-          canonicalId = row.defectSubcategoryId;
+          canonicalId = String(row.defectSubcategoryId || '');
           break;
         }
         case 'defectType': {
-          canonicalId = row.defectCategoryId;
+          canonicalId = String(row.defectCategoryId || '');
           break;
         }
         case 'division': {
-          canonicalId = row.divisionId;
+          canonicalId = String(row.divisionId || '');
           break;
         }
         case 'projectName': {
-          canonicalId = row.projectId;
+          canonicalId = String(row.projectId || '');
           break;
         }
         case 'reportMonth': {
-          name = formatDate(row.date).slice(0, 7);
+          name = formatDate(row.date as Date).slice(0, 7);
           break;
         }
         case 'responsibleDepartment': {
-          canonicalId = row.responsibleDepartmentId;
+          canonicalId = String(row.responsibleDepartmentId || '');
           break;
         }
         case 'severity': {
-          name = row.severity || '未分类';
+          name = String(row.severity || '未分类');
           break;
         }
         case 'status': {
-          name = row.status || '未分类';
+          name = String(row.status || '未分类');
           break;
         }
         case 'supplierName': {
-          canonicalId = row.supplierId;
+          canonicalId = String(row.supplierId || '');
           break;
         }
       }
 
-      let value = 1;
-      if (params.metric === 'lossAmount') {
-        value = Number(row.lossAmount || 0);
-      } else if (params.metric === 'quantity') {
-        value = Number(row.quantity || 0);
-      }
+      const value = getIssueChartMetricValue(params.metric, row);
       const normalizedId = String(canonicalId || '').trim() || null;
       let key = `value:${name}`;
       if (controlledConfigKey || classificationDimension) {
@@ -403,10 +422,7 @@ export const InspectionIssueStatsService = {
     start: Date;
     where: Prisma.quality_recordsWhereInput;
   }): Promise<TrendDataItem[]> {
-    const ownershipFilter =
-      typeof params.where.createdBy === 'string'
-        ? Prisma.sql`AND createdBy = ${params.where.createdBy}`
-        : Prisma.sql``;
+    const ownershipFilter = buildIssueTrendOwnershipRawFilter(params.where);
 
     if (params.dateMode === 'month' || params.dateMode === 'week') {
       const trendResults = await prisma.$queryRaw<

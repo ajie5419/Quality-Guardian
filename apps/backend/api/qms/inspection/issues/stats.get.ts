@@ -31,7 +31,8 @@ export default defineValidatedHandler(
       const result = await InspectionService.getIssueStats({
         dateMode: parseInspectionIssueDateMode(query.dateMode),
         dateValue: parseInspectionIssueDateValue(query.dateValue),
-        userContext,
+        userContext: { ...userContext, dataScope: event.context.dataScope },
+        dataScope: event.context.dataScope,
         year: parseOptionalIssueYear(query.year),
       });
       return useResponseSuccess(result);
