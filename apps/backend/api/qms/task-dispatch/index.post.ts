@@ -7,6 +7,7 @@ import {
   TaskDispatchService,
 } from '~/modules/task-dispatch/task-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
@@ -25,16 +26,20 @@ const bodySchema = z
 export default defineEventHandler(async (event) => {
   await authorizeWrite(event, TASK_DISPATCH_PERMISSION_CODES.CREATE);
   const userinfo = getCurrentUser(event);
-
   const body = bodySchema.parse(await readBody(event));
   if (!body.type || !body.title || !body.assigneeId)
     return badRequestResponse(event, '缺少必填字段: type/title/assigneeId');
 
   try {
     return useResponseSuccess(
-      await TaskDispatchService.create({ body, userinfo }),
+      await TaskDispatchService.create({
+        body,
+        scope: event.context.dataScope,
+        userinfo,
+      }),
     );
   } catch (error: unknown) {
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     logApiError('task-dispatch', error, undefined, event);
     if (error instanceof Error) {
       const mappedMessage = getTaskDispatchErrorMessage(error.message);

@@ -5,6 +5,8 @@ import { authorizeWrite } from '~/modules/rbac';
 import { normalizeTaskDispatchStatus } from '~/modules/task-dispatch/task-dispatch-rules';
 import { TaskDispatchService } from '~/modules/task-dispatch/task-dispatch.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -28,10 +30,19 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    const userinfo = getCurrentUser(event);
     return useResponseSuccess(
-      await TaskDispatchService.updateStatus(String(id), status),
+      await TaskDispatchService.updateStatus(
+        String(id),
+        status,
+        userinfo,
+        event.context.dataScope,
+      ),
     );
   } catch (error: unknown) {
+    if (isBusinessError(error)) {
+      return businessErrorResponse(event, error);
+    }
     logApiError('status', error, undefined, event);
     return internalServerErrorResponse(event, 'Update failed');
   }
