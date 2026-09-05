@@ -27,7 +27,11 @@ export default defineValidatedHandler(
       );
       const result = await InspectionService.getIssues({
         ...params,
-        userContext: { ...userContext, username: userinfo.username },
+        userContext: {
+          ...userContext,
+          dataScope: event.context.dataScope,
+          username: userinfo.username,
+        },
       });
 
       return useResponseSuccess(result);

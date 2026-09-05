@@ -1,13 +1,36 @@
+import type { Prisma } from '@prisma/client';
+import type { AccessScope } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { shouldRestrictInspectionIssueRead } from '@qgs/shared';
+import { DataScopeService } from '~/modules/data-scope';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { BusinessError } from '~/utils/business-error';
 
 export interface InspectionIssueUserContext {
+  dataScope?: AccessScope;
   roles?: unknown;
   userId: string;
   username?: string;
+}
+
+/** Canonical scope builder shared by issue list, detail and statistics. */
+export async function buildInspectionIssueScopeWhere(
+  where: Prisma.quality_recordsWhereInput,
+  userContext: InspectionIssueUserContext,
+): Promise<Prisma.quality_recordsWhereInput> {
+  const scopedWhere = await DataScopeService.buildScopedWhere(
+    'inspection',
+    where,
+    { userId: userContext.userId, username: userContext.username },
+    userContext.dataScope,
+  );
+  // Legacy direct service callers may not yet carry middleware scope. Keep
+  // their existing ownership restriction while all HTTP callers provide the
+  // canonical scope explicitly.
+  return userContext.dataScope
+    ? scopedWhere
+    : applyInspectionIssueReadOwnership(scopedWhere, userContext);
 }
 
 export function applyInspectionIssueReadOwnership<T extends object>(

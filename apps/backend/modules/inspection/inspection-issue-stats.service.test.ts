@@ -405,38 +405,16 @@ describe('inspectionIssueStatsService', () => {
 
   describe('getIssueChartAggregation', () => {
     it('should aggregate by defectType dimension with count metric', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
         {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
           defectCategoryId: 'defect-welding',
-          defectSubtype: '气孔',
           defectType: '历史焊接缺陷名称',
-          division: '车辆',
-          isClaim: false,
-          lossAmount: 100,
-          projectName: 'P1',
-          quantity: 5,
-          responsibleDepartment: '质量部',
-          severity: 'Major',
-          status: 'OPEN',
-          supplierName: '供应商A',
+          _count: { id: 1 },
         },
         {
-          date: new Date('2024-01-20'),
-          defectSubcategoryId: null,
           defectCategoryId: 'defect-welding',
-          defectSubtype: '裂纹',
           defectType: '焊接缺陷',
-          division: '车辆',
-          isClaim: true,
-          lossAmount: 200,
-          projectName: 'P1',
-          quantity: 3,
-          responsibleDepartment: '生产部',
-          severity: 'Critical',
-          status: 'CLOSED',
-          supplierName: '供应商B',
+          _count: { id: 1 },
         },
       ]);
       (
@@ -462,23 +440,8 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('should aggregate by status dimension', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: 'defect-a',
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
-          responsibleDepartment: '',
-          severity: '',
-          status: 'OPEN',
-          supplierName: '',
-        },
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
+        { status: 'OPEN', _count: { id: 1 } },
       ]);
       (
         QualityClassificationService.resolveCategoryNamesByIds as any
@@ -503,23 +466,8 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('should aggregate by claim dimension', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: 'defect-b',
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: true,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
-          responsibleDepartment: '',
-          severity: '',
-          status: '',
-          supplierName: '',
-        },
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
+        { isClaim: true, _count: { id: 1 } },
       ]);
       (
         QualityClassificationService.resolveCategoryNamesByIds as any
@@ -544,22 +492,11 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('should use lossAmount metric', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
         {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
           defectCategoryId: 'defect-a',
-          defectSubtype: '',
           defectType: 'A',
-          division: '',
-          isClaim: false,
-          lossAmount: 150,
-          projectName: '',
-          quantity: 0,
-          responsibleDepartment: '',
-          severity: '',
-          status: '',
-          supplierName: '',
+          _sum: { lossAmount: 150 },
         },
       ]);
       (
@@ -585,22 +522,11 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('should use quantity metric', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
         {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
           defectCategoryId: 'defect-b',
-          defectSubtype: '',
           defectType: 'B',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 10,
-          responsibleDepartment: '',
-          severity: '',
-          status: '',
-          supplierName: '',
+          _sum: { quantity: 10 },
         },
       ]);
       (
@@ -627,22 +553,11 @@ describe('inspectionIssueStatsService', () => {
 
     it('should limit results by top parameter', async () => {
       const rows = Array.from({ length: 20 }, (_, i) => ({
-        date: new Date('2024-01-15'),
-        defectSubcategoryId: null,
         defectCategoryId: `defect-${i}`,
-        defectSubtype: '',
         defectType: `Type-${i}`,
-        division: '',
-        isClaim: false,
-        lossAmount: 0,
-        projectName: '',
-        quantity: 0,
-        responsibleDepartment: '',
-        severity: '',
-        status: '',
-        supplierName: '',
+        _count: { id: 1 },
       }));
-      (prisma.quality_records.findMany as any).mockResolvedValue(rows);
+      (prisma.quality_records.groupBy as any).mockResolvedValue(rows);
       (
         QualityClassificationService.resolveCategoryNamesByIds as any
       ).mockResolvedValue(
@@ -663,22 +578,11 @@ describe('inspectionIssueStatsService', () => {
 
     it('should use default top of 15', async () => {
       const rows = Array.from({ length: 20 }, (_, i) => ({
-        date: new Date('2024-01-15'),
-        defectSubcategoryId: null,
         defectCategoryId: `defect-${i}`,
-        defectSubtype: '',
         defectType: `Type-${i}`,
-        division: '',
-        isClaim: false,
-        lossAmount: 0,
-        projectName: '',
-        quantity: 0,
-        responsibleDepartment: '',
-        severity: '',
-        status: '',
-        supplierName: '',
+        _count: { id: 1 },
       }));
-      (prisma.quality_records.findMany as any).mockResolvedValue(rows);
+      (prisma.quality_records.groupBy as any).mockResolvedValue(rows);
       (
         QualityClassificationService.resolveCategoryNamesByIds as any
       ).mockResolvedValue(
@@ -697,23 +601,8 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('should expose missing dimension evidence instead of Unknown', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: null,
-          defectSubtype: '',
-          defectType: '',
-          division: '车辆 OBU',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
-          responsibleDepartment: '',
-          severity: '',
-          status: '',
-          supplierName: '',
-        },
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
+        { divisionId: null, division: '车辆 OBU', _count: { id: 1 } },
       ]);
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
@@ -737,24 +626,8 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('should mark an empty supplier identity as not applicable', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
-        {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: null,
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
-          responsibleDepartment: '',
-          severity: '',
-          status: 'OPEN',
-          supplierId: null,
-          supplierName: null,
-        },
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
+        { supplierId: null, supplierName: null, _count: { id: 1 } },
       ]);
 
       const result = await InspectionIssueStatsService.getIssueChartAggregation(
@@ -777,24 +650,11 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('uses the active department name over the frozen snapshot', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
         {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: null,
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
           responsibleDepartment: 'dept-1769576623191',
           responsibleDepartmentId: 'a3a98d7b568511f1881c00163e37355f',
-          severity: '',
-          status: 'OPEN',
-          supplierId: null,
-          supplierName: '',
+          _count: { id: 1 },
         },
       ]);
       vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
@@ -825,24 +685,11 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('keeps an unresolvable department reference as invalidated master data', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
         {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: null,
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
           responsibleDepartment: '秦皇岛弘旺设备安装工程有限公司',
           responsibleDepartmentId: 'a3a98e23568511f1881c00163e37355f',
-          severity: '',
-          status: 'OPEN',
-          supplierId: null,
-          supplierName: '',
+          _count: { id: 1 },
         },
       ]);
       vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
@@ -870,42 +717,16 @@ describe('inspectionIssueStatsService', () => {
     });
 
     it('keeps distinct active department IDs separate despite matching snapshots', async () => {
-      (prisma.quality_records.findMany as any).mockResolvedValue([
+      (prisma.quality_records.groupBy as any).mockResolvedValue([
         {
-          date: new Date('2024-01-15'),
-          defectSubcategoryId: null,
-          defectCategoryId: null,
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
           responsibleDepartment: 'dept-1769576623191',
           responsibleDepartmentId: 'a3a98d7b568511f1881c00163e37355f',
-          severity: '',
-          status: 'OPEN',
-          supplierId: null,
-          supplierName: '',
+          _count: { id: 1 },
         },
         {
-          date: new Date('2024-01-16'),
-          defectSubcategoryId: null,
-          defectCategoryId: null,
-          defectSubtype: '',
-          defectType: '',
-          division: '',
-          isClaim: false,
-          lossAmount: 0,
-          projectName: '',
-          quantity: 0,
           responsibleDepartment: '生产 OBU',
           responsibleDepartmentId: 'dept-1769576623191',
-          severity: '',
-          status: 'OPEN',
-          supplierId: null,
-          supplierName: '',
+          _count: { id: 1 },
         },
       ]);
       vi.mocked(DeptService.resolveActiveNamesByIds).mockResolvedValue(
