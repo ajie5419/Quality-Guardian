@@ -25,7 +25,8 @@ type TableRecord = Record<string, unknown>;
 <template>
   <div>
     <div
-      class="mb-0 inline-block bg-gray-800 px-3 py-2 text-base font-bold text-white sm:px-4 sm:text-xl"
+      class="mb-0 inline-block px-3 py-2 text-base font-bold text-white sm:px-4 sm:text-xl"
+      :style="{ backgroundColor: '#1677FF' }"
     >
       {{ title }}
     </div>
