@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type {
   VehicleCommissioningDailyReportPayload,
   VehicleCommissioningIssue,
@@ -10,6 +11,7 @@ import { nanoid } from 'nanoid';
 import { FileStorageService } from '~/modules/file-storage';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
+import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
@@ -17,11 +19,17 @@ import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { VehicleCommissioningDailyReportService } from './vehicle-commissioning-daily-report.service';
 import { VehicleCommissioningDeleteService } from './vehicle-commissioning-delete.service';
 import { exportVehicleCommissioningIssuesWorkbook } from './vehicle-commissioning-export.service';
+import { applyIssueCreatePostCommit } from './vehicle-commissioning-issue-create-effects.service';
+import { buildVehicleCommissioningIssuePayload } from './vehicle-commissioning-issue-create-payload';
 import {
   mapVehicleCommissioningIssueToDto,
   normalizeVehicleCommissioningPhotos,
   parseVehicleCommissioningIssueStatus,
 } from './vehicle-commissioning-issue-format';
+import {
+  assertVehicleCommissioningIssueStatus,
+  assertVehicleCommissioningIssueTransition,
+} from './vehicle-commissioning-state';
 
 export const VehicleCommissioningService = {
   async findIssueId(id: string) {
@@ -87,7 +95,9 @@ export const VehicleCommissioningService = {
   async createIssueFromBody(
     body: Record<string, unknown>,
     operatorUserId?: string,
+    client?: Prisma.TransactionClient,
   ) {
+    assertVehicleCommissioningIssueStatus(body.status);
     const photos = Array.isArray(body.photos)
       ? body.photos.map(String).filter(Boolean)
       : [];
@@ -98,49 +108,17 @@ export const VehicleCommissioningService = {
       return Number.isFinite(parsed) ? parsed : undefined;
     };
     const created = await this.createIssue(
-      {
-        assignee: body.assignee ? String(body.assignee) : undefined,
-        date: body.date ? String(body.date) : undefined,
-        description: body.description ? String(body.description) : undefined,
-        isClaim:
-          body.isClaim === undefined
-            ? undefined
-            : ['1', 'true', 'yes', '是'].includes(
-                String(body.isClaim).toLowerCase(),
-              ),
-        lossAmount: toNumber(body.lossAmount),
-        partName: body.partName ? String(body.partName) : undefined,
-        photos,
-        projectName: body.projectName ? String(body.projectName) : undefined,
-        recoveredAmount: toNumber(body.recoveredAmount),
-        ...buildGovernedWriteFieldsForTable('vehicle_commissioning_issues', {
-          responsibleDepartment: body.responsibleDepartment
-            ? String(body.responsibleDepartment)
-            : undefined,
-        }),
-        claimNotes: body.claimNotes ? String(body.claimNotes) : undefined,
-        claimStatus: body.claimStatus ? String(body.claimStatus) : undefined,
-        severity: body.severity ? String(body.severity) : undefined,
-        solution: body.solution ? String(body.solution) : undefined,
-        status: body.status
-          ? parseVehicleCommissioningIssueStatus(body.status)
-          : undefined,
-        title: body.title ? String(body.title) : undefined,
-        workOrderNumber: body.workOrderNumber
-          ? String(body.workOrderNumber)
-          : undefined,
-      },
+      buildVehicleCommissioningIssuePayload(body, photos, toNumber),
       operatorUserId,
+      client,
     );
-    try {
-      await FileStorageService.registerReferencesFromAttachments({
-        attachments: photos,
-        bizId: String(created.id),
-        bizType: 'vehicle_commissioning_issue',
-        fieldName: 'photos',
+    if (!client) {
+      await applyIssueCreatePostCommit({
+        description: created.description,
+        operatorUserId,
+        photos,
+        issueId: created.id,
       });
-    } catch (error) {
-      if (!isPrismaSchemaMismatchError(error)) throw error;
     }
     return created;
   },
@@ -155,6 +133,7 @@ export const VehicleCommissioningService = {
   async createIssue(
     payload: Partial<VehicleCommissioningIssue>,
     operatorUserId?: string,
+    client?: Prisma.TransactionClient,
   ) {
     const now = new Date();
     const status = parseVehicleCommissioningIssueStatus(payload.status);
@@ -164,7 +143,7 @@ export const VehicleCommissioningService = {
         responsibleDepartment: payload.responsibleDepartment || '调试组',
       },
     );
-    const row = await prisma.$transaction(async (tx) => {
+    const createRow = async (tx: Prisma.TransactionClient) => {
       const row = await tx.vehicle_commissioning_issues.create({
         data: {
           id: `DA-${new Date().getFullYear()}-${nanoid(8).toUpperCase()}`,
@@ -194,15 +173,17 @@ export const VehicleCommissioningService = {
         'vehicle-commissioning.created',
       );
       return row;
-    });
+    };
+    const row = client
+      ? await createRow(client)
+      : await prisma.$transaction(createRow);
 
-    if (operatorUserId) {
-      await SystemLogService.auditLog('vehicle-commissioning', 'issueCreate', {
-        detailsVariables: {
-          issue: row.description || row.id,
-        },
-        targetId: row.id,
-        userId: operatorUserId,
+    if (!client && operatorUserId) {
+      await applyIssueCreatePostCommit({
+        description: row.description || '',
+        operatorUserId,
+        photos: payload.photos ?? [],
+        issueId: row.id,
       });
     }
 
@@ -292,12 +273,6 @@ export const VehicleCommissioningService = {
       payload.status === undefined
         ? undefined
         : parseVehicleCommissioningIssueStatus(payload.status);
-    let closedAt: Date | null | undefined;
-    if (status === ISSUE_TRACKING_STATUS.CLOSED) {
-      closedAt = new Date();
-    } else if (status !== undefined) {
-      closedAt = null;
-    }
     const governedFields = buildGovernedWriteFieldsForTable(
       'vehicle_commissioning_issues',
       {
@@ -305,11 +280,24 @@ export const VehicleCommissioningService = {
       },
     );
     const row = await prisma.$transaction(async (tx) => {
-      const row = await tx.vehicle_commissioning_issues.update({
-        where: { id },
+      let expectedStatus: string | undefined;
+      if (status !== undefined) {
+        const current = await tx.vehicle_commissioning_issues.findFirst({
+          where: { id },
+          select: { id: true, status: true },
+        });
+        if (!current) {
+          throw new BusinessError('NOT_FOUND', '调试验收问题不存在', 404);
+        }
+        assertVehicleCommissioningIssueTransition(current.status, status);
+        expectedStatus = current.status;
+      }
+      const result = await tx.vehicle_commissioning_issues.updateMany({
+        where: {
+          id,
+          ...(expectedStatus === undefined ? {} : { status: expectedStatus }),
+        },
         data: {
-          status,
-          closedAt,
           description: payload.description,
           partName: payload.partName,
           projectName: payload.projectName,
@@ -336,14 +324,41 @@ export const VehicleCommissioningService = {
           claimNotes: payload.claimNotes,
           workOrderNumber: payload.workOrderNumber || undefined,
           date: payload.date ? new Date(payload.date) : undefined,
+          ...(status === undefined
+            ? {}
+            : {
+                status,
+                closedAt:
+                  status === ISSUE_TRACKING_STATUS.CLOSED ? new Date() : null,
+              }),
         },
       });
+      if (result.count !== 1) {
+        const fresh = await tx.vehicle_commissioning_issues.findFirst({
+          where: { id },
+          select: { id: true, status: true },
+        });
+        if (!fresh) {
+          throw new BusinessError('NOT_FOUND', '调试验收问题不存在', 404);
+        }
+        throw new BusinessError(
+          'CONFLICT',
+          '调试验收问题状态已变化，请刷新后重试',
+          409,
+        );
+      }
+      const updated = await tx.vehicle_commissioning_issues.findFirst({
+        where: { id },
+      });
+      if (!updated) {
+        throw new BusinessError('NOT_FOUND', '调试验收问题不存在', 404);
+      }
       await QualityLossIndexQueue.enqueue(
         tx,
-        [{ source: 'COMMISSIONING', sourcePk: row.id }],
+        [{ source: 'COMMISSIONING', sourcePk: updated.id }],
         'vehicle-commissioning.updated',
       );
-      return row;
+      return updated;
     });
 
     if (operatorUserId) {
@@ -364,6 +379,7 @@ export const VehicleCommissioningService = {
     body: Record<string, unknown>,
     operatorUserId?: string,
   ) {
+    assertVehicleCommissioningIssueStatus(body.status);
     const hasPhotos = body.photos !== undefined;
     let photos: string[] | undefined;
     if (!hasPhotos) {
