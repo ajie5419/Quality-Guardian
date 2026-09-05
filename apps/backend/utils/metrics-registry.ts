@@ -69,6 +69,8 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     freshness: 'real-time',
     implementationPoints: [
       'modules/report/pass-rate.ts#getLegacyInspectionPassRateSummaryByRange',
+      'modules/report/pass-rate.ts#getLegacyPassRateMonthlyByRange',
+      'modules/report/pass-rate-rows.ts#getInspectionPassRateRows',
     ],
   },
   {
@@ -83,7 +85,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'report',
     consumers: 'pass-rate.ts getNetPassRateSummaryByRange(source=issue)',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/report/pass-rate-rows.ts#getIssuePassRateRows',
+    ],
   },
   {
     id: 'M-A03',
@@ -243,13 +247,18 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     id: 'M-B06',
     key: 'qualityLossDashboard',
     name: '质量损失看板汇总',
-    definition: '看板页汇总（含趋势与分布），getDashboardSummary。',
-    formula: 'QualityLossService.getDashboardSummary',
+    definition:
+      '看板页汇总（含趋势与分布），getDashboardSummary / getYearlyCharts。',
+    formula:
+      'QualityLossService.getDashboardSummary（aggregate + groupBy）；getYearlyCharts（groupBy 部门分布 + 趋势）',
     sourceTable: 'quality_losses + 三源',
     owner: 'quality-loss',
     consumers: 'GET /qms/quality-loss/dashboard',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/quality-loss/quality-loss.service.ts#getDashboardSummary',
+      'modules/quality-loss/quality-loss.service.ts#getYearlyCharts',
+    ],
   },
 
   // ---- C. 售后族（after-sales 模块） ----
@@ -319,6 +328,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     freshness: 'real-time',
     implementationPoints: [
       'modules/after-sales/after-sales-chart-aggregation.service.ts#getChartAggregation',
+      'modules/after-sales/after-sales-chart-aggregation.service.ts#getReportMonthAggregation',
     ],
   },
   {
@@ -384,6 +394,7 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     freshness: 'real-time',
     implementationPoints: [
       'modules/inspection/inspection-issue-stats.service.ts#buildIssueTrendData',
+      'modules/inspection/inspection-issue-stats.service.ts#getIssueChartAggregation',
     ],
   },
   {
@@ -392,13 +403,18 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     name: '报检任务统计（检验员在办/完成/平均时长/排行）',
     definition:
       '检验员工作负载与排行：在办任务数、完成任务数、总/平均任务时长。',
-    formula: 'inspection-request-stats（JS 聚合，CLOSED + closedAt 区间规则）',
+    formula:
+      'inspection-request-stats（DB 预聚合 GROUP BY + COUNT/SUM，Node 仅身份归一与结果组合；CLOSED + closedAt 区间规则）',
     sourceTable: 'qms_inspection_requests',
     owner: 'inspection',
     consumers:
       'GET /qms/inspection/requests/stats；用户管理在办量（阶段 3 收敛）',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/inspection/inspection-request-stats-data.ts#loadClosedPeriodGroups',
+      'modules/inspection/inspection-request-stats-data.ts#loadSubmittedPeriodGroups',
+      'modules/inspection/inspection-request-stats-data.ts#loadActiveInspectorRequestAggregates',
+    ],
   },
   {
     id: 'M-D05',
@@ -488,7 +504,9 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'dashboard',
     consumers: 'GET /qms/dashboard（5 个页面复用）',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/work-order/work-order.service.ts#getDashboardStats',
+    ],
   },
   {
     id: 'M-F02',
@@ -500,7 +518,10 @@ export const METRIC_REGISTRY: MetricRegistration[] = [
     owner: 'dashboard',
     consumers: 'GET /qms/dashboard',
     freshness: 'real-time',
-    implementationPoints: [],
+    implementationPoints: [
+      'modules/report/pass-rate.ts#getLegacyPassRateMonthlyByRange',
+      'modules/report/pass-rate-projection-query.service.ts#getProjectedPassRateMonthlyByRange',
+    ],
   },
   {
     id: 'M-F03',

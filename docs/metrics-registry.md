@@ -2,6 +2,8 @@
 
 > 权威文档：2026-08-17 成文。**一个指标，全世界只有一个定义**。任何聚合（groupBy / aggregate / 含聚合的 SQL）必须先查本字典：已存在则复用，不存在则登记后再写代码。代码版登记表（门禁输入，必须与本文档一致）：`apps/backend/utils/metrics-registry.ts`。门禁：B-MF（scripts/check-metric-registration.mjs）——新增聚合未登记即拦截（2026-08-17 立项，随阶段 1 落地）。关联：docs/data-contract.md（字段级治理）、apps/backend/utils/master-data-fields.ts（字段治理登记）。
 
+> **边界澄清（METRIC-GOVERNANCE-001 / PHASE-1）**：本文是 **Technical Aggregation Registry**，记录聚合实现点并服务 B-MF 门禁；它不是业务 Metric Code、Owner、审批、生效版本或公式治理的唯一来源。业务 Definition、生命周期、审计和首批 10 项 DRAFT Definition 见 [docs/metrics/metric-registry.md](./metrics/metric-registry.md)。`M-*` 技术 ID 与 `BM-*` 业务 Metric Code 不可互换。
+
 ---
 
 ## 1. 治理规则
@@ -24,7 +26,7 @@
 | F 工作台   | M-F01 ~ M-F05 | 5      | dashboard / work-order |
 | G 其他     | M-G01 ~ M-G08 | 8      | 各域                   |
 
-**合计 41 个登记指标**（覆盖 51 处聚合点的全部聚合函数；同名聚合函数如 M-B03/M-B04/M-B05 为多源适配，由阶段 2 收敛）。
+**合计 41 个登记指标**（覆盖 69 处聚合点的全部聚合函数；同名聚合函数如 M-B03/M-B04/M-B05 为多源适配，由阶段 2 收敛。PERF-QMS-001/PHASE-1B 后：pass-rate 月度/钻取预聚合、quality-loss 看板/年度图表、inspection-request 在办聚合、work-order 看板统计全部登记为 DB 聚合点）。
 
 ## 3. 指标明细
 
@@ -51,7 +53,7 @@
 | M-B03 | qualityLossTrend | 损失趋势（统一出口） | **getTrendData 查 quality_loss_index 按 source 分组**（四源口径写入时统一，2026-08-17 三源直查函数退役） | quality_loss_index | /qms/quality-loss/charts | 实时 |
 | M-B04 | qualityLossDrillDown | 损失钻取（统一出口） | getDrillDown 查 quality_loss_index | quality_loss_index | charts 钻取 | 实时 |
 | M-B05 | lossRecordsAggregation | 损失记录分页聚合（统一出口） | getAllLosses 查 quality_loss_index；口径 lossAmount>0 OR isClaim=true | quality_loss_index | 损失列表/导出 | 实时 |
-| M-B06 | qualityLossDashboard | 质量损失看板汇总 | getDashboardSummary | quality_losses+三源 | /qms/quality-loss/dashboard | 实时 |
+| M-B06 | qualityLossDashboard | 质量损失看板汇总 | getDashboardSummary（aggregate+groupBy）/ getYearlyCharts（groupBy 部门分布+趋势） | quality_loss_index | /qms/quality-loss/dashboard | 实时 |
 
 ### C. 售后族（after-sales 模块）
 
@@ -71,7 +73,7 @@
 | M-D01 | inspectionReportStatistics | 检验报告统计（缺陷分布/风险项目/供应商绩效） | getDefectDistribution/getTopRiskProjects/getSupplierPerformance | quality_records | 检验报告统计页 | 实时 |
 | M-D02 | inspectionIssueStats | 不合格品项统计（总数/损失/关闭率/类型分布） | aggregate(\_count/\_sum lossAmount)+count(closed)+groupBy(defectCategoryId) | quality_records | /qms/inspection/issues/stats | 实时 |
 | M-D03 | inspectionIssueChartAggregate | 不合格品图表聚合 | metric: count/lossAmount/quantity | quality_records | /qms/inspection/issues/chart-aggregate | 实时 |
-| M-D04 | inspectionRequestStats | 报检任务统计（检验员负载/排行） | JS 聚合；CLOSED+closedAt 区间规则 | qms_inspection_requests | /qms/inspection/requests/stats；用户管理在办量（阶段 3 收敛） | 实时 |
+| M-D04 | inspectionRequestStats | 报检任务统计（检验员负载/排行） | DB 预聚合 GROUP BY + COUNT/SUM；Node 仅身份归一与结果组合；CLOSED+closedAt 区间规则 | qms_inspection_requests | /qms/inspection/requests/stats；用户管理在办量（阶段 3 收敛） | 实时 |
 | M-D05 | workspaceIssueSummary | 工作台问题汇总 | getWorkspaceIssueSummary | quality_records+inspections | /qms/dashboard | 实时 |
 | M-D06 | inspectionReportPeriodMetrics | 检验报告周期指标 | getReportPeriodMetrics（新问题/关闭/内部损失） | quality_records | /qms/reports/summary（internalLoss 组成） | 实时 |
 
