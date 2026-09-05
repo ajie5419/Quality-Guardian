@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+import type { AuthorizedSourceContext } from './inspection-request-close-effects.service';
+
 import prisma from '~/utils/prisma';
 
 import { buildInspectionRecordFromRequest } from './inspection-request';
@@ -23,9 +25,12 @@ export type CloseInspectionRecordLink = {
 export async function createCloseInspectionRecords(options: {
   body: Record<string, unknown>;
   request: CloseRecordRequest;
+  sourceContext?: AuthorizedSourceContext;
   tx?: Prisma.TransactionClient;
 }): Promise<CloseInspectionRecordLink[]> {
   const client = options.tx ?? prisma;
+  if (options.sourceContext && options.sourceContext.transaction !== options.tx)
+    throw new Error('Close derived write transaction mismatch');
   const numbers = resolveCloseWorkOrderNumbers(options.request);
   const workOrders = await assertWorkOrdersExist(client, numbers);
   const projectByWorkOrder = new Map(
@@ -43,6 +48,8 @@ export async function createCloseInspectionRecords(options: {
       },
       options.tx,
     );
+    // qms-arch-allow R-SCOPE: close-flow inspection persist; the record was
+    // built and its id assigned in the same transaction.
     await client.inspections.update({
       data: buildCloseInspectionResponsibilityWrite({
         inspection,

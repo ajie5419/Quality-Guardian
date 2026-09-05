@@ -1,18 +1,17 @@
+import type { Prisma } from '@prisma/client';
 import type { H3Event } from 'h3';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import type { InspectionAccessContext } from './inspection-access-context';
 import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
 
-import {
-  INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
-  normalizeInspectionIssueResponsibilityType,
-} from '@qgs/shared';
+import { createScopedRepository } from '~/modules/data-scope';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
 
-import { isInspectionSerialNumberConflict } from './inspection-record-types';
+import { toScopedAccessContext } from './inspection-access-context';
 import {
   INSPECTION_REQUEST_STATUS,
   mapInspectionRequest,
@@ -26,10 +25,12 @@ import {
   runClosePostCommitTask,
   syncCloseAttachments,
   syncCloseIssueEffects,
+  updateDerivedDispatchTask,
 } from './inspection-request-close-effects.service';
 import { buildCloseLinkedIssueCreateResult } from './inspection-request-close-issue.service';
 import { buildCloseLinkedIssueWhere } from './inspection-request-close-linked-issue.service';
 import { createCloseInspectionRecords } from './inspection-request-close-records.service';
+import { hydrateOutsourcingLinkedIssueResponsibility } from './inspection-request-close-responsibility-hydration';
 import {
   assertCloseLinkedIssueResponsibilityMatches,
   assertExistingCloseLinkedIssueResponsibilityMatches,
@@ -37,6 +38,7 @@ import {
   requireCanonicalCloseResponsibility,
   resolveLegacyCloseRequestResponsibility,
 } from './inspection-request-close-responsibility.service';
+import { retryOnSerialNumberConflict } from './inspection-request-close-serial-retry';
 import {
   failCloseRequest,
   parseCloseRequestNumber,
@@ -44,54 +46,50 @@ import {
 } from './inspection-request-close.schema';
 import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
 
-export function hydrateOutsourcingLinkedIssueResponsibility(options: {
-  linkedIssue: Record<string, unknown>;
-  responsibility: {
-    responsibleDepartmentId: string;
-  };
-}) {
-  const responsibilityType = normalizeInspectionIssueResponsibilityType(
-    options.linkedIssue.responsibilityType,
-  );
-  if (
-    responsibilityType !==
-      INSPECTION_ISSUE_RESPONSIBILITY_TYPE.OUTSOURCING_UNIT &&
-    responsibilityType !== INSPECTION_ISSUE_RESPONSIBILITY_TYPE.SUPPLIER
-  ) {
-    return options.linkedIssue;
-  }
-  // The close responsibility (inherited from the request snapshot by the
-  // close pipeline) is the department source; the client never resolves it.
-  return {
-    ...options.linkedIssue,
-    responsibleDepartmentId: options.responsibility.responsibleDepartmentId,
-  };
-}
-
+export { hydrateOutsourcingLinkedIssueResponsibility } from './inspection-request-close-responsibility-hydration';
 export const InspectionRequestCloseService = {
   async closeRequest(
     event: H3Event,
     id: string,
     body: Record<string, unknown>,
     userinfo: UserSession,
+    access?: InspectionAccessContext,
   ) {
     validateCloseRequestBody(body);
     const explicitInspectionId = normalizeInspectionRequestText(
       body.inspectionId,
     );
-    const request = await prisma.qms_inspection_requests.findFirst({
-      include: {
-        process: { select: { name: true } },
-        work_order: { select: { projectName: true } },
-        workOrders: inspectionRequestWorkOrdersInclude,
+    const scopedAccess = access
+      ? toScopedAccessContext(access)
+      : {
+          user: { id: userinfo.userId || userinfo.id || 'unknown' },
+          scope: { scopeType: 'ALL' as const },
+        };
+    const requestRepo = createScopedRepository(
+      'inspection',
+      prisma.qms_inspection_requests,
+    );
+    const request = (await requestRepo.findAccessible(
+      {
+        include: {
+          process: { select: { name: true } },
+          work_order: { select: { projectName: true } },
+          workOrders: inspectionRequestWorkOrdersInclude,
+        },
+        where: { id, isDeleted: false },
       },
-      where: { id, isDeleted: false },
-    });
+      scopedAccess,
+    )) as Prisma.qms_inspection_requestsGetPayload<{
+      include: {
+        process: true;
+        work_order: true;
+        workOrders: true;
+      };
+    }>;
     if (!request) failCloseRequest('NOT_FOUND', '报检任务不存在');
     await ensureCloseRequestAccess({ request, userinfo });
     if (request.status === INSPECTION_REQUEST_STATUS.CLOSED)
       failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
-
     if (explicitInspectionId) {
       const inspection = await prisma.inspections.findFirst({
         select: { id: true },
@@ -107,7 +105,6 @@ export const InspectionRequestCloseService = {
           '关联的检验记录不存在，或工单号与报检任务不一致',
         );
     }
-
     const closeAttachments = normalizeInspectionRequestAttachments(
       body.attachments,
     );
@@ -117,8 +114,6 @@ export const InspectionRequestCloseService = {
       body.responsibility && typeof body.responsibility === 'object'
         ? (body.responsibility as Record<string, unknown>)
         : undefined;
-    // FAIL clients released before the dedicated close responsibility field
-    // remain compatible. PASS never infers a missing request fact from issue data.
     const closeResponsibility =
       responsibility || (result === 'FAIL' ? linkedIssue : undefined);
     const totalQuantity = parseInspectionRequestQuantity(
@@ -140,25 +135,31 @@ export const InspectionRequestCloseService = {
     const closeInspectorId =
       request.inspectorId ||
       (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
-
     const runCloseTransaction = () =>
       prisma.$transaction(async (tx) => {
-        // Atomic guard: the authoritative status check happens inside the
-        // transaction, so concurrent close attempts cannot both pass.
-        const guard = await tx.qms_inspection_requests.updateMany({
-          data: { status: INSPECTION_REQUEST_STATUS.INSPECTING },
-          where: {
-            id,
-            isDeleted: false,
-            status: { not: INSPECTION_REQUEST_STATUS.CLOSED },
+        const txRequestRepo = createScopedRepository(
+          'inspection',
+          tx.qms_inspection_requests,
+        );
+        const guard = await txRequestRepo.updateAccessible(
+          {
+            data: { status: INSPECTION_REQUEST_STATUS.INSPECTING },
+            where: {
+              id,
+              isDeleted: false,
+              status: request.status,
+            },
           },
-        });
+          scopedAccess,
+        );
         if (guard.count === 0)
           failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
-
-        // The state guard above locks this request row. Re-read every fact that
-        // influences responsibility validation so changes made before the lock
-        // cannot be validated against the stale outer request snapshot.
+        const authorizedSource = {
+          casVerified: true as const,
+          dataScopeVerified: true as const,
+          source: { id, model: 'qms_inspection_requests' as const },
+          transaction: tx,
+        };
         const currentLink = await tx.qms_inspection_requests.findUnique({
           select: {
             category: true,
@@ -176,7 +177,6 @@ export const InspectionRequestCloseService = {
         });
         if (!currentLink) failCloseRequest('NOT_FOUND', '报检任务不存在');
         const requestAtClose = { ...request, ...currentLink };
-
         let inspectionId = explicitInspectionId;
         const responsibilityResolution =
           await resolveLegacyCloseRequestResponsibility({
@@ -210,16 +210,14 @@ export const InspectionRequestCloseService = {
             ]
           : [];
         if (!inspectionId) {
-          // Created inside the transaction so a failed close leaves no
-          // orphan inspection records behind.
           inspectionLinks = await createCloseInspectionRecords({
             body,
             request: requestWithResponsibility,
+            sourceContext: authorizedSource,
             tx,
           });
           inspectionId = inspectionLinks[0]?.inspectionId || '';
         }
-
         if (explicitInspectionId && inspectionId) {
           const existingInspection = await tx.inspections.findFirst({
             select: {
@@ -242,6 +240,7 @@ export const InspectionRequestCloseService = {
               '关联的检验记录不存在，或工单号与报检任务不一致',
             );
           }
+          // qms-arch-allow R-SCOPE: request CAS authorizes this linked inspection.
           await tx.inspections.update({
             data: {
               ...buildCloseInspectionResponsibilityWrite({
@@ -290,6 +289,7 @@ export const InspectionRequestCloseService = {
               inspectionId,
               linkedIssue: linkedIssueWithCanonicalResponsibility,
               request: requestWithResponsibility,
+              sourceContext: authorizedSource,
               tx,
               userinfo,
             });
@@ -332,6 +332,7 @@ export const InspectionRequestCloseService = {
           })),
           skipDuplicates: true,
         });
+        // qms-arch-allow R-SCOPE: same transaction holds the request CAS anchor.
         const record = await tx.qms_inspection_requests.update({
           data: {
             closeAttachments:
@@ -372,12 +373,17 @@ export const InspectionRequestCloseService = {
           where: { id },
         });
         if (record.dispatchTaskId) {
-          await tx.qms_task_dispatches.updateMany({
-            data: {
-              status: shouldCloseRequest ? 'COMPLETED' : 'PROCESSING',
+          await updateDerivedDispatchTask(
+            tx,
+            record.dispatchTaskId,
+            authorizedSource,
+            {
+              data: {
+                status: shouldCloseRequest ? 'COMPLETED' : 'PROCESSING',
+              },
+              where: { id: record.dispatchTaskId },
             },
-            where: { id: record.dispatchTaskId },
-          });
+          );
         }
         const changedInspectionIdentities = await tx.inspections.findMany({
           select: {
@@ -421,71 +427,74 @@ export const InspectionRequestCloseService = {
       resolvedLegacyResponsibility,
       record: updated,
     } = await retryOnSerialNumberConflict(runCloseTransaction, 3);
+    const postCommitSource = {
+      source: {
+        id: String(updated.id),
+        model: 'qms_inspection_requests' as const,
+      },
+    };
 
-    await runClosePostCommitTask('attachments', () =>
-      syncCloseAttachments({
-        closeAttachments,
-        hasDocuments:
-          typeof body.hasDocuments === 'boolean'
-            ? body.hasDocuments
-            : undefined,
-        inspectionId,
-        inspectionIds: inspectionLinks.map((item) => item.inspectionId),
-        requestId: String(updated.id),
-        selfCheckAttachments: request.attachments,
-      }),
+    await runClosePostCommitTask(
+      'attachments',
+      () =>
+        syncCloseAttachments({
+          closeAttachments,
+          hasDocuments:
+            typeof body.hasDocuments === 'boolean'
+              ? body.hasDocuments
+              : undefined,
+          inspectionId,
+          inspectionIds: inspectionLinks.map((item) => item.inspectionId),
+          requestId: String(updated.id),
+          selfCheckAttachments: request.attachments,
+          sourceContext: postCommitSource,
+        }),
+      { requestId: String(updated.id) },
     );
-    await runClosePostCommitTask('issue-effects', () =>
-      syncCloseIssueEffects({
-        closedLinkedIssueCount,
-        issue: createdIssue ? issue : null,
-        issueAuditVariables,
-        linkedIssue: createdIssue ? linkedIssue : undefined,
-        updated,
-        userinfo,
-      }),
+    await runClosePostCommitTask(
+      'issue-effects',
+      () =>
+        syncCloseIssueEffects({
+          closedLinkedIssueCount,
+          issue: createdIssue ? issue : null,
+          issueAuditVariables,
+          linkedIssue: createdIssue ? linkedIssue : undefined,
+          updated,
+          userinfo,
+          sourceContext: postCommitSource,
+        }),
+      { requestId: String(updated.id) },
     );
 
-    await runClosePostCommitTask('audit-log', () =>
-      recordBusinessAuditLog(event, {
-        action: 'UPDATE',
-        detailsTemplate:
-          '关闭报检任务: {{requestNo}}，关联检验记录: {{inspectionId}}',
-        detailsVariables: { inspectionId, requestNo: updated.requestNo },
-        targetId: String(updated.id),
-        targetType: 'inspection_request',
-        userId: userinfo?.id,
-      }),
-    );
-    if (resolvedLegacyResponsibility) {
-      await runClosePostCommitTask('responsibility-audit-log', () =>
+    await runClosePostCommitTask(
+      'audit-log',
+      () =>
         recordBusinessAuditLog(event, {
           action: 'UPDATE',
-          detailsTemplate: '关闭报检时裁决并固化责任事实: {{requestNo}}',
-          detailsVariables: { requestNo: updated.requestNo },
+          detailsTemplate:
+            '关闭报检任务: {{requestNo}}，关联检验记录: {{inspectionId}}',
+          detailsVariables: { inspectionId, requestNo: updated.requestNo },
           targetId: String(updated.id),
           targetType: 'inspection_request',
           userId: userinfo?.id,
         }),
+      { requestId: String(updated.id) },
+    );
+    if (resolvedLegacyResponsibility) {
+      await runClosePostCommitTask(
+        'responsibility-audit-log',
+        () =>
+          recordBusinessAuditLog(event, {
+            action: 'UPDATE',
+            detailsTemplate: '关闭报检时裁决并固化责任事实: {{requestNo}}',
+            detailsVariables: { requestNo: updated.requestNo },
+            targetId: String(updated.id),
+            targetType: 'inspection_request',
+            userId: userinfo?.id,
+          }),
+        { requestId: String(updated.id) },
       );
     }
     return mapInspectionRequest(updated);
   },
 };
-
-async function retryOnSerialNumberConflict<T>(
-  run: () => Promise<T>,
-  maxAttempts: number,
-): Promise<T> {
-  for (let attempt = 1; ; attempt++) {
-    try {
-      return await run();
-    } catch (error) {
-      // Concurrent transactions can select the same next serial number, so a
-      // unique-index conflict must retry the whole close transaction as one unit.
-      if (attempt >= maxAttempts || !isInspectionSerialNumberConflict(error)) {
-        throw error;
-      }
-    }
-  }
-}

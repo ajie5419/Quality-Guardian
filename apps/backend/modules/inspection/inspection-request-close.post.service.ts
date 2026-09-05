@@ -27,6 +27,12 @@ export default defineEventHandler(async (event) => {
       id,
       body,
       userinfo,
+      {
+        dataScope: event.context.dataScope,
+        permission: 'QMS:Inspection:Requests:Close',
+        scopeIdentity: event.context.dataScope ?? {},
+        user: userinfo,
+      },
     );
     return useResponseSuccess(result);
   } catch (error) {
