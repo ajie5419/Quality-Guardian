@@ -6,7 +6,7 @@ import {
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
-import { getCurrentUser } from '~/utils/current-user';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -25,20 +25,13 @@ export default defineEventHandler(async (event) => {
   const dateValue = parseAfterSalesDateValue(rawDateValue);
 
   try {
-    const userinfo = getCurrentUser(event);
     const stats = await AfterSalesService.getStats(
       {
         dateMode,
         dateValue,
         year: Number.isNaN(currentYear) ? undefined : currentYear,
       },
-      {
-        dataScope: event.context.dataScope,
-        user: {
-          userId: String(userinfo.id || userinfo.userId || ''),
-          username: userinfo.username,
-        },
-      },
+      getAnalyticsAccessContext(event),
     );
     return useResponseSuccess(stats);
   } catch (error) {
