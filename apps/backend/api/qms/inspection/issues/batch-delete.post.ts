@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
         event,
         userinfo,
         ids,
+        event.context.dataScope,
       ),
     });
   } catch (error) {

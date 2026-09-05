@@ -1,4 +1,8 @@
+import type { Prisma } from '@prisma/client';
+import type { AccessScope } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
+
+import type { IssueAuthorizedSourceContext } from './inspection-issue-create.service';
 
 import { INSPECTION_ISSUE_PERMISSION_CODES } from '@qgs/shared';
 import { resolveRetainUntil } from '~/modules/data-lifecycle';
@@ -17,7 +21,6 @@ import { WelderScoreRefreshService } from '~/modules/welder';
 import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
 
 import {
   buildInspectionIssueUpdateData,
@@ -27,12 +30,19 @@ import {
 } from './inspection-issue';
 import {
   applyInspectionIssueWriteOwnership,
+  buildInspectionIssueScopeWhere,
   InspectionIssueAccessService,
 } from './inspection-issue-access.service';
 import {
   InspectionIssueCreateService,
   validateOnlineInspectionIssueResponsibilityInput,
 } from './inspection-issue-create.service';
+import {
+  hasInspectionIssueResponsibilityUpdate,
+  isSerialNumberConflict,
+  mergeResponsibilityInput,
+  rejectSubmittedImportNcNumber,
+} from './inspection-issue-mutation-helpers';
 import { reserveInspectionIssueNcNumber } from './inspection-issue-nc-number.service';
 import { resolveInspectionIssueResponsibility } from './inspection-issue-responsibility.service';
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
@@ -42,22 +52,29 @@ const logger = createModuleLogger('InspectionIssueMutation');
 type RequestBody = Record<string, unknown>;
 
 export const InspectionIssueMutationService = {
+  /**
+   * Business create inside a caller-provided transaction (idempotency claim
+   * transaction). Pre-checks that must fail WITHOUT occupying the key live in
+   * the caller; this method only runs the create + its DB-side queue jobs.
+   */
+  async createIssueInTransaction(
+    userinfo: UserSession,
+    body: RequestBody,
+    tx: Prisma.TransactionClient,
+  ) {
+    return InspectionIssueCreateService.createInTransaction({
+      body,
+      tx,
+      userinfo,
+    });
+  },
+
   async createIssue(userinfo: UserSession, body: RequestBody) {
     await InspectionIssueAccessService.ensurePermission(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.CREATE,
     );
-    const sourceType = String(body.sourceType || '')
-      .trim()
-      .toUpperCase();
-    if (
-      (sourceType === 'INSPECTION' || sourceType === 'INSPECTION_RECORD') &&
-      !String(body.inspectionId || '').trim()
-    ) {
-      throw new Error(
-        'BAD_REQUEST:检验记录来源创建不合格项时必须携带 inspectionId',
-      );
-    }
+    assertIssueCreateSourceContext(body);
     const newRecord = await createIssueWithSerialRetry(async () =>
       prisma.$transaction(async (tx) =>
         InspectionIssueCreateService.createInTransaction({
@@ -103,18 +120,23 @@ export const InspectionIssueMutationService = {
     id: string,
     body: RequestBody,
     existingNcNumber: null | string,
+    dataScope?: AccessScope,
   ) {
     const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
       INSPECTION_ISSUE_PERMISSION_CODES.EDIT,
     );
-    const ownershipWhere = applyInspectionIssueWriteOwnership(
+    const scopedWhere = await buildInspectionIssueScopeWhere(
       { id, isDeleted: false },
+      { ...userContext, dataScope },
+    );
+    const ownershipWhere = applyInspectionIssueWriteOwnership(
+      scopedWhere,
       userContext,
     );
     const { updateData } = await prisma.$transaction(async (tx) => {
       validateOnlineInspectionIssueResponsibilityInput(body);
-      const current = await tx.quality_records.findUnique({
+      const current = await tx.quality_records.findFirst({
         where: ownershipWhere,
         select: {
           defectSubcategoryId: true,
@@ -137,6 +159,12 @@ export const InspectionIssueMutationService = {
           403,
         );
       }
+      const sourceContext: IssueAuthorizedSourceContext = {
+        casVerified: true,
+        dataScopeVerified: true,
+        source: { id, model: 'inspections' },
+        transaction: tx,
+      };
       const responsibility = hasInspectionIssueResponsibilityUpdate(body)
         ? await resolveInspectionIssueResponsibility(
             mergeResponsibilityInput(body, current),
@@ -176,7 +204,7 @@ export const InspectionIssueMutationService = {
           canonicalBody.responsibleWelderId ?? current.responsibleWelderId,
           canonicalBody.responsibleWelder ?? current.responsibleWelder,
         );
-      const updated = await tx.quality_records.update({
+      const updateResult = await tx.quality_records.updateMany({
         where: ownershipWhere,
         data: responsibility
           ? {
@@ -187,6 +215,19 @@ export const InspectionIssueMutationService = {
             }
           : { ...updateData, responsibleWelderId },
       });
+      if (updateResult && updateResult.count !== 1) {
+        throw new BusinessError('FORBIDDEN', '记录不在当前数据权限范围内', 403);
+      }
+      if (sourceContext.transaction !== tx) {
+        throw new BusinessError(
+          'FORBIDDEN',
+          'Issue 派生写入缺少授权上下文',
+          403,
+        );
+      }
+      // Queue boundary: preserve source identity for future system context;
+      // worker execution remains unchanged in this phase.
+      const updated = { ...current, ...updateData, id };
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
         [current.supplierId, updated.supplierId],
@@ -199,7 +240,7 @@ export const InspectionIssueMutationService = {
       );
       await WelderScoreRefreshService.enqueueForResponsibleText(
         tx,
-        [updated.responsibleWelder],
+        [String(updated.responsibleWelder || '')],
         'inspection-issue.updated',
       );
       return { updateData };
@@ -222,11 +263,11 @@ export const InspectionIssueMutationService = {
       },
     });
   },
-
   async batchDeleteIssues(
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
     ids: string[],
+    dataScope?: AccessScope,
   ) {
     const userContext = await InspectionIssueAccessService.getAccessContext(
       userinfo,
@@ -234,8 +275,12 @@ export const InspectionIssueMutationService = {
     );
     const uniqueIds = [...new Set(ids)];
     const result = await prisma.$transaction(async (tx) => {
+      const scopedWhere = await buildInspectionIssueScopeWhere(
+        { id: { in: uniqueIds }, isDeleted: false },
+        { ...userContext, dataScope },
+      );
       const existing = await tx.quality_records.findMany({
-        where: { id: { in: uniqueIds }, isDeleted: false },
+        where: scopedWhere,
         select: {
           createdBy: true,
           id: true,
@@ -261,12 +306,27 @@ export const InspectionIssueMutationService = {
         );
       }
       const result = await tx.quality_records.updateMany({
-        where: applyInspectionIssueWriteOwnership(
-          { id: { in: uniqueIds }, isDeleted: false },
-          userContext,
-        ),
+        where: applyInspectionIssueWriteOwnership(scopedWhere, userContext),
         data: { isDeleted: true, updatedAt: new Date() },
       });
+      const sourceContext: IssueAuthorizedSourceContext = {
+        casVerified: true,
+        dataScopeVerified: true,
+        source: {
+          id: existing[0]?.id || uniqueIds[0] || 'unknown',
+          model: 'inspections',
+        },
+        transaction: tx,
+      };
+      if (sourceContext.transaction !== tx) {
+        throw new BusinessError(
+          'FORBIDDEN',
+          'Issue 派生写入缺少授权上下文',
+          403,
+        );
+      }
+      // Queue boundary: batch source identities are available for later worker
+      // context propagation; queue implementation is intentionally unchanged.
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
         existing.map((item) => item.supplierId),
@@ -407,61 +467,25 @@ export const InspectionIssueMutationService = {
  * Returns true when the Prisma error is a P2002 unique-constraint violation
  * targeting the serialNumber column in quality_records.
  */
-function isSerialNumberConflict(error: unknown): boolean {
-  if (!isPrismaUniqueConstraintError(error)) return false;
-  const message = String((error as { message?: string })?.message || '');
-  const target: unknown = (error as { meta?: { target?: unknown } })?.meta
-    ?.target;
-  const targetStr = Array.isArray(target)
-    ? target.join(',')
-    : String(target ?? '');
-  return message.includes('serialNumber') || targetStr.includes('serialNumber');
-}
 
-function hasInspectionIssueResponsibilityUpdate(body: RequestBody) {
-  return (
-    body.responsibilityType !== undefined ||
-    body.responsibleDepartmentId !== undefined ||
-    body.supplierId !== undefined
-  );
-}
-
-function rejectSubmittedImportNcNumber(item: Record<string, unknown>) {
-  for (const key of ['ncNumber', 'nonConformanceNumber'] as const) {
-    const value = item[key];
-    if (value !== undefined && value !== null && String(value).trim()) {
-      throw new BusinessError(
-        'VALIDATION',
-        '导入不支持手工填写不合格编号',
-        400,
-      );
-    }
+export function assertIssueCreateSourceContext(body: RequestBody) {
+  const sourceType = String(body.sourceType || '')
+    .trim()
+    .toUpperCase();
+  if (
+    (sourceType === 'INSPECTION' || sourceType === 'INSPECTION_RECORD') &&
+    !String(body.inspectionId || '').trim()
+  ) {
+    throw new Error(
+      'BAD_REQUEST:检验记录来源创建不合格项时必须携带 inspectionId',
+    );
   }
-}
-
-function mergeResponsibilityInput(
-  body: RequestBody,
-  current: {
-    responsibilityType: null | string;
-    responsibleDepartmentId: null | string;
-    supplierId: null | string;
-  },
-) {
-  return {
-    responsibilityType: String(
-      body.responsibilityType ?? current.responsibilityType ?? '',
-    ).trim(),
-    responsibleDepartmentId: String(
-      body.responsibleDepartmentId ?? current.responsibleDepartmentId ?? '',
-    ).trim(),
-    supplierId: String(body.supplierId ?? current.supplierId ?? '').trim(),
-  };
 }
 
 /**
  * Executes `run` up to 3 times for generated serial identifier conflicts.
  */
-async function createIssueWithSerialRetry<T>(
+export async function createIssueWithSerialRetry<T>(
   run: () => Promise<T>,
   maxAttempts = 3,
 ): Promise<T> {

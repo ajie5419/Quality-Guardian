@@ -1,3 +1,4 @@
+import type { AccessScope } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
@@ -58,12 +59,14 @@ export const InspectionApiService = {
     id: string,
     body: RequestBody,
     existingNcNumber: null | string,
+    dataScope?: AccessScope,
   ) {
     return InspectionIssueMutationService.updateIssue(
       userinfo,
       id,
       body,
       existingNcNumber,
+      dataScope,
     );
   },
   async assignIssueNcNumber(userinfo: UserSession, id: string) {
@@ -73,11 +76,13 @@ export const InspectionApiService = {
     event: Parameters<typeof recordBusinessAuditLog>[0],
     userinfo: UserSession,
     ids: string[],
+    dataScope?: AccessScope,
   ) {
     return InspectionIssueMutationService.batchDeleteIssues(
       event,
       userinfo,
       ids,
+      dataScope,
     );
   },
   async importIssues(

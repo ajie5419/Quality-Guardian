@@ -58,6 +58,7 @@ export default defineEventHandler(async (event) => {
       id,
       body,
       existingNcNumber,
+      event.context.dataScope,
     );
     return useResponseSuccess(null);
   } catch (error: unknown) {
