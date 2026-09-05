@@ -8,6 +8,10 @@ import {
   createInspectionRecord,
   updateInspectionRecord,
 } from '#/api/qms/inspection';
+import {
+  isIdempotencyReusedError,
+  useCreateOperationId,
+} from '#/composables/useCreateOperationId';
 import { useAvailableYears } from '#/hooks/useAvailableYears';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 
@@ -22,6 +26,8 @@ interface GridRefLike {
 
 export function useInspectionRecords() {
   const { handleApiError } = useErrorHandler();
+  const { acquire: acquireOperationId, reset: resetOperationId } =
+    useCreateOperationId();
   const activeKey = ref('incoming');
   const currentYear = ref(new Date().getFullYear());
   const { years: availableYears } = useAvailableYears(['inspection-record']);
@@ -57,13 +63,17 @@ export function useInspectionRecords() {
 
       await (isEdit.value && currentRecord.value?.id
         ? updateInspectionRecord(currentRecord.value.id, values)
-        : createInspectionRecord(values));
+        : createInspectionRecord(values, acquireOperationId()));
 
       message.success('保存成功');
+      resetOperationId();
       modalVisible.value = false;
       currentRecord.value = undefined;
       gridRef.value?.reload();
     } catch (error: unknown) {
+      if (isIdempotencyReusedError(error)) {
+        resetOperationId();
+      }
       handleApiError(error, 'Submit Inspection Record');
       let errorMsg = '提交失败，请重试';
       if (error instanceof Error) {

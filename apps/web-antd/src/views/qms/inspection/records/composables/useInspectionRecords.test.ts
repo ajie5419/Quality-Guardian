@@ -176,6 +176,7 @@ describe('useInspectionRecords', () => {
           responsibleDepartmentId: 'dept-purchasing',
         }),
       }),
+      expect.any(String),
     );
   });
 
@@ -214,6 +215,7 @@ describe('useInspectionRecords', () => {
           responsibilityType: 'OUTSOURCING_UNIT',
         }),
       }),
+      expect.any(String),
     );
   });
 
@@ -244,6 +246,7 @@ describe('useInspectionRecords', () => {
           responsibleDepartmentId: 'dept-quality',
         }),
       }),
+      expect.any(String),
     );
   });
 
