@@ -14,9 +14,13 @@ vi.mock('~/utils/prisma', () => {
     findUnique: vi.fn(),
     groupBy: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
   };
   const transactionClient = {
     metric_refresh_jobs: {
+      createMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    quality_loss_index_jobs: {
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     quality_records: qualityRecords,
@@ -25,6 +29,9 @@ vi.mock('~/utils/prisma', () => {
     default: {
       $queryRaw: vi.fn(),
       $transaction: vi.fn((callback) => callback(transactionClient)),
+      departments: {
+        findMany: vi.fn(),
+      },
       inspections: {
         count: vi.fn(),
         findMany: vi.fn(),
@@ -100,18 +107,23 @@ describe('inspectionReportingService', () => {
 
   describe('updateQualityLossFields', () => {
     it('should update recoveredAmount only and ignore status', async () => {
+      vi.mocked(prisma.quality_records.findFirst).mockResolvedValueOnce({
+        recoveredAmount: null,
+        supplierId: null,
+      } as never);
       await InspectionReportingService.updateQualityLossFields({
         actualClaim: 500,
         id: 'qr-1',
+        access: { user: { userId: 'user-1' } },
       });
 
-      expect(prisma.quality_records.update).toHaveBeenCalledWith({
-        where: { id: 'qr-1' },
+      expect(prisma.quality_records.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({ AND: expect.any(Array) }),
         data: expect.objectContaining({
           recoveredAmount: 500,
         }),
       });
-      expect(prisma.quality_records.update).not.toHaveBeenCalledWith(
+      expect(prisma.quality_records.updateMany).not.toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({ status: expect.anything() }),
         }),
@@ -119,12 +131,17 @@ describe('inspectionReportingService', () => {
     });
 
     it('should skip status when not provided', async () => {
+      vi.mocked(prisma.quality_records.findFirst).mockResolvedValueOnce({
+        recoveredAmount: null,
+        supplierId: null,
+      } as never);
       await InspectionReportingService.updateQualityLossFields({
         id: 'qr-1',
+        access: { user: { userId: 'user-1' } },
       });
 
-      const callData = (prisma.quality_records.update as any).mock.calls[0][0]
-        .data;
+      const callData = (prisma.quality_records.updateMany as any).mock
+        .calls[0][0].data;
       expect(callData).not.toHaveProperty('status');
     });
   });
@@ -399,6 +416,49 @@ describe('inspectionReportingService', () => {
       });
 
       expect(result).toHaveLength(1);
+    });
+  });
+
+  it('scopes dashboard stats by the caller department', async () => {
+    (prisma.quality_records.aggregate as any)
+      .mockResolvedValueOnce({ _count: { id: 5 }, _sum: { lossAmount: 100 } })
+      .mockResolvedValueOnce({ _sum: { lossAmount: 20 } });
+    (prisma.quality_records.count as any).mockResolvedValue(2);
+    (prisma.quality_records.groupBy as any).mockResolvedValue([]);
+    (prisma.departments.findMany as any).mockResolvedValue([
+      { name: 'Dept A' },
+    ]);
+
+    await InspectionReportingService.getStatsForDashboard(
+      {
+        weekStart: new Date('2026-01-06'),
+        yearStart: new Date('2026-01-01'),
+      },
+      {
+        dataScope: {
+          deptIds: ['dept-a'],
+          module: 'inspection',
+          scopeType: 'DEPT' as const,
+        },
+        user: { userId: 'u-dept-a', username: 'user-a' },
+      },
+    );
+
+    const aggregateCalls = (prisma.quality_records.aggregate as any).mock.calls;
+    expect(aggregateCalls[0][0].where).toEqual({
+      AND: [
+        { date: { gte: expect.any(Date) }, isDeleted: false },
+        {
+          OR: [
+            { responsibleDepartment: { in: ['dept-a', 'Dept A'] } },
+            { responsibleBU: { in: ['dept-a', 'Dept A'] } },
+          ],
+        },
+      ],
+    });
+    const groupByCalls = (prisma.quality_records.groupBy as any).mock.calls;
+    expect(groupByCalls[0][0].where.AND[1].OR[0]).toEqual({
+      responsibleDepartment: { in: ['dept-a', 'Dept A'] },
     });
   });
 
