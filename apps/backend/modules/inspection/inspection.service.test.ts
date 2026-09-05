@@ -291,24 +291,27 @@ describe('inspectionService', () => {
       (prisma.$transaction as any).mockImplementation(async (callback: any) =>
         callback({
           inspections: {
-            findUnique: vi.fn().mockResolvedValue({
-              category: 'PROCESS',
-              incomingType: null,
-              processId: 'process-old',
-              processName: '旧工序',
-              team: 'A班',
-              teamId: 'team-1',
-              templateId: null,
-              templateName: null,
-              workOrderNumber: 'WO-1001',
-            }),
-            update: vi.fn().mockResolvedValue({
-              id: 'inspection-1',
-              processId: 'process-new',
-              processName: '新工序',
-              documents: null,
-              workOrderNumber: 'WO-1001',
-            }),
+            findFirst: vi
+              .fn()
+              .mockResolvedValueOnce({
+                category: 'PROCESS',
+                incomingType: null,
+                processId: 'process-old',
+                processName: '旧工序',
+                team: 'A班',
+                teamId: 'team-1',
+                templateId: null,
+                templateName: null,
+                workOrderNumber: 'WO-1001',
+              })
+              .mockResolvedValue({
+                id: 'inspection-1',
+                processId: 'process-new',
+                processName: '新工序',
+                documents: null,
+                workOrderNumber: 'WO-1001',
+              }),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
           },
           processes: {
             findFirst: vi.fn().mockResolvedValue({
@@ -350,27 +353,30 @@ describe('inspectionService', () => {
     it('loads the canonical team name when updating inspection', async () => {
       const stopError = new Error('stop-after-template-binding');
       const inspectionFormFindFirst = vi.fn().mockResolvedValue(null);
-      const inspectionsUpdate = vi.fn().mockResolvedValue({
-        id: 'inspection-2',
-        processId: null,
-        processName: null,
-        documents: null,
-        workOrderNumber: 'WO-1002',
-      });
+      const inspectionsUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
       (prisma.$queryRawUnsafe as any).mockResolvedValue([]);
       (prisma.$transaction as any).mockImplementation(async (callback: any) =>
         callback({
           inspections: {
-            findUnique: vi.fn().mockResolvedValue({
-              category: 'PROCESS',
-              incomingType: null,
-              processId: null,
-              processName: null,
-              templateId: null,
-              templateName: null,
-              workOrderNumber: 'WO-1002',
-            }),
-            update: inspectionsUpdate,
+            findFirst: vi
+              .fn()
+              .mockResolvedValueOnce({
+                category: 'PROCESS',
+                incomingType: null,
+                processId: null,
+                processName: null,
+                templateId: null,
+                templateName: null,
+                workOrderNumber: 'WO-1002',
+              })
+              .mockResolvedValue({
+                id: 'inspection-2',
+                processId: null,
+                processName: null,
+                documents: null,
+                workOrderNumber: 'WO-1002',
+              }),
+            updateMany: inspectionsUpdateMany,
           },
           processes: {
             findFirst: vi.fn().mockResolvedValue(null),
@@ -399,7 +405,7 @@ describe('inspectionService', () => {
         } as any),
       ).rejects.toThrow('stop-after-template-binding');
 
-      expect(inspectionsUpdate).toHaveBeenCalledWith(
+      expect(inspectionsUpdateMany).toHaveBeenCalledWith(
         expect.objectContaining({
           data: expect.objectContaining({
             team: 'A班',

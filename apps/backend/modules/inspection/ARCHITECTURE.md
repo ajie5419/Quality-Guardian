@@ -103,6 +103,32 @@ The prior desktop TreeSelect strict-check value was stringified before persisten
 - `qms_inspection_requests.closeAttachments` 是检验员关闭报检时上传的关闭附件，写入 `inspections.documents`，并登记 `file_references(bizType=inspection_record, fieldName=documents)`。
 - 自检记录和关闭附件不得混用同一个字段；检验记录详情展示必须分别读取 `selfCheckDocuments` 与 `documents`。
 
+## 关闭副作用一致性（CLOSE-EFFECTS-INTEGRITY-001）
+
+效果分类原则（同一 DB 内、业务完成必要组成部分 → 同一事务；允许 eventual consistency 的后置效果 → 幂等 + 可重试 + 不得覆盖新数据）：
+
+- **MUST_SAME_TRANSACTION**：请求行状态/closeAttachments、检验记录（结果/数量/责任/附件）、不合格项创建与关闭、`qms_inspection_request_inspections` 关联、派单任务状态、`MetricRefreshQueue` / `QualityLossIndexQueue` 信号——全部在主关单事务内。
+- **AFTER_COMMIT_IDEMPOTENT**：`file_references` 登记（deleteMany + createMany skipDuplicates）、检验记录附件 JSON 合并、业务审计、焊工评分入队。
+- **BEST_EFFORT_EXTERNAL**：无（关闭链路无外部通知副作用）。
+
+关单并发：
+
+- 主事务内状态守卫是严格 CAS：`updateMany({ where: { id, isDeleted: false, status: <预读状态> }, data: { status: INSPECTING } })`。并发同请求 close 只有一个成功，败者抛业务错误且**不执行任何 close-effects**（禁止使用 `status: { not: CLOSED }`——并发 FAIL 关单会双过）。
+
+附件合并（`inspection-request-close-effects.service.ts`）：
+
+- `file_references` 是附件生命周期唯一权威；`inspections.documents / selfCheckDocuments` 是兼容快照，两者必须一致。
+- 快照合并使用乐观 CAS：`findUnique` 读当前值 → 按 fileId/url 去重合并 → `updateMany({ where: { id, documents, selfCheckDocuments }, data: 合并值 })`；`count=0` 重读重合并，最多 3 次，超限记录 `effectName/requestId/inspectionId` 供人工补偿，禁止无限重试。
+- 按检验记录逐个隔离失败：一条记录的合并失败不得吞掉其它记录的引用登记。
+
+事务客户端传播：
+
+- 在事务内调用 `FileStorageService.registerReferencesFromAttachments` 必须传 `tx`（record create/update 已强制）；禁止事务内调用但内部走 global `prisma`。
+
+审计边界：
+
+- 业务 close 审计只在主事务成功后的 post-commit 记录成功；任一 post-commit 副作用失败不得把 close 审计改成失败，只记录独立 technical/error log。
+
 ## Public 报检入口边界
 
 匿名扫码报检只能访问 `apps/backend/api/qms/public/inspection/requests/` 下的 public API。public 页面不得调用需要登录态的字典、工单、用户或模块内部接口。
@@ -212,3 +238,10 @@ Dashboard API contracts and Vue row keys carry the same stable IDs. A display na
 - 本 wave 只覆盖供应商身份相关的检验链路，不代表其他主数据（部门、项目、工序等）已完成全项目 `ID_ONLY` 迁移。未纳入模块必须显式标注治理阶段并单独推进。
 
 跨模块的通用规则见 `docs/master-data-identity-governance.md`。
+
+## 创建入口幂等（IDEMPOTENCY-KEY-001 / PHASE-2）
+
+- `POST /qms/inspection/requests/v2`（含 public v2 已登录分支）强制 `Idempotency-Key`，operationKey = `qms.inspection-request.create`；匿名扫码分支不强制（见 `docs/idempotency.md` §13 PUBLIC IDEMPOTENCY IDENTITY GAP）。claim 事务 = `prepareCreateRequest`（读操作，事务外）→ `createRequestInTransaction` （requestNo 生成在事务内）→ 首次提交后仅一次 `applyCreateRequestPostCommitEffects` （文件引用 / 审计 / SSE / Wx / Telegram）。
+- `POST /qms/inspection/issues`（NC create）强制 `Idempotency-Key`，operationKey = `qms.inspection-nc.create`；指纹非去重键，不同 key + 相同 payload 仍允许第二条 NC。import 等系统/批处理入口继续走旧 `createIssue`，不受用户 key 契约影响。
+- `POST /qms/inspection/records` 强制 `Idempotency-Key`，operationKey = `qms.inspection-record.create`；检验 serial 冲突在内层 for 循环重启整个 claim 事务。
+- 窗口统一 5 分钟；replay 不重复 post-commit 副作用；Guard `R-IDEMPOTENCY` 配置化覆盖。

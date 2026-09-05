@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import prisma from '~/utils/prisma';
 
 import { buildSupplierEngineeringIssueWhere } from './inspection-supplier-profile';
@@ -140,9 +142,24 @@ export const InspectionScoreDataService = {
     });
   },
 
-  async getWorkOrderAggregateInspections(workOrderNumber: string) {
+  async getWorkOrderAggregateInspections(
+    workOrderNumber: string,
+    access?: AnalyticsAccessContext,
+  ) {
+    const baseWhere: Prisma.inspectionsWhereInput = {
+      isDeleted: false,
+      workOrderNumber,
+    };
+    const where = access
+      ? await DataScopeService.buildScopedWhere(
+          'inspection',
+          baseWhere,
+          requireAnalyticsUser(access),
+          access.dataScope,
+        )
+      : baseWhere;
     return prisma.inspections.findMany({
-      where: { isDeleted: false, workOrderNumber },
+      where,
       orderBy: [{ inspectionDate: 'desc' }],
       include: {
         items: {

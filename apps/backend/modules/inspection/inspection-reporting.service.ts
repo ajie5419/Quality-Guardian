@@ -1,45 +1,114 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
 import { Prisma } from '@prisma/client';
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import prisma from '~/utils/prisma';
 
 import { InspectionReportStatisticsService } from './inspection-report-statistics.service';
 
+async function buildScopedIssueWhere(
+  baseWhere: Prisma.quality_recordsWhereInput,
+  access?: AnalyticsAccessContext,
+): Promise<Prisma.quality_recordsWhereInput> {
+  if (!access) return baseWhere;
+  const user = requireAnalyticsUser(access);
+  return DataScopeService.buildInspectionWhere(
+    baseWhere,
+    user,
+    access.dataScope,
+  );
+}
+
+async function buildScopedInspectionWhere(
+  baseWhere: Prisma.inspectionsWhereInput,
+  access?: AnalyticsAccessContext,
+): Promise<Prisma.inspectionsWhereInput> {
+  if (!access) return baseWhere;
+  const user = requireAnalyticsUser(access);
+  return DataScopeService.buildScopedWhere(
+    'inspection',
+    baseWhere,
+    user,
+    access.dataScope,
+  );
+}
+
 export const InspectionReportingService = {
-  async findIssueIdBySerialNumber(serialNumber: number) {
+  async findIssueIdBySerialNumber(
+    serialNumber: number,
+    access?: AnalyticsAccessContext,
+  ) {
     const row = await prisma.quality_records.findFirst({
-      where: { isDeleted: false, serialNumber },
+      where: await buildScopedIssueWhere(
+        { isDeleted: false, serialNumber },
+        access,
+      ),
       select: { id: true },
     });
     return row?.id || null;
   },
-  async updateQualityLossFields(params: { actualClaim?: number; id: string }) {
+  async updateQualityLossFields(params: {
+    access?: AnalyticsAccessContext;
+    actualClaim?: number;
+    id: string;
+  }) {
+    const user = requireAnalyticsUser(params.access);
     await prisma.$transaction(async (tx) => {
-      const current = await tx.quality_records.findUnique({
-        where: { id: params.id },
-        select: { supplierId: true },
+      const scopedWhere = await DataScopeService.buildInspectionWhere(
+        { id: params.id, isDeleted: false },
+        user,
+        params.access?.dataScope,
+      );
+      const current = await tx.quality_records.findFirst({
+        where: scopedWhere,
+        select: { recoveredAmount: true, supplierId: true },
       });
-      const updated = await tx.quality_records.update({
-        where: { id: params.id },
+      if (!current) throw new Error('Inspection issue is outside data scope');
+      const updated = await tx.quality_records.updateMany({
+        where: {
+          AND: [scopedWhere, { recoveredAmount: current.recoveredAmount }],
+        },
         data: {
           recoveredAmount: params.actualClaim,
           updatedAt: new Date(),
         },
       });
+      if (updated.count !== 1) throw new Error('Inspection issue changed');
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
-        [current?.supplierId, updated.supplierId],
+        [current.supplierId],
         'inspection-issue.quality-loss-updated',
       );
       await QualityLossIndexQueue.enqueue(
         tx,
-        [{ source: 'INTERNAL', sourcePk: updated.id }],
+        [{ source: 'INTERNAL', sourcePk: params.id }],
         'inspection-issue.quality-loss-updated',
       );
     });
   },
 
-  async getWorkspaceIssueSummary(params: { today: Date }) {
+  async getWorkspaceIssueSummary(
+    params: { today: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const openIssueWhere = await buildScopedIssueWhere(
+      { status: 'OPEN', isDeleted: false },
+      access,
+    );
+    const todayInspectionWhere = await buildScopedInspectionWhere(
+      { createdAt: { gte: params.today }, isDeleted: false },
+      access,
+    );
+    const todayIssueWhere = await buildScopedIssueWhere(
+      { createdAt: { gte: params.today }, isDeleted: false },
+      access,
+    );
+    const recentIssueWhere = await buildScopedIssueWhere(
+      { isDeleted: false },
+      access,
+    );
     const [
       openIssues,
       todayInspections,
@@ -48,23 +117,23 @@ export const InspectionReportingService = {
       recentIssues,
     ] = await Promise.all([
       prisma.quality_records.findMany({
-        where: { status: 'OPEN', isDeleted: false },
+        where: openIssueWhere,
         take: 5,
         orderBy: { createdAt: 'desc' },
       }),
       prisma.inspections.count({
-        where: { createdAt: { gte: params.today }, isDeleted: false },
+        where: todayInspectionWhere,
       }),
       prisma.quality_records.count({
-        where: { createdAt: { gte: params.today }, isDeleted: false },
+        where: todayIssueWhere,
       }),
       prisma.quality_records.count({
-        where: { status: 'OPEN', isDeleted: false },
+        where: openIssueWhere,
       }),
       prisma.quality_records.findMany({
         take: 8,
         orderBy: { createdAt: 'desc' },
-        where: { isDeleted: false },
+        where: recentIssueWhere,
         select: {
           id: true,
           partName: true,
@@ -85,23 +154,33 @@ export const InspectionReportingService = {
     };
   },
 
-  async getWeeklyReportIssues(params: { end: Date; start: Date }) {
-    return prisma.quality_records.findMany({
-      where: {
+  async getWeeklyReportIssues(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      {
         isDeleted: false,
         date: { gte: params.start, lte: params.end },
       },
+      access,
+    );
+    return prisma.quality_records.findMany({
+      where,
     });
   },
 
-  async getDailyReportInspections(params: {
-    end: Date;
-    realName?: string;
-    start: Date;
-    username: string;
-  }) {
-    return prisma.inspections.findMany({
-      where: {
+  async getDailyReportInspections(
+    params: {
+      end: Date;
+      realName?: string;
+      start: Date;
+      username: string;
+    },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedInspectionWhere(
+      {
         isDeleted: false,
         inspectionDate: { gte: params.start, lte: params.end },
         OR: [
@@ -109,6 +188,10 @@ export const InspectionReportingService = {
           { inspector: params.realName || '' },
         ],
       },
+      access,
+    );
+    return prisma.inspections.findMany({
+      where,
       include: {
         process: { select: { name: true } },
         work_order: { select: { projectName: true, customerName: true } },
@@ -116,13 +199,16 @@ export const InspectionReportingService = {
     });
   },
 
-  async getDailyReportIssues(params: {
-    end: Date;
-    start: Date;
-    username: string;
-  }) {
-    return prisma.quality_records.findMany({
-      where: {
+  async getDailyReportIssues(
+    params: {
+      end: Date;
+      start: Date;
+      username: string;
+    },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      {
         isDeleted: false,
         OR: [
           {
@@ -149,6 +235,10 @@ export const InspectionReportingService = {
           },
         ],
       },
+      access,
+    );
+    return prisma.quality_records.findMany({
+      where,
       include: {
         work_orders: { select: { projectName: true, customerName: true } },
       },
@@ -198,27 +288,37 @@ export const InspectionReportingService = {
     return { tasks, templates };
   },
 
-  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
+  async getReportPeriodMetrics(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const newIssuesWhere = await buildScopedIssueWhere(
+      {
+        createdAt: { gte: params.start, lte: params.end },
+        isDeleted: false,
+      },
+      access,
+    );
+    const internalLossWhere = await buildScopedIssueWhere(
+      {
+        date: { gte: params.start, lte: params.end },
+        isDeleted: false,
+      },
+      access,
+    );
     const [newIssues, closedIssues, internalLossAgg] = await Promise.all([
       prisma.quality_records.count({
-        where: {
-          createdAt: { gte: params.start, lte: params.end },
-          isDeleted: false,
-        },
+        where: newIssuesWhere,
       }),
       prisma.quality_records.count({
         where: {
-          createdAt: { gte: params.start, lte: params.end },
+          ...newIssuesWhere,
           status: 'CLOSED',
-          isDeleted: false,
         },
       }),
       prisma.quality_records.aggregate({
         _sum: { lossAmount: true },
-        where: {
-          date: { gte: params.start, lte: params.end },
-          isDeleted: false,
-        },
+        where: internalLossWhere,
       }),
     ]);
     return {
@@ -228,49 +328,84 @@ export const InspectionReportingService = {
     };
   },
 
-  async getReportDefectRows(params: { end: Date; start: Date }) {
+  async getReportDefectRows(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      access,
+    );
     return prisma.quality_records.findMany({
-      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      where,
       select: { defectCategoryId: true, defectType: true },
     });
   },
 
-  async getReportTopRiskProjects(params: { end: Date; start: Date }) {
-    return InspectionReportStatisticsService.getTopRiskProjects(params);
+  async getReportTopRiskProjects(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    return InspectionReportStatisticsService.getTopRiskProjects(params, access);
   },
 
-  async getReportSupplierPerformance(params: { end: Date; start: Date }) {
-    return InspectionReportStatisticsService.getSupplierPerformance(params);
+  async getReportSupplierPerformance(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    return InspectionReportStatisticsService.getSupplierPerformance(
+      params,
+      access,
+    );
   },
 
-  async getReportMajorEvents(params: { end: Date; start: Date }) {
+  async getReportMajorEvents(
+    params: { end: Date; start: Date },
+    access?: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedIssueWhere(
+      { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      access,
+    );
     return prisma.quality_records.findMany({
-      where: { date: { gte: params.start, lte: params.end }, isDeleted: false },
+      where,
       orderBy: { lossAmount: 'desc' },
       take: 3,
     });
   },
 
-  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+  async getStatsForDashboard(
+    params: { weekStart: Date; yearStart: Date },
+    access?: AnalyticsAccessContext,
+  ) {
     const baseWhere: Prisma.quality_recordsWhereInput = {
       isDeleted: false,
     };
+    const yearWhere = await buildScopedIssueWhere(
+      { ...baseWhere, date: { gte: params.yearStart } },
+      access,
+    );
+    const weekWhere = await buildScopedIssueWhere(
+      { ...baseWhere, date: { gte: params.weekStart } },
+      access,
+    );
     const [yearAggregate, weekAggregate, weekCount, yearTypeStats] =
       await Promise.all([
         prisma.quality_records.aggregate({
-          where: { ...baseWhere, date: { gte: params.yearStart } },
+          where: yearWhere,
           _count: { id: true },
           _sum: { lossAmount: true },
         }),
         prisma.quality_records.aggregate({
-          where: { ...baseWhere, date: { gte: params.weekStart } },
+          where: weekWhere,
           _sum: { lossAmount: true },
         }),
         prisma.quality_records.count({
-          where: { ...baseWhere, date: { gte: params.weekStart } },
+          where: weekWhere,
         }),
         InspectionReportStatisticsService.getDefectDistribution(
           params.yearStart,
+          access,
         ),
       ]);
 
