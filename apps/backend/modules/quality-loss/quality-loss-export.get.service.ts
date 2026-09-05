@@ -5,12 +5,16 @@ import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
+  EXPORT_LIMIT_EXCEEDED_MESSAGE,
+  exportLimitExceededError,
+  isExportLimitExceeded,
+} from '~/utils/export-constants';
+import {
   badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
-const MAX_EXPORT_ROWS = 20_000;
 const qualityLossExportQuerySchema = z.object({}).passthrough();
 
 export default defineValidatedHandler(
@@ -22,9 +26,16 @@ export default defineValidatedHandler(
     const filters = parseQualityLossCommonQuery(query);
 
     try {
-      const items = await QualityLossService.getLossSummary(filters);
+      const items = await QualityLossService.getExportRows({
+        ...filters,
+        dataScope: event.context.dataScope,
+        userContext: {
+          userId: String(userinfo.id || userinfo.userId || ''),
+          username: userinfo.username,
+        },
+      });
 
-      if (items.length > MAX_EXPORT_ROWS) {
+      if (isExportLimitExceeded(items)) {
         logApiWarn('quality-loss-export', 'export rows exceed limit', {
           count: items.length,
           filters,
@@ -34,7 +45,8 @@ export default defineValidatedHandler(
         });
         return badRequestResponse(
           event,
-          `导出数据量超过上限（${MAX_EXPORT_ROWS} 条），请缩小筛选范围后重试`,
+          EXPORT_LIMIT_EXCEEDED_MESSAGE,
+          exportLimitExceededError(),
         );
       }
 
