@@ -31,6 +31,7 @@ export default defineEventHandler(async (event) => {
       id,
       body,
       userinfo,
+      event.context.dataScope,
     );
     return useResponseSuccess(updated);
   } catch (error) {

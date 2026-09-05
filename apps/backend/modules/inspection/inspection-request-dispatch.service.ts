@@ -1,6 +1,9 @@
 import type { Prisma } from '@prisma/client';
 import type { EventHandlerRequest, H3Event } from 'h3';
+import type { ResolvedDataScope } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
+
+import type { AuthorizedSourceContext } from './inspection-request-close-effects.service';
 
 import { TASK_DISPATCH_STATUS } from '@qgs/shared';
 import { z } from 'zod';
@@ -19,6 +22,7 @@ import {
   parseInspectionRequestPriority,
   resolveInspectionRequestCurrentUserId,
 } from './inspection-request';
+import { buildScopedInspectionRequestWhere } from './inspection-request-scope';
 
 type RequestBody = Record<string, unknown>;
 
@@ -60,6 +64,7 @@ export const InspectionRequestDispatchService = {
     id: string,
     body: RequestBody,
     userinfo: UserSession,
+    dataScope?: ResolvedDataScope,
   ) {
     await this.ensureDispatchPermission(userinfo);
 
@@ -73,13 +78,25 @@ export const InspectionRequestDispatchService = {
     if (!dispatcherId)
       throw new BusinessError('BAD_REQUEST', '无法识别当前调度人', 400);
 
+    const requestWhere = dataScope
+      ? await buildScopedInspectionRequestWhere(
+          { id, isDeleted: false },
+          {
+            dataScope,
+            user: {
+              userId: String(userinfo.id || userinfo.userId || ''),
+              username: userinfo.username,
+            },
+          },
+        )
+      : { id, isDeleted: false };
     const [request, inspector] = await Promise.all([
       prisma.qms_inspection_requests.findFirst({
         include: {
           materialRequest: { select: { status: true } },
           work_order: { select: { projectName: true } },
         },
-        where: { id, isDeleted: false },
+        where: requestWhere,
       }),
       UserService.findEligibleInspector(inspectorId),
     ]);
@@ -124,8 +141,7 @@ export const InspectionRequestDispatchService = {
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.qms_inspection_requests.updateMany({
         where: {
-          id,
-          isDeleted: false,
+          ...requestWhere,
           status: { in: DISPATCHABLE_STATUSES },
           updatedAt: request.updatedAt,
         },
@@ -144,12 +160,21 @@ export const InspectionRequestDispatchService = {
           '该报检任务状态已变化，请刷新后重试',
           400,
         );
+      const sourceContext: AuthorizedSourceContext = {
+        casVerified: true,
+        dataScopeVerified: true,
+        source: { id, model: 'qms_inspection_requests' },
+        transaction: tx,
+      };
       const dispatchTaskId = await upsertDispatchTask(tx, {
         assignorId: dispatcherId,
         inspectorId: inspector.id,
         priority,
         request,
+        sourceContext,
       });
+      // qms-arch-allow R-SCOPE: dispatch commit; the request row was
+      // CAS-guarded by the updateMany above in the same transaction.
       return tx.qms_inspection_requests.update({
         data: { dispatchTaskId },
         include: {
@@ -200,8 +225,15 @@ async function upsertDispatchTask(
       requestNo: string;
       workOrderNumber: string;
     };
+    sourceContext: AuthorizedSourceContext;
   },
 ) {
+  if (
+    options.sourceContext.transaction !== tx ||
+    !options.sourceContext.casVerified
+  ) {
+    throw new BusinessError('FORBIDDEN', '派生派单写入缺少授权上下文', 403);
+  }
   const data = buildDispatchTaskUpdateData(options);
   if (!options.request.dispatchTaskId) {
     const task = await tx.qms_task_dispatches.create({
@@ -210,6 +242,8 @@ async function upsertDispatchTask(
     return task.id;
   }
 
+  // qms-arch-allow R-SCOPE: dispatch task promotion; the id is derived from
+  // the dispatched request and the write is state-guarded (DISPATCHED only).
   const updated = await tx.qms_task_dispatches.updateMany({
     data,
     where: {
