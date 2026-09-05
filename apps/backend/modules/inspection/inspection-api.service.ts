@@ -1,4 +1,4 @@
-import type { AccessScope } from '~/modules/data-scope';
+import type { AccessScope, ResolvedDataScope } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
@@ -36,12 +36,14 @@ export const InspectionApiService = {
     id: string,
     body: RequestBody,
     userinfo: UserSession,
+    dataScope?: ResolvedDataScope,
   ) {
     return InspectionRequestDispatchService.dispatchRequest(
       event,
       id,
       body,
       userinfo,
+      dataScope,
     );
   },
   async deleteRequest(
