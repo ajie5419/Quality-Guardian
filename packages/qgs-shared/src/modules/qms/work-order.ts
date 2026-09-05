@@ -18,6 +18,7 @@ export interface WorkOrderItem {
   projectName?: null | string;
   quantity: null | number;
   status: string;
+  version?: number; // Optimistic-lock version (OPTIMISTIC-LOCK-001)
   warrantyStatus?: null | string;
   workOrderNumber: string;
 }

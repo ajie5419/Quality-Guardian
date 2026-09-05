@@ -71,7 +71,7 @@ export function useWorkOrderActions(options: {
       content: `${t('qms.common.confirmDeleteContent')} ${row.workOrderNumber}?`,
       onOk: async () => {
         try {
-          await deleteWorkOrder(row.workOrderNumber);
+          await deleteWorkOrder(row.workOrderNumber, row.version);
           message.success(t('qms.common.deleteSuccess'));
           handleSuccess();
         } catch (error) {

@@ -125,9 +125,9 @@ export async function updateWorkOrder(
   });
 }
 
-export async function deleteWorkOrder(id: string) {
+export async function deleteWorkOrder(id: string, version?: number) {
   // Use query param 'id' to handle special characters like '/'
-  return requestClient.delete(QMS_API.WORK_ORDER, { params: { id } });
+  return requestClient.delete(QMS_API.WORK_ORDER, { params: { id, version } });
 }
 
 export async function createWorkOrderMutation(data: Partial<WorkOrderItem>) {

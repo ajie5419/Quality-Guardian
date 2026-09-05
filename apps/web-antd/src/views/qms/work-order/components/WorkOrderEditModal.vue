@@ -25,6 +25,8 @@ const { handleApiError } = useErrorHandler();
 const { isMobile } = useAdaptivePopup();
 const isUpdate = ref(false);
 const recordId = ref<null | string>(null);
+// OPTIMISTIC-LOCK-001: version read from the record is echoed back on update.
+const currentVersion = ref<number | undefined>(undefined);
 
 // ========== 3. 表单配置 ==========
 const [Form, formApi] = useVbenForm({
@@ -61,6 +63,7 @@ async function handleSubmit() {
       division: values.division || null,
       multiStationEnabled: values.multiStationEnabled === true,
       effectiveTime: values.effectiveTime || null, // 确保 null 而非空字符串
+      ...(isUpdate.value ? { version: currentVersion.value } : {}),
     };
 
     // ✅ 修复：移除前端生成的 createTime，由后端统一生成
@@ -88,6 +91,7 @@ async function open({ record, deptData = [] }: OpenParams = {}) {
     // 1. 状态标记：使用 workOrderNumber 作为主键
     isUpdate.value = !!record?.workOrderNumber;
     recordId.value = record?.workOrderNumber || null;
+    currentVersion.value = record?.version ?? undefined;
 
     // 2. 弹窗配置
     modalApi.setState({
