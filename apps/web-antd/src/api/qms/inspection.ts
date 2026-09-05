@@ -102,11 +102,18 @@ export async function getInspectionIssueChartAggregate(params: {
 
 /**
  * Create Inspection Issue
+ *
+ * `idempotencyKey` (IDEMPOTENCY-KEY-001 / PHASE-2): one UUID per
+ * user-initiated create attempt; network / button retries of the same attempt
+ * reuse the key.
  */
 export async function createInspectionIssue(
   data: Partial<InspectionIssue> | Record<string, unknown>,
+  idempotencyKey?: string,
 ) {
-  return requestClient.post<InspectionIssue>(QMS_API.INSPECTION_ISSUES, data);
+  return requestClient.post<InspectionIssue>(QMS_API.INSPECTION_ISSUES, data, {
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  });
 }
 
 export async function updateInspectionIssue(
@@ -202,8 +209,26 @@ export async function getInspectionRecordsExport(params?: {
   return normalizeListResponse<InspectionRecord>(raw);
 }
 
-export async function createInspectionRecord(data: Partial<InspectionRecord>) {
-  return requestClient.post<InspectionRecord>(QMS_API.INSPECTION_RECORDS, data);
+/**
+ * Create Inspection Record.
+ *
+ * `idempotencyKey` (IDEMPOTENCY-KEY-001 / PHASE-2): one UUID per
+ * user-initiated create attempt; network / button retries of the same attempt
+ * reuse the key.
+ */
+export async function createInspectionRecord(
+  data: Partial<InspectionRecord>,
+  idempotencyKey?: string,
+) {
+  return requestClient.post<InspectionRecord>(
+    QMS_API.INSPECTION_RECORDS,
+    data,
+    {
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : undefined,
+    },
+  );
 }
 
 export async function updateInspectionRecord(

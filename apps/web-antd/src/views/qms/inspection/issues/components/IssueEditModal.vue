@@ -13,6 +13,10 @@ import {
   createInspectionIssue,
   updateInspectionIssue,
 } from '#/api/qms/inspection';
+import {
+  isIdempotencyReusedError,
+  useCreateOperationId,
+} from '#/composables/useCreateOperationId';
 import { useAdaptivePopup } from '#/hooks/useAdaptivePopup';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import { buildThumbUrlFromOriginal } from '#/views/qms/shared/utils/photo-url';
@@ -39,6 +43,8 @@ const emit = defineEmits<{
   success: [];
   'update:open': [boolean];
 }>();
+const { acquire: acquireOperationId, reset: resetOperationId } =
+  useCreateOperationId();
 
 const { isMobile, modalWidth, modalWrapClassName } = useAdaptivePopup();
 const { t } = useI18n();
@@ -167,12 +173,16 @@ async function handleOk() {
       await updateInspectionIssue(data.id, data);
       message.success(t('common.saveSuccess'));
     } else {
-      await createInspectionIssue(data);
+      await createInspectionIssue(data, acquireOperationId());
       message.success(t('common.createSuccess'));
+      resetOperationId();
     }
     emit('update:open', false);
     emit('success');
   } catch (error) {
+    if (isIdempotencyReusedError(error)) {
+      resetOperationId();
+    }
     handleApiError(error, 'Save Inspection Issue');
     const errorMessage =
       error instanceof Error ? error.message : t('common.saveFailed');
