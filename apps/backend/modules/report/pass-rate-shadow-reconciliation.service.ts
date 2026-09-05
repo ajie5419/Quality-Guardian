@@ -164,6 +164,9 @@ export const PassRateShadowReconciliationService = {
       };
     } catch (error: unknown) {
       logger.error(error, 'Pass-rate shadow reconciliation failed');
+      // qms-arch-allow R-SCOPE: system maintenance write - failure finalizer
+      // for a reconciliation run owned by this background script, no
+      // user-controlled row selection.
       await prisma.identity_reconciliation_runs.update({
         where: { id: run.id },
         data: {

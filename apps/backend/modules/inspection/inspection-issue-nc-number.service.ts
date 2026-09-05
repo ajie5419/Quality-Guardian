@@ -13,6 +13,8 @@ const logger = createModuleLogger('InspectionIssueNcNumber');
  * the same sequence row. This avoids snapshot-read races when the row is
  * first created under MySQL's default repeatable-read isolation level.
  */
+// qms-arch-allow R-SCOPE-RAW: NC number sequence generator; reads/writes only
+// the internal sequences table, no business row exposure and no scope needed.
 export async function reserveInspectionIssueNcNumber(
   tx: NcNumberTransaction,
 ): Promise<string> {

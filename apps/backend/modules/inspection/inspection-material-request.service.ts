@@ -197,6 +197,8 @@ async function approveInTransaction(
         409,
       );
     }
+    // qms-arch-allow R-SCOPE: material request approve CAS; the id comes from
+    // the scoped application load and the write is count-checked.
     const approvalUpdate = await tx.qms_inspection_material_requests.updateMany(
       {
         where: { id, status: 'PENDING' },
@@ -299,6 +301,8 @@ export const InspectionMaterialRequestService = {
           409,
         );
       }
+      // qms-arch-allow R-SCOPE: linked request cancel CAS; the id comes from
+      // the scoped application load and the write is count-checked.
       const requestUpdate = await tx.qms_inspection_requests.updateMany({
         where: {
           id: application.inspectionRequest.id,
@@ -314,6 +318,8 @@ export const InspectionMaterialRequestService = {
           409,
         );
       }
+      // qms-arch-allow R-SCOPE: material request reject CAS; the id comes from
+      // the scoped application load and the write is count-checked.
       const updated = await tx.qms_inspection_material_requests.updateMany({
         where: { id, status: 'PENDING' },
         data: {
@@ -331,6 +337,8 @@ export const InspectionMaterialRequestService = {
         );
       }
       if (application.inspectionRequest.dispatchTaskId) {
+        // qms-arch-allow R-SCOPE: task dispatch cancel follow-up; the id is
+        // derived from the request authorized by the reject flow above.
         await tx.qms_task_dispatches.updateMany({
           where: { id: application.inspectionRequest.dispatchTaskId },
           data: { status: TASK_DISPATCH_STATUS.CANCELLED },
