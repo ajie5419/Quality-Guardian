@@ -4,6 +4,9 @@ import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    departments: {
+      findMany: vi.fn(),
+    },
     work_orders: {
       findFirst: vi.fn(),
     },
@@ -83,10 +86,60 @@ describe('workOrderAggregateService', () => {
       const result =
         await WorkOrderAggregateService.getWorkOrderAggregate('WO-001');
 
-      expect(result.workOrder.workOrderNumber).toBe('WO-001');
-      expect(result.summary.plannedPoints).toBe(0);
-      expect(result.summary.completionRate).toBe(0);
-      expect(result.requirements).toHaveLength(0);
+      // Unscoped / missing work order denies the aggregate (route returns 404).
+      expect(result).toBeNull();
+    });
+
+    it('scopes the work order lookup and inherits the inspection scope for details', async () => {
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        customerName: 'Customer A',
+        division: 'Div1',
+        projectName: 'Project X',
+        quantity: 100,
+        status: 'OPEN',
+        workOrderNumber: 'WO-001',
+      });
+      (prisma.departments.findMany as any).mockResolvedValue([
+        { name: 'Dept A' },
+      ]);
+      const { WorkOrderRequirementService } = await import(
+        '~/modules/work-order-requirement/work-order-requirement.service'
+      );
+      const { InspectionService } = await import('~/modules/inspection');
+      (
+        WorkOrderRequirementService.findActiveForAggregate as any
+      ).mockResolvedValue([]);
+      (
+        InspectionService.getWorkOrderAggregateInspections as any
+      ).mockResolvedValue([]);
+
+      const access = {
+        dataScope: {
+          deptIds: ['dept-a'],
+          module: 'work-order',
+          scopeType: 'DEPT' as const,
+        },
+        user: { userId: 'u-dept-a', username: 'user-a' },
+      };
+      const result = await WorkOrderAggregateService.getWorkOrderAggregate(
+        'WO-001',
+        access,
+      );
+
+      expect(result).not.toBeNull();
+      expect(prisma.work_orders.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            AND: [
+              { isDeleted: false, workOrderNumber: 'WO-001' },
+              { division: { in: ['dept-a', 'Dept A'] } },
+            ],
+          },
+        }),
+      );
+      expect(
+        InspectionService.getWorkOrderAggregateInspections,
+      ).toHaveBeenCalledWith('WO-001', access);
     });
 
     it('should aggregate requirements and inspections correctly', async () => {
@@ -170,7 +223,9 @@ describe('workOrderAggregateService', () => {
     });
 
     it('does not match missing identities by display snapshot', async () => {
-      (prisma.work_orders.findFirst as any).mockResolvedValue(null);
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        workOrderNumber: 'WO-001',
+      });
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
@@ -225,7 +280,9 @@ describe('workOrderAggregateService', () => {
     });
 
     it('should handle missing requirement points', async () => {
-      (prisma.work_orders.findFirst as any).mockResolvedValue(null);
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        workOrderNumber: 'WO-001',
+      });
       const { WorkOrderRequirementService } = await import(
         '~/modules/work-order-requirement/work-order-requirement.service'
       );
@@ -264,7 +321,9 @@ describe('workOrderAggregateService', () => {
       vi.useFakeTimers();
       try {
         vi.setSystemTime(new Date('2025-01-15T00:00:00.000Z'));
-        (prisma.work_orders.findFirst as any).mockResolvedValue(null);
+        (prisma.work_orders.findFirst as any).mockResolvedValue({
+          workOrderNumber: 'WO-001',
+        });
         const { WorkOrderRequirementService } = await import(
           '~/modules/work-order-requirement/work-order-requirement.service'
         );

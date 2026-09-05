@@ -10,6 +10,7 @@ vi.mock('~/utils/prisma', () => ({
   default: {
     work_orders: {
       create: vi.fn(),
+      findFirst: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
@@ -21,6 +22,7 @@ vi.mock('~/utils/prisma', () => ({
 vi.mock('~/modules/work-order/work-order.service', () => ({
   WorkOrderService: {
     getList: vi.fn(),
+    getListForExport: vi.fn(),
   },
 }));
 
@@ -127,31 +129,85 @@ describe('workOrderRouteService', () => {
 
   describe('deleteById', () => {
     it('should soft delete single work order', async () => {
-      (prisma.work_orders.update as any).mockResolvedValue({
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
         customerName: 'C1',
+        version: 1,
         workOrderNumber: 'WO-001',
       });
+      (prisma.work_orders.updateMany as any).mockResolvedValue({ count: 1 });
 
       const result = await WorkOrderRouteService.deleteById(
         mockEvent(),
         'WO-001',
         mockUserinfo(),
+        1,
       );
 
       expect(result).toBeNull();
+      expect(prisma.work_orders.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          version: 1,
+          workOrderNumber: 'WO-001',
+        }),
+        data: expect.objectContaining({ isDeleted: true }),
+      });
     });
 
     it('should throw BusinessError when not found', async () => {
-      const error = new Error('NOT_FOUND');
-      (prisma.work_orders.update as any).mockRejectedValue(error);
+      (prisma.work_orders.findFirst as any).mockResolvedValue(null);
 
       await expect(
         WorkOrderRouteService.deleteById(
           mockEvent(),
           'WO-MISS',
           mockUserinfo(),
+          1,
         ),
       ).rejects.toThrow();
+    });
+
+    it('returns 409 when the stored version is stale on delete', async () => {
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        customerName: 'C1',
+        version: 2,
+        workOrderNumber: 'WO-001',
+      });
+      (prisma.work_orders.updateMany as any).mockResolvedValue({ count: 0 });
+
+      await expect(
+        WorkOrderRouteService.deleteById(
+          mockEvent(),
+          'WO-001',
+          mockUserinfo(),
+          1,
+        ),
+      ).rejects.toMatchObject({
+        code: 'OPTIMISTIC_LOCK_CONFLICT',
+        httpStatus: 409,
+      });
+      expect(prisma.work_orders.updateMany).toHaveBeenCalledTimes(1);
+    });
+
+    it('system delete without a version stays force-delete', async () => {
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        customerName: 'C1',
+        version: 3,
+        workOrderNumber: 'WO-001',
+      });
+      (prisma.work_orders.updateMany as any).mockResolvedValue({ count: 1 });
+
+      await WorkOrderRouteService.deleteById(
+        mockEvent(),
+        'WO-001',
+        mockUserinfo(),
+      );
+
+      expect(prisma.work_orders.updateMany).toHaveBeenCalledWith({
+        where: expect.not.objectContaining({
+          version: expect.any(Number),
+        }),
+        data: expect.objectContaining({ isDeleted: true }),
+      });
     });
   });
 
@@ -305,20 +361,29 @@ describe('workOrderRouteService', () => {
 
   describe('update', () => {
     it('should update work order fields', async () => {
-      (prisma.work_orders.update as any).mockResolvedValue({
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
         customerName: 'Updated',
+        version: 1,
         workOrderNumber: 'WO-001',
       });
+      (prisma.work_orders.updateMany as any).mockResolvedValue({ count: 1 });
 
       const result = await WorkOrderRouteService.update(
         mockEvent(),
         'WO-001',
         { customerName: 'Updated', quantity: 50 },
         mockUserinfo(),
+        1,
       );
 
       expect(result).toBeNull();
-      expect(prisma.work_orders.update).toHaveBeenCalled();
+      expect(prisma.work_orders.updateMany).toHaveBeenCalledWith({
+        where: expect.objectContaining({
+          version: 1,
+          workOrderNumber: 'WO-001',
+        }),
+        data: expect.objectContaining({ version: { increment: 1 } }),
+      });
     });
 
     it('resolves a department ID into division ID and name on update', async () => {
@@ -326,30 +391,33 @@ describe('workOrderRouteService', () => {
         division: 'Bridge OBU',
         divisionId: 'dept-bridge',
       });
-      (prisma.work_orders.update as any).mockResolvedValue({
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
         customerName: 'Customer',
+        version: 1,
         workOrderNumber: 'WO-001',
       });
+      (prisma.work_orders.updateMany as any).mockResolvedValue({ count: 1 });
 
       await WorkOrderRouteService.update(
         mockEvent(),
         'WO-001',
         { division: 'dept-bridge' },
         mockUserinfo(),
+        1,
       );
 
-      expect(prisma.work_orders.update).toHaveBeenCalledWith({
+      expect(prisma.work_orders.updateMany).toHaveBeenCalledWith({
         data: expect.objectContaining({
           division: 'Bridge OBU',
           divisionId: 'dept-bridge',
+          version: { increment: 1 },
         }),
-        where: { workOrderNumber: 'WO-001' },
+        where: expect.objectContaining({ workOrderNumber: 'WO-001' }),
       });
     });
 
     it('should throw when work order not found', async () => {
-      const error = new Error('NOT_FOUND');
-      (prisma.work_orders.update as any).mockRejectedValue(error);
+      (prisma.work_orders.findFirst as any).mockResolvedValue(null);
 
       await expect(
         WorkOrderRouteService.update(
@@ -357,8 +425,32 @@ describe('workOrderRouteService', () => {
           'WO-MISS',
           { customerName: 'X' },
           mockUserinfo(),
+          1,
         ),
       ).rejects.toThrow();
+    });
+
+    it('returns 409 when the stored version is newer than the submitted one', async () => {
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        customerName: 'C1',
+        version: 2,
+        workOrderNumber: 'WO-001',
+      });
+      (prisma.work_orders.updateMany as any).mockResolvedValue({ count: 0 });
+
+      await expect(
+        WorkOrderRouteService.update(
+          mockEvent(),
+          'WO-001',
+          { customerName: 'Stale' },
+          mockUserinfo(),
+          1,
+        ),
+      ).rejects.toMatchObject({
+        code: 'OPTIMISTIC_LOCK_CONFLICT',
+        httpStatus: 409,
+      });
+      expect(prisma.work_orders.updateMany).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -452,7 +544,7 @@ describe('workOrderRouteService', () => {
       const { WorkOrderService } = await import(
         '~/modules/work-order/work-order.service'
       );
-      (WorkOrderService.getList as any).mockResolvedValue({
+      (WorkOrderService.getListForExport as any).mockResolvedValue({
         items: [{ id: 'WO-1' }],
         total: 1,
       });
@@ -471,8 +563,10 @@ describe('workOrderRouteService', () => {
       const { WorkOrderService } = await import(
         '~/modules/work-order/work-order.service'
       );
-      (WorkOrderService.getList as any).mockResolvedValue({
-        items: [],
+      (WorkOrderService.getListForExport as any).mockResolvedValue({
+        items: Array.from({ length: 20_001 }, (_, i) => ({
+          id: `WO-${i}`,
+        })),
         total: 25_000,
       });
 

@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { Prisma } from '@prisma/client';
@@ -439,7 +440,13 @@ export const WorkOrderRequirementRouteService = {
       total: result.total,
     };
   },
-  async getWorkOrderAggregate(workOrderNumber: string) {
-    return WorkOrderAggregateService.getWorkOrderAggregate(workOrderNumber);
+  async getWorkOrderAggregate(
+    workOrderNumber: string,
+    access?: AnalyticsAccessContext,
+  ) {
+    return WorkOrderAggregateService.getWorkOrderAggregate(
+      workOrderNumber,
+      access,
+    );
   },
 };

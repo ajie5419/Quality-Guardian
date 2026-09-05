@@ -1,4 +1,5 @@
 import type { H3Event } from 'h3';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 import type { ImportRowError } from '~/modules/file-storage/import-report';
 import type { UserSession } from '~/utils/jwt-utils';
 
@@ -18,14 +19,16 @@ import {
 } from '~/modules/work-order/work-order-query';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
-import { BusinessError } from '~/utils/business-error';
+import {
+  EXPORT_LIMIT_EXCEEDED_MESSAGE,
+  isExportLimitExceeded,
+} from '~/utils/export-constants';
 import {
   buildGovernedCanonicalWritePairForTable,
   buildGovernedWriteFieldsForTable,
 } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import {
-  isPrismaNotFoundError,
   isPrismaRequiredValueError,
   isPrismaUniqueConflictError,
 } from '~/utils/prisma-error';
@@ -33,6 +36,11 @@ import {
 import { buildWorkOrderImportGovernedFields } from './work-order-import-governance';
 import { WorkOrderRequirementRouteService } from './work-order-requirement-route.service';
 import { mapWorkOrderStatus } from './work-order-status';
+import {
+  buildScopedWorkOrderWhere,
+  deleteWorkOrderVersioned,
+  updateWorkOrderVersioned,
+} from './work-order-versioned-write.service';
 
 async function buildWorkOrderGovernedFields(input: Record<string, unknown>) {
   const governedFields = buildGovernedWriteFieldsForTable('work_orders', input);
@@ -45,8 +53,13 @@ async function buildWorkOrderGovernedFields(input: Record<string, unknown>) {
 
 export const WorkOrderRouteService = {
   async batchDelete(event: H3Event, ids: string[], userinfo: UserSession) {
+    const where = await buildScopedWorkOrderWhere(
+      { workOrderNumber: { in: ids }, isDeleted: false },
+      event,
+      userinfo,
+    );
     const result = await prisma.work_orders.updateMany({
-      where: { workOrderNumber: { in: ids }, isDeleted: false },
+      where,
       data: { isDeleted: true, updatedAt: new Date() },
     });
     await recordBusinessAuditLog(event, {
@@ -59,30 +72,14 @@ export const WorkOrderRouteService = {
     });
     return { successCount: result.count };
   },
-  async deleteById(event: H3Event, id: string, userinfo: UserSession) {
-    try {
-      const deleted = await prisma.work_orders.update({
-        where: { workOrderNumber: id },
-        data: { isDeleted: true, updatedAt: new Date() },
-      });
-      await recordBusinessAuditLog(event, {
-        userId: userinfo.id,
-        action: 'DELETE',
-        targetType: 'work_order',
-        targetId: String(id),
-        detailsTemplate: '删除工单: {{workOrderNumber}} ({{customerName}})',
-        detailsVariables: {
-          customerName: deleted.customerName,
-          workOrderNumber: deleted.workOrderNumber,
-        },
-      });
-      return null;
-    } catch (error) {
-      if (isPrismaNotFoundError(error)) {
-        throw new BusinessError('NOT_FOUND', '工单不存在', 404);
-      }
-      throw error;
-    }
+  async deleteById(
+    event: H3Event,
+    id: string,
+    userinfo: UserSession,
+    expectedVersion?: number,
+  ) {
+    await deleteWorkOrderVersioned(event, id, userinfo, expectedVersion);
+    return null;
   },
   async create(
     event: H3Event,
@@ -119,7 +116,10 @@ export const WorkOrderRouteService = {
           `CONFLICT:工单号 ${woNum} 已存在且未删除，请在工单列表搜索或调整筛选条件后处理`,
         );
       const newWO = existing?.isDeleted
-        ? await prisma.work_orders.update({
+        ? // qms-arch-allow R-SCOPE: create-restore of a soft-deleted work order;
+          // the workOrderNumber uniqueness check replaces scope here
+          // (PRODUCT_DECISION: restore-on-create semantics).
+          await prisma.work_orders.update({
             where: { workOrderNumber: woNum },
             data: workOrderData,
           })
@@ -170,6 +170,7 @@ export const WorkOrderRouteService = {
     id: string,
     body: Record<string, unknown>,
     userinfo: UserSession,
+    expectedVersion: number,
   ) {
     const updateData: Record<string, unknown> = { updatedAt: new Date() };
     if (
@@ -201,28 +202,14 @@ export const WorkOrderRouteService = {
     if (body.workOrderNumber && body.workOrderNumber !== id)
       updateData.workOrderNumber = body.workOrderNumber;
     if (body.status) updateData.status = mapWorkOrderStatus(body.status);
-    try {
-      const updated = await prisma.work_orders.update({
-        where: { workOrderNumber: id },
-        data: updateData,
-      });
-      await recordBusinessAuditLog(event, {
-        userId: userinfo.id,
-        action: 'UPDATE',
-        targetType: 'work_order',
-        targetId: String(id),
-        detailsTemplate: '修改工单: {{workOrderNumber}} ({{customerName}})',
-        detailsVariables: {
-          customerName: updated.customerName,
-          workOrderNumber: updated.workOrderNumber,
-        },
-      });
-      return null;
-    } catch (error) {
-      if (isPrismaNotFoundError(error))
-        throw new BusinessError('NOT_FOUND', `工单不存在: ${id}`, 404);
-      throw error;
-    }
+    await updateWorkOrderVersioned(
+      event,
+      id,
+      updateData,
+      userinfo,
+      expectedVersion,
+    );
+    return null;
   },
   async importRows(
     event: H3Event,
@@ -353,17 +340,17 @@ export const WorkOrderRouteService = {
     query: Record<string, unknown>,
     userinfo: UserSession,
   ) {
-    const MAX_EXPORT_ROWS = 20_000;
     const params = parseWorkOrderListQuery(query);
-    const result = await WorkOrderService.getList({
+    const result = await WorkOrderService.getListForExport({
       ...params,
-      page: 1,
-      pageSize: MAX_EXPORT_ROWS + 1,
+      dataScope: event.context.dataScope,
+      userContext: {
+        userId: String(userinfo.id || userinfo.userId || ''),
+        username: userinfo.username,
+      },
     });
-    if ((result.total || 0) > MAX_EXPORT_ROWS)
-      throw new Error(
-        `BAD_REQUEST:导出数据量超过上限（${MAX_EXPORT_ROWS} 条），请缩小筛选范围后重试`,
-      );
+    if (isExportLimitExceeded(result.items))
+      throw new Error(`BAD_REQUEST:${EXPORT_LIMIT_EXCEEDED_MESSAGE}`);
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'EXPORT',
@@ -383,9 +370,13 @@ export const WorkOrderRouteService = {
       userinfo,
     );
   },
-  async getWorkOrderAggregate(workOrderNumber: string) {
+  async getWorkOrderAggregate(
+    workOrderNumber: string,
+    access?: AnalyticsAccessContext,
+  ) {
     return WorkOrderRequirementRouteService.getWorkOrderAggregate(
       workOrderNumber,
+      access,
     );
   },
 };
