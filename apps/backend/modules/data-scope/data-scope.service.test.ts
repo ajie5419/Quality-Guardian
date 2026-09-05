@@ -212,15 +212,15 @@ describe('dataScopeService', () => {
     });
   });
 
-  it('keeps base query for modules without data-scope config', async () => {
-    const where = await DataScopeService.buildScopedWhere(
-      'unknown-module',
-      { isDeleted: false },
-      { userId: 'u1', username: 'vben' },
-      { scopeType: 'SELF', deptIds: [] },
-    );
-
-    expect(where).toEqual({ isDeleted: false });
+  it('fails closed for modules without data-scope config', async () => {
+    await expect(
+      DataScopeService.buildScopedWhere(
+        'unknown-module',
+        { isDeleted: false },
+        { userId: 'u1', username: 'vben' },
+        { scopeType: 'SELF', deptIds: [] },
+      ),
+    ).rejects.toThrow('数据范围策略缺失');
   });
 
   it('delegates after-sales wrapper to its configured department fields', async () => {
@@ -248,7 +248,7 @@ describe('dataScopeService', () => {
     });
   });
 
-  it('quality-loss SELF scope filters by createdBy when no department fallback exists', async () => {
+  it('quality-loss SELF scope filters by creator id when no department fallback exists', async () => {
     (prisma.departments.findMany as any).mockResolvedValueOnce([]);
 
     const where = await DataScopeService.buildQualityLossWhere(
@@ -257,7 +257,9 @@ describe('dataScopeService', () => {
       { scopeType: 'SELF', deptIds: [] },
     );
 
-    expect(where).toEqual({ isDeleted: false });
+    expect(where).toEqual({
+      AND: [{ isDeleted: false }, { createdBy: 'u-self' }],
+    });
   });
 
   it('quality-loss DEPT scope filters by canonical department IDs', async () => {

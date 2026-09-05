@@ -6,6 +6,7 @@ const QMS_MODULE_PREFIXES = [
   { module: 'inspection', prefix: '/api/qms/inspection' },
   { module: 'quality-loss', prefix: '/api/qms/quality-loss' },
   { module: 'supplier', prefix: '/api/qms/supplier' },
+  { module: 'task-dispatch', prefix: '/api/qms/task-dispatch' },
   { module: 'work-order', prefix: '/api/qms/work-order' },
 ];
 

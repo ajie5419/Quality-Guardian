@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { isDataScopeV2Enabled } from '~/modules/rbac/rbac-config';
+import { BusinessError } from '~/utils/business-error';
 import { getDataScopeConfig } from '~/utils/module-loader';
 import prisma from '~/utils/prisma';
 
@@ -15,6 +16,10 @@ interface UserContext {
   userId: string;
   username?: string;
 }
+
+type ResolvedScopeInput = Partial<
+  Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>
+>;
 
 // Prisma where inputs use union types for AND (array or single object);
 // an index-signature-friendly shape keeps buildScopedWhere generic.
@@ -101,7 +106,20 @@ function buildFieldFilter(
   fields: string[],
   valueBuilder: (field: string) => unknown,
 ) {
-  const filters = fields.map((field) => ({ [field]: valueBuilder(field) }));
+  const filters = fields.map((field) => {
+    const value = valueBuilder(field);
+    if (field.includes('.')) {
+      const segments = field.split('.');
+      let node: Record<string, unknown> = {
+        [segments[segments.length - 1]]: value,
+      };
+      for (let index = segments.length - 2; index >= 0; index -= 1) {
+        node = { [segments[index]]: node };
+      }
+      return node;
+    }
+    return { [field]: value };
+  });
   if (filters.length === 1) {
     return filters[0];
   }
@@ -109,7 +127,13 @@ function buildFieldFilter(
 }
 
 function isIdentityField(field: string) {
-  return field === 'id' || field.endsWith('Id') || field.endsWith('_id');
+  return (
+    field === 'createdBy' ||
+    field === 'id' ||
+    field === 'updatedBy' ||
+    field.endsWith('Id') ||
+    field.endsWith('_id')
+  );
 }
 
 function combineWhere<T extends ScopedWhere>(
@@ -141,15 +165,27 @@ export const DataScopeService = {
     module: string,
     baseWhere: T,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<T> {
     const config = getDataScopeConfig(module);
     if (!config) {
-      return baseWhere;
+      throw new BusinessError(
+        'FORBIDDEN',
+        `数据范围策略缺失，拒绝访问: ${module}`,
+        403,
+      );
     }
 
     const { scopeType, deptIds } =
       resolvedScope ?? (await resolveScope(user.userId, module));
+
+    if (!scopeType) {
+      throw new BusinessError(
+        'FORBIDDEN',
+        `数据范围无法解析，拒绝访问: ${module}`,
+        403,
+      );
+    }
 
     if (scopeType === 'ALL') {
       return baseWhere;
@@ -169,7 +205,12 @@ export const DataScopeService = {
     if (config.selfFallsBackToDept) {
       const deptCandidates = await this.getDeptCandidates(deptIds);
       if (deptCandidates.length === 0) {
-        return baseWhere;
+        return combineWhere(
+          baseWhere,
+          buildFieldFilter(config.selfFields, (field) =>
+            isIdentityField(field) ? user.userId : user.username || '',
+          ),
+        );
       }
 
       return combineWhere(
@@ -182,14 +223,16 @@ export const DataScopeService = {
 
     return combineWhere(
       baseWhere,
-      buildFieldFilter(config.selfFields, () => user.username || ''),
+      buildFieldFilter(config.selfFields, (field) =>
+        isIdentityField(field) ? user.userId : user.username || '',
+      ),
     );
   },
 
   async buildInspectionWhere(
     baseWhere: Prisma.quality_recordsWhereInput,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<Prisma.quality_recordsWhereInput> {
     return this.buildScopedWhere('inspection', baseWhere, user, resolvedScope);
   },
@@ -197,7 +240,7 @@ export const DataScopeService = {
   async buildSupplierWhere(
     baseWhere: Prisma.suppliersWhereInput,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<Prisma.suppliersWhereInput> {
     return this.buildScopedWhere('supplier', baseWhere, user, resolvedScope);
   },
@@ -205,7 +248,7 @@ export const DataScopeService = {
   async buildAfterSalesWhere(
     baseWhere: Prisma.after_salesWhereInput,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<Prisma.after_salesWhereInput> {
     return this.buildScopedWhere('after-sales', baseWhere, user, resolvedScope);
   },
@@ -213,7 +256,7 @@ export const DataScopeService = {
   async buildQualityLossWhere(
     baseWhere: Prisma.quality_lossesWhereInput,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<Prisma.quality_lossesWhereInput> {
     return this.buildScopedWhere(
       'quality-loss',
@@ -226,7 +269,7 @@ export const DataScopeService = {
   async buildQualityLossIndexWhere(
     baseWhere: Prisma.quality_loss_indexWhereInput,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<Prisma.quality_loss_indexWhereInput> {
     return this.buildScopedWhere(
       'quality-loss',
@@ -239,11 +282,11 @@ export const DataScopeService = {
   async buildWorkOrderWhere(
     baseWhere: Prisma.work_ordersWhereInput,
     user: UserContext,
-    resolvedScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+    resolvedScope?: ResolvedScopeInput,
   ): Promise<Prisma.work_ordersWhereInput> {
     const scope =
       resolvedScope ?? (await resolveScope(user.userId, 'work-order'));
-    if (scope.scopeType === 'SELF' && scope.deptIds.length === 0) {
+    if (scope.scopeType === 'SELF' && (scope.deptIds ?? []).length === 0) {
       return { AND: [baseWhere, { division: { in: [] } }] };
     }
     return this.buildScopedWhere('work-order', baseWhere, user, scope);
