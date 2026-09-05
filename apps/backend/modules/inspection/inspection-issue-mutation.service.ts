@@ -463,11 +463,6 @@ export const InspectionIssueMutationService = {
   },
 };
 
-/**
- * Returns true when the Prisma error is a P2002 unique-constraint violation
- * targeting the serialNumber column in quality_records.
- */
-
 export function assertIssueCreateSourceContext(body: RequestBody) {
   const sourceType = String(body.sourceType || '')
     .trim()
