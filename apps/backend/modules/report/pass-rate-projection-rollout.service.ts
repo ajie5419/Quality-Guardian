@@ -254,6 +254,9 @@ export const PassRateProjectionRolloutService = {
         );
       }
       const result = { ...staged, ...passRateProjection, ...publication };
+      // qms-arch-allow R-SCOPE: system maintenance write - the rebuild job
+      // was CAS-claimed above (status/lease updateMany, count===1) and this
+      // completion write only finalizes the same owned job row.
       await prisma.pass_rate_projection_refresh_jobs.update({
         where: { id: candidate.id },
         data: {
@@ -265,6 +268,8 @@ export const PassRateProjectionRolloutService = {
       return result;
     } catch (error: unknown) {
       logger.error(error, 'Pass-rate projection rebuild failed');
+      // qms-arch-allow R-SCOPE: system maintenance write - failure finalizer
+      // for the CAS-claimed rebuild job, no user-controlled row selection.
       await prisma.pass_rate_projection_refresh_jobs.update({
         where: { id: candidate.id },
         data: {

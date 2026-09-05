@@ -58,6 +58,7 @@ function scheduleStaleProjectionRebuild(reason: string) {
 }
 
 async function buildRowsForGeneration(generationId: string) {
+  // qms-arch-allow R-SCOPE-AGG: projection rollout pages all inspections to materialize the identity projection (report-write LEGACY)
   let afterId: string | undefined;
   let written = 0;
   for (;;) {
@@ -240,6 +241,7 @@ export const PassRateProjectionService = {
       });
     const generationId = control?.activeGenerationId || null;
     if (!generationId) return null;
+    // qms-arch-allow R-SCOPE-AGG: identity decision sync looks up the inspection keyed by the decision's entityId (report-write LEGACY)
     const inspection = await client.inspections.findFirst({
       where: { id: decision.entityId, isDeleted: false },
       select: {
