@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const analyticsAccess = {
+  dataScope: { deptIds: [], module: 'after-sales', scopeType: 'ALL' as const },
+  user: { userId: 'user-1', username: 'admin' },
+};
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     after_sales: {
@@ -105,11 +110,10 @@ describe('after-sales-chart-aggregation.service', () => {
       ],
     );
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'defectType',
-      metric: 'count',
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'defectType', metric: 'count', year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result).toEqual([
       {
@@ -155,12 +159,10 @@ describe('after-sales-chart-aggregation.service', () => {
       ]),
     );
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'responsibleDept',
-      metric: 'totalLoss',
-      top: 5,
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'responsibleDept', metric: 'totalLoss', top: 5, year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result).toEqual([
       {
@@ -188,28 +190,21 @@ describe('after-sales-chart-aggregation.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    (prisma.after_sales.findMany as any).mockResolvedValue([
+    (prisma.after_sales.groupBy as any).mockResolvedValue([
       {
         occurDate: new Date('2026-01-15T00:00:00.000Z'),
-        laborTravelCost: 20,
-        materialCost: 80,
-        quantity: 2,
-        runningHours: 10,
+        _sum: { laborTravelCost: 20, materialCost: 80 },
       },
       {
         occurDate: new Date('2026-01-20T00:00:00.000Z'),
-        laborTravelCost: 5,
-        materialCost: 15,
-        quantity: 1,
-        runningHours: 4,
+        _sum: { laborTravelCost: 5, materialCost: 15 },
       },
     ]);
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'reportMonth',
-      metric: 'totalLoss',
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'reportMonth', metric: 'totalLoss', year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result).toEqual([
       {
@@ -219,6 +214,10 @@ describe('after-sales-chart-aggregation.service', () => {
         value: 120,
       },
     ]);
+    expect(prisma.after_sales.groupBy).toHaveBeenCalledWith(
+      expect.objectContaining({ by: ['occurDate'] }),
+    );
+    expect(prisma.after_sales.findMany).not.toHaveBeenCalled();
   });
 
   it('should limit results to top N items sorted by value desc', async () => {
@@ -268,12 +267,10 @@ describe('after-sales-chart-aggregation.service', () => {
       ],
     );
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'defectType',
-      metric: 'count',
-      top: 2,
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'defectType', metric: 'count', top: 2, year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result).toHaveLength(2);
     expect(result[0]).toEqual({
@@ -326,11 +323,10 @@ describe('after-sales-chart-aggregation.service', () => {
       ],
     );
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'defectType',
-      metric: 'count',
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'defectType', metric: 'count', year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result).toEqual([
       {
@@ -357,11 +353,10 @@ describe('after-sales-chart-aggregation.service', () => {
       },
     ]);
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'defectType',
-      metric: 'count',
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'defectType', metric: 'count', year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result[0]).toEqual({
       id: null,
@@ -388,11 +383,10 @@ describe('after-sales-chart-aggregation.service', () => {
       },
     ]);
 
-    const result = await AfterSalesChartAggregationService.getChartAggregation({
-      dimension: 'supplierBrand',
-      metric: 'count',
-      year: 2026,
-    });
+    const result = await AfterSalesChartAggregationService.getChartAggregation(
+      { dimension: 'supplierBrand', metric: 'count', year: 2026 },
+      analyticsAccess,
+    );
 
     expect(result).toEqual([
       {

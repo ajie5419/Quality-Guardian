@@ -23,7 +23,7 @@ describe('after-sales list route', () => {
     vi.clearAllMocks();
   });
 
-  it('returns the requested page instead of the full list', async () => {
+  it('delegates server-side pagination to the service and returns total', async () => {
     const { default: handler } = await import(
       '~/api/qms/after-sales/index.get'
     );
@@ -31,13 +31,10 @@ describe('after-sales list route', () => {
       '~/modules/after-sales/after-sales.service'
     );
 
-    vi.mocked(AfterSalesService.getList).mockResolvedValue([
-      { id: 'AS-1' },
-      { id: 'AS-2' },
-      { id: 'AS-3' },
-      { id: 'AS-4' },
-      { id: 'AS-5' },
-    ] as never);
+    vi.mocked(AfterSalesService.getList).mockResolvedValue({
+      items: [{ id: 'AS-3' }, { id: 'AS-4' }],
+      total: 5,
+    } as never);
 
     const response = (await handler({
       context: {
@@ -50,5 +47,12 @@ describe('after-sales list route', () => {
 
     expect(response.data.items).toEqual([{ id: 'AS-3' }, { id: 'AS-4' }]);
     expect(response.data.total).toBe(5);
+    expect(AfterSalesService.getList).toHaveBeenCalledWith(
+      expect.objectContaining({
+        page: 2,
+        pageSize: 2,
+        year: 2026,
+      }),
+    );
   });
 });

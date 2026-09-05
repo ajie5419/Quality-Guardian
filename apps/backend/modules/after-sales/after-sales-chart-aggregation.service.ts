@@ -1,4 +1,4 @@
-import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 
 import type {
   AfterSalesChartAggregateItem,
@@ -16,7 +16,7 @@ import {
   QMS_DEFAULT_VALUES,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
@@ -90,37 +90,6 @@ const CHART_DIMENSION_CONFIG: Record<
   },
 };
 
-function getMetricValueFromRow(
-  metric: AfterSalesChartMetric,
-  row: {
-    laborTravelCost: null | number | Prisma.Decimal;
-    materialCost: null | number | Prisma.Decimal;
-    quantity: null | number | Prisma.Decimal;
-    runningHours: null | number | Prisma.Decimal;
-  },
-) {
-  switch (metric) {
-    case 'count': {
-      return 1;
-    }
-    case 'laborTravelCost': {
-      return Number(row.laborTravelCost || 0);
-    }
-    case 'materialCost': {
-      return Number(row.materialCost || 0);
-    }
-    case 'quantity': {
-      return Number(row.quantity || 0);
-    }
-    case 'runningHours': {
-      return Number(row.runningHours || 0);
-    }
-    case 'totalLoss': {
-      return Number(row.materialCost || 0) + Number(row.laborTravelCost || 0);
-    }
-  }
-}
-
 function getMetricValueFromGroupedItem(
   metric: AfterSalesChartMetric,
   item: Record<string, unknown>,
@@ -157,16 +126,17 @@ function getMetricValueFromGroupedItem(
 }
 
 export const AfterSalesChartAggregationService = {
-  async getChartAggregation(params: {
-    dataScope?: ResolvedDataScope;
-    dateMode?: AfterSalesDateMode;
-    dateValue?: string;
-    dimension: AfterSalesChartDimension;
-    metric: AfterSalesChartMetric;
-    top?: number;
-    userContext?: { userId: string; username?: string };
-    year?: number;
-  }): Promise<AfterSalesChartAggregateItem[]> {
+  async getChartAggregation(
+    params: {
+      dateMode?: AfterSalesDateMode;
+      dateValue?: string;
+      dimension: AfterSalesChartDimension;
+      metric: AfterSalesChartMetric;
+      top?: number;
+      year?: number;
+    },
+    access?: AnalyticsAccessContext,
+  ): Promise<AfterSalesChartAggregateItem[]> {
     const { dateMode, dateValue, dimension, metric, year } = params;
     const { start, end } = buildAfterSalesDateRange({
       dateMode,
@@ -178,16 +148,11 @@ export const AfterSalesChartAggregationService = {
       occurDate: { gte: start, lt: end },
     };
 
-    if (params.userContext?.userId) {
-      where = await DataScopeService.buildAfterSalesWhere(
-        where,
-        {
-          userId: params.userContext.userId,
-          username: params.userContext.username,
-        },
-        params.dataScope,
-      );
-    }
+    where = await DataScopeService.buildAfterSalesWhere(
+      where,
+      requireAnalyticsUser(access),
+      access?.dataScope,
+    );
 
     const limit = Math.min(Math.max(Number(params.top) || 15, 1), 50);
     if (dimension === 'reportMonth') {
@@ -315,20 +280,30 @@ export const AfterSalesChartAggregationService = {
     metric: AfterSalesChartMetric,
     limit: number,
   ) {
-    const rows = await prisma.after_sales.findMany({
+    // DB-level count/sum per occurDate; the YYYY-MM bucket is a presentation
+    // composition over at most one row per date (<= 366 for a year range),
+    // never a full table load. Month formatting stays on the same formatDate
+    // used by the legacy implementation so the result is identical.
+    const sumFields =
+      metric === 'totalLoss'
+        ? (['laborTravelCost', 'materialCost'] as const)
+        : ([metric] as const);
+    const sumPayload: Record<string, true> = {};
+    for (const field of sumFields) sumPayload[field] = true;
+    const rows = await prisma.after_sales.groupBy({
+      by: ['occurDate'],
       where,
-      select: {
-        occurDate: true,
-        laborTravelCost: true,
-        materialCost: true,
-        quantity: true,
-        runningHours: true,
-      },
+      ...(metric === 'count' ? { _count: { id: true } } : {}),
+      ...(metric === 'count' ? {} : { _sum: sumPayload }),
     });
     const map = new Map<string, number>();
     for (const row of rows) {
       const key = formatDate(row.occurDate).slice(0, 7);
-      map.set(key, (map.get(key) || 0) + getMetricValueFromRow(metric, row));
+      map.set(
+        key,
+        (map.get(key) || 0) +
+          getMetricValueFromGroupedItem(metric, row as Record<string, unknown>),
+      );
     }
     return [...map.entries()]
       .sort(([a], [b]) => a.localeCompare(b))
