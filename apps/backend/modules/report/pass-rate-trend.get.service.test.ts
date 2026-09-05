@@ -42,26 +42,52 @@ vi.mock('~/utils/response', () => ({
   })),
 }));
 
+const testEvent = {
+  context: { user: { id: 'u1', username: 'u1', realName: 'U1' } },
+  node: { req: {}, res: {} },
+} as any;
+
 describe('passRateTrendGetService handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('returns trend data for weekly granularity by default', async () => {
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data).toHaveProperty('trend');
     expect(result.data.trend).toBeInstanceOf(Array);
     expect(result.data.trend.length).toBeGreaterThan(0);
   });
 
+  it('forwards the middleware-resolved data scope to pass-rate reads', async () => {
+    const { getNetPassRateSummaryByRange } = await import(
+      '~/modules/report/pass-rate'
+    );
+    testEvent.context.dataScope = {
+      deptIds: ['dept-a'],
+      module: 'inspection',
+      scopeType: 'DEPT',
+    };
+
+    await handler(testEvent);
+
+    expect(getNetPassRateSummaryByRange).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.any(Date),
+      'inspection',
+      expect.objectContaining({
+        dataScope: expect.objectContaining({ scopeType: 'DEPT' }),
+      }),
+    );
+    delete testEvent.context.dataScope;
+  });
+
   it('returns trend data for monthly granularity', async () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({ granularity: 'month' });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data).toHaveProperty('trend');
     expect(result.data.trend).toHaveLength(12);
@@ -71,8 +97,7 @@ describe('passRateTrendGetService handler', () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({ granularity: 'week' });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data).toHaveProperty('trend');
     expect(result.data.trend).toHaveLength(4);
@@ -82,8 +107,7 @@ describe('passRateTrendGetService handler', () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({ period: '2026-W01' });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data).toHaveProperty('drillDown');
     expect(result.data).toHaveProperty('period', '2026-W01');
@@ -96,8 +120,7 @@ describe('passRateTrendGetService handler', () => {
       period: '2026-01',
     });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data.drillDown).toEqual([]);
   });
@@ -106,8 +129,7 @@ describe('passRateTrendGetService handler', () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({ source: 'issue' });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data).toHaveProperty('trend');
   });
@@ -116,8 +138,7 @@ describe('passRateTrendGetService handler', () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({ source: 'something' });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result.data).toHaveProperty('trend');
   });
@@ -133,8 +154,7 @@ describe('passRateTrendGetService handler', () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({});
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     expect(result).toEqual(expect.objectContaining({ _error: true }));
   });
@@ -147,8 +167,7 @@ describe('passRateTrendGetService handler', () => {
     const { getQuery } = await import('h3');
     (getQuery as any).mockReturnValue({ granularity: 'week' });
 
-    const event = { node: { req: {}, res: {} } } as any;
-    const result = await handler(event);
+    const result = await handler(testEvent);
 
     for (const item of result.data.trend) {
       expect(item).toHaveProperty('period');
