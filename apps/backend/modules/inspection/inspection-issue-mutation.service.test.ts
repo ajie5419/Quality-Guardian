@@ -14,9 +14,13 @@ vi.mock('~/utils/prisma', () => {
   const qualityRecords = {
     create: vi.fn(),
     findMany: vi.fn(),
+    findFirst: vi.fn((args) => qualityRecords.findUnique(args)),
     findUnique: vi.fn(),
     update: vi.fn(),
-    updateMany: vi.fn(),
+    updateMany: vi.fn((args) => {
+      qualityRecords.update(args);
+      return { count: 1 };
+    }),
     upsert: vi.fn(),
   };
   const transactionClient = {
@@ -105,6 +109,7 @@ vi.mock('~/modules/inspection/inspection-issue', () => ({
 }));
 
 vi.mock('~/modules/inspection/inspection-issue-access.service', () => ({
+  buildInspectionIssueScopeWhere: vi.fn(async (where) => where),
   applyInspectionIssueWriteOwnership: vi.fn(
     (
       where: Record<string, unknown>,

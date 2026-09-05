@@ -77,11 +77,18 @@ describe('inspectionApiService', () => {
       undefined as any,
     );
 
+    const dataScope = {
+      deptIds: ['dept-1'],
+      module: 'inspection',
+      scopeType: 'DEPT' as const,
+    };
+
     await InspectionApiService.updateIssue(
       { id: 'u1' } as any,
       'rec-1',
       { partName: 'Updated' },
       'NC-001',
+      dataScope,
     );
 
     expect(InspectionIssueMutationService.updateIssue).toHaveBeenCalledWith(
@@ -89,6 +96,7 @@ describe('inspectionApiService', () => {
       'rec-1',
       { partName: 'Updated' },
       'NC-001',
+      dataScope,
     );
   });
 
