@@ -28,6 +28,10 @@ export default defineEventHandler(async (event) => {
     const result = await InspectionService.update(
       id,
       body as unknown as Parameters<typeof InspectionService.update>[1],
+      {
+        scope: event.context.dataScope,
+        user: userinfo,
+      },
     );
     await recordBusinessAuditLog(event, {
       userId: userinfo?.id,

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { InspectionRecordUpdateService } from '~/modules/inspection/inspection-record-update.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
@@ -92,31 +93,34 @@ describe('inspectionRecordUpdateService', () => {
       teamId: 'team-2',
       workOrderNumber: 'WO-1',
     };
-    const txInspectionsUpdate = vi.fn().mockResolvedValue(mockInspection);
-    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
-      cb({
-        inspections: {
-          findUnique: vi.fn().mockResolvedValue({
-            category: 'PROCESS',
-            incomingType: null,
-            processId: 'process-old',
-            processName: 'Old',
-            supplierName: 'Supplier A',
-            supplierId: 'supplier-1',
-            team: 'Team A',
-            teamId: 'team-1',
-            templateId: null,
-            templateName: null,
-            workOrderNumber: 'WO-1',
-          }),
-          update: txInspectionsUpdate,
-        },
-        inspection_items: {
-          deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
-          createMany: vi.fn().mockResolvedValue({ count: 0 }),
-        },
-      }),
-    );
+    const txInspectionsFindFirst = vi
+      .fn()
+      .mockResolvedValueOnce({
+        category: 'PROCESS',
+        incomingType: null,
+        processId: 'process-old',
+        processName: 'Old',
+        supplierName: 'Supplier A',
+        supplierId: 'supplier-1',
+        team: 'Team A',
+        teamId: 'team-1',
+        templateId: null,
+        templateName: null,
+        workOrderNumber: 'WO-1',
+      })
+      .mockResolvedValue(mockInspection);
+    const txInspectionsUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const tx = {
+      inspections: {
+        findFirst: txInspectionsFindFirst,
+        updateMany: txInspectionsUpdateMany,
+      },
+      inspection_items: {
+        deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
+        createMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    (prisma.$transaction as any).mockImplementation(async (cb: any) => cb(tx));
 
     const result = await InspectionRecordUpdateService.update('i-1', {
       category: 'PROCESS',
@@ -136,6 +140,11 @@ describe('inspectionRecordUpdateService', () => {
       expect.objectContaining({ supplierId: undefined }),
     );
     expect(result).toEqual(mockInspection);
+    // CLOSE-EFFECTS-INTEGRITY-001: file references must be registered on the
+    // transaction client, never the global prisma instance.
+    expect(
+      FileStorageService.registerReferencesFromAttachments,
+    ).toHaveBeenCalledWith(expect.objectContaining({ tx }));
     expect(
       MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
     ).toHaveBeenCalledWith(
@@ -151,24 +160,28 @@ describe('inspectionRecordUpdateService', () => {
   it('should replace items (delete old, create new)', async () => {
     const txDeleteMany = vi.fn().mockResolvedValue({ count: 2 });
     const txCreateMany = vi.fn().mockResolvedValue({ count: 2 });
+    const txInspectionsFindFirst = vi
+      .fn()
+      .mockResolvedValueOnce({
+        category: 'PROCESS',
+        incomingType: null,
+        processId: null,
+        processName: null,
+        teamId: 'team-1',
+        templateId: null,
+        templateName: null,
+        workOrderNumber: 'WO-1',
+      })
+      .mockResolvedValue({
+        id: 'i-1',
+        documents: null,
+        workOrderNumber: 'WO-1',
+      });
     (prisma.$transaction as any).mockImplementation(async (cb: any) =>
       cb({
         inspections: {
-          findUnique: vi.fn().mockResolvedValue({
-            category: 'PROCESS',
-            incomingType: null,
-            processId: null,
-            processName: null,
-            teamId: 'team-1',
-            templateId: null,
-            templateName: null,
-            workOrderNumber: 'WO-1',
-          }),
-          update: vi.fn().mockResolvedValue({
-            id: 'i-1',
-            documents: null,
-            workOrderNumber: 'WO-1',
-          }),
+          findFirst: txInspectionsFindFirst,
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         inspection_items: {
           deleteMany: txDeleteMany,
@@ -197,26 +210,30 @@ describe('inspectionRecordUpdateService', () => {
     const { syncInspectionProjectDocuments } = await import(
       '~/modules/inspection/inspection-project-document-sync.service'
     );
+    const txInspectionsFindFirst = vi
+      .fn()
+      .mockResolvedValueOnce({
+        category: 'PROCESS',
+        incomingType: null,
+        processId: null,
+        processName: null,
+        teamId: 'team-1',
+        templateId: null,
+        templateName: null,
+        workOrderNumber: 'WO-1',
+      })
+      .mockResolvedValue({
+        id: 'i-1',
+        processId: 'process-1',
+        processName: 'Welding',
+        documents: null,
+        workOrderNumber: 'WO-1',
+      });
     (prisma.$transaction as any).mockImplementation(async (cb: any) =>
       cb({
         inspections: {
-          findUnique: vi.fn().mockResolvedValue({
-            category: 'PROCESS',
-            incomingType: null,
-            processId: null,
-            processName: null,
-            teamId: 'team-1',
-            templateId: null,
-            templateName: null,
-            workOrderNumber: 'WO-1',
-          }),
-          update: vi.fn().mockResolvedValue({
-            id: 'i-1',
-            processId: 'process-1',
-            processName: 'Welding',
-            documents: null,
-            workOrderNumber: 'WO-1',
-          }),
+          findFirst: txInspectionsFindFirst,
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         inspection_items: {
           deleteMany: vi.fn().mockResolvedValue({ count: 0 }),
@@ -263,7 +280,7 @@ describe('inspectionRecordUpdateService', () => {
     (prisma.$transaction as any).mockImplementation(async (cb: any) =>
       cb({
         inspections: {
-          findUnique: vi.fn().mockResolvedValue({
+          findFirst: vi.fn().mockResolvedValue({
             category: 'PROCESS',
             processId: null,
             processName: 'Welding',
