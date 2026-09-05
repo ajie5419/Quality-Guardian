@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
+const analyticsAccess = {
+  dataScope: { deptIds: [], module: 'after-sales', scopeType: 'ALL' as const },
+  user: { userId: 'user-1', username: 'admin' },
+};
+
 vi.mock('~/utils/prisma', () => {
   const afterSales = {
     aggregate: vi.fn(),
@@ -170,10 +175,13 @@ describe('after-sales-integration.service', () => {
 
     (prisma.after_sales.findMany as any).mockResolvedValue([{ id: 'as-1' }]);
 
-    const result = await AfterSalesIntegrationService.getWeeklyReportIssues({
-      end: new Date('2026-01-07'),
-      start: new Date('2026-01-01'),
-    });
+    const result = await AfterSalesIntegrationService.getWeeklyReportIssues(
+      {
+        end: new Date('2026-01-07'),
+        start: new Date('2026-01-01'),
+      },
+      analyticsAccess,
+    );
 
     expect(result).toEqual([{ id: 'as-1' }]);
   });
@@ -189,10 +197,13 @@ describe('after-sales-integration.service', () => {
       _sum: { actualClaim: 250, laborTravelCost: 200, materialCost: 500 },
     });
 
-    const result = await AfterSalesIntegrationService.getReportPeriodMetrics({
-      end: new Date('2026-01-31'),
-      start: new Date('2026-01-01'),
-    });
+    const result = await AfterSalesIntegrationService.getReportPeriodMetrics(
+      {
+        end: new Date('2026-01-31'),
+        start: new Date('2026-01-01'),
+      },
+      analyticsAccess,
+    );
 
     expect(result).toEqual({
       grossCost: 700,
@@ -212,10 +223,13 @@ describe('after-sales-integration.service', () => {
       _sum: { actualClaim: null, laborTravelCost: null, materialCost: null },
     });
 
-    const result = await AfterSalesIntegrationService.getReportPeriodMetrics({
-      end: new Date('2026-01-31'),
-      start: new Date('2026-01-01'),
-    });
+    const result = await AfterSalesIntegrationService.getReportPeriodMetrics(
+      {
+        end: new Date('2026-01-31'),
+        start: new Date('2026-01-01'),
+      },
+      analyticsAccess,
+    );
 
     expect(result).toEqual({
       grossCost: 0,
@@ -241,10 +255,13 @@ describe('after-sales-integration.service', () => {
       });
     (prisma.after_sales.count as any).mockResolvedValue(5);
 
-    const result = await AfterSalesIntegrationService.getStatsForDashboard({
-      weekStart: new Date('2026-01-06'),
-      yearStart: new Date('2026-01-01'),
-    });
+    const result = await AfterSalesIntegrationService.getStatsForDashboard(
+      {
+        weekStart: new Date('2026-01-06'),
+        yearStart: new Date('2026-01-01'),
+      },
+      analyticsAccess,
+    );
 
     expect(result).toEqual({
       totalCount: 20,

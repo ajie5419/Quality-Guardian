@@ -1,13 +1,22 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
 import { buildGovernedAfterSalesUpdateData } from '~/modules/after-sales/after-sales-payload';
+import {
+  assertVersionedWriteAffected,
+  createScopedRepository,
+} from '~/modules/data-scope';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { logApiError } from '~/utils/api-logger';
-import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
+import {
+  BusinessError,
+  businessErrorResponse,
+  isBusinessError,
+} from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
+import { requireExpectedVersionBody } from '~/utils/optimistic-lock';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -29,38 +38,64 @@ export default defineEventHandler(async (event) => {
 
   try {
     const bodyRecord = updateAfterSalesSchema.parse(await readBody(event));
-    const { costsChanged, data: updateData } =
+    const scope = event.context.dataScope;
+    const access = {
+      user: {
+        id: userinfo.id ?? userinfo.userId ?? '',
+        username: userinfo.username,
+      },
+      scope,
+    };
+    // OPTIMISTIC-LOCK-001: interactive edits must carry the version the client
+    // read; a missing version would silently degrade to last-write-wins.
+    const expectedVersion = requireExpectedVersionBody(bodyRecord);
+    const { data: updateData } =
       await buildGovernedAfterSalesUpdateData(bodyRecord);
-    const supplierChanged =
-      updateData.supplierBrand !== undefined ||
-      updateData.supplierBrandId !== undefined;
+
+    let currentVersion: number | undefined;
     await prisma.$transaction(async (tx) => {
-      const current =
-        costsChanged || supplierChanged
-          ? await tx.after_sales.findUnique({
-              where: { id },
-              select: {
-                laborTravelCost: true,
-                materialCost: true,
-                supplierBrandId: true,
-              },
-            })
-          : null;
-      if (costsChanged && !current) {
-        throw new Error('AFTER_SALES_NOT_FOUND');
+      const txRepo = createScopedRepository('after-sales', tx.after_sales);
+      const current = await txRepo.findAccessible(
+        {
+          where: { id, isDeleted: false },
+          select: {
+            id: true,
+            laborTravelCost: true,
+            materialCost: true,
+            supplierBrandId: true,
+            version: true,
+          },
+        },
+        access,
+      );
+      if (!current) {
+        throw new BusinessError('NOT_FOUND', '售后记录不存在', 404);
       }
-      const updated = await tx.after_sales.update({
-        where: { id },
-        data: updateData,
-      });
+      currentVersion = current.version;
+      const result = await txRepo.updateAccessibleVersioned(
+        { where: { id }, data: updateData },
+        access,
+        expectedVersion,
+      );
+      if (result.count === 0) {
+        const exists = await txRepo.findAccessible(
+          { where: { id, isDeleted: false }, select: { id: true } },
+          access,
+        );
+        assertVersionedWriteAffected(result.count, Boolean(exists), '售后记录');
+      }
+      const nextBrandId =
+        typeof updateData.supplierBrandId === 'string'
+          ? updateData.supplierBrandId
+          : (updateData.supplierBrandId?.set ?? null);
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
-        [current?.supplierBrandId, updated.supplierBrandId],
+        [current.supplierBrandId, nextBrandId],
         'after-sales.updated',
       );
       await QualityLossIndexQueue.enqueue(
         tx,
-        [{ source: 'EXTERNAL', sourcePk: updated.id }],
+        [{ source: 'EXTERNAL', sourcePk: id }],
         'after-sales.updated',
       );
     });
@@ -75,7 +110,11 @@ export default defineEventHandler(async (event) => {
     await SystemLogService.auditLog('after-sales', 'update', {
       userId: String(userinfo.id),
       targetId: String(id),
-      detailsVariables: { id },
+      detailsVariables: {
+        id,
+        oldVersion: currentVersion,
+        newVersion: expectedVersion + 1,
+      },
     });
 
     return useResponseSuccess(null);

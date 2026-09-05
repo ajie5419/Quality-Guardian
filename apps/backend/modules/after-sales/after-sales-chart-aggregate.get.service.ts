@@ -5,6 +5,7 @@ import {
 } from '~/modules/after-sales/after-sales-query';
 import { AfterSalesService } from '~/modules/after-sales/after-sales.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
 import {
@@ -52,22 +53,27 @@ export default defineValidatedHandler(
     const year = yearRaw ? Number.parseInt(yearRaw, 10) : undefined;
 
     try {
-      const data = await AfterSalesService.getChartAggregation({
-        dateMode: parseAfterSalesDateMode(query.dateMode),
-        dateValue: parseAfterSalesDateValue(query.dateValue),
-        dimension,
-        metric,
-        top: Number.isNaN(top) ? 15 : top,
-        year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
-        userContext: {
-          userId: String(userinfo.id || userinfo.userId || ''),
-          username: userinfo.username,
+      const data = await AfterSalesService.getChartAggregation(
+        {
+          dateMode: parseAfterSalesDateMode(query.dateMode),
+          dateValue: parseAfterSalesDateValue(query.dateValue),
+          dimension,
+          metric,
+          top: Number.isNaN(top) ? 15 : top,
+          year: Number.isNaN(year ?? Number.NaN) ? undefined : year,
         },
-        dataScope: event.context.dataScope,
-      });
+        {
+          dataScope: event.context.dataScope,
+          user: {
+            userId: String(userinfo.id || userinfo.userId || ''),
+            username: userinfo.username,
+          },
+        },
+      );
       return useResponseSuccess({ items: data });
     } catch (error) {
       logApiError('after-sales-chart-aggregate', error, undefined, event);
+      if (isBusinessError(error)) return businessErrorResponse(event, error);
       return internalServerErrorResponse(
         event,
         'Failed to fetch after-sales chart aggregate',

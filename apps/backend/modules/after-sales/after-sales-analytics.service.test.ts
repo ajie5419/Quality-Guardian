@@ -1,5 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const analyticsAccess = {
+  dataScope: { deptIds: [], module: 'after-sales', scopeType: 'ALL' as const },
+  user: { userId: 'user-1', username: 'admin' },
+};
+
 vi.mock('h3', () => ({
   defineEventHandler: (fn: any) => fn,
 }));
@@ -234,7 +239,10 @@ describe('after-sales-analytics.service', () => {
       new Map([['dept-1', 'QA']]),
     );
 
-    const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
+    const stats = await AfterSalesAnalyticsService.getStats(
+      { year: 2026 },
+      analyticsAccess,
+    );
 
     expect(stats.kpi.total).toBe(10);
     expect(stats.kpi.open).toBe(3);
@@ -380,7 +388,10 @@ describe('after-sales-analytics.service', () => {
       new Map(),
     );
 
-    const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
+    const stats = await AfterSalesAnalyticsService.getStats(
+      { year: 2026 },
+      analyticsAccess,
+    );
 
     expect(stats.defectDistribution).toEqual([
       {
@@ -480,7 +491,10 @@ describe('after-sales-analytics.service', () => {
       new Error('db unavailable'),
     );
 
-    const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
+    const stats = await AfterSalesAnalyticsService.getStats(
+      { year: 2026 },
+      analyticsAccess,
+    );
 
     expect(stats.kpi).toEqual({ avgTime: 0, cost: 0, open: 0, total: 0 });
     expect(stats.defectDistribution).toEqual([]);
@@ -493,12 +507,75 @@ describe('after-sales-analytics.service', () => {
       '~/modules/after-sales/after-sales-analytics.service'
     );
 
-    const result = await AfterSalesAnalyticsService.getChartAggregation({
-      dimension: 'defectType',
-      metric: 'count',
-      year: 2026,
-    });
+    const result = await AfterSalesAnalyticsService.getChartAggregation(
+      {
+        dimension: 'defectType',
+        metric: 'count',
+        year: 2026,
+      },
+      analyticsAccess,
+    );
 
     expect(Array.isArray(result)).toBe(true);
+  });
+
+  it('scopes every stats query to the caller data scope', async () => {
+    const { AfterSalesAnalyticsService } = await import(
+      '~/modules/after-sales/after-sales-analytics.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const { DataScopeService } = await import(
+      '~/modules/data-scope/data-scope.service'
+    );
+
+    (prisma.after_sales.aggregate as any).mockResolvedValue({
+      _count: { id: 0 },
+      _sum: { laborTravelCost: 0, materialCost: 0 },
+    });
+    (prisma.after_sales.count as any).mockResolvedValue(0);
+    (prisma.$queryRaw as any)
+      .mockResolvedValueOnce([{ avgDays: null }])
+      .mockResolvedValueOnce([]);
+    (prisma.after_sales.groupBy as any)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([]);
+    vi.mocked(DataScopeService.getDeptCandidates).mockResolvedValue([
+      'dept-a',
+      'Dept A',
+    ]);
+    vi.mocked(DataScopeService.buildAfterSalesWhere).mockImplementation(
+      async (baseWhere: any) => ({
+        AND: [baseWhere, { division: { in: ['dept-a', 'Dept A'] } }],
+      }),
+    );
+
+    await AfterSalesAnalyticsService.getStats(
+      {
+        dateMode: 'year',
+        year: 2026,
+      },
+      {
+        dataScope: {
+          deptIds: ['dept-a'],
+          module: 'after-sales',
+          scopeType: 'DEPT',
+        },
+        user: { userId: 'user-a', username: 'alice' },
+      },
+    );
+
+    expect(prisma.after_sales.aggregate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ AND: expect.anything() }),
+      }),
+    );
+    const sqlCalls = vi.mocked(prisma.$queryRaw).mock.calls;
+    expect(sqlCalls).toHaveLength(2);
+    for (const call of sqlCalls) {
+      const sql = JSON.stringify(call);
+      expect(sql).toContain('division IN');
+    }
   });
 });

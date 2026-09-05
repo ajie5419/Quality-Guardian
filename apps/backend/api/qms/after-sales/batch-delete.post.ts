@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { AfterSalesRouteService } from '~/modules/after-sales/after-sales-route.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -20,6 +21,8 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, '请提供有效的 ID 列表');
     const successCount = await AfterSalesRouteService.batchDelete(
       parsed.data.ids,
+      getCurrentUser(event),
+      event.context.dataScope,
     );
     return useResponseSuccess({ successCount });
   } catch (error) {

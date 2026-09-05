@@ -92,6 +92,9 @@ describe('after-sales-chart-aggregate.get.service', () => {
         dimension: 'defectType',
         metric: 'count',
       }),
+      expect.objectContaining({
+        user: expect.objectContaining({ userId: 'user-1' }),
+      }),
     );
   });
 
@@ -114,6 +117,9 @@ describe('after-sales-chart-aggregate.get.service', () => {
 
     expect(AfterSalesService.getChartAggregation).toHaveBeenCalledWith(
       expect.objectContaining({ top: 15 }),
+      expect.objectContaining({
+        user: expect.objectContaining({ userId: 'user-1' }),
+      }),
     );
   });
 

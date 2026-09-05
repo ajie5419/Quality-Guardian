@@ -3,17 +3,27 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('h3', () => ({
   defineEventHandler: (fn: any) => fn,
   readBody: vi.fn(),
+  setResponseStatus: vi.fn(),
 }));
 
 vi.mock('~/utils/prisma', () => {
   const afterSales = {
+    findFirst: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   };
   return {
     default: {
       after_sales: afterSales,
-      $transaction: vi.fn((callback) => callback({ after_sales: afterSales })),
+      $transaction: vi.fn((callback) =>
+        callback({
+          after_sales: afterSales,
+          quality_loss_index_jobs: {
+            createMany: vi.fn().mockResolvedValue({ count: 1 }),
+          },
+        }),
+      ),
     },
   };
 });
@@ -45,6 +55,27 @@ vi.mock('~/utils/current-user', () => ({
     userId: 'user-1',
     username: 'admin',
   })),
+}));
+
+vi.mock('~/utils/business-error', () => ({
+  BusinessError: class BusinessError extends Error {
+    code: string;
+    httpStatus: number;
+    constructor(code: string, message?: string, httpStatus = 400) {
+      super(message || code);
+      this.name = 'BusinessError';
+      this.code = code;
+      this.httpStatus = httpStatus;
+    }
+  },
+  isBusinessError: (error: unknown) =>
+    error instanceof Error && error.name === 'BusinessError',
+  businessErrorResponse: vi.fn((_event: any, err: any) => ({
+    error: true,
+    message: err.message,
+    statusCode: err.httpStatus || 400,
+  })),
+  legacyErrorToBusinessError: vi.fn().mockReturnValue(null),
 }));
 
 vi.mock('~/utils/response', () => ({
@@ -95,15 +126,23 @@ describe('after-sales-id.put.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ projectName: 'Updated' });
-    (prisma.after_sales.update as any).mockResolvedValue({});
+    vi.mocked(readBody).mockResolvedValue({
+      projectName: 'Updated',
+      version: 1,
+    });
+    (prisma.after_sales.findFirst as any).mockResolvedValue({
+      id: 'test-id',
+      supplierBrandId: 'supplier-1',
+      version: 1,
+    });
+    (prisma.after_sales.updateMany as any).mockResolvedValue({ count: 1 });
 
-    const result = await handler({} as any);
+    const result = await handler({ context: {} } as any);
 
     expect(result).toEqual({ data: null, success: true });
-    expect(prisma.after_sales.update).toHaveBeenCalledWith({
-      where: { id: 'test-id' },
-      data: { projectName: 'Updated' },
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledWith({
+      where: { id: 'test-id', version: 1 },
+      data: { projectName: 'Updated', version: { increment: 1 } },
     });
   });
 
@@ -115,22 +154,23 @@ describe('after-sales-id.put.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ materialCost: 100 });
-    (prisma.after_sales.findUnique as any).mockResolvedValue({
+    vi.mocked(readBody).mockResolvedValue({ materialCost: 100, version: 1 });
+    (prisma.after_sales.findFirst as any).mockResolvedValue({
       laborTravelCost: 50,
       materialCost: 30,
+      version: 1,
     });
-    (prisma.after_sales.update as any).mockResolvedValue({});
+    (prisma.after_sales.updateMany as any).mockResolvedValue({ count: 1 });
 
-    await handler({} as any);
+    await handler({ context: {} } as any);
 
-    expect(prisma.after_sales.update).toHaveBeenCalledWith({
-      where: { id: 'test-id' },
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledWith({
+      where: { id: 'test-id', version: 1 },
       data: expect.objectContaining({
         materialCost: 100,
       }),
     });
-    const callArgs = (prisma.after_sales.update as any).mock.calls[0][0];
+    const callArgs = (prisma.after_sales.updateMany as any).mock.calls[0][0];
     expect(callArgs.data).not.toHaveProperty('qualityLoss');
   });
 
@@ -146,21 +186,24 @@ describe('after-sales-id.put.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ supplierBrandId: 'supplier-2' });
+    vi.mocked(readBody).mockResolvedValue({
+      supplierBrandId: 'supplier-2',
+      version: 1,
+    });
     vi.mocked(buildGovernedAfterSalesUpdateData).mockResolvedValueOnce({
       costsChanged: false,
       data: { supplierBrandId: 'supplier-2' },
     });
-    vi.mocked(prisma.after_sales.findUnique).mockResolvedValue({
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValue({
       supplierBrand: 'Supplier A',
       supplierBrandId: 'supplier-1',
+      version: 1,
     } as never);
-    vi.mocked(prisma.after_sales.update).mockResolvedValue({
-      supplierBrand: 'Supplier B',
-      supplierBrandId: 'supplier-2',
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
+      count: 1,
     } as never);
 
-    await handler({} as any);
+    await handler({ context: {} } as any);
 
     expect(MetricRefreshQueue.enqueueSupplierScores).toHaveBeenCalledWith(
       expect.any(Object),
@@ -177,10 +220,10 @@ describe('after-sales-id.put.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ materialCost: 100 });
-    (prisma.after_sales.findUnique as any).mockResolvedValue(null);
+    vi.mocked(readBody).mockResolvedValue({ materialCost: 100, version: 1 });
+    (prisma.after_sales.findFirst as any).mockResolvedValue(null);
 
-    const result = await handler({} as any);
+    const result = await handler({ context: {} } as any);
 
     expect(result).toEqual(expect.objectContaining({ error: true }));
   });
@@ -198,10 +241,16 @@ describe('after-sales-id.put.service', () => {
 
     vi.mocked(readBody).mockResolvedValue({
       photos: [{ url: 'https://oss.example.com/photo.jpg' }],
+      version: 1,
     });
-    (prisma.after_sales.update as any).mockResolvedValue({});
+    (prisma.after_sales.findFirst as any).mockResolvedValue({
+      id: 'test-id',
+      supplierBrandId: 'supplier-1',
+      version: 1,
+    });
+    (prisma.after_sales.updateMany as any).mockResolvedValue({ count: 1 });
 
-    await handler({} as any);
+    await handler({ context: {} } as any);
 
     expect(
       FileStorageService.registerReferencesFromAttachments,
@@ -221,8 +270,14 @@ describe('after-sales-id.put.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ projectName: 'Test' });
-    (prisma.after_sales.update as any).mockRejectedValue(new Error('db error'));
+    vi.mocked(readBody).mockResolvedValue({ projectName: 'Test', version: 1 });
+    (prisma.after_sales.findFirst as any).mockResolvedValue({
+      id: 'test-id',
+      version: 1,
+    });
+    (prisma.after_sales.updateMany as any).mockRejectedValue(
+      new Error('db error'),
+    );
 
     const result = await handler({} as any);
 
@@ -240,13 +295,60 @@ describe('after-sales-id.put.service', () => {
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
 
-    vi.mocked(readBody).mockResolvedValue({ projectName: 'Test' });
-    (prisma.after_sales.update as any).mockRejectedValue(
+    vi.mocked(readBody).mockResolvedValue({ projectName: 'Test', version: 1 });
+    (prisma.after_sales.findFirst as any).mockResolvedValue({
+      id: 'test-id',
+      version: 1,
+    });
+    (prisma.after_sales.updateMany as any).mockRejectedValue(
       new Error('not found'),
     );
 
     const result = await handler({} as any);
 
     expect(result).toEqual(expect.objectContaining({ error: true }));
+  });
+
+  it('rejects an interactive edit without a version (400, no write attempted)', async () => {
+    const { readBody } = await import('h3');
+    const { default: handler } = await import(
+      '~/modules/after-sales/after-sales-id.put.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    vi.mocked(readBody).mockResolvedValue({ projectName: 'No version' });
+
+    const result = await handler({ context: {} } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({ error: true, statusCode: 400 }),
+    );
+    expect(prisma.after_sales.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the stored version is newer than the submitted one', async () => {
+    const { readBody } = await import('h3');
+    const { default: handler } = await import(
+      '~/modules/after-sales/after-sales-id.put.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    vi.mocked(readBody).mockResolvedValue({ projectName: 'Stale', version: 1 });
+    // Two users both read version=1; the other user already committed v2.
+    (prisma.after_sales.findFirst as any).mockResolvedValue({
+      id: 'test-id',
+      supplierBrandId: 'supplier-1',
+      version: 2,
+    });
+    (prisma.after_sales.updateMany as any).mockResolvedValue({ count: 0 });
+
+    const result = await handler({ context: {} } as any);
+
+    expect(result).toEqual(
+      expect.objectContaining({ error: true, statusCode: 409 }),
+    );
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledTimes(1);
   });
 });

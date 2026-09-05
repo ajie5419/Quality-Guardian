@@ -1,5 +1,8 @@
 import type { AfterSalesStats, IdentityAggregateItem } from '@qgs/shared';
-import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
+import type {
+  AnalyticsAccessContext,
+  ResolvedDataScope,
+} from '~/modules/data-scope';
 
 import type { AfterSalesDateMode } from './after-sales-query';
 import type { AfterSalesStatisticsIdentity } from './after-sales-statistics-identity';
@@ -12,6 +15,7 @@ import {
   QMS_STATUS_OPEN_SET,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { QualityClassificationService } from '~/modules/quality-classification';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
@@ -28,6 +32,21 @@ import {
 import { normalizeAfterSalesClaimStatus } from './after-sales-status';
 
 const logger = createModuleLogger('AfterSalesAnalyticsService');
+
+async function buildAfterSalesRawScopeSql(
+  userContext: { userId: string; username?: string },
+  dataScope?: ResolvedDataScope,
+) {
+  if (dataScope.scopeType === 'ALL') return Prisma.empty;
+  if (dataScope.scopeType === 'SELF') {
+    return Prisma.sql`AND handler = ${userContext.username ?? ''}`;
+  }
+  const candidates = await DataScopeService.getDeptCandidates(
+    dataScope.deptIds ?? [],
+  );
+  if (candidates.length === 0) return Prisma.sql`AND 1 = 0`;
+  return Prisma.sql`AND (division IN (${Prisma.join(candidates)}) OR feedbackDept IN (${Prisma.join(candidates)}) OR respDept IN (${Prisma.join(candidates)}))`;
+}
 
 export type AfterSalesChartAggregateItem = IdentityAggregateItem;
 
@@ -277,11 +296,15 @@ function buildAfterSalesMonths(params: {
 }
 
 export const AfterSalesAnalyticsService = {
-  async getStats(params?: {
-    dateMode?: AfterSalesDateMode;
-    dateValue?: string;
-    year?: number;
-  }): Promise<AfterSalesStats> {
+  async getStats(
+    params?: {
+      dateMode?: AfterSalesDateMode;
+      dateValue?: string;
+      year?: number;
+    },
+    access?: AnalyticsAccessContext,
+  ): Promise<AfterSalesStats> {
+    const user = requireAnalyticsUser(access);
     const { start: startDate, end } = buildAfterSalesDateRange({
       dateMode: params?.dateMode,
       dateValue: params?.dateValue,
@@ -290,10 +313,19 @@ export const AfterSalesAnalyticsService = {
     const endDate = new Date(end.getTime() - 1);
     const isYearMode = (params?.dateMode || 'year') === 'year';
     const months = buildAfterSalesMonths({ end, isYearMode, startDate });
-    const baseWhere = {
+    let baseWhere: Prisma.after_salesWhereInput = {
       isDeleted: false,
       occurDate: { gte: startDate, lte: endDate },
     };
+    baseWhere = await DataScopeService.buildAfterSalesWhere(
+      baseWhere,
+      user,
+      access?.dataScope,
+    );
+    const rawScopeSql = await buildAfterSalesRawScopeSql(
+      user,
+      access?.dataScope,
+    );
 
     try {
       const openStatus = [...QMS_STATUS_OPEN_SET]
@@ -312,6 +344,7 @@ export const AfterSalesAnalyticsService = {
           SELECT AVG(DATEDIFF(closeDate, occurDate)) as avgDays 
           FROM after_sales 
           WHERE isDeleted = 0 AND occurDate >= ${startDate} AND occurDate <= ${endDate} 
+          ${rawScopeSql}
           AND closeDate IS NOT NULL
         `,
       ]);
@@ -372,6 +405,7 @@ export const AfterSalesAnalyticsService = {
               ) as closed
             FROM after_sales
             WHERE isDeleted = 0 AND occurDate >= ${startDate} AND occurDate <= ${endDate}
+            ${rawScopeSql}
             GROUP BY period
           `
         : await prisma.$queryRaw<TrendResultDay[]>`
@@ -387,6 +421,7 @@ export const AfterSalesAnalyticsService = {
               ) as closed
             FROM after_sales
             WHERE isDeleted = 0 AND occurDate >= ${startDate} AND occurDate <= ${endDate}
+            ${rawScopeSql}
             GROUP BY period
           `;
 
@@ -424,16 +459,20 @@ export const AfterSalesAnalyticsService = {
     }
   },
 
-  async getChartAggregation(params: {
-    dataScope?: ResolvedDataScope;
-    dateMode?: AfterSalesDateMode;
-    dateValue?: string;
-    dimension: AfterSalesChartDimension;
-    metric: AfterSalesChartMetric;
-    top?: number;
-    userContext?: { userId: string; username?: string };
-    year?: number;
-  }): Promise<AfterSalesChartAggregateItem[]> {
-    return AfterSalesChartAggregationService.getChartAggregation(params);
+  async getChartAggregation(
+    params: {
+      dateMode?: AfterSalesDateMode;
+      dateValue?: string;
+      dimension: AfterSalesChartDimension;
+      metric: AfterSalesChartMetric;
+      top?: number;
+      year?: number;
+    },
+    access?: AnalyticsAccessContext,
+  ): Promise<AfterSalesChartAggregateItem[]> {
+    return AfterSalesChartAggregationService.getChartAggregation(
+      params,
+      access,
+    );
   },
 };
