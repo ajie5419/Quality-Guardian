@@ -13,9 +13,15 @@ let running = false;
 /**
  * Persist every registered definition into cron_jobs (upsert by jobKey).
  * Called once at plugin startup so the table mirrors the code registry.
+ *
+ * jobKey is globally unique (SCHEDULER-INTEGRITY-001), so concurrent instance
+ * startup can never create duplicate definition rows. The code registry is the
+ * single source of truth: rows removed from the registry are disabled (not
+ * deleted), and soft-deleted rows are revived by the next sync.
  */
 export async function syncCronJobDefinitions(): Promise<void> {
   const definitions = listCronJobs();
+  const validRegistryKeys: string[] = [];
   for (const definition of definitions) {
     try {
       parseCronExpression(definition.cronExpr);
@@ -26,28 +32,37 @@ export async function syncCronJobDefinitions(): Promise<void> {
       );
       continue;
     }
-    // upsert by jobKey: find-then-update (jobKey has no unique constraint).
-    const existing = await prisma.cron_jobs.findFirst({
-      where: { jobKey: definition.key, isDeleted: false },
-      select: { id: true },
+    validRegistryKeys.push(definition.key);
+    // Atomic upsert by unique jobKey: registry definition always wins.
+    await prisma.cron_jobs.upsert({
+      where: { jobKey: definition.key },
+      create: {
+        jobKey: definition.key,
+        cronExpr: definition.cronExpr,
+        description: definition.description ?? null,
+        enabled: true,
+      },
+      update: {
+        cronExpr: definition.cronExpr,
+        description: definition.description ?? null,
+        enabled: true,
+        isDeleted: false,
+      },
     });
-    await (existing
-      ? prisma.cron_jobs.update({
-          where: { id: existing.id },
-          data: {
-            cronExpr: definition.cronExpr,
-            description: definition.description ?? null,
-            enabled: true,
-          },
-        })
-      : prisma.cron_jobs.create({
-          data: {
-            jobKey: definition.key,
-            cronExpr: definition.cronExpr,
-            description: definition.description ?? null,
-          },
-        }));
   }
+  // Registry is the source of truth: disable definitions that no longer exist
+  // in code. Never delete them, so history and manual re-enable stay possible.
+  await prisma.cron_jobs.updateMany({
+    where:
+      validRegistryKeys.length === 0
+        ? { enabled: true, isDeleted: false }
+        : {
+            enabled: true,
+            isDeleted: false,
+            jobKey: { notIn: validRegistryKeys },
+          },
+    data: { enabled: false },
+  });
   logger.info({ jobCount: definitions.length }, 'cron job definitions synced');
 }
 
@@ -59,6 +74,10 @@ export async function runSchedulerTick(now = new Date()): Promise<number> {
   if (running) return 0;
   running = true;
   let executed = 0;
+  // Compare against the minute boundary, not "now minus 60 seconds". A timer
+  // that drifts within a minute must still run once in every matching minute.
+  const currentMinuteStart = new Date(now);
+  currentMinuteStart.setSeconds(0, 0);
   try {
     const dueJobs = await prisma.cron_jobs.findMany({
       where: {
@@ -67,7 +86,7 @@ export async function runSchedulerTick(now = new Date()): Promise<number> {
         OR: [
           { lastRunAt: null },
           // lastRunAt strictly before the current minute
-          { lastRunAt: { lt: new Date(now.getTime() - 60_000) } },
+          { lastRunAt: { lt: currentMinuteStart } },
         ],
       },
       select: {
@@ -96,15 +115,13 @@ export async function runSchedulerTick(now = new Date()): Promise<number> {
       }
       if (!matches) continue;
 
-      // At-most-once per minute: CAS on lastRunAt (null or older than a minute).
+      // At-most-once per minute: CAS on lastRunAt before this minute.
       const claimed = await prisma.cron_jobs.updateMany({
         where: {
           id: job.id,
+          enabled: true,
           isDeleted: false,
-          OR: [
-            { lastRunAt: null },
-            { lastRunAt: { lt: new Date(now.getTime() - 60_000) } },
-          ],
+          OR: [{ lastRunAt: null }, { lastRunAt: { lt: currentMinuteStart } }],
         },
         data: { lastRunAt: now },
       });
