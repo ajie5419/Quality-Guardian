@@ -2,6 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    departments: {
+      findMany: vi.fn(),
+    },
     quality_losses: {
       aggregate: vi.fn(),
       findMany: vi.fn(),
@@ -147,5 +150,46 @@ describe('quality-loss-reporting.service', () => {
     });
 
     expect(result).toEqual({ manualLoss: 0 });
+  });
+
+  it('scopes dashboard stats by the caller department', async () => {
+    const { QualityLossReportingService } = await import(
+      '~/modules/quality-loss/quality-loss-reporting.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    (prisma.quality_losses.aggregate as any)
+      .mockResolvedValueOnce({ _sum: { amount: 500 } })
+      .mockResolvedValueOnce({ _sum: { amount: 120 } });
+    (prisma.departments.findMany as any).mockResolvedValue([
+      { name: 'Dept A' },
+    ]);
+
+    const result = await QualityLossReportingService.getStatsForDashboard(
+      {
+        weekStart: new Date('2026-01-06'),
+        yearStart: new Date('2026-01-01'),
+      },
+      {
+        dataScope: {
+          deptIds: ['dept-a'],
+          module: 'quality-loss',
+          scopeType: 'DEPT' as const,
+        },
+        user: { userId: 'u-dept-a', username: 'user-a' },
+      },
+    );
+
+    expect(result).toEqual({ totalLoss: 500, weeklyLoss: 120 });
+    const aggregateCalls = (prisma.quality_losses.aggregate as any).mock.calls;
+    for (const call of aggregateCalls) {
+      expect(call[0].where).toEqual({
+        AND: [
+          expect.objectContaining({ isDeleted: false }),
+          { respDeptId: { in: ['dept-a'] } },
+        ],
+      });
+    }
   });
 });

@@ -22,6 +22,7 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('~/modules/data-scope/data-scope.service', () => ({
   DataScopeService: {
+    buildQualityLossWhere: vi.fn(async (baseWhere: unknown) => baseWhere),
     getDeptCandidates: vi.fn(),
   },
 }));
@@ -52,7 +53,11 @@ describe('quality-loss-record-maintenance.service', () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    (prisma.quality_losses.findFirst as any).mockResolvedValue({ id: 'ql-1' });
+    (prisma.quality_losses.findFirst as any).mockResolvedValue({
+      createdBy: 'user-1',
+      id: 'ql-1',
+      respDept: null,
+    });
     (prisma.quality_losses.updateMany as any).mockResolvedValue({ count: 1 });
 
     await QualityLossRecordMaintenanceService.deleteRecord('ql-1', {
@@ -74,7 +79,11 @@ describe('quality-loss-record-maintenance.service', () => {
     const { QualityLossRecordMaintenanceService } = await import(
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
-    (prisma.quality_losses.findFirst as any).mockResolvedValue({ id: 'ql-1' });
+    (prisma.quality_losses.findFirst as any).mockResolvedValue({
+      createdBy: 'user-1',
+      id: 'ql-1',
+      respDept: null,
+    });
     (prisma.quality_losses.updateMany as any).mockResolvedValue({ count: 1 });
 
     await QualityLossRecordMaintenanceService.deleteRecord('QL-2026-001', {
@@ -206,8 +215,8 @@ describe('quality-loss-record-maintenance.service', () => {
       '~/modules/quality-loss/quality-loss-record-maintenance.service'
     );
     (prisma.quality_losses.findMany as any).mockResolvedValue([
-      { id: 'ql-1' },
-      { id: 'ql-2' },
+      { createdBy: 'user-1', id: 'ql-1', respDept: null },
+      { createdBy: 'user-1', id: 'ql-2', respDept: null },
     ]);
     (prisma.quality_losses.updateMany as any).mockResolvedValue({ count: 2 });
 

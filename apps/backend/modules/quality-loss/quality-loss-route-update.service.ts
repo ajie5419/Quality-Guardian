@@ -9,6 +9,10 @@ import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
+  assertQualityLossTransition,
+  parseQualityLossUpdateStatus,
+} from '~/modules/quality-loss/quality-loss-state';
+import {
   normalizeQualityLossSource,
   QUALITY_LOSS_SOURCE,
   toQualityLossTargetType,
@@ -34,9 +38,12 @@ type QualityLossUpdateTarget =
     };
 
 async function resolveQualityLossUpdateTarget(params: {
+  dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>;
   pathId: string;
   pk: unknown;
   source: QualityLossSource;
+  userId: string;
+  username?: string;
 }): Promise<QualityLossUpdateTarget> {
   const target = resolveQualityLossTargetLocator(params);
   if ('message' in target) return { valid: false, message: target.message };
@@ -63,7 +70,15 @@ async function resolveQualityLossUpdateTarget(params: {
         id: target.identifier,
       };
     }
-    const id = await InspectionService.findIssueIdBySerialNumber(target.serial);
+    const id = await InspectionService.findIssueIdBySerialNumber(
+      target.serial,
+      {
+        dataScope: params.dataScope
+          ? { ...params.dataScope, module: 'inspection' }
+          : undefined,
+        user: { userId: params.userId, username: params.username },
+      },
+    );
     return id
       ? { source: QUALITY_LOSS_SOURCE.INTERNAL, valid: true, id }
       : { valid: false, message: '内部质量记录不存在' };
@@ -161,7 +176,8 @@ async function assertOwnership(params: {
   target: Exclude<QualityLossUpdateTarget, { valid: false }>;
   userId: string;
 }) {
-  const scopeType = params.dataScope?.scopeType ?? 'ALL';
+  // Fail closed: a missing scope resolves to SELF (own records only).
+  const scopeType = params.dataScope?.scopeType ?? 'SELF';
   if (scopeType === 'ALL') return;
 
   const ownership = await loadOwnershipForTarget(params.target);
@@ -208,11 +224,25 @@ export const QualityLossRouteUpdateService = {
         message: parsedBody.message,
       };
     }
+    if (
+      params.body.status !== undefined &&
+      String(params.body.status).trim() !== '' &&
+      parseQualityLossUpdateStatus(params.body.status) === null
+    ) {
+      return {
+        ok: false as const,
+        code: 'BAD_REQUEST' as const,
+        message: '无效的质量损失状态',
+      };
+    }
 
     const target = await resolveQualityLossUpdateTarget({
+      dataScope: params.dataScope,
       pathId: params.id,
       pk: params.body.pk,
       source,
+      userId: params.userId,
+      username: params.username,
     });
     if ('message' in target) {
       return {
@@ -258,6 +288,12 @@ export const QualityLossRouteUpdateService = {
         }
         case QUALITY_LOSS_SOURCE.INTERNAL: {
           await InspectionService.updateQualityLossFields({
+            access: {
+              dataScope: params.dataScope
+                ? { ...params.dataScope, module: 'inspection' }
+                : undefined,
+              user: { userId: params.userId, username: params.username },
+            },
             id: target.id,
             actualClaim: parsedBody.actualClaim,
           });
@@ -279,8 +315,25 @@ export const QualityLossRouteUpdateService = {
                   parsedBody.respDeptId,
                 )
               : {};
-            const updated = await tx.quality_losses.update({
+            const current = await tx.quality_losses.findFirst({
               where: target.where,
+              select: { id: true, status: true },
+            });
+            if (!current) {
+              throw new BusinessError('NOT_FOUND', '目标记录不存在', 404);
+            }
+            let expectedStatus: string | undefined;
+            if (parsedBody.status !== undefined) {
+              assertQualityLossTransition(current.status, parsedBody.status);
+              expectedStatus = current.status;
+            }
+            const result = await tx.quality_losses.updateMany({
+              where: {
+                ...target.where,
+                ...(expectedStatus === undefined
+                  ? {}
+                  : { status: expectedStatus }),
+              },
               data: {
                 ...(parsedBody.occurDate
                   ? { occurDate: parsedBody.occurDate }
@@ -301,9 +354,23 @@ export const QualityLossRouteUpdateService = {
                 updatedAt: new Date(),
               },
             });
+            if (result.count !== 1) {
+              const fresh = await tx.quality_losses.findFirst({
+                where: target.where,
+                select: { id: true, status: true },
+              });
+              if (!fresh) {
+                throw new BusinessError('NOT_FOUND', '目标记录不存在', 404);
+              }
+              throw new BusinessError(
+                'CONFLICT',
+                '质量损失状态已变化，请刷新后重试',
+                409,
+              );
+            }
             await QualityLossIndexQueue.enqueue(
               tx,
-              [{ source: 'MANUAL', sourcePk: updated.id }],
+              [{ source: 'MANUAL', sourcePk: current.id }],
               'quality-loss.updated',
             );
           });
@@ -311,12 +378,18 @@ export const QualityLossRouteUpdateService = {
       }
     } catch (error) {
       if (isBusinessError(error)) {
+        if (error.httpStatus === 409) {
+          // Concurrent transition or stale CAS claim: propagate as a real
+          // 409 so the route can grade it with the shared error code.
+          throw error;
+        }
+        const code =
+          error.httpStatus === 404
+            ? ('NOT_FOUND' as const)
+            : ('BAD_REQUEST' as const);
         return {
           ok: false as const,
-          code:
-            error.httpStatus === 404
-              ? ('NOT_FOUND' as const)
-              : ('BAD_REQUEST' as const),
+          code,
           message: error.message,
         };
       }

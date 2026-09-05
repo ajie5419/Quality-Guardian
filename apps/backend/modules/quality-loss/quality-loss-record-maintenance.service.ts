@@ -45,7 +45,9 @@ async function assertDeleteAccess(
   targets: ManualDeleteTarget[],
   context: DeleteContext,
 ) {
-  const scopeType = context.dataScope?.scopeType ?? 'ALL';
+  // Fail closed: a missing scope resolves to SELF (own records only) instead
+  // of silently allowing every record in the system.
+  const scopeType = context.dataScope?.scopeType ?? 'SELF';
   if (scopeType === 'ALL') return;
 
   if (scopeType === 'SELF') {
@@ -64,6 +66,17 @@ async function assertDeleteAccess(
     return;
   }
   throw new BusinessError('FORBIDDEN', '无权删除其他部门的质量损失记录', 403);
+}
+
+async function buildDeleteScopeWhere(
+  context: DeleteContext,
+  baseWhere: Prisma.quality_lossesWhereInput,
+) {
+  return DataScopeService.buildQualityLossWhere(
+    baseWhere,
+    { userId: context.userId },
+    context.dataScope,
+  );
 }
 
 export const QualityLossRecordMaintenanceService = {
@@ -87,7 +100,10 @@ export const QualityLossRecordMaintenanceService = {
     await assertDeleteAccess([target], context);
     const result = await prisma.$transaction(async (tx) => {
       const result = await tx.quality_losses.updateMany({
-        where: { id: target.id, isDeleted: false },
+        where: await buildDeleteScopeWhere(context, {
+          id: target.id,
+          isDeleted: false,
+        }),
         data: { isDeleted: true },
       });
       if (result.count > 0) {
@@ -134,7 +150,10 @@ export const QualityLossRecordMaintenanceService = {
     const targetIds = targets.map((target) => target.id);
     const result = await prisma.$transaction(async (tx) => {
       const result = await tx.quality_losses.updateMany({
-        where: { id: { in: targetIds }, isDeleted: false },
+        where: await buildDeleteScopeWhere(context, {
+          id: { in: targetIds },
+          isDeleted: false,
+        }),
         data: { isDeleted: true },
       });
       if (result.count > 0) {
@@ -158,12 +177,27 @@ export const QualityLossRecordMaintenanceService = {
     return result;
   },
 
-  async getDrillDown(start: Date, end: Date) {
+  async getDrillDown(
+    start: Date,
+    end: Date,
+    userContext?: { userId: string; username?: string },
+    dataScope?: Pick<ResolvedDataScope, 'deptIds' | 'scopeType'>,
+  ) {
+    const where = userContext?.userId
+      ? await DataScopeService.buildQualityLossIndexWhere(
+          {
+            isDeleted: false,
+            occurDate: { gte: start, lte: end },
+          },
+          userContext,
+          dataScope,
+        )
+      : {
+          isDeleted: false,
+          occurDate: { gte: start, lte: end },
+        };
     return prisma.quality_loss_index.findMany({
-      where: {
-        isDeleted: false,
-        occurDate: { gte: start, lte: end },
-      },
+      where,
       orderBy: { occurDate: 'desc' },
       take: 2000,
     });

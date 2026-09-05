@@ -10,8 +10,9 @@ const {
   defineValidatedHandler,
   getCurrentUser,
   getMissingRequiredFields,
+  getHeader,
   getQuery,
-  getLossSummary,
+  getExportRows,
   getTrendData,
   getDrillDown,
   internalServerErrorResponse,
@@ -21,6 +22,7 @@ const {
   readBody,
   resolveManualQualityLossContext,
   useResponseSuccess,
+  withRequestIdempotency,
 } = vi.hoisted(() => ({
   auditLog: vi.fn(),
   badRequestResponse: vi.fn((_event, message) => ({ message, type: 'bad' })),
@@ -34,8 +36,9 @@ const {
   defineValidatedHandler: vi.fn((_schema, handler) => handler),
   getCurrentUser: vi.fn(),
   getDrillDown: vi.fn(),
-  getLossSummary: vi.fn(),
+  getExportRows: vi.fn(),
   getMissingRequiredFields: vi.fn(),
+  getHeader: vi.fn(),
   getQuery: vi.fn(),
   getTrendData: vi.fn(),
   internalServerErrorResponse: vi.fn((_event, message) => ({
@@ -54,6 +57,7 @@ const {
     workOrderNumber: 'WO-468624',
   })),
   useResponseSuccess: vi.fn((data) => ({ data, type: 'success' })),
+  withRequestIdempotency: vi.fn(),
 }));
 
 vi.mock('~/utils/prisma', () => ({
@@ -70,8 +74,17 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('h3', () => ({
   defineEventHandler: (handler: unknown) => handler,
+  getHeader,
   getQuery,
   readBody,
+}));
+
+vi.mock('~/modules/idempotency', () => ({
+  buildRequestFingerprint: vi.fn(() => 'stable-fingerprint'),
+  normalizeIdempotencyKey: vi.fn((value: unknown) =>
+    typeof value === 'string' && value ? value : null,
+  ),
+  withRequestIdempotency,
 }));
 
 vi.mock('~/utils/current-user', () => ({
@@ -117,7 +130,7 @@ vi.mock('~/modules/quality-loss/quality-loss-manual-context', () => ({
 vi.mock('~/modules/quality-loss/quality-loss.service', () => ({
   QualityLossService: {
     getDrillDown,
-    getLossSummary,
+    getExportRows,
     getTrendData,
   },
 }));
@@ -130,6 +143,34 @@ describe('quality-loss route handlers', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     getCurrentUser.mockReturnValue({ id: 'u-1', userId: 'u-1' });
+    getHeader.mockReturnValue('test-key-0001');
+    vi.mocked(withRequestIdempotency).mockImplementation(
+      async (options: {
+        run: (tx: unknown) => Promise<{
+          resourceId: string;
+          resourceType: string;
+          response: unknown;
+        }>;
+      }) => {
+        let result:
+          | undefined
+          | {
+              resourceId: string;
+              resourceType: string;
+              response: unknown;
+            };
+        await prisma.$transaction(async (tx) => {
+          result = await options.run(tx);
+        });
+        return {
+          replayed: false,
+          resourceId: result?.resourceId ?? '',
+          resourceType: result?.resourceType ?? '',
+          response: result?.response,
+          responseStatus: 200,
+        };
+      },
+    );
     getMissingRequiredFields.mockReturnValue([]);
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback({
@@ -200,13 +241,13 @@ describe('quality-loss route handlers', () => {
       '~/modules/quality-loss/quality-loss-export.get.service'
     );
     const handler = mod.default as any;
-    getLossSummary.mockResolvedValueOnce([{ id: '1' }, { id: '2' }]);
+    getExportRows.mockResolvedValueOnce([{ id: '1' }, { id: '2' }]);
     expect(await handler(event(), { year: '2026' })).toEqual({
       data: { items: [{ id: '1' }, { id: '2' }], total: 2 },
       type: 'success',
     });
 
-    getLossSummary.mockResolvedValueOnce(
+    getExportRows.mockResolvedValueOnce(
       Array.from({ length: 20_001 }, (_, id) => ({
         id,
       })),
@@ -216,7 +257,7 @@ describe('quality-loss route handlers', () => {
       type: 'bad',
     });
 
-    getLossSummary.mockRejectedValueOnce(new Error('db'));
+    getExportRows.mockRejectedValueOnce(new Error('db'));
     expect(await handler(event(), {})).toEqual({
       message: 'Failed to export quality loss data',
       type: 'internal',
