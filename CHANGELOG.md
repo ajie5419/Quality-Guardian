@@ -1,3 +1,24 @@
+### 2026-09-05 日报表标题固定蓝色
+
+**执行内容：**
+- `apps/web-antd/src/views/qms/reports/components/ReportTable.vue`：移除 `bg-gray-800`，标题容器改为固定内联 `background-color: #1677FF`，使页面与 html2canvas 导出使用同一明确色值。
+
+**验证结果：**
+- `pnpm lint`：通过（Prettier 与 ESLint 均通过）。
+- `pnpm run check:type`：通过（3/3 tasks；web-antd `vue-tsc --noEmit --skipLibCheck` 通过）。
+- `pnpm run check:qms-arch`：通过（changed scope，0 violations）。
+- `pnpm run docs:sync`：通过，自动硬数据已同步为 v0.29.0、34 模块、684 个模块 TS 文件、299 个后端测试文件。
+- `pnpm run check:docs-drift`：通过（完成自动硬数据同步后）。
+- 生产 overlay（独立于未发布源码）：实际桌面 Firefox、402×874 响应式视口及 `/Users/zhaoxiaojie/Downloads/每日质量报表_2026-09-05_赵小杰.png` 均已核验两处标题为蓝底白字；后端进程身份和启动状态未变化，`/api/status` 返回 200。overlay 位于持久化 `/opt/qms/nginx.conf`，已通过 `nginx -t` 并优雅重载。
+
+**commit:** 本次修复提交与合并记录见对应功能 PR。
+
+**遗留问题：**
+- 本工作区未启动前端 dev/build/start/serve，未执行完整发布；生产 overlay 未替代源码发布，仍需按正式发布链路纳入此源码改动。
+- 生产 overlay 回滚：保留备份 `/opt/qms/nginx.before-report-title-blue-20260905.conf`，可运行 `bash /opt/qms/rollback-report-title-blue-20260905.sh`（配置发生后续变更时拒绝覆盖）；源码发布后仅删除 `qms-report-title-blue-20260905` 的 `sub_filter` 块。该 selector 精确依赖原 `bg-gray-800` 类，源码移除此类后 overlay 自然不再匹配。没有前端/后端镜像变更或数据库操作。
+
+---
+
 ### 2026-08-20 报检任务列表视图筛选调整：已完成仅 3 天 + 我的检验仅未完成
 
 **执行内容：**

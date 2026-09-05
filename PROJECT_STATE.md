@@ -6,8 +6,8 @@
 
 <!-- docs:sync-start -->
 
-- 最后同步时间: 2026-08-20 11:45
-- 版本: 0.28.2
+- 最后同步时间: 2026-09-05 08:50
+- 版本: 0.29.0
 - 后端模块数: 34
 - 模块 TS 文件数: 684
 - 后端测试文件数: 299
@@ -25,6 +25,7 @@
 
 ## 最近变更（倒序）
 
+- 2026-09-05 日报表标题底色固定为 `#1677FF`：`ReportTable.vue` 移除 `bg-gray-800`，改用内联 `background-color`，保证 html2canvas 导出不受主题工具类影响；源码本地门禁验证见 CHANGELOG。生产 overlay 已独立验证桌面、402×874 响应式视口及导出 PNG 均为双蓝底白字，但源码尚未走发布链路。
 - 2026-08-20 报检任务列表筛选调整（codex/inspection-list-filters 分支）：已完成单 scope=closed 只显示近 3 天关闭的检验单；我的检验 scope=my-inspection 改为只显示未完成检验单（DISPATCHED/INSPECTING），删除 sinceDays 参数；列表查询辅助拆至 inspection-request-list-query.ts。
 <!-- AI 维护：每次完成工作后，在顶部插入一行：日期 + 做了什么 + commit/验证。 -->
 
