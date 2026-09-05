@@ -165,19 +165,31 @@ export async function getInspectionRequest(id: string) {
 
 export async function createInspectionRequest(
   data: CreateInspectionRequestV2Params,
+  idempotencyKey?: string,
 ) {
   return requestClient.post<InspectionRequest>(
     QMS_API.INSPECTION_REQUESTS_V2,
     data,
+    {
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : undefined,
+    },
   );
 }
 
 export async function createPublicInspectionRequest(
   data: CreateInspectionRequestV2Params,
+  idempotencyKey?: string,
 ) {
   return publicRequestClient.post<InspectionRequest>(
     QMS_API.PUBLIC_INSPECTION_REQUESTS_V2,
     data,
+    {
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : undefined,
+    },
   );
 }
 

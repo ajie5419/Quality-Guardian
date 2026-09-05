@@ -9,6 +9,8 @@ import type { UploadChangeParam, UploadFile } from 'ant-design-vue';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
+import { useAccessStore } from '@vben/stores';
+
 import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { Form, message, Tabs } from 'ant-design-vue';
 
@@ -18,6 +20,10 @@ import {
   getPublicInspectionRequestWorkOrders,
 } from '#/api/qms/inspection-request';
 import { getPublicIncomingMaterialInputSettingApi } from '#/api/system/inspection-settings';
+import {
+  isIdempotencyReusedError,
+  useCreateOperationId,
+} from '#/composables/useCreateOperationId';
 import { useImageCompress } from '#/composables/useImageCompress';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
 import {
@@ -71,6 +77,9 @@ const workOrderOptions = ref<
 >([]);
 const { compressImage } = useImageCompress();
 const { handleApiError } = useErrorHandler();
+const accessStore = useAccessStore();
+const { acquire: acquireOperationId, reset: resetOperationId } =
+  useCreateOperationId();
 
 const requestForm = reactive({
   attachments: [] as InspectionRequestAttachment[],
@@ -275,35 +284,44 @@ async function submitRequest() {
       message.warning('请选择完整的责任归属信息');
       return;
     }
-    const created = await createPublicInspectionRequest({
-      attachments: requestForm.attachments,
-      category: isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
-      componentName: requiresComponentName.value
-        ? requestForm.componentName
-        : '',
-      mutualCheckResult: requestForm.mutualCheckResult,
-      partId: requestForm.partId || undefined,
-      processId: requestForm.processId,
-      quantity: requestForm.quantity,
-      reporter: requestForm.reporter,
-      requestedPartName:
-        isIncomingEntry.value && !requestForm.partId
-          ? requestForm.requestedPartName.trim()
-          : undefined,
-      requestInfo: isIncomingEntry.value
-        ? buildIncomingInspectionRequestInfo({
-            incomingType: requestForm.processName,
-            notes: requestForm.requestInfo,
-          })
-        : requestForm.requestInfo,
-      selfCheckResult: requestForm.selfCheckResult,
-      stationSelection: requestForm.stationSelection || undefined,
-      ...responsibilityPayload,
-      workOrderNumber: requestForm.workOrderNumber,
-      workOrderNumbers: isIncomingEntry.value
-        ? requestForm.workOrderNumbers
-        : [requestForm.workOrderNumber],
-    });
+    const signedIn = Boolean(accessStore.accessToken);
+    const created = await createPublicInspectionRequest(
+      {
+        attachments: requestForm.attachments,
+        category: isIncomingEntry.value ? 'INCOMING' : 'PROCESS',
+        componentName: requiresComponentName.value
+          ? requestForm.componentName
+          : '',
+        mutualCheckResult: requestForm.mutualCheckResult,
+        partId: requestForm.partId || undefined,
+        processId: requestForm.processId,
+        quantity: requestForm.quantity,
+        reporter: requestForm.reporter,
+        requestedPartName:
+          isIncomingEntry.value && !requestForm.partId
+            ? requestForm.requestedPartName.trim()
+            : undefined,
+        requestInfo: isIncomingEntry.value
+          ? buildIncomingInspectionRequestInfo({
+              incomingType: requestForm.processName,
+              notes: requestForm.requestInfo,
+            })
+          : requestForm.requestInfo,
+        selfCheckResult: requestForm.selfCheckResult,
+        stationSelection: requestForm.stationSelection || undefined,
+        ...responsibilityPayload,
+        workOrderNumber: requestForm.workOrderNumber,
+        workOrderNumbers: isIncomingEntry.value
+          ? requestForm.workOrderNumbers
+          : [requestForm.workOrderNumber],
+      },
+      // Anonymous public scans have no verifiable identity (see PUBLIC
+      // IDEMPOTENCY IDENTITY GAP); only signed-in callers send a key.
+      signedIn ? acquireOperationId() : undefined,
+    );
+    if (signedIn) {
+      resetOperationId();
+    }
     message.success(
       `${entryCopy.value.submitSuccessPrefix}：${created.requestNo}`,
     );
@@ -317,6 +335,11 @@ async function submitRequest() {
       path: route.path,
       query: buildInspectionRequestPostSubmitQuery(route.query),
     });
+  } catch (error: unknown) {
+    if (isIdempotencyReusedError(error)) {
+      resetOperationId();
+    }
+    throw error;
   } finally {
     submitting.value = false;
   }
