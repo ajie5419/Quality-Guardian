@@ -6,8 +6,10 @@ import prisma from '~/utils/prisma';
 vi.mock('~/utils/prisma', () => ({
   default: {
     work_orders: {
-      findMany: vi.fn(),
+      aggregate: vi.fn(),
       count: vi.fn(),
+      findMany: vi.fn(),
+      groupBy: vi.fn(),
     },
     work_order_requirements: {
       findMany: vi.fn(),
@@ -155,25 +157,33 @@ describe('workOrderService', () => {
               ['project-2', '786'],
             ]),
           );
-        (prisma.work_orders.findMany as any).mockResolvedValueOnce([
-          {
-            deliveryDate: new Date('2025-09-01T00:00:00.000Z'),
-            divisionId: 'dept-1',
-            projectId: 'project-1',
-            quantity: 1,
-            status: 'COMPLETED',
-          },
-          {
-            deliveryDate: new Date('2025-10-01T00:00:00.000Z'),
-            divisionId: 'dept-1',
-            projectId: 'project-2',
-            quantity: 1,
-            status: 'OPEN',
-          },
-        ]);
+        (prisma.work_orders.groupBy as any)
+          .mockResolvedValueOnce([
+            { status: 'COMPLETED', _count: { workOrderNumber: 1 } },
+            { status: 'OPEN', _count: { workOrderNumber: 1 } },
+          ])
+          .mockResolvedValueOnce([
+            { divisionId: 'dept-1', _count: { workOrderNumber: 2 } },
+          ])
+          .mockResolvedValueOnce([
+            {
+              divisionId: 'dept-1',
+              projectId: 'project-1',
+              _sum: { quantity: 1 },
+            },
+            {
+              divisionId: 'dept-1',
+              projectId: 'project-2',
+              _sum: { quantity: 1 },
+            },
+          ]);
 
         const result = await WorkOrderService.getDashboardStats({});
 
+        expect(result.total).toBe(2);
+        expect(result.completed).toBe(1);
+        expect(result.inProgress).toBe(0);
+        expect(result.progressPercent).toBe(50);
         expect(result.rankings).toHaveLength(1);
         expect(result.rankings[0]).toEqual({
           division: {
@@ -215,32 +225,20 @@ describe('workOrderService', () => {
           ]),
         )
         .mockResolvedValueOnce(new Map());
-      (prisma.work_orders.findMany as any).mockResolvedValueOnce([
-        {
-          deliveryDate: null,
-          divisionId: 'dept-1',
-          projectId: null,
-          quantity: 1,
-          status: 'OPEN',
-        },
-        {
-          deliveryDate: null,
-          divisionId: 'dept-2',
-          projectId: null,
-          quantity: 1,
-          status: 'OPEN',
-        },
-        {
-          deliveryDate: null,
-          divisionId: null,
-          projectId: null,
-          quantity: 1,
-          status: 'OPEN',
-        },
-      ]);
+      (prisma.work_orders.groupBy as any)
+        .mockResolvedValueOnce([
+          { status: 'OPEN', _count: { workOrderNumber: 3 } },
+        ])
+        .mockResolvedValueOnce([
+          { divisionId: 'dept-1', _count: { workOrderNumber: 1 } },
+          { divisionId: 'dept-2', _count: { workOrderNumber: 1 } },
+          { divisionId: null, _count: { workOrderNumber: 1 } },
+        ])
+        .mockResolvedValueOnce([]);
 
       const result = await WorkOrderService.getDashboardStats({});
 
+      expect(result.total).toBe(3);
       expect(result.pieData).toEqual([
         {
           id: 'dept-1',

@@ -2,9 +2,11 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { WorkOrderRouteService } from '~/modules/work-order/work-order-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
+  notFoundResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
@@ -20,9 +22,14 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
-    return useResponseSuccess(
-      await WorkOrderRouteService.getWorkOrderAggregate(workOrderNumber),
+    const aggregate = await WorkOrderRouteService.getWorkOrderAggregate(
+      workOrderNumber,
+      getAnalyticsAccessContext(event),
     );
+    if (!aggregate) {
+      return notFoundResponse(event, '工单不存在或无权访问');
+    }
+    return useResponseSuccess(aggregate);
   } catch (error) {
     logApiError('workspace-work-order-aggregate', error, undefined, event);
     return internalServerErrorResponse(event, '获取工单聚合信息失败');

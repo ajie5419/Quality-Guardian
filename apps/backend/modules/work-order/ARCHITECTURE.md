@@ -28,3 +28,9 @@ Open governance audits for work order project, division, and customer identities
 ## BOM 工序关系
 
 `project_bom_required_processes` 是 BOM 所需工序的正式关系表。旧 `required_processes` JSON 仅作历史快照和兼容展示，不参与在线统计关联。存量回填只在全部名称唯一精确解析时原子写入，禁止部分回填。
+
+## 乐观锁契约（OPTIMISTIC-LOCK-001）
+
+- `work_orders.version`（`Int @default(1)`）是交互式编辑的乐观锁令牌：列表响应携带 `version`，编辑（PUT）与删除（DELETE）必须提交客户端读取到的 `version`，缺失或非法 → 400。
+- 版本化写集中在 `work-order-versioned-write.service.ts`：`updateMany({ where: { workOrderNumber, version: expectedVersion, ...scopeWhere }, data: { ..., version: { increment: 1 } } })`，count=0 时只读 scoped 复查，不存在/无权限 → 404，版本过期 → 409 `OPTIMISTIC_LOCK_CONFLICT`。
+- import upsert / create-restore 属于批量/系统语义（PRODUCT_DECISION），不要求逐行用户 `version`；系统删除（无 `version`）保持 force-delete。
