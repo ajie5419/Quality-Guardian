@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -20,11 +21,15 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
+    const userinfo = getCurrentUser(event);
     const pagination = paginationSchema.safeParse(getQuery(event));
     if (!pagination.success) {
       return badRequestResponse(event, '分页参数无效');
     }
-    const issues = await SupplierService.getQualityIssues(id, pagination.data);
+    const issues = await SupplierService.getQualityIssues(id, pagination.data, {
+      scope: event.context.dataScope,
+      user: userinfo,
+    });
     if (!issues) {
       return notFoundResponse(event, '供应商不存在');
     }

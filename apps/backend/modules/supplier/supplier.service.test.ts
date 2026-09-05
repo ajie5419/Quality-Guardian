@@ -20,6 +20,7 @@ vi.mock('~/utils/prisma', () => {
     findMany: vi.fn(),
     findFirst: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     upsert: vi.fn(),
   };
   const transactionClient = {
@@ -32,6 +33,9 @@ vi.mock('~/utils/prisma', () => {
     default: {
       ...transactionClient,
       $transaction: vi.fn((callback) => callback(transactionClient)),
+      departments: {
+        findMany: vi.fn().mockResolvedValue([{ name: 'Dept A' }]),
+      },
       supplier_score_snapshots: {
         aggregate: vi.fn(),
         upsert: vi.fn(),
@@ -842,16 +846,22 @@ describe('supplierService admission fields', () => {
 
   it('updates admission metadata and refreshes admission document references', async () => {
     const updated = supplier('Supplier A');
-    (prisma.suppliers.update as any).mockResolvedValue(updated);
+    (prisma.suppliers.findFirst as any).mockResolvedValue(updated);
+    (prisma.suppliers.updateMany as any).mockResolvedValue({ count: 1 });
     const admissionDocuments = [{ fileId: 'file-2', name: 'renewal.pdf' }];
 
-    await SupplierService.updateSupplier(updated.id, {
-      recognizedAt: '2026-06-02T00:00:00.000Z',
-      admissionDocuments,
-    });
+    await SupplierService.updateSupplier(
+      updated.id,
+      {
+        recognizedAt: '2026-06-02T00:00:00.000Z',
+        admissionDocuments,
+      },
+      1,
+      { scope: { deptIds: [], scopeType: 'ALL' }, user: { id: 1 } },
+    );
 
-    expect(prisma.suppliers.update).toHaveBeenCalledWith({
-      where: { id: updated.id },
+    expect(prisma.suppliers.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: updated.id, version: 1 }),
       data: expect.objectContaining({
         recognizedAt: new Date('2026-06-02T00:00:00.000Z'),
         admissionDocuments: JSON.stringify(admissionDocuments),
@@ -865,6 +875,78 @@ describe('supplierService admission fields', () => {
       bizType: 'supplier',
       fieldName: 'admissionDocuments',
     });
+  });
+
+  it('updateSupplier with a stale version returns 409 and never overwrites the newer edit', async () => {
+    const updated = supplier('Supplier A');
+    (prisma.suppliers.findFirst as any).mockResolvedValue(updated);
+    (prisma.suppliers.updateMany as any).mockResolvedValue({ count: 0 });
+
+    await expect(
+      SupplierService.updateSupplier(
+        updated.id,
+        { recognizedAt: '2026-06-02T00:00:00.000Z' },
+        1,
+        { scope: { deptIds: [], scopeType: 'ALL' }, user: { id: 1 } },
+      ),
+    ).rejects.toMatchObject({
+      code: 'OPTIMISTIC_LOCK_CONFLICT',
+      httpStatus: 409,
+    });
+    expect(prisma.suppliers.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('updateSupplier outside the data scope returns 404, never 409', async () => {
+    (prisma.suppliers.findFirst as any).mockResolvedValue(null);
+
+    await expect(
+      SupplierService.updateSupplier(
+        'supplier-b',
+        { recognizedAt: '2026-06-02T00:00:00.000Z' },
+        1,
+        { scope: { deptIds: [], scopeType: 'DEPT' }, user: { id: 1 } },
+      ),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      httpStatus: 404,
+    });
+    expect(prisma.suppliers.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('deleteSupplier keys the soft-delete by the client version and increments it', async () => {
+    const updated = supplier('Supplier A');
+    (prisma.suppliers.findFirst as any).mockResolvedValue(updated);
+    (prisma.suppliers.updateMany as any).mockResolvedValue({ count: 1 });
+
+    await SupplierService.deleteSupplier(updated.id, 2, {
+      scope: { deptIds: [], scopeType: 'ALL' },
+      user: { id: 1 },
+    });
+
+    expect(prisma.suppliers.updateMany).toHaveBeenCalledWith({
+      where: expect.objectContaining({ id: updated.id, version: 2 }),
+      data: expect.objectContaining({
+        isDeleted: true,
+        version: { increment: 1 },
+      }),
+    });
+  });
+
+  it('deleteSupplier with a stale version returns 409', async () => {
+    const updated = supplier('Supplier A');
+    (prisma.suppliers.findFirst as any).mockResolvedValue(updated);
+    (prisma.suppliers.updateMany as any).mockResolvedValue({ count: 0 });
+
+    await expect(
+      SupplierService.deleteSupplier(updated.id, 1, {
+        scope: { deptIds: [], scopeType: 'ALL' },
+        user: { id: 1 },
+      }),
+    ).rejects.toMatchObject({
+      code: 'OPTIMISTIC_LOCK_CONFLICT',
+      httpStatus: 409,
+    });
+    expect(prisma.suppliers.updateMany).toHaveBeenCalledTimes(1);
   });
 
   it('loads supplier history projects from inspection requests through inspection service', async () => {
@@ -951,6 +1033,105 @@ describe('supplierService admission fields', () => {
       source: 'PROCESS',
       total: 1,
     });
+  });
+
+  it('inherits the inspection data scope for supplier inspection history', async () => {
+    vi.mocked(SupplierIdentityService.teamIdsForSupplier).mockResolvedValue([]);
+    (prisma.suppliers.findFirst as any).mockResolvedValue({
+      category: 'Supplier',
+      id: 'supplier-1',
+      name: 'Supplier A',
+      outsourcingMode: null,
+    });
+    (InspectionService.findSupplierHistory as any).mockResolvedValue({
+      items: [],
+      total: 0,
+    });
+
+    await SupplierService.getInspectionHistory(
+      'supplier-1',
+      { page: 1, pageSize: 5 },
+      {
+        scope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        user: { id: 'user-a', username: 'alice' },
+      },
+    );
+
+    const supplierWhere = (prisma.suppliers.findFirst as any).mock.calls[0]?.[0]
+      ?.where;
+    expect(JSON.stringify(supplierWhere)).toContain('buyer');
+    expect(JSON.stringify(supplierWhere)).toContain('dept-a');
+
+    expect(InspectionService.findSupplierHistory).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataScope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        userContext: { userId: 'user-a', username: 'alice' },
+      }),
+    );
+  });
+
+  it('inherits the supplier data scope for supplier history projects', async () => {
+    (prisma.suppliers.findFirst as any).mockResolvedValue({
+      category: 'Supplier',
+      id: 'supplier-1',
+      outsourcingMode: null,
+    });
+    (InspectionService.getSupplierHistoryProjects as any).mockResolvedValue({
+      items: [{ workOrderNumber: 'WO-1', projectName: 'Project A' }],
+      total: 1,
+    });
+
+    await SupplierService.getHistoryProjects(
+      'supplier-1',
+      { page: 1, pageSize: 5 },
+      {
+        scope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        user: { id: 'user-a', username: 'alice' },
+      },
+    );
+
+    const supplierWhere = (prisma.suppliers.findFirst as any).mock.calls[0]?.[0]
+      ?.where;
+    expect(JSON.stringify(supplierWhere)).toContain('buyer');
+    expect(JSON.stringify(supplierWhere)).toContain('dept-a');
+
+    expect(InspectionService.getSupplierHistoryProjects).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataScope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        userContext: { userId: 'user-a', username: 'alice' },
+      }),
+    );
+  });
+
+  it('inherits the supplier data scope for supplier quality issues', async () => {
+    (prisma.suppliers.findFirst as any).mockResolvedValue({
+      id: 'supplier-1',
+    });
+    (InspectionService.findSupplierIssues as any).mockResolvedValue({
+      items: [{ id: 'issue-1' }],
+      total: 1,
+    });
+
+    await SupplierService.getQualityIssues(
+      'supplier-1',
+      { page: 1, pageSize: 5 },
+      {
+        scope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        user: { id: 'user-a', username: 'alice' },
+      },
+    );
+
+    const supplierWhere = (prisma.suppliers.findFirst as any).mock.calls[0]?.[0]
+      ?.where;
+    expect(JSON.stringify(supplierWhere)).toContain('buyer');
+    expect(JSON.stringify(supplierWhere)).toContain('dept-a');
+
+    expect(InspectionService.findSupplierIssues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dataScope: { scopeType: 'DEPT', deptIds: ['dept-a'] },
+        userContext: { userId: 'user-a', username: 'alice' },
+      }),
+    );
   });
 
   it('loads quality issues by canonical supplier ID', async () => {

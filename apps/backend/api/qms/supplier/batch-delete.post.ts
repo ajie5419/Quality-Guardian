@@ -27,8 +27,10 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, '请提供有效的 ID 列表');
     }
 
-    const result = await SupplierService.batchDeleteSuppliers(ids);
-
+    const result = await SupplierService.batchDeleteSuppliers(ids, {
+      scope: event.context.dataScope,
+      user: userinfo,
+    });
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
       action: 'DELETE',

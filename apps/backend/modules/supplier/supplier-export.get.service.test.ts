@@ -20,7 +20,7 @@ vi.mock('~/modules/supplier/supplier-query', () => ({
 
 vi.mock('~/modules/supplier/supplier.service', () => ({
   SupplierService: {
-    findAll: vi.fn(),
+    findAllForExport: vi.fn(),
   },
 }));
 
@@ -30,14 +30,21 @@ vi.mock('~/utils/api-logger', () => ({
   logApiWarn: vi.fn(),
 }));
 
+vi.mock('~/utils/current-user', () => ({
+  getCurrentUser: vi.fn(() => ({ id: 'user-1', username: 'buyer-a' })),
+}));
+
 vi.mock('~/utils/response', () => ({
   badRequestResponse: vi.fn(),
   internalServerErrorResponse: vi.fn(),
   useResponseSuccess: vi.fn(),
 }));
 
-function mockEvent(query: Record<string, unknown> = {}) {
-  return { query } as any;
+function mockEvent(
+  query: Record<string, unknown> = {},
+  dataScope?: { deptIds?: string[]; scopeType?: 'ALL' | 'DEPT' | 'SELF' },
+) {
+  return { context: { dataScope }, query } as any;
 }
 
 describe('supplierExportGetService', () => {
@@ -47,7 +54,7 @@ describe('supplierExportGetService', () => {
 
   it('should return items when total is within limit', async () => {
     (parseSupplierListQuery as any).mockReturnValue({ category: 'Supplier' });
-    (SupplierService.findAll as any).mockResolvedValue({
+    (SupplierService.findAllForExport as any).mockResolvedValue({
       items: [{ id: '1', name: 'S1' }],
       total: 5,
     });
@@ -64,8 +71,11 @@ describe('supplierExportGetService', () => {
 
   it('should return badRequestResponse when total exceeds MAX_EXPORT_ROWS', async () => {
     (parseSupplierListQuery as any).mockReturnValue({ category: 'Supplier' });
-    (SupplierService.findAll as any).mockResolvedValue({
-      items: [],
+    const overLimitItems = Array.from({ length: 20_001 }, (_, i) => ({
+      id: `supplier-${i}`,
+    }));
+    (SupplierService.findAllForExport as any).mockResolvedValue({
+      items: overLimitItems,
       total: 20_001,
     });
     (badRequestResponse as any).mockReturnValue({ code: 1, message: 'limit' });
@@ -76,32 +86,43 @@ describe('supplierExportGetService', () => {
     expect(badRequestResponse).toHaveBeenCalledWith(
       event,
       expect.stringContaining('导出数据量超过上限'),
+      expect.objectContaining({ maxRows: 20_000 }),
     );
     expect(result).toEqual({ code: 1, message: 'limit' });
     expect(logApiWarn).toHaveBeenCalled();
   });
 
-  it('should pass page=1 and pageSize=20001 to findAll', async () => {
+  it('should pass export filters and caller scope to findAllForExport', async () => {
     (parseSupplierListQuery as any).mockReturnValue({
       category: 'Supplier',
       keyword: 'test',
     });
-    (SupplierService.findAll as any).mockResolvedValue({ items: [], total: 0 });
+    (SupplierService.findAllForExport as any).mockResolvedValue({
+      items: [],
+      total: 0,
+    });
     (useResponseSuccess as any).mockReturnValue({ code: 0 });
 
-    await handler(mockEvent({ keyword: 'test' }));
+    await handler(
+      mockEvent(
+        { keyword: 'test' },
+        { deptIds: ['dept-a'], scopeType: 'DEPT' },
+      ),
+    );
 
-    expect(SupplierService.findAll).toHaveBeenCalledWith({
+    expect(SupplierService.findAllForExport).toHaveBeenCalledWith({
       category: 'Supplier',
+      dataScope: { deptIds: ['dept-a'], scopeType: 'DEPT' },
       keyword: 'test',
-      page: 1,
-      pageSize: 20_001,
+      userContext: { userId: 'user-1', username: 'buyer-a' },
     });
   });
 
   it('should return internalServerErrorResponse on error', async () => {
     (parseSupplierListQuery as any).mockReturnValue({});
-    (SupplierService.findAll as any).mockRejectedValue(new Error('db error'));
+    (SupplierService.findAllForExport as any).mockRejectedValue(
+      new Error('db error'),
+    );
     (internalServerErrorResponse as any).mockReturnValue({
       code: 1,
       message: 'error',
@@ -120,7 +141,7 @@ describe('supplierExportGetService', () => {
 
   it('should return empty items when result.items is undefined', async () => {
     (parseSupplierListQuery as any).mockReturnValue({});
-    (SupplierService.findAll as any).mockResolvedValue({});
+    (SupplierService.findAllForExport as any).mockResolvedValue({});
     (useResponseSuccess as any).mockReturnValue({ code: 0 });
 
     await handler(mockEvent());
@@ -133,7 +154,9 @@ describe('supplierExportGetService', () => {
 
   it('should return empty items when result.total is undefined', async () => {
     (parseSupplierListQuery as any).mockReturnValue({});
-    (SupplierService.findAll as any).mockResolvedValue({ items: [] });
+    (SupplierService.findAllForExport as any).mockResolvedValue({
+      items: [],
+    });
     (useResponseSuccess as any).mockReturnValue({ code: 0 });
 
     await handler(mockEvent());

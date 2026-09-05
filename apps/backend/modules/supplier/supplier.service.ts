@@ -9,6 +9,7 @@ import {
   normalizeOutsourcingMode,
   resolveSupplierInspectionPolicy,
 } from '~/modules/supplier/supplier-query';
+import { EXPORT_QUERY_TAKE } from '~/utils/export-constants';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr } from '~/utils/query-helpers';
 
@@ -164,6 +165,68 @@ async function buildSupplierGlobalStats(
   };
 }
 
+async function buildSupplierScopedWhere(params: {
+  category?: string;
+  dataScope?: ResolvedDataScope;
+  keyword?: string;
+  outsourcingMode?: string;
+  status?: string;
+  userContext?: { userId: string; username?: string };
+}): Promise<SupplierWhereInput> {
+  const { category, status, keyword, outsourcingMode } = params;
+  const where: SupplierWhereInput = { isDeleted: false };
+  if (category) {
+    const cat = category.toLowerCase();
+    if (cat === 'supplier' || cat === 'productionunit') {
+      where.NOT = { category: { contains: 'Outsourcing' } };
+    } else if (cat === 'outsourcing') {
+      where.category = { contains: 'Outsourcing' };
+    } else {
+      where.category = { contains: category };
+    }
+  }
+  if (status) where.status = status;
+  const keywordOr = buildKeywordOr(keyword, [
+    'name',
+    'contact',
+    'email',
+    'phone',
+  ] as const);
+  if (keywordOr) Object.assign(where, keywordOr);
+  const normalizedOutsourcingMode = normalizeOutsourcingMode(
+    outsourcingMode,
+    category,
+  );
+  if (normalizedOutsourcingMode && outsourcingMode) {
+    if (normalizedOutsourcingMode === DEFAULT_OUTSOURCING_MODE) {
+      where.AND = [
+        ...((Array.isArray(where.AND)
+          ? where.AND
+          : []) as SupplierWhereInput[]),
+        {
+          OR: [
+            { outsourcingMode: normalizedOutsourcingMode },
+            { outsourcingMode: null },
+          ],
+        },
+      ];
+    } else {
+      where.outsourcingMode = normalizedOutsourcingMode;
+    }
+  }
+
+  return params.userContext?.userId
+    ? DataScopeService.buildSupplierWhere(
+        where,
+        {
+          userId: params.userContext.userId,
+          username: params.userContext.username,
+        },
+        params.dataScope,
+      )
+    : where;
+}
+
 export const SupplierService = {
   async listActiveOptions(options: { category: string; keyword?: string }) {
     const keyword = String(options.keyword || '').trim();
@@ -204,73 +267,13 @@ export const SupplierService = {
    * Find all suppliers with advanced filtering, scoring, and aggregation
    */
   async findAll(params: SupplierQueryParams) {
-    const {
-      page = 1,
-      pageSize = 20,
-      category,
-      status,
-      keyword,
-      sortBy,
-      sortOrder,
-      outsourcingMode,
-    } = params;
+    const { page = 1, pageSize = 20, sortBy, sortOrder } = params;
 
     const safePage = Math.max(Number(page) || 1, 1);
     const safePageSize = Math.min(Math.max(Number(pageSize) || 20, 1), 100);
     const skip = (safePage - 1) * safePageSize;
 
-    // 1. 构造极其稳健的过滤条件
-    const where: SupplierWhereInput = { isDeleted: false };
-    if (category) {
-      const cat = category.toLowerCase();
-      if (cat === 'supplier' || cat === 'productionunit') {
-        where.NOT = { category: { contains: 'Outsourcing' } };
-      } else if (cat === 'outsourcing') {
-        where.category = { contains: 'Outsourcing' };
-      } else {
-        where.category = { contains: category };
-      }
-    }
-    if (status) where.status = status;
-    const keywordOr = buildKeywordOr(keyword, [
-      'name',
-      'contact',
-      'email',
-      'phone',
-    ] as const);
-    if (keywordOr) Object.assign(where, keywordOr);
-    const normalizedOutsourcingMode = normalizeOutsourcingMode(
-      outsourcingMode,
-      category,
-    );
-    if (normalizedOutsourcingMode && outsourcingMode) {
-      if (normalizedOutsourcingMode === DEFAULT_OUTSOURCING_MODE) {
-        where.AND = [
-          ...((Array.isArray(where.AND)
-            ? where.AND
-            : []) as SupplierWhereInput[]),
-          {
-            OR: [
-              { outsourcingMode: normalizedOutsourcingMode },
-              { outsourcingMode: null },
-            ],
-          },
-        ];
-      } else {
-        where.outsourcingMode = normalizedOutsourcingMode;
-      }
-    }
-
-    const scopedWhere = params.userContext?.userId
-      ? await DataScopeService.buildSupplierWhere(
-          where,
-          {
-            userId: params.userContext.userId,
-            username: params.userContext.username,
-          },
-          params.dataScope,
-        )
-      : where;
+    const scopedWhere = await buildSupplierScopedWhere(params);
 
     // 2. 执行核心查询
     const [rawItems, totalCount] = await Promise.all([
@@ -293,17 +296,59 @@ export const SupplierService = {
     };
   },
 
+  /**
+   * Bounded export read (PERF-QMS-001 / PHASE-1A): same filters and DataScope
+   * as the interactive list but reads at most EXPORT_QUERY_TAKE rows and never
+   * goes through the interactive page-size cap (100).
+   */
+  async findAllForExport(
+    params: Omit<SupplierQueryParams, 'page' | 'pageSize'>,
+  ) {
+    const { sortBy, sortOrder } = params;
+    const scopedWhere = await buildSupplierScopedWhere(params);
+    const [rawItems, totalCount] = await Promise.all([
+      prisma.suppliers.findMany({
+        where: scopedWhere,
+        include: { scoreSnapshot: true },
+        orderBy: buildSupplierOrderBy(sortBy, sortOrder),
+        take: EXPORT_QUERY_TAKE,
+      }),
+      prisma.suppliers.count({ where: scopedWhere }),
+    ]);
+    return {
+      items: rawItems.map((item) => mapSupplierListItem(item)),
+      total: totalCount,
+    };
+  },
+
   async getHistoryProjects(
     id: string,
     params: { page?: number; pageSize?: number } = {},
+    access?: {
+      scope?: { deptIds?: string[]; scopeType?: 'ALL' | 'DEPT' | 'SELF' };
+      user?: { id?: number | string; username?: string };
+    },
   ) {
+    const userContext = access?.user
+      ? {
+          userId: String(access.user.id ?? ''),
+          username: access.user.username,
+        }
+      : undefined;
+    const supplierWhere = userContext?.userId
+      ? await DataScopeService.buildSupplierWhere(
+          { id, isDeleted: false },
+          userContext,
+          access?.scope,
+        )
+      : { id, isDeleted: false };
     const supplier = await prisma.suppliers.findFirst({
       select: {
         category: true,
         id: true,
         outsourcingMode: true,
       },
-      where: { id, isDeleted: false },
+      where: supplierWhere,
     });
     if (!supplier) return null;
 
@@ -313,18 +358,37 @@ export const SupplierService = {
         ? await SupplierIdentityService.teamIdsForSupplier(supplier.id)
         : [];
     return InspectionService.getSupplierHistoryProjects({
+      dataScope: access?.scope,
       identitySource: policy.identitySource,
       page: params.page,
       pageSize: params.pageSize,
       supplierId: supplier.id,
       teamIds,
+      userContext,
     });
   },
 
   async getInspectionHistory(
     id: string,
     params: { page?: number; pageSize?: number } = {},
+    access?: {
+      scope?: { deptIds?: string[]; scopeType?: 'ALL' | 'DEPT' | 'SELF' };
+      user?: { id?: number | string; username?: string };
+    },
   ) {
+    const userContext = access?.user
+      ? {
+          userId: String(access.user.id ?? ''),
+          username: access.user.username,
+        }
+      : undefined;
+    const supplierWhere = userContext?.userId
+      ? await DataScopeService.buildSupplierWhere(
+          { id, isDeleted: false },
+          userContext,
+          access?.scope,
+        )
+      : { id, isDeleted: false };
     const supplier = await prisma.suppliers.findFirst({
       select: {
         category: true,
@@ -332,7 +396,7 @@ export const SupplierService = {
         name: true,
         outsourcingMode: true,
       },
-      where: { id, isDeleted: false },
+      where: supplierWhere,
     });
     if (!supplier) return null;
 
@@ -343,11 +407,13 @@ export const SupplierService = {
         : [];
     const history = await InspectionService.findSupplierHistory({
       category: policy.inspectionCategory,
+      dataScope: access?.scope,
       identitySource: policy.identitySource,
       page: params.page,
       pageSize: params.pageSize,
       supplierId: supplier.id,
       teamIds,
+      userContext,
     });
     return {
       ...history,
@@ -358,17 +424,36 @@ export const SupplierService = {
   async getQualityIssues(
     id: string,
     params: { page?: number; pageSize?: number } = {},
+    access?: {
+      scope?: { deptIds?: string[]; scopeType?: 'ALL' | 'DEPT' | 'SELF' };
+      user?: { id?: number | string; username?: string };
+    },
   ) {
+    const userContext = access?.user
+      ? {
+          userId: String(access.user.id ?? ''),
+          username: access.user.username,
+        }
+      : undefined;
+    const supplierWhere = userContext?.userId
+      ? await DataScopeService.buildSupplierWhere(
+          { id, isDeleted: false },
+          userContext,
+          access?.scope,
+        )
+      : { id, isDeleted: false };
     const supplier = await prisma.suppliers.findFirst({
       select: { id: true },
-      where: { id, isDeleted: false },
+      where: supplierWhere,
     });
     if (!supplier) return null;
 
     return InspectionService.findSupplierIssues({
+      dataScope: access?.scope,
       page: params.page,
       pageSize: params.pageSize,
       supplierId: supplier.id,
+      userContext,
     });
   },
 };

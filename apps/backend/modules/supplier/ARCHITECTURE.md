@@ -72,3 +72,9 @@
 - 检验、不合格项、售后、供应商档案和 TEAM 映射变更只用 ID 驱动持久化刷新任务；任务具有租约抢占、失败重试和发布清零门禁，不再存在 `EventEmitter` 或按名称刷新入口。
 - after-sales 和 supervision 在线供应商写入已要求 ID；名称解析只允许存在于审核过的 import/backfill 入口。
 - 本 wave 不代表部门、项目、工序等其他主数据已完成全项目 `ID_ONLY`；未解析审计和 TEAM 映射管理也尚无前端处置界面。
+
+## 乐观锁契约（OPTIMISTIC-LOCK-001）
+
+- `suppliers.version`（`Int @default(1)`）是交互式编辑的乐观锁令牌：列表响应携带 `version`，编辑（PUT）与删除（DELETE）必须提交客户端读取到的 `version`，缺失或非法 → 400。
+- `SupplierMutationService.update/delete` 通过 `updateAccessibleVersioned` 原子执行（`where: { id, version: expectedVersion, ...scopeWhere }` + `version: { increment: 1 }`）；count=0 时只读 scoped 复查，不存在/无权限 → 404，版本过期 → 409 `OPTIMISTIC_LOCK_CONFLICT`。
+- create / restore / import / batchUpsert 属于 PRODUCT_DECISION 系统或批量路径，不要求用户逐行提交 `version`；不得把用户型编辑路径退化回 `updateAccessible` 无版本写。
