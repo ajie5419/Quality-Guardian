@@ -272,19 +272,22 @@ export const SupervisionReportService = {
       // Uses the shared helper so both code paths stay consistent.
       await syncSupervisionProjectProgress(projectId, tx);
       // Update location/stage from the report payload separately.
-      const projectUpdate = await tx.supervision_projects.updateMany({
-        data: {
-          location: normalizeText(payload.location) || undefined,
-          stage: normalizeText(payload.completedMilestone) || undefined,
-        },
-        where: {
-          id: projectId,
-          isDeleted: false,
-          ...buildSupervisionAccessWhere('project', context),
-        },
-      });
-      if (projectUpdate.count !== 1) {
-        throwSupervisionConflict('监造项目状态已变化，请刷新后重试');
+      const location = normalizeText(payload.location);
+      const stage = normalizeText(payload.completedMilestone);
+      // Quick progress reports have no metadata patch. Prisma returns zero
+      // for an empty update, which is not evidence of a concurrent change.
+      if (location || stage) {
+        const projectUpdate = await tx.supervision_projects.updateMany({
+          data: { location: location || undefined, stage: stage || undefined },
+          where: {
+            id: projectId,
+            isDeleted: false,
+            ...buildSupervisionAccessWhere('project', context),
+          },
+        });
+        if (projectUpdate.count !== 1) {
+          throwSupervisionConflict('监造项目状态已变化，请刷新后重试');
+        }
       }
 
       return tx.supervision_daily_reports.findUniqueOrThrow({

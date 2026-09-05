@@ -94,6 +94,42 @@ describe('supervisionReportService', () => {
     vi.clearAllMocks();
   });
 
+  it('accepts quick progress reports without a project metadata update', async () => {
+    const tx = {
+      supervision_daily_reports: {
+        create: vi.fn().mockResolvedValue({ id: 'report-1' }),
+        findUniqueOrThrow: vi.fn().mockResolvedValue(reportRow()),
+      },
+      supervision_plan_tasks: {
+        findFirst: vi.fn().mockResolvedValue(taskRow()),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      supervision_projects: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      supervision_report_task_updates: { create: vi.fn() },
+    };
+    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
+
+    await expect(
+      SupervisionReportService.createReport(
+        {
+          projectId: 'project-1',
+          reportDate: '2026-01-02',
+          workContent: 'Progress only',
+          taskUpdates: [{ taskId: 'task-1', dailyQuantity: 1 }],
+        },
+        context,
+      ),
+    ).resolves.toMatchObject({ id: 'report-1' });
+    expect(tx.supervision_projects.updateMany).not.toHaveBeenCalled();
+    expect(tx.supervision_plan_tasks.updateMany).toHaveBeenCalled();
+    expect(syncSupervisionProjectProgress).toHaveBeenCalledWith(
+      'project-1',
+      tx,
+    );
+  });
+
   it('creates report, summarizes task fields, updates task quantities, and syncs project progress', async () => {
     const tx = {
       supervision_daily_reports: {

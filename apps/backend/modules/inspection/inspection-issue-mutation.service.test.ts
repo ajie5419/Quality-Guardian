@@ -412,6 +412,50 @@ describe('inspectionIssueMutationService', () => {
       });
     });
 
+    it('uses a scoped single-row write for nested relation updates', async () => {
+      const { buildInspectionIssueUpdateData } = await import(
+        './inspection-issue'
+      );
+      const relationData = {
+        defectSubcategory: { connect: { id: 'subcategory-1' } },
+        work_orders: { connect: { workOrderNumber: 'WO-1' } },
+      };
+      vi.mocked(buildInspectionIssueUpdateData).mockResolvedValueOnce(
+        relationData,
+      );
+      await InspectionIssueMutationService.updateIssue(
+        { id: 'user-1', username: 'admin', roles: [] } as any,
+        'rec-1',
+        {},
+        null,
+      );
+      expect(prisma.quality_records.updateMany).not.toHaveBeenCalled();
+      expect(prisma.quality_records.update).toHaveBeenCalledWith({
+        where: {
+          id: 'rec-1',
+          AND: { id: 'rec-1', isDeleted: false, createdBy: 'user-1' },
+        },
+        data: { ...relationData, responsibleWelderId: null },
+      });
+    });
+
+    it('does not enqueue derived writes when the scoped update no longer matches', async () => {
+      const { QualityLossIndexQueue } = await import('~/modules/quality-loss');
+      const missing = Object.assign(new Error('Record not found'), {
+        code: 'P2025',
+      });
+      vi.mocked(prisma.quality_records.update).mockRejectedValueOnce(missing);
+      await expect(
+        InspectionIssueMutationService.updateIssue(
+          { id: 'user-1', username: 'admin', roles: [] } as any,
+          'rec-1',
+          {},
+          null,
+        ),
+      ).rejects.toBe(missing);
+      expect(QualityLossIndexQueue.enqueue).not.toHaveBeenCalled();
+    });
+
     it('should update the quality record', async () => {
       const { SystemLogService } = await import(
         '~/modules/system-log/system-log.service'
@@ -427,9 +471,8 @@ describe('inspectionIssueMutationService', () => {
 
       expect(prisma.quality_records.update).toHaveBeenCalledWith({
         where: {
-          createdBy: 'user-1',
           id: 'rec-1',
-          isDeleted: false,
+          AND: { createdBy: 'user-1', id: 'rec-1', isDeleted: false },
         },
         data: { partName: 'Updated', responsibleWelderId: null },
       });
@@ -699,7 +742,7 @@ describe('inspectionIssueMutationService', () => {
         },
       });
       expect(prisma.quality_records.update).toHaveBeenCalledWith({
-        where: { id: 'rec-other', isDeleted: false },
+        where: { id: 'rec-other', AND: { id: 'rec-other', isDeleted: false } },
         data: { partName: 'Updated', responsibleWelderId: null },
       });
     });

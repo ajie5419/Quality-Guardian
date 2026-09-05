@@ -1624,7 +1624,7 @@ onMounted(async () => {
                 :project-id="selectedPlanProjectId"
                 :reporter="selectedPlanProject?.supervisor || ''"
                 :tasks="planTasks"
-                @refresh="loadPlanTasks(selectedPlanProjectId)"
+                @refresh="refreshAll"
               />
             </div>
           </template>

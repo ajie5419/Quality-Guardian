@@ -8,7 +8,7 @@ interface RequestOptions {
 interface ApiResponse<T = unknown> {
   code: number;
   data: T;
-  error: null | string;
+  error: null | string | { code?: string };
   message: string;
 }
 

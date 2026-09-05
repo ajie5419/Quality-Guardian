@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   getInspectionRequestResponsibilityOptions,
   getPartOptions,
+  submitInspectionRequest,
 } from './inspection';
 
 const { requestMock } = vi.hoisted(() => ({
@@ -16,6 +17,16 @@ vi.mock('./request', () => ({
 describe('inspection material option api', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('sends the operation key to the authenticated create endpoint', async () => {
+    await submitInspectionRequest({ workOrderNumber: 'WO-1' }, 'operation-001');
+    expect(requestMock).toHaveBeenCalledWith({
+      data: { workOrderNumber: 'WO-1' },
+      header: { 'Idempotency-Key': 'operation-001' },
+      method: 'POST',
+      url: '/api/qms/inspection/requests/v2',
+    });
   });
 
   it('searches active canonical materials through the public endpoint', async () => {

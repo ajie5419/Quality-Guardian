@@ -13,7 +13,6 @@ import {
   getPartOptions,
   getProcesses,
   searchWorkOrders,
-  submitInspectionRequest,
 } from '@/api/inspection';
 import { buildResourceUrl, uploadFile } from '@/api/request';
 import { useUserStore } from '@/stores/user';
@@ -30,6 +29,7 @@ import {
   isCurrentResponsibilityOptionsRequest,
   isRequestCreateExternalResponsibility,
 } from './create-responsibility';
+import { createRequestSubmission } from './create-submission';
 
 interface WorkOrderItem {
   workOrderNumber: string;
@@ -82,6 +82,7 @@ interface FormState {
 
 const CHECK_RESULT_OPTIONS = ['PASS', 'FAIL', 'NA'];
 const userStore = useUserStore();
+const submitRequest = createRequestSubmission();
 
 const form = reactive<FormState>({
   category: '',
@@ -567,7 +568,7 @@ async function handleSubmit() {
       payload.mutualCheckResult = form.mutualCheckResult;
     if (form.requestInfo.trim()) payload.requestInfo = form.requestInfo.trim();
 
-    const res = await submitInspectionRequest(payload);
+    const res = await submitRequest(payload);
     if (res.code !== 0) throw new Error(res.message || '提交失败');
     uni.showToast({ title: '报检提交成功', icon: 'success', duration: 2000 });
     setTimeout(() => {
