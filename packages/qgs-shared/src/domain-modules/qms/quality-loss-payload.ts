@@ -14,7 +14,10 @@ function createQualityLossIdSuffix(size = QUALITY_LOSS_ID_SIZE) {
   return output;
 }
 
-function parseQualityLossNumber(value: unknown, fallback: number): number {
+export function parseQualityLossNumber(
+  value: unknown,
+  fallback: number,
+): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) {
     return fallback;
@@ -22,7 +25,7 @@ function parseQualityLossNumber(value: unknown, fallback: number): number {
   return parsed;
 }
 
-function parseQualityLossDate(value: unknown): Date {
+export function parseQualityLossDate(value: unknown): Date {
   if (!value) {
     return new Date();
   }

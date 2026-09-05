@@ -10,12 +10,15 @@
  *   FORBIDDEN     → permission denied (403)
  *   UNAUTHORIZED  → expired / missing session → redirect to login
  *   CONFLICT      → state conflict / concurrent write → refresh and retry
+ *   OPTIMISTIC_LOCK_CONFLICT → version mismatch on an interactive edit →
+ *                              refresh and retry (409)
  *   IDEMPOTENCY_KEY_REUSED → same Idempotency-Key sent with a different
  *                            request fingerprint → refresh and retry (409)
  *   IDEMPOTENCY_REQUEST_IN_PROGRESS → duplicate Idempotency-Key still being
  *                                     processed (409)
  *   BAD_REQUEST   → malformed request
  *   DUPLICATE     → duplicate entity / unique violation (409)
+ *   EXPORT_LIMIT_EXCEEDED → export row limit exceeded; narrow filters (400)
  *   BUSINESS      → generic business failure → warning toast
  *   INTERNAL      → unexpected internal failure → error toast + log
  *
@@ -28,10 +31,12 @@ export const ErrorCode = {
   FORBIDDEN: 'FORBIDDEN',
   UNAUTHORIZED: 'UNAUTHORIZED',
   CONFLICT: 'CONFLICT',
+  OPTIMISTIC_LOCK_CONFLICT: 'OPTIMISTIC_LOCK_CONFLICT',
   IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
   IDEMPOTENCY_REQUEST_IN_PROGRESS: 'IDEMPOTENCY_REQUEST_IN_PROGRESS',
   BAD_REQUEST: 'BAD_REQUEST',
   DUPLICATE: 'DUPLICATE',
+  EXPORT_LIMIT_EXCEEDED: 'EXPORT_LIMIT_EXCEEDED',
   BUSINESS: 'BUSINESS',
   INTERNAL: 'INTERNAL',
 } as const;
@@ -45,10 +50,12 @@ export const ERROR_UX_LEVEL = {
   FORBIDDEN: 'error',
   UNAUTHORIZED: 'error',
   CONFLICT: 'warning',
+  OPTIMISTIC_LOCK_CONFLICT: 'warning',
   IDEMPOTENCY_KEY_REUSED: 'warning',
   IDEMPOTENCY_REQUEST_IN_PROGRESS: 'warning',
   BAD_REQUEST: 'error',
   DUPLICATE: 'warning',
+  EXPORT_LIMIT_EXCEEDED: 'error',
   BUSINESS: 'warning',
   INTERNAL: 'error',
 } as const satisfies Record<ErrorCodeValue, 'error' | 'warning'>;
