@@ -2598,6 +2598,33 @@ model cron_jobs {
   @@index([enabled, isDeleted])
 }
 
+// @module idempotency
+model idempotency_requests {
+  id                 String                     @id @default(cuid())
+  // Request-level idempotency (IDEMPOTENCY-KEY-001). actorKey+operationKey+
+  // idempotencyKey is the claim identity: the same user sending the same
+  // client key for the same operation may only create one business entity.
+  // The key row and the business write live in the same transaction, so a
+  // failed business transaction rolls the claim back and the key is reusable.
+  actorKey           String
+  operationKey       String
+  idempotencyKey     String
+  requestFingerprint String
+  status             idempotency_request_status @default(PROCESSING)
+  responseStatus     Int?
+  resourceType       String?
+  resourceId         String?
+  responseBody       Json?
+  createdAt          DateTime                   @default(now())
+  expiresAt          DateTime
+  completedAt        DateTime?
+  updatedAt          DateTime                   @updatedAt
+
+  @@unique([actorKey, operationKey, idempotencyKey])
+  @@index([expiresAt])
+  @@index([actorKey, operationKey, status])
+}
+
 enum users_status {
   ACTIVE
   INACTIVE
@@ -2635,4 +2662,9 @@ enum inspection_request_status {
   INSPECTING
   CLOSED
   CANCELLED
+}
+
+enum idempotency_request_status {
+  PROCESSING
+  COMPLETED
 }
