@@ -2,27 +2,36 @@ import { z } from 'zod';
 import { parseSupplierListQuery } from '~/modules/supplier/supplier-query';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
+import {
+  EXPORT_LIMIT_EXCEEDED_MESSAGE,
+  exportLimitExceededError,
+  isExportLimitExceeded,
+} from '~/utils/export-constants';
 import {
   badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
-const MAX_EXPORT_ROWS = 20_000;
 const querySchema = z.object({}).passthrough();
 
 export default defineValidatedHandler(querySchema, async (event, query) => {
   const startedAt = Date.now();
   try {
+    const userinfo = getCurrentUser(event);
     const params = parseSupplierListQuery(query);
-    const result = await SupplierService.findAll({
+    const result = await SupplierService.findAllForExport({
       ...params,
-      page: 1,
-      pageSize: MAX_EXPORT_ROWS + 1,
+      dataScope: event.context.dataScope,
+      userContext: {
+        userId: String(userinfo.id ?? userinfo.userId ?? ''),
+        username: userinfo.username,
+      },
     });
 
-    if ((result.total || 0) > MAX_EXPORT_ROWS) {
+    if (isExportLimitExceeded(result.items)) {
       logApiWarn('supplier-export', 'export rows exceed limit', {
         count: result.total,
         filters: params,
@@ -31,7 +40,8 @@ export default defineValidatedHandler(querySchema, async (event, query) => {
       });
       return badRequestResponse(
         event,
-        `导出数据量超过上限（${MAX_EXPORT_ROWS} 条），请缩小筛选范围后重试`,
+        EXPORT_LIMIT_EXCEEDED_MESSAGE,
+        exportLimitExceededError(),
       );
     }
 

@@ -1,3 +1,9 @@
+import type { AccessScope } from '~/modules/data-scope';
+
+import {
+  assertVersionedWriteAffected,
+  createScopedRepository,
+} from '~/modules/data-scope';
 import { FileStorageService } from '~/modules/file-storage';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import {
@@ -5,6 +11,7 @@ import {
   buildSupplierUpsertPayload,
   normalizeSupplierString,
 } from '~/modules/supplier/supplier-query';
+import { BusinessError } from '~/utils/business-error';
 import { buildGovernedCanonicalWritePairForTable } from '~/utils/governed-write';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
@@ -70,48 +77,142 @@ export const SupplierMutationService = {
     return outcome;
   },
 
-  async update(id: string, payload: SupplierAdmissionPayload) {
+  async update(
+    id: string,
+    payload: SupplierAdmissionPayload,
+    expectedVersion: number,
+    access?: {
+      scope?: AccessScope;
+      user?: { id?: number | string; username?: string };
+    },
+  ) {
     const updateData = await buildSupplierUpdateDataWithCanonical(payload);
     const updated = await prisma.$transaction(async (tx) => {
-      const updated = await tx.suppliers.update({
-        where: { id },
-        data: updateData,
-      });
+      const txRepo = createScopedRepository('supplier', tx.suppliers);
+      const ctx = {
+        user: {
+          id: access?.user?.id ?? '',
+          username: access?.user?.username,
+        },
+        scope: access?.scope,
+      };
+      const current = await txRepo.findAccessible(
+        {
+          where: { id, isDeleted: false },
+          select: { id: true, name: true },
+        },
+        ctx,
+      );
+      if (!current) {
+        throw new BusinessError('NOT_FOUND', '供应商不存在', 404);
+      }
+      const result = await txRepo.updateAccessibleVersioned(
+        { where: { id }, data: updateData },
+        ctx,
+        expectedVersion,
+      );
+      if (result.count === 0) {
+        const exists = await txRepo.findAccessible(
+          { where: { id, isDeleted: false }, select: { id: true } },
+          ctx,
+        );
+        assertVersionedWriteAffected(result.count, Boolean(exists), '供应商');
+      }
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
-        [updated.id],
+        [id],
         'supplier.updated',
       );
-      return updated;
+      return { ...current, version: expectedVersion + 1 };
     });
     await registerAdmissionDocuments(updated.id, payload);
     return updated;
   },
 
-  async delete(id: string) {
+  async delete(
+    id: string,
+    expectedVersion: number,
+    access?: {
+      scope?: AccessScope;
+      user?: { id?: number | string; username?: string };
+    },
+  ) {
     return prisma.$transaction(async (tx) => {
-      const deleted = await tx.suppliers.update({
-        where: { id },
-        data: { isDeleted: true, updatedAt: new Date() },
-      });
+      const txRepo = createScopedRepository('supplier', tx.suppliers);
+      const ctx = {
+        user: {
+          id: access?.user?.id ?? '',
+          username: access?.user?.username,
+        },
+        scope: access?.scope,
+      };
+      const current = await txRepo.findAccessible(
+        {
+          where: { id, isDeleted: false },
+          select: { id: true, name: true },
+        },
+        ctx,
+      );
+      if (!current) {
+        throw new BusinessError('NOT_FOUND', '供应商不存在', 404);
+      }
+      const result = await txRepo.updateAccessibleVersioned(
+        {
+          where: { id },
+          data: { isDeleted: true, updatedAt: new Date() },
+        },
+        ctx,
+        expectedVersion,
+      );
+      if (result.count === 0) {
+        const exists = await txRepo.findAccessible(
+          { where: { id, isDeleted: false }, select: { id: true } },
+          ctx,
+        );
+        assertVersionedWriteAffected(result.count, Boolean(exists), '供应商');
+      }
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
         [id],
         'supplier.deleted',
       );
-      return deleted;
+      return current;
     });
   },
 
-  async batchDelete(ids: string[]) {
+  async batchDelete(
+    ids: string[],
+    access?: {
+      scope?: AccessScope;
+      user?: { id?: number | string; username?: string };
+    },
+  ) {
     return prisma.$transaction(async (tx) => {
-      const result = await tx.suppliers.updateMany({
-        where: { id: { in: ids } },
-        data: { isDeleted: true, updatedAt: new Date() },
-      });
+      const txRepo = createScopedRepository('supplier', tx.suppliers);
+      const ctx = {
+        user: {
+          id: access?.user?.id ?? '',
+          username: access?.user?.username,
+        },
+        scope: access?.scope,
+      };
+      const existing = await txRepo.findManyAccessible(
+        {
+          where: { id: { in: ids }, isDeleted: false },
+          select: { id: true },
+        },
+        ctx,
+      );
+      const result = await txRepo.updateAccessible(
+        {
+          where: { id: { in: ids } },
+          data: { isDeleted: true, updatedAt: new Date() },
+        },
+        ctx,
+      );
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
-        ids,
+        existing.map((item) => item.id),
         'supplier.batch-deleted',
       );
       return result;

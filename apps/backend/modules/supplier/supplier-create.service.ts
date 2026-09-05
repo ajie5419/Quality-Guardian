@@ -56,6 +56,9 @@ async function restoreDeletedSupplier(
   if (!existing) throw originalError;
   if (!existing.isDeleted) throw supplierNameConflict();
 
+  // qms-arch-allow R-SCOPE: create-restore of a soft-deleted supplier; the id
+  // comes from a server-side name lookup and the create endpoint is RBAC-gated
+  // (PRODUCT_DECISION: restore-on-create semantics).
   const restored = await client.suppliers.updateMany({
     where: { id: existing.id, isDeleted: true, name },
     data: {

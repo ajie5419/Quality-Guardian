@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { SupplierService } from '~/modules/supplier/supplier.service';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
+import { requireExpectedVersionBody } from '~/utils/optimistic-lock';
 import {
   isPrismaNotFoundError,
   isPrismaUniqueConstraintError,
@@ -26,7 +28,18 @@ export default defineEventHandler(async (event) => {
 
   try {
     const body = updateSupplierBodySchema.parse(await readBody(event));
-    const updated = await SupplierService.updateSupplier(id, body);
+    // OPTIMISTIC-LOCK-001: interactive supplier edits carry the version the
+    // client read; a missing version would silently degrade to LWW.
+    const expectedVersion = requireExpectedVersionBody(body);
+    const updated = await SupplierService.updateSupplier(
+      id,
+      body,
+      expectedVersion,
+      {
+        scope: event.context.dataScope,
+        user: userinfo,
+      },
+    );
 
     await recordBusinessAuditLog(event, {
       userId: userinfo.id,
@@ -34,12 +47,13 @@ export default defineEventHandler(async (event) => {
       targetType: 'supplier',
       targetId: String(id),
       detailsTemplate: '修改供应商/外协单位: {{name}}',
-      detailsVariables: { name: updated.name },
+      detailsVariables: { name: updated.name, version: expectedVersion + 1 },
     });
 
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('supplier', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '供应商不存在');
     }

@@ -19,6 +19,7 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 vi.mock('h3', () => ({
   defineEventHandler: (fn: any) => fn,
   readBody: vi.fn(),
+  setResponseStatus: vi.fn(),
 }));
 
 vi.mock('~/modules/supplier/supplier.service', () => ({
@@ -48,6 +49,10 @@ vi.mock('~/utils/response', () => ({
   conflictResponse: vi.fn(),
   internalServerErrorResponse: vi.fn(),
   notFoundResponse: vi.fn(),
+  useResponseError: vi.fn((message: string) => ({
+    error: true,
+    message,
+  })),
   useResponseSuccess: vi.fn(),
 }));
 
@@ -70,33 +75,40 @@ describe('supplierIdPutService', () => {
 
   it('should update supplier successfully', async () => {
     (getRequiredRouterParam as any).mockReturnValue('supplier-1');
-    (readBody as any).mockResolvedValue({ name: 'Updated' });
+    (readBody as any).mockResolvedValue({ name: 'Updated', version: 1 });
     (SupplierService.updateSupplier as any).mockResolvedValue({
       id: 'supplier-1',
       name: 'Updated',
+      version: 2,
     });
     (useResponseSuccess as any).mockReturnValue({ code: 0 });
 
     const event = mockEvent();
     const _result = await handler(event);
 
-    expect(SupplierService.updateSupplier).toHaveBeenCalledWith('supplier-1', {
-      name: 'Updated',
-    });
+    expect(SupplierService.updateSupplier).toHaveBeenCalledWith(
+      'supplier-1',
+      expect.objectContaining({ name: 'Updated', version: 1 }),
+      1,
+      {
+        scope: undefined,
+        user: { id: 'user-1', username: 'admin' },
+      },
+    );
     expect(recordBusinessAuditLog).toHaveBeenCalledWith(event, {
       userId: 'user-1',
       action: 'UPDATE',
       targetType: 'supplier',
       targetId: 'supplier-1',
       detailsTemplate: '修改供应商/外协单位: {{name}}',
-      detailsVariables: { name: 'Updated' },
+      detailsVariables: { name: 'Updated', version: 2 },
     });
     expect(useResponseSuccess).toHaveBeenCalledWith(null);
   });
 
   it('should return notFoundResponse when supplier not found', async () => {
     (getRequiredRouterParam as any).mockReturnValue('missing');
-    (readBody as any).mockResolvedValue({});
+    (readBody as any).mockResolvedValue({ version: 1 });
     (SupplierService.updateSupplier as any).mockRejectedValue(
       new Error('not found'),
     );
@@ -112,7 +124,7 @@ describe('supplierIdPutService', () => {
 
   it('should return conflictResponse on unique constraint error', async () => {
     (getRequiredRouterParam as any).mockReturnValue('supplier-1');
-    (readBody as any).mockResolvedValue({ name: 'Duplicate' });
+    (readBody as any).mockResolvedValue({ name: 'Duplicate', version: 1 });
     (SupplierService.updateSupplier as any).mockRejectedValue(
       new Error('duplicate'),
     );
@@ -129,7 +141,7 @@ describe('supplierIdPutService', () => {
 
   it('should return internalServerErrorResponse on unknown error', async () => {
     (getRequiredRouterParam as any).mockReturnValue('supplier-1');
-    (readBody as any).mockResolvedValue({});
+    (readBody as any).mockResolvedValue({ version: 1 });
     (SupplierService.updateSupplier as any).mockRejectedValue(
       new Error('unknown error'),
     );
@@ -152,6 +164,19 @@ describe('supplierIdPutService', () => {
     const result = await handler(mockEvent());
 
     expect(result).toEqual({ message: 'error' });
+    expect(SupplierService.updateSupplier).not.toHaveBeenCalled();
+  });
+
+  it('rejects an edit without a version (400) and never calls the service', async () => {
+    (getRequiredRouterParam as any).mockReturnValue('supplier-1');
+    (readBody as any).mockResolvedValue({ name: 'No version' });
+
+    const result = await handler(mockEvent());
+
+    expect(result).toEqual({
+      error: true,
+      message: '缺少有效的 version 参数，请刷新后重试',
+    });
     expect(SupplierService.updateSupplier).not.toHaveBeenCalled();
   });
 });
