@@ -419,6 +419,7 @@ export function mapInspectionRequestRecord<
     | 'MATERIAL_APPROVAL_REJECTED'
     | null;
   dispatcherName: null | string;
+  historicalUnqualifiedQuantity: null | number;
   inspectionResult: string;
   inspectorName: null | string;
   linkedIssueId: null | string;
@@ -457,6 +458,9 @@ export function mapInspectionRequestRecord<
     ),
     inspectionResult:
       record.inspectionResult || record.inspection?.result || 'PASS',
+    // A reinspection writes the current PASS result (and 0 unqualified) to the
+    // request. The linked NC retains the original failed quantity for history.
+    historicalUnqualifiedQuantity: issue?.quantity ?? null,
     inspectorName:
       record.inspector?.realName || record.inspector?.username || null,
     linkedIssueId: record.linkedIssueId || issue?.id || null,

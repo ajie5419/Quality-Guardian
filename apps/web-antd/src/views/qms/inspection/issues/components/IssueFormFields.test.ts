@@ -1,5 +1,5 @@
 import { mount } from '@vue/test-utils';
-import { defineComponent, h, ref } from 'vue';
+import { defineComponent, h, nextTick, ref } from 'vue';
 
 import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -14,12 +14,14 @@ const {
   mockSetFormState,
   mockUpdateSchema,
   mockFormStates,
+  formCallbacks,
 } = vi.hoisted(() => ({
   mockGetWelderListPage: vi.fn(),
   mockHandleApiError: vi.fn(),
   mockSetFieldValue: vi.fn(),
   mockSetFormState: vi.fn(),
   mockUpdateSchema: vi.fn(),
+  formCallbacks: { change: (_values: Record<string, unknown>) => {} },
   mockFormStates: [] as Array<{
     schema: Array<{
       componentProps?: Record<string, unknown>;
@@ -36,12 +38,14 @@ vi.mock('@vben/locales', () => ({
 
 vi.mock('#/adapter/form', () => ({
   useVbenForm: (config: {
+    handleValuesChange: (values: Record<string, unknown>) => void;
     schema: Array<{
       componentProps?: Record<string, unknown>;
       fieldName: string;
       label?: string;
     }>;
   }) => {
+    formCallbacks.change = config.handleValuesChange;
     const state = { schema: [...config.schema] };
     mockFormStates.push(state);
 
@@ -201,6 +205,29 @@ describe('issue form fields responsibility contract', () => {
       },
     });
   }
+
+  it('preserves hydrated subcategory before async options arrive, but clears it on category change', async () => {
+    const wrapper = mountComponent(true);
+    formCallbacks.change({
+      defectCategoryId: 'cat-1',
+      defectSubcategoryId: 'sub-1',
+    });
+    await nextTick();
+    expect(mockSetFieldValue).not.toHaveBeenCalledWith(
+      'defectSubcategoryId',
+      undefined,
+    );
+    formCallbacks.change({
+      defectCategoryId: 'cat-2',
+      defectSubcategoryId: 'sub-1',
+    });
+    await nextTick();
+    expect(mockSetFieldValue).toHaveBeenCalledWith(
+      'defectSubcategoryId',
+      undefined,
+    );
+    wrapper.unmount();
+  });
 
   it('shows the automatic NC number generation switch only while creating', () => {
     const wrapper = mountComponent(false);

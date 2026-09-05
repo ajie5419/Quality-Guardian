@@ -6,6 +6,19 @@ import { INSPECTION_ISSUE_RESPONSIBILITY_TYPE } from '@qgs/shared';
 
 export const INCOMING_INSPECTION_PROCESS_NAME = '进货检验';
 
+export function getInspectionRequestEntryAttachmentWarning(
+  files: Array<{ status?: string }>,
+  attachmentCount: number,
+  label: string,
+) {
+  if (
+    files.some((file) => ['error', 'uploading'].includes(file.status || ''))
+  ) {
+    return `${label}仍在上传或上传失败，请处理后再提交`;
+  }
+  return attachmentCount === 0 ? `${label}不能为空` : '';
+}
+
 export const inspectionRequestEntryCheckResultOptions = [
   { label: '合格', value: 'PASS' },
   { label: '不合格', value: 'FAIL' },

@@ -6,6 +6,7 @@ import {
   getInspectionRequestResponsibilitySupplierCategory,
   INCOMING_INSPECTION_PROCESS_NAME,
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
+  isIncomingInspectionRequestCategory,
   mapInspectionRequestRecord,
   mergeInspectionProcessNames,
   normalizeInspectionIssueResponsibilityType,
@@ -45,6 +46,20 @@ describe('mapInspectionRequestRecord', () => {
     expect(mapped.dispatchBlockedReason).toBeNull();
     expect(mapped.materialApprovalStatus).toBe('APPROVED');
   });
+
+  it('keeps the linked NC quantity separate from a PASS reinspection result', () => {
+    const mapped = mapInspectionRequestRecord({
+      inspectionResult: 'PASS',
+      linkedIssueId: 'issue-1',
+      qualityRecords: [
+        { id: 'issue-1', isDeleted: false, quantity: 1, status: 'CLOSED' },
+      ],
+      unqualifiedQuantity: 0,
+    });
+
+    expect(mapped.unqualifiedQuantity).toBe(0);
+    expect(mapped.historicalUnqualifiedQuantity).toBe(1);
+  });
 });
 
 describe('inspection process options', () => {
@@ -52,6 +67,35 @@ describe('inspection process options', () => {
     expect(
       mergeInspectionProcessNames(['下料', ' 焊接 ', ''], ['焊接', '组对']),
     ).toEqual(['下料', '焊接', '组对']);
+  });
+});
+
+describe('isIncomingInspectionRequestCategory', () => {
+  it('uses the persisted INCOMING category regardless of a renamed process', () => {
+    expect(
+      isIncomingInspectionRequestCategory({
+        category: 'INCOMING',
+        processName: '供应商来料检验',
+      }),
+    ).toBe(true);
+  });
+
+  it('does not treat a PROCESS request as incoming solely by its process snapshot', () => {
+    expect(
+      isIncomingInspectionRequestCategory({
+        category: 'PROCESS',
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+      }),
+    ).toBe(false);
+  });
+
+  it('uses the legacy process-name fallback only when category is absent', () => {
+    expect(
+      isIncomingInspectionRequestCategory({
+        category: null,
+        processName: INCOMING_INSPECTION_PROCESS_NAME,
+      }),
+    ).toBe(true);
   });
 });
 

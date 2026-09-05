@@ -50,4 +50,32 @@ describe('inspection request material approval presentation', () => {
 
     expect(presentation.isDispatchable(request)).toBe(true);
   });
+
+  it('shows historical NC quantity separately from current reinspection quantities', () => {
+    const request = createRequest({
+      status: 'CLOSED',
+      inspectionResult: 'PASS',
+      linkedIssueId: 'issue-1',
+      qualifiedQuantity: 1,
+      unqualifiedQuantity: 0,
+      historicalUnqualifiedQuantity: 1,
+    });
+    expect(presentation.inspectionQuantityText(request)).toBe(
+      '合格 1 / 曾不合格 1',
+    );
+    expect(
+      presentation.inspectionQuantityText({
+        ...request,
+        historicalUnqualifiedQuantity: undefined,
+      }),
+    ).toBe('合格 1 / 曾不合格 -');
+    expect(
+      presentation.inspectionQuantityText({
+        ...request,
+        inspectionResult: 'FAIL',
+        qualifiedQuantity: 0,
+        unqualifiedQuantity: 1,
+      }),
+    ).toBe('合格 0 / 不合格 1');
+  });
 });

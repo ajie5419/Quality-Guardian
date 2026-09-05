@@ -11,6 +11,7 @@ import { UI_CONSTANTS } from '../constants';
 
 const props = defineProps<{
   maxCount?: number;
+  required?: boolean;
 }>();
 
 const photos = defineModel<UploadFileWithResponse[]>('value', {
@@ -28,7 +29,9 @@ const maxImages = computed(
 <template>
   <div>
     <label class="mb-1 block text-sm font-medium text-gray-700">
+      <span v-if="required" class="text-red-500">* </span>
       {{ t('qms.inspection.issues.photos') }}
+      <span v-if="required">（必填）</span>
     </label>
     <QmsFileUpload
       v-model:file-list="photos"

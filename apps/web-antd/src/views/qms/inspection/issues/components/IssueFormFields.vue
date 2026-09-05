@@ -402,7 +402,10 @@ watch(
   () => formValues.value.defectCategoryId,
   (categoryId, previousCategoryId) => {
     const subcategoryId = formValues.value.defectSubcategoryId;
+    // Initial edit hydration may precede async options. Preserve its IDs;
+    // clear an incompatible child only after an actual parent change.
     if (
+      previousCategoryId === undefined ||
       categoryId === previousCategoryId ||
       !subcategoryId ||
       mapSubcategoryOptions(categoryId).some(
@@ -709,7 +712,7 @@ defineExpose({
       </template>
 
       <template #photos="slotProps">
-        <IssuePhotoUpload v-bind="slotProps" />
+        <IssuePhotoUpload v-bind="slotProps" :required="isEmbedded" />
       </template>
     </Form>
 

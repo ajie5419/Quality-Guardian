@@ -443,7 +443,14 @@ watch(
 watch(
   localCloseForm,
   (value) => {
-    emit('update:closeForm', cloneCloseForm(value));
+    // Uploads are owned by the parent; local edits must not restore an older list.
+    emit(
+      'update:closeForm',
+      cloneCloseForm({
+        ...value,
+        attachments: props.closeForm.attachments,
+      }),
+    );
   },
   { deep: true },
 );
