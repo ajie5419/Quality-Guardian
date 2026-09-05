@@ -1,5 +1,8 @@
 import type { H3Event } from 'h3';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 import type { UserSession } from '~/utils/jwt-utils';
+
+import type { InspectionAccessContext } from './inspection-access-context';
 
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { buildInspectionFormProcessFilter } from '~/modules/inspection/inspection-form';
@@ -26,21 +29,26 @@ export const InspectionRouteService = {
     id: string,
     body: Record<string, unknown>,
     userinfo: UserSession,
+    access?: InspectionAccessContext,
   ) {
     return InspectionRequestCloseService.closeRequest(
       event,
       id,
       body,
       userinfo,
+      access,
     );
   },
 
-  async getRequestStats(query: {
-    endDate?: string;
-    period?: string;
-    startDate?: string;
-  }) {
-    return InspectionRequestStatsService.getRequestStats(query);
+  async getRequestStats(
+    query: {
+      endDate?: string;
+      period?: string;
+      startDate?: string;
+    },
+    access: AnalyticsAccessContext,
+  ) {
+    return InspectionRequestStatsService.getRequestStats(query, access);
   },
 
   async updateInspectionFormTemplate(

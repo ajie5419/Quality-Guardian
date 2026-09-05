@@ -2,6 +2,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { InspectionRouteService } from '~/modules/inspection/inspection-route.service';
 import { logApiError } from '~/utils/api-logger';
+import { getAnalyticsAccessContext } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -18,7 +19,10 @@ export default defineEventHandler(async (event) => {
 
   try {
     return useResponseSuccess(
-      await InspectionRouteService.getRequestStats(query),
+      await InspectionRouteService.getRequestStats(query, {
+        ...getAnalyticsAccessContext(event),
+        dataScope: event.context.dataScope,
+      }),
     );
   } catch (error) {
     logApiError('inspection-request-stats', error, undefined, event);

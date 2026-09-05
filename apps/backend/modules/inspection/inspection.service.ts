@@ -9,6 +9,7 @@ export const InspectionService = {
   deleteRecord: InspectionCoreService.deleteRecord,
   determineItemResult: InspectionCoreService.determineItemResult,
   findAll: InspectionCoreService.findAll,
+  findAllForExport: InspectionCoreService.findAllForExport,
   findSupplierIssues: InspectionCoreService.findSupplierIssues,
   findSupplierHistory: InspectionCoreService.findSupplierHistory,
   findById: InspectionCoreService.findById,

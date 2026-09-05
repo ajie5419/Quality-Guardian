@@ -56,12 +56,19 @@ describe('inspectionRouteService', () => {
       );
       const event = {} as any;
       const userinfo = { username: 'admin' } as any;
+      const access = {
+        dataScope: { module: 'inspection', scopeType: 'ALL' as const },
+        permission: 'QMS:Inspection:Requests:Close',
+        scopeIdentity: {},
+        user: userinfo,
+      };
 
       const result = await InspectionRouteService.closeRequest(
         event,
         'id-1',
         {},
         userinfo,
+        access,
       );
 
       expect(InspectionRequestCloseService.closeRequest).toHaveBeenCalledWith(
@@ -69,6 +76,7 @@ describe('inspectionRouteService', () => {
         'id-1',
         {},
         userinfo,
+        access,
       );
       expect(result).toEqual({ closed: true });
     });
@@ -79,14 +87,25 @@ describe('inspectionRouteService', () => {
       const { InspectionRequestStatsService } = await import(
         '~/modules/inspection/inspection-request-stats.service'
       );
+      const testAccess = {
+        dataScope: {
+          deptIds: [],
+          module: 'inspection',
+          scopeType: 'ALL' as const,
+        },
+        user: { userId: 'u1', username: 'u1' },
+      };
 
-      const result = await InspectionRouteService.getRequestStats({
-        period: 'week',
-      });
+      const result = await InspectionRouteService.getRequestStats(
+        {
+          period: 'week',
+        },
+        testAccess,
+      );
 
       expect(
         InspectionRequestStatsService.getRequestStats,
-      ).toHaveBeenCalledWith({ period: 'week' });
+      ).toHaveBeenCalledWith({ period: 'week' }, testAccess);
       expect(result).toEqual({ total: 0 });
     });
   });

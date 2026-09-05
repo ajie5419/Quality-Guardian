@@ -1,15 +1,22 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
+import type {
+  PeriodClosedGroup,
+  PeriodRequestStatsContext,
+} from './inspection-request-stats-period';
+
+import { requireAnalyticsUser } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { TeamIdentityService } from '~/modules/team';
-import prisma from '~/utils/prisma';
 
 import {
   createInspectionRequestStatsAccumulator,
   isInspectorUser,
 } from './inspection-request-stats-accumulator';
+import { loadInspectionRequestStatsData } from './inspection-request-stats-data';
 import {
   inspectionRequestDurationMinutes as durationMinutes,
-  formatInspectionRequestStatsDate as formatShanghaiDate,
   resolveInspectionRequestStatsRange as resolveStatsRange,
 } from './inspection-request-stats-date';
 import {
@@ -17,8 +24,6 @@ import {
   createIdentityCountRows,
   createInspectorHistoryRows,
   createReinspectionRows,
-  incrementReinspectionCounts,
-  isIncomingInspectionRequest,
   normalizeIdentityId,
   UNRESOLVED_IDENTITY_KEY,
   UNRESOLVED_INSPECTOR_NAME,
@@ -30,117 +35,59 @@ import {
   mergeSameNameReinspectionRows,
   resolveProcessDepartmentsById,
 } from './inspection-request-stats-merge';
+import {
+  applyPeriodClosedGroup,
+  applyPeriodSubmittedGroup,
+  classifyPeriodClosedRow,
+  classifyPeriodSubmittedRow,
+} from './inspection-request-stats-period';
 import { buildInspectionRequestDepartmentStats } from './inspection-request-stats-responsibility';
 
 export const InspectionRequestStatsService = {
-  async getRequestStats(query: {
-    endDate?: string;
-    period?: string;
-    startDate?: string;
-  }) {
+  async getRequestStats(
+    query: {
+      endDate?: string;
+      period?: string;
+      startDate?: string;
+    },
+    access: AnalyticsAccessContext,
+  ) {
+    requireAnalyticsUser(access);
     const { end, start } = resolveStatsRange(query);
-    const [
-      periodRequests,
+    const {
       activeInspectorRequests,
+      activeUsers,
+      closedGroups,
       pendingDispatchCount,
       pendingInspectionCount,
-      activeUsers,
-    ] = await Promise.all([
-      prisma.qms_inspection_requests.findMany({
-        select: {
-          category: true,
-          closedAt: true,
-          dispatchedAt: true,
-          inspectionResult: true,
-          inspector: { select: { id: true, realName: true, username: true } },
-          inspectorId: true,
-          linkedIssueId: true,
-          linkedIssueNo: true,
-          status: true,
-          submittedAt: true,
-          supplierId: true,
-          responsibilityType: true,
-          responsibleDepartmentId: true,
-          processId: true,
-          teamId: true,
-        },
-        where: {
-          OR: [
-            { submittedAt: { gte: start, lt: end } },
-            { closedAt: { gte: start, lt: end } },
-          ],
-          isDeleted: false,
-        },
-      }),
-      prisma.qms_inspection_requests.findMany({
-        select: {
-          dispatchedAt: true,
-          inspector: { select: { id: true, realName: true, username: true } },
-          inspectorId: true,
-          submittedAt: true,
-        },
-        where: {
-          inspectorId: { not: null },
-          isDeleted: false,
-          status: { in: ['DISPATCHED', 'INSPECTING'] },
-        },
-      }),
-      prisma.qms_inspection_requests.count({
-        where: { isDeleted: false, status: 'SUBMITTED' },
-      }),
-      prisma.qms_inspection_requests.count({
-        where: {
-          isDeleted: false,
-          status: { in: ['DISPATCHED', 'INSPECTING'] },
-        },
-      }),
-      prisma.users.findMany({
-        where: { isDeleted: false, status: 'ACTIVE' },
-        select: {
-          id: true,
-          realName: true,
-          username: true,
-          roles: {
-            select: {
-              name: true,
-              rbac_role_permissions: {
-                select: { permission: { select: { code: true } } },
-              },
-            },
-          },
-          rbac_user_roles: {
-            select: {
-              role: {
-                select: {
-                  name: true,
-                  rbac_role_permissions: {
-                    select: { permission: { select: { code: true } } },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }),
-    ]);
+      submittedGroups,
+    } = await loadInspectionRequestStatsData(start, end, access);
+
+    // PERF-QMS-001 / PHASE-2A: identity maps are resolved from the union of
+    // the pre-aggregated submitted/closed groups, which is the same id set
+    // the legacy full period row read fed into these resolvers.
+    const groupRows: Array<{
+      supplierId: null | string;
+      teamId: null | string;
+    }> = [...submittedGroups, ...closedGroups];
     const [supplierNamesById, teamNamesById, teamCanonicalById] =
       await Promise.all([
         SupplierIdentityService.resolveNamesByIds(
-          collectIdentityIds(periodRequests.map((item) => item.supplierId)),
+          collectIdentityIds(groupRows.map((item) => item.supplierId)),
         ),
         TeamIdentityService.resolveNamesByIds(
-          collectIdentityIds(periodRequests.map((item) => item.teamId)),
+          collectIdentityIds(groupRows.map((item) => item.teamId)),
         ),
         TeamIdentityService.resolveCanonicalIds(
-          periodRequests.map((item) => item.teamId),
+          groupRows.map((item) => item.teamId),
         ),
       ]);
     const processDepartmentsById = await resolveProcessDepartmentsById(
-      collectIdentityIds(periodRequests.map((item) => item.processId)),
+      collectIdentityIds(submittedGroups.map((item) => item.processId)),
     );
     const responsibilityDepartments = await DeptService.findActiveByIdsOrNames({
       ids: collectIdentityIds([
-        ...periodRequests.map((item) => item.responsibleDepartmentId),
+        ...submittedGroups.map((item) => item.responsibleDepartmentId),
         ...processDepartmentsById.values(),
       ]),
     });
@@ -182,53 +129,46 @@ export const InspectionRequestStatsService = {
           user.id,
         ),
       );
-    type InspectorRequest =
-      | (typeof activeInspectorRequests)[number]
-      | (typeof periodRequests)[number];
-    const resolveInspectorKey = (item: InspectorRequest) =>
-      normalizeIdentityId(item.inspectorId) || UNRESOLVED_IDENTITY_KEY;
-    const resolveInspectorName = (item: InspectorRequest) =>
-      item.inspector?.realName ||
-      item.inspector?.username ||
-      UNRESOLVED_INSPECTOR_NAME;
-    const getInspectorStatus = (item: InspectorRequest) => {
-      const key = resolveInspectorKey(item);
+    const getInspectorStatus = (
+      inspectorId: null | string,
+      inspectorName: string,
+    ) => {
+      const key = normalizeIdentityId(inspectorId) || UNRESOLVED_IDENTITY_KEY;
       const existing = inspectorStatusMap.get(key);
       if (existing) return existing;
-      const created = createInspectorStatus(resolveInspectorName(item), key);
+      const created = createInspectorStatus(inspectorName, key);
       inspectorStatusMap.set(key, created);
       return created;
     };
     for (const item of activeInspectorRequests) {
       if (!item.inspectorId) continue;
-      const stat = getInspectorStatus(item);
-      stat.activeTaskCount += 1;
+      const stat = getInspectorStatus(
+        item.inspectorId,
+        item.inspector?.realName ||
+          item.inspector?.username ||
+          UNRESOLVED_INSPECTOR_NAME,
+      );
+      stat.activeTaskCount += item.activeTaskCount;
       stat.status = 'BUSY';
       stat.currentTaskMinutes = Math.max(
         stat.currentTaskMinutes,
-        durationMinutes(item.dispatchedAt || item.submittedAt, now),
+        durationMinutes(item.earliestStartAt, now),
       );
     }
-    for (const item of periodRequests) {
+    for (const group of closedGroups) {
       // Completed tasks follow the same CLOSED + closedAt-in-range rule as
       // the inspector ranking so both surfaces stay consistent.
-      if (
-        item.closedAt &&
-        item.closedAt >= start &&
-        item.closedAt < end &&
-        item.status === 'CLOSED'
-      ) {
-        const stat = getInspectorStatus(item);
-        const taskMinutes = durationMinutes(
-          item.dispatchedAt || item.submittedAt,
-          item.closedAt,
-        );
-        stat.completedTaskCount += 1;
-        stat.totalTaskMinutes += taskMinutes;
-        stat.averageTaskMinutes = Math.round(
-          stat.totalTaskMinutes / stat.completedTaskCount,
-        );
-      }
+      const stat = getInspectorStatus(
+        group.inspectorId,
+        group.inspectorRealName ||
+          group.inspectorUsername ||
+          UNRESOLVED_INSPECTOR_NAME,
+      );
+      stat.completedTaskCount += group.requestCount;
+      stat.totalTaskMinutes += group.totalTaskMinutes;
+      stat.averageTaskMinutes = Math.round(
+        stat.totalTaskMinutes / stat.completedTaskCount,
+      );
     }
     const inspectorStatus = [...inspectorStatusMap.values()]
       .filter((item) => item.inspector !== UNRESOLVED_INSPECTOR_NAME)
@@ -241,6 +181,7 @@ export const InspectionRequestStatsService = {
         }
         return a.status === 'BUSY' ? -1 : 1;
       });
+    const accumulator = createInspectionRequestStatsAccumulator(start, end);
     const {
       counters,
       dailyTrendMap,
@@ -254,147 +195,63 @@ export const InspectionRequestStatsService = {
       supplierReinspectionMap,
       teamMap,
       teamReinspectionMap,
-    } = createInspectionRequestStatsAccumulator(start, end);
-    for (const item of periodRequests) {
-      if (
-        item.submittedAt >= start &&
-        item.submittedAt < end &&
-        item.status !== 'CANCELLED'
-      ) {
-        counters.todaySubmittedCount += 1;
-        const date = formatShanghaiDate(item.submittedAt);
-        const daily = dailyTrendMap.get(date);
-        if (daily) daily.submittedCount += 1;
-        const isIncoming = isIncomingInspectionRequest(item);
-        const isExternalResponsibility =
-          item.responsibilityType === 'SUPPLIER' ||
-          item.responsibilityType === 'OUTSOURCING_UNIT';
-        const usesSupplierIdentity = isExternalResponsibility || isIncoming;
-        const isInternalProcess = !isIncoming && !isExternalResponsibility;
-        if (isIncoming) {
-          counters.todaySubmittedIncomingCount += 1;
-        } else {
-          counters.todaySubmittedProcessCount += 1;
-        }
-        const supplierIdentityKey =
-          normalizeIdentityId(item.supplierId) || UNRESOLVED_IDENTITY_KEY;
-        const departmentIdentityKey =
-          normalizeIdentityId(item.responsibleDepartmentId) ||
-          normalizeIdentityId(processDepartmentsById.get(item.processId)) ||
-          UNRESOLVED_IDENTITY_KEY;
-        const teamIdentityKey =
-          normalizeIdentityId(
-            teamCanonicalById.get(item.teamId) ?? item.teamId,
-          ) ||
-          (isInternalProcess &&
-          departmentIdentityKey !== UNRESOLVED_IDENTITY_KEY
-            ? `dept:${departmentIdentityKey}`
-            : '');
-        if (usesSupplierIdentity) {
-          supplierMap.set(
-            supplierIdentityKey,
-            (supplierMap.get(supplierIdentityKey) || 0) + 1,
-          );
-        }
-        if (isInternalProcess) {
-          departmentMap.set(
-            departmentIdentityKey,
-            (departmentMap.get(departmentIdentityKey) || 0) + 1,
-          );
-          historyDepartmentMap.set(
-            departmentIdentityKey,
-            (historyDepartmentMap.get(departmentIdentityKey) || 0) + 1,
-          );
-          if (teamIdentityKey) {
-            teamMap.set(
-              teamIdentityKey,
-              (teamMap.get(teamIdentityKey) || 0) + 1,
-            );
-            historyTeamMap.set(
-              teamIdentityKey,
-              (historyTeamMap.get(teamIdentityKey) || 0) + 1,
-            );
-          }
-        }
-        const reinspectionMap = usesSupplierIdentity
-          ? supplierReinspectionMap
-          : departmentReinspectionMap;
-        const reinspectionKey = usesSupplierIdentity
-          ? supplierIdentityKey
-          : departmentIdentityKey;
-        // Reinspection is measured against closed requests only: in-flight
-        // FAIL records (status not CLOSED) never count as inspected or
-        // reinspected before the inspection flow completes, and requests
-        // already inspected but not yet closed stay out of the denominator.
-        const hasClosed = item.status === 'CLOSED';
-        const hasReinspection =
-          hasClosed &&
-          (Boolean(item.linkedIssueId || item.linkedIssueNo) ||
-            item.inspectionResult === 'FAIL');
-        const hasInspectionResult = hasClosed;
-        incrementReinspectionCounts(
-          reinspectionMap,
-          reinspectionKey,
-          hasInspectionResult,
-          hasReinspection,
-        );
-        if (isInternalProcess && teamIdentityKey) {
-          incrementReinspectionCounts(
-            teamReinspectionMap,
-            teamIdentityKey,
-            hasInspectionResult,
-            hasReinspection,
-          );
-        }
-      }
-      if (
-        item.closedAt &&
-        item.closedAt >= start &&
-        item.closedAt < end &&
-        item.status === 'CLOSED'
-      ) {
-        counters.todayClosedCount += 1;
-        const closedIsIncoming = isIncomingInspectionRequest(item);
-        if (closedIsIncoming) {
-          counters.todayClosedIncomingCount += 1;
-        } else {
-          counters.todayClosedProcessCount += 1;
-        }
-        const date = formatShanghaiDate(item.closedAt);
-        const daily = dailyTrendMap.get(date);
-        if (daily) daily.closedCount += 1;
-        const inspectorId = normalizeIdentityId(item.inspectorId);
-        const inspectorKey = inspectorId || UNRESOLVED_IDENTITY_KEY;
-        inspectorMap.set(
-          inspectorKey,
-          (inspectorMap.get(inspectorKey) || 0) + 1,
-        );
-        const existing = historyInspectorMap.get(inspectorKey) || {
-          averageTaskMinutes: 0,
-          completedTaskCount: 0,
-          totalTaskMinutes: 0,
-        };
-        const taskMinutes = durationMinutes(
-          item.dispatchedAt || item.submittedAt,
-          item.closedAt,
-        );
-        existing.completedTaskCount += 1;
-        existing.totalTaskMinutes += taskMinutes;
-        existing.averageTaskMinutes = Math.round(
-          existing.totalTaskMinutes / existing.completedTaskCount,
-        );
-        historyInspectorMap.set(inspectorKey, existing);
-      }
+    } = accumulator;
+    const statsContext: PeriodRequestStatsContext = {
+      processDepartmentsById,
+      teamCanonicalById,
+    };
+    for (const group of submittedGroups) {
+      const classification = classifyPeriodSubmittedRow(
+        {
+          category: group.category,
+          hasLinkedIssue: group.hasLinkedIssue,
+          inspectionResult: group.inspectionResult,
+          processId: group.processId,
+          responsibilityType: group.responsibilityType,
+          responsibleDepartmentId: group.responsibleDepartmentId,
+          status: group.status,
+          supplierId: group.supplierId,
+          teamId: group.teamId,
+        },
+        statsContext,
+        group.submittedDate,
+      );
+      applyPeriodSubmittedGroup(
+        accumulator,
+        classification,
+        group.requestCount,
+      );
+    }
+    for (const group of closedGroups) {
+      const classification = classifyPeriodClosedRow(
+        {
+          category: group.category,
+          inspectorId: group.inspectorId,
+          supplierId: group.supplierId,
+          teamId: group.teamId,
+        },
+        group.closedDate,
+      );
+      applyPeriodClosedGroup(
+        accumulator,
+        classification,
+        group.requestCount,
+        group.totalTaskMinutes,
+      );
     }
     const teamNamesByIdWithDeptFallback = new Map(teamNamesById);
     for (const [departmentId, name] of departmentNamesById) {
       teamNamesByIdWithDeptFallback.set(`dept:${departmentId}`, name);
     }
+    const resolveClosedInspectorName = (group: PeriodClosedGroup) =>
+      group.inspectorRealName ||
+      group.inspectorUsername ||
+      UNRESOLVED_INSPECTOR_NAME;
     const inspectorNamesById = new Map(
-      periodRequests.flatMap((item) => {
-        const inspectorId = normalizeIdentityId(item.inspectorId);
+      closedGroups.flatMap((group) => {
+        const inspectorId = normalizeIdentityId(group.inspectorId);
         return inspectorId
-          ? [[inspectorId, resolveInspectorName(item)] as const]
+          ? [[inspectorId, resolveClosedInspectorName(group)] as const]
           : [];
       }),
     );

@@ -22,6 +22,7 @@ vi.mock('~/utils/prisma', () => ({
 
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: vi.fn().mockReturnValue({ warn: vi.fn() }),
+  sanitizeContext: vi.fn((context: unknown) => context),
 }));
 
 vi.mock('~/modules/dept', () => ({
@@ -219,16 +220,20 @@ describe('inspectionRecordQueryService', () => {
       expect(resolveIncomingTypeNamesByIds).toHaveBeenCalledWith(['dict-1']);
     });
 
-    it('should call forExport mode without skip/take', async () => {
+    it('should run the export path with a bounded take and no skip', async () => {
       (prisma.inspections.findMany as any).mockResolvedValue([]);
       (prisma.inspections.count as any).mockResolvedValue(0);
 
-      await InspectionRecordQueryService.findAll({ forExport: true });
+      await InspectionRecordQueryService.findAllForExport({});
 
+      expect(prisma.inspections.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          take: 20_001,
+        }),
+      );
       expect(prisma.inspections.findMany).toHaveBeenCalledWith(
         expect.not.objectContaining({
           skip: expect.anything(),
-          take: expect.anything(),
         }),
       );
     });
@@ -252,9 +257,7 @@ describe('inspectionRecordQueryService', () => {
         },
       ]);
 
-      const result = await InspectionRecordQueryService.findAll({
-        forExport: true,
-      });
+      const result = await InspectionRecordQueryService.findAllForExport({});
 
       expect(result.items[0]?.team).toBe('Machining BU');
     });
@@ -276,9 +279,7 @@ describe('inspectionRecordQueryService', () => {
         new Map([['dept-machining', 'Renamed Machining BU']]),
       );
 
-      const result = await InspectionRecordQueryService.findAll({
-        forExport: true,
-      });
+      const result = await InspectionRecordQueryService.findAllForExport({});
 
       expect(result.items[0]?.team).toBe('Renamed Machining BU');
     });
