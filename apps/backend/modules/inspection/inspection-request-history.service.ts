@@ -1,4 +1,7 @@
+import type { AccessScope } from '~/modules/data-scope';
+
 import { Prisma } from '@prisma/client';
+import { DataScopeService } from '~/modules/data-scope';
 import prisma from '~/utils/prisma';
 import { parsePagination } from '~/utils/query-helpers';
 
@@ -18,8 +21,28 @@ function buildRequestIdentityFilter(params: {
     : Prisma.sql`request_row.supplierId = ${params.supplierId}`;
 }
 
+export async function buildRequestHistoryRawScopeSql(
+  userContext: { userId: string; username?: string },
+  dataScope?: AccessScope,
+) {
+  if (!dataScope) return Prisma.sql`AND 1 = 0`;
+  if (dataScope.scopeType === 'ALL') return Prisma.empty;
+  if (dataScope.scopeType === 'SELF') {
+    // The request domain restricts non-dispatch users to their own related
+    // requests (inspector/reporter), mirroring the request list scope model.
+    return Prisma.sql`AND (request_row.inspectorId = ${userContext.userId} OR request_row.reporterId = ${userContext.userId})`;
+  }
+  if (dataScope.scopeType !== 'DEPT') return Prisma.sql`AND 1 = 0`;
+  const deptCandidates = await DataScopeService.getDeptCandidates(
+    dataScope.deptIds ?? [],
+  );
+  if (deptCandidates.length === 0) return Prisma.sql`AND 1 = 0`;
+  return Prisma.sql`AND request_row.responsibleDepartment IN (${Prisma.join(deptCandidates)})`;
+}
+
 function buildSupplierRequestWorkOrdersSql(params: {
   identitySource: 'supplier' | 'team';
+  rawScopeSql: Prisma.Sql;
   supplierId: string;
   teamIds: string[];
 }) {
@@ -27,7 +50,7 @@ function buildSupplierRequestWorkOrdersSql(params: {
   return Prisma.sql`
     SELECT request_row.workOrderNumber, request_row.submittedAt
     FROM qms_inspection_requests AS request_row
-    WHERE request_row.isDeleted = 0 AND ${identityFilter}
+    WHERE request_row.isDeleted = 0 AND ${identityFilter} ${params.rawScopeSql}
 
     UNION ALL
 
@@ -35,24 +58,35 @@ function buildSupplierRequestWorkOrdersSql(params: {
     FROM qms_inspection_request_work_orders AS request_work_order
     INNER JOIN qms_inspection_requests AS request_row
       ON request_row.id = request_work_order.requestId
-    WHERE request_row.isDeleted = 0 AND ${identityFilter}
+    WHERE request_row.isDeleted = 0 AND ${identityFilter} ${params.rawScopeSql}
   `;
 }
 
 export const InspectionRequestHistoryService = {
   async getSupplierHistoryProjects(params: {
+    dataScope?: AccessScope;
     identitySource: 'supplier' | 'team';
     page?: number;
     pageSize?: number;
     supplierId: string;
     teamIds: string[];
+    userContext?: { userId: string; username?: string };
   }): Promise<{ items: SupplierHistoryProject[]; total: number }> {
     if (params.identitySource === 'team' && params.teamIds.length === 0) {
       return { items: [], total: 0 };
     }
 
     const { pageSize, skip } = parsePagination(params);
-    const requestWorkOrdersSql = buildSupplierRequestWorkOrdersSql(params);
+    const rawScopeSql = params.userContext?.userId
+      ? await buildRequestHistoryRawScopeSql(
+          params.userContext,
+          params.dataScope,
+        )
+      : Prisma.empty;
+    const requestWorkOrdersSql = buildSupplierRequestWorkOrdersSql({
+      ...params,
+      rawScopeSql,
+    });
     const [countRows, rows] = await Promise.all([
       prisma.$queryRaw<Array<{ total: bigint | number }>>(Prisma.sql`
         SELECT COUNT(*) AS total

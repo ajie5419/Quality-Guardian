@@ -1,7 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import prisma from '~/utils/prisma';
 
-import { InspectionRequestHistoryService } from './inspection-request-history.service';
+import {
+  buildRequestHistoryRawScopeSql,
+  InspectionRequestHistoryService,
+} from './inspection-request-history.service';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -12,6 +15,19 @@ vi.mock('~/utils/prisma', () => ({
 describe('inspectionRequestHistoryService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('fails closed when a user-context request has no resolved DataScope', async () => {
+    const missingScopeSql = await buildRequestHistoryRawScopeSql({
+      userId: 'user-1',
+    });
+    const allScopeSql = await buildRequestHistoryRawScopeSql(
+      { userId: 'user-1' },
+      { deptIds: [], scopeType: 'ALL' },
+    );
+
+    expect(missingScopeSql.sql).toContain('AND 1 = 0');
+    expect(allScopeSql.sql).not.toContain('AND 1 = 0');
   });
 
   it('returns paged supplier request work orders with their latest submission', async () => {
