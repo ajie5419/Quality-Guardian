@@ -6,11 +6,16 @@ import prisma from '~/utils/prisma';
 
 import {
   deriveMetrologyInspectionStatus,
-  normalizeMetrologyBorrowStatus,
   startOfToday,
 } from '../metrology-status';
 import { MetrologyBorrowQueryService } from './metrology-borrow-query.service';
 import { MetrologyBorrowReturnService } from './metrology-borrow-return.service';
+import {
+  ACTIVE_BORROW_RECORD_STATUSES,
+  BORROW_RECORD_STATUS,
+  INSTRUMENT_BORROW_STATUS,
+  throwBorrowConflict,
+} from './metrology-borrow-state';
 
 interface MetrologyBorrowListParams {
   borrowerDepartment?: string;
@@ -88,10 +93,10 @@ async function refreshOverdueStatuses() {
       expectedReturnAt: { lt: startOfToday() },
       isDeleted: false,
       returnedAt: null,
-      status: 'BORROWED',
+      status: BORROW_RECORD_STATUS.BORROWED,
     },
     data: {
-      status: 'OVERDUE',
+      status: BORROW_RECORD_STATUS.OVERDUE,
     },
   });
 }
@@ -143,7 +148,6 @@ export const MetrologyBorrowService = {
         isDeleted: false,
       },
       select: {
-        borrowStatus: true,
         id: true,
         inspectionStatus: true,
         validUntil: true,
@@ -164,21 +168,11 @@ export const MetrologyBorrowService = {
     if (inspectionStatus === 'EXPIRED') {
       throw new Error('超期量具不能借用');
     }
-    const borrowStatus = normalizeMetrologyBorrowStatus(
-      instrument.borrowStatus,
-    );
-    if (borrowStatus === 'BORROWED') {
-      throw new Error('该量具当前已借出');
-    }
-    if (borrowStatus === 'RETURN_PENDING') {
-      throw new Error('该量具正在等待归还确认');
-    }
-
     const status =
       normalized.expectedReturnAt.date &&
       normalized.expectedReturnAt.date.getTime() < startOfToday().getTime()
-        ? 'OVERDUE'
-        : 'BORROWED';
+        ? BORROW_RECORD_STATUS.OVERDUE
+        : BORROW_RECORD_STATUS.BORROWED;
     const borrowedAt = normalized.borrowedAt.date;
 
     if (!borrowedAt) {
@@ -186,6 +180,36 @@ export const MetrologyBorrowService = {
     }
 
     await prisma.$transaction(async (tx) => {
+      // CAS on the instrument is the mutex: exactly one concurrent borrow may
+      // claim an AVAILABLE instrument; everyone else gets a 409 conflict.
+      const claimed = await tx.measuring_instruments.updateMany({
+        where: {
+          id: normalized.instrumentId,
+          isDeleted: false,
+          borrowStatus: INSTRUMENT_BORROW_STATUS.AVAILABLE,
+        },
+        data: {
+          borrowStatus: INSTRUMENT_BORROW_STATUS.BORROWED,
+          updatedBy: operator || null,
+        },
+      });
+      if (claimed.count !== 1) {
+        throwBorrowConflict('该量具当前不可借用或已被其他用户借出');
+      }
+      // Legacy drift guard: the CAS above holds the instrument row lock, so no
+      // concurrent borrow can slip in; this only detects pre-existing dirty
+      // state where an active record outlives an AVAILABLE instrument.
+      const legacyActive = await tx.metrology_borrow_records.findFirst({
+        where: {
+          instrumentId: normalized.instrumentId,
+          isDeleted: false,
+          status: { in: [...ACTIVE_BORROW_RECORD_STATUSES] },
+        },
+        select: { id: true },
+      });
+      if (legacyActive) {
+        throwBorrowConflict('该量具存在未关闭的借用记录，请联系管理员处理');
+      }
       const governedFields = buildGovernedWriteFieldsForTable(
         'metrology_borrow_records',
         {
@@ -221,14 +245,6 @@ export const MetrologyBorrowService = {
           },
           remark: normalized.remark,
           status,
-          updatedBy: operator || null,
-        },
-      });
-
-      await tx.measuring_instruments.update({
-        where: { id: normalized.instrumentId },
-        data: {
-          borrowStatus: 'BORROWED',
           updatedBy: operator || null,
         },
       });

@@ -1,16 +1,13 @@
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { handleBorrowRouteError } from '~/modules/metrology/borrow/metrology-borrow-route-error';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
 import {
   PUBLIC_METROLOGY_BORROW_OPERATOR,
   verifyPublicMetrologyBorrowAccess,
 } from '~/modules/metrology/public-metrology-borrow';
 import { logApiError } from '~/utils/api-logger';
-import {
-  badRequestResponse,
-  internalServerErrorResponse,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseSuccess } from '~/utils/response';
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 const publicReturnBodySchema = z
@@ -42,9 +39,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('public-metrology-borrow-return', error, undefined, event);
-    if (error instanceof Error) {
-      return badRequestResponse(event, error.message);
-    }
-    return internalServerErrorResponse(event, '归还量具失败');
+    return handleBorrowRouteError(event, error, '归还量具失败');
   }
 });

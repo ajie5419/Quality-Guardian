@@ -17,7 +17,9 @@ export function verifyPublicMetrologyBorrowAccess(
   const expectedToken = readPublicMetrologyBorrowExpectedToken();
 
   if (!expectedToken) {
-    return true;
+    // This is a mutation-capable public capability, not a login fallback.
+    // Missing runtime configuration must not turn it into an anonymous writer.
+    return forbiddenResponse(event, '扫码借用入口未配置访问凭证');
   }
 
   if (

@@ -10,6 +10,7 @@ vi.mock('~/utils/prisma', () => ({
       findMany: vi.fn(),
       findFirst: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn(),
     },
     metrology_borrow_records: {
       count: vi.fn(),
@@ -136,13 +137,18 @@ describe('metrology borrow services', () => {
     expect(prisma.measuring_instruments.findMany).not.toHaveBeenCalled();
   });
 
-  it('borrows an available instrument inside transaction', async () => {
+  it('borrows an available instrument via CAS claim and record create', async () => {
     vi.mocked(prisma.measuring_instruments.findFirst).mockResolvedValue(
       instrument as never,
     );
     const tx = {
-      measuring_instruments: { update: vi.fn() },
-      metrology_borrow_records: { create: vi.fn() },
+      measuring_instruments: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      metrology_borrow_records: {
+        create: vi.fn(),
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
 
@@ -157,6 +163,14 @@ describe('metrology borrow services', () => {
       'admin',
     );
 
+    expect(tx.measuring_instruments.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'm-1',
+        isDeleted: false,
+        borrowStatus: 'AVAILABLE',
+      },
+      data: { borrowStatus: 'BORROWED', updatedBy: 'admin' },
+    });
     expect(tx.metrology_borrow_records.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
         borrowerDepartment: 'QA',
@@ -167,13 +181,71 @@ describe('metrology borrow services', () => {
         status: 'BORROWED',
       }),
     });
-    expect(tx.measuring_instruments.update).toHaveBeenCalledWith({
-      where: { id: 'm-1' },
-      data: { borrowStatus: 'BORROWED', updatedBy: 'admin' },
-    });
   });
 
-  it('rejects borrow when dates or instrument state are invalid', async () => {
+  it('rejects a second concurrent borrow with 409 and does not create a record', async () => {
+    vi.mocked(prisma.measuring_instruments.findFirst).mockResolvedValue(
+      instrument as never,
+    );
+    const create = vi.fn();
+    const tx = {
+      measuring_instruments: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+      metrology_borrow_records: { create, findFirst: vi.fn() },
+    };
+    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
+
+    await expect(
+      MetrologyBorrowService.borrow(
+        {
+          borrowedAt: '2099-01-01',
+          borrowerDepartment: 'QA',
+          borrowerName: 'Alice',
+          expectedReturnAt: '2099-01-10',
+          instrumentId: 'm-1',
+        },
+        'admin',
+      ),
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      httpStatus: 409,
+      message: '该量具当前不可借用或已被其他用户借出',
+    });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it('rejects borrow when a legacy active record outlives an available instrument', async () => {
+    vi.mocked(prisma.measuring_instruments.findFirst).mockResolvedValue(
+      instrument as never,
+    );
+    const tx = {
+      measuring_instruments: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      metrology_borrow_records: {
+        create: vi.fn(),
+        findFirst: vi.fn().mockResolvedValue({ id: 'stale-1' }),
+      },
+    };
+    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
+
+    await expect(
+      MetrologyBorrowService.borrow(
+        {
+          borrowedAt: '2099-01-01',
+          borrowerDepartment: 'QA',
+          borrowerName: 'Alice',
+          expectedReturnAt: '2099-01-10',
+          instrumentId: 'm-1',
+        },
+        'admin',
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(tx.metrology_borrow_records.create).not.toHaveBeenCalled();
+  });
+
+  it('rejects borrow when dates or instrument inspection state are invalid', async () => {
     await expect(
       MetrologyBorrowService.borrow({
         borrowedAt: '2026-01-10',
@@ -186,7 +258,7 @@ describe('metrology borrow services', () => {
 
     vi.mocked(prisma.measuring_instruments.findFirst).mockResolvedValue({
       ...instrument,
-      borrowStatus: 'BORROWED',
+      inspectionStatus: 'DISABLED',
     } as never);
     await expect(
       MetrologyBorrowService.borrow({
@@ -195,10 +267,45 @@ describe('metrology borrow services', () => {
         borrowerName: 'Alice',
         instrumentId: 'm-1',
       }),
-    ).rejects.toThrow('该量具当前已借出');
+    ).rejects.toThrow('停用量具不能借用');
   });
 
-  it('requests return and updates instrument status to pending', async () => {
+  it('rolls back the instrument claim when record creation fails', async () => {
+    vi.mocked(prisma.measuring_instruments.findFirst).mockResolvedValue(
+      instrument as never,
+    );
+    const tx = {
+      measuring_instruments: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      metrology_borrow_records: {
+        create: vi.fn().mockRejectedValue(new Error('db write failed')),
+        findFirst: vi.fn().mockResolvedValue(null),
+      },
+    };
+    vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
+      await cb(tx);
+    });
+
+    await expect(
+      MetrologyBorrowService.borrow(
+        {
+          borrowedAt: '2099-01-01',
+          borrowerDepartment: 'QA',
+          borrowerName: 'Alice',
+          expectedReturnAt: '2099-01-10',
+          instrumentId: 'm-1',
+        },
+        'admin',
+      ),
+    ).rejects.toThrow('db write failed');
+    // The instrument CAS claim and the record create share one transaction, so
+    // a failed create aborts the whole unit and reverts the instrument state.
+    expect(tx.measuring_instruments.updateMany).toHaveBeenCalledTimes(1);
+    expect(tx.metrology_borrow_records.create).toHaveBeenCalledTimes(1);
+  });
+
+  it('requests return via CAS on record and instrument', async () => {
     vi.mocked(prisma.metrology_borrow_records.findFirst).mockResolvedValue({
       id: 'borrow-1',
       instrumentId: 'm-1',
@@ -206,8 +313,12 @@ describe('metrology borrow services', () => {
       status: 'BORROWED',
     } as never);
     const tx = {
-      measuring_instruments: { update: vi.fn() },
-      metrology_borrow_records: { update: vi.fn() },
+      measuring_instruments: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      metrology_borrow_records: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
 
@@ -217,21 +328,60 @@ describe('metrology borrow services', () => {
       'admin',
     );
 
-    expect(tx.metrology_borrow_records.update).toHaveBeenCalledWith({
-      where: { id: 'borrow-1' },
-      data: {
-        remark: 'done',
-        status: 'RETURN_PENDING',
-        updatedBy: 'admin',
+    expect(tx.metrology_borrow_records.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'borrow-1',
+        isDeleted: false,
+        status: { in: ['BORROWED', 'OVERDUE'] },
       },
+      data: { remark: 'done', status: 'RETURN_PENDING', updatedBy: 'admin' },
     });
-    expect(tx.measuring_instruments.update).toHaveBeenCalledWith({
-      where: { id: 'm-1' },
+    expect(tx.measuring_instruments.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'm-1',
+        isDeleted: false,
+        borrowStatus: 'BORROWED',
+      },
       data: { borrowStatus: 'RETURN_PENDING', updatedBy: 'admin' },
     });
   });
 
-  it('confirms return and restores instrument status from active sibling record', async () => {
+  it('rejects a repeated requestReturn with 409', async () => {
+    vi.mocked(prisma.metrology_borrow_records.findFirst).mockResolvedValue({
+      id: 'borrow-1',
+      instrumentId: 'm-1',
+      returnedAt: null,
+      status: 'BORROWED',
+    } as never);
+    const instrumentUpdate = vi.fn();
+    const tx = {
+      measuring_instruments: { updateMany: instrumentUpdate },
+      metrology_borrow_records: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+      },
+    };
+    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
+
+    await expect(
+      MetrologyBorrowReturnService.requestReturn('borrow-1', {}, 'admin'),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(instrumentUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects requestReturn on an already returned record', async () => {
+    vi.mocked(prisma.metrology_borrow_records.findFirst).mockResolvedValue({
+      id: 'borrow-1',
+      instrumentId: 'm-1',
+      returnedAt: new Date('2026-01-02T00:00:00.000Z'),
+      status: 'RETURNED',
+    } as never);
+
+    await expect(
+      MetrologyBorrowReturnService.requestReturn('borrow-1', {}, 'admin'),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+  });
+
+  it('confirms return via CAS and restores instrument to available', async () => {
     vi.mocked(prisma.metrology_borrow_records.findFirst).mockResolvedValue({
       borrowedAt: new Date('2026-01-01T00:00:00.000Z'),
       id: 'borrow-1',
@@ -240,12 +390,11 @@ describe('metrology borrow services', () => {
       status: 'RETURN_PENDING',
     } as never);
     const tx = {
-      measuring_instruments: { update: vi.fn() },
+      measuring_instruments: {
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
       metrology_borrow_records: {
-        findFirst: vi
-          .fn()
-          .mockResolvedValue({ id: 'borrow-2', status: 'BORROWED' }),
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 1 }),
       },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
@@ -256,21 +405,30 @@ describe('metrology borrow services', () => {
       'admin',
     );
 
-    expect(tx.metrology_borrow_records.update).toHaveBeenCalledWith({
-      where: { id: 'borrow-1' },
+    expect(tx.metrology_borrow_records.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'borrow-1',
+        isDeleted: false,
+        status: 'RETURN_PENDING',
+      },
       data: expect.objectContaining({
         remark: 'returned',
+        returnedAt: new Date('2026-01-02T00:00:00'),
         status: 'RETURNED',
         updatedBy: 'admin',
       }),
     });
-    expect(tx.measuring_instruments.update).toHaveBeenCalledWith({
-      where: { id: 'm-1' },
-      data: { borrowStatus: 'BORROWED', updatedBy: 'admin' },
+    expect(tx.measuring_instruments.updateMany).toHaveBeenCalledWith({
+      where: {
+        id: 'm-1',
+        isDeleted: false,
+        borrowStatus: 'RETURN_PENDING',
+      },
+      data: { borrowStatus: 'AVAILABLE', updatedBy: 'admin' },
     });
   });
 
-  it('confirms return and keeps instrument return-pending when another active record exists', async () => {
+  it('rejects a duplicate confirmReturn with 409', async () => {
     vi.mocked(prisma.metrology_borrow_records.findFirst).mockResolvedValue({
       borrowedAt: new Date('2026-01-01T00:00:00.000Z'),
       id: 'borrow-1',
@@ -278,37 +436,50 @@ describe('metrology borrow services', () => {
       returnedAt: null,
       status: 'RETURN_PENDING',
     } as never);
+    const instrumentUpdate = vi.fn();
     const tx = {
-      measuring_instruments: { update: vi.fn() },
+      measuring_instruments: { updateMany: instrumentUpdate },
       metrology_borrow_records: {
-        findFirst: vi.fn().mockResolvedValue({
-          id: 'borrow-2',
-          status: 'RETURN_PENDING',
-        }),
-        update: vi.fn(),
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
     };
     vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
 
-    await MetrologyBorrowReturnService.confirmReturn(
-      'borrow-1',
-      { returnedAt: '2026-01-05', remark: ' ok ' },
-      'admin',
-    );
+    await expect(
+      MetrologyBorrowReturnService.confirmReturn(
+        'borrow-1',
+        { returnedAt: '2026-01-02' },
+        'admin',
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(instrumentUpdate).not.toHaveBeenCalled();
+  });
 
-    expect(tx.metrology_borrow_records.update).toHaveBeenCalledWith({
-      where: { id: 'borrow-1' },
-      data: {
-        remark: 'ok',
-        returnedAt: new Date('2026-01-05T00:00:00'),
-        status: 'RETURNED',
-        updatedBy: 'admin',
+  it('rejects confirmReturn when the record is not return-pending', async () => {
+    vi.mocked(prisma.metrology_borrow_records.findFirst).mockResolvedValue({
+      borrowedAt: new Date('2026-01-01T00:00:00.000Z'),
+      id: 'borrow-1',
+      instrumentId: 'm-1',
+      returnedAt: null,
+      status: 'BORROWED',
+    } as never);
+    const instrumentUpdate = vi.fn();
+    const tx = {
+      measuring_instruments: { updateMany: instrumentUpdate },
+      metrology_borrow_records: {
+        updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       },
-    });
-    expect(tx.measuring_instruments.update).toHaveBeenCalledWith({
-      where: { id: 'm-1' },
-      data: { borrowStatus: 'RETURN_PENDING', updatedBy: 'admin' },
-    });
+    };
+    vi.mocked(prisma.$transaction).mockImplementation((cb: any) => cb(tx));
+
+    await expect(
+      MetrologyBorrowReturnService.confirmReturn(
+        'borrow-1',
+        { returnedAt: '2026-01-02' },
+        'admin',
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(instrumentUpdate).not.toHaveBeenCalled();
   });
 
   it('rejects invalid return confirmation payloads and already returned records', async () => {

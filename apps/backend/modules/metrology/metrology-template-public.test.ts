@@ -44,13 +44,21 @@ describe('metrology template and public borrow helpers', () => {
     ]);
   });
 
-  it('allows public borrow access when no expected token is configured', async () => {
+  it('fails closed when the public borrow token is not configured', async () => {
     readPublicMetrologyBorrowExpectedToken.mockReturnValue('');
     const { verifyPublicMetrologyBorrowAccess } = await import(
       '~/modules/metrology/public-metrology-borrow'
     );
+    const event = {} as any;
 
-    expect(verifyPublicMetrologyBorrowAccess({} as any)).toBe(true);
+    expect(verifyPublicMetrologyBorrowAccess(event)).toEqual({
+      code: 403,
+      message: '扫码借用入口未配置访问凭证',
+    });
+    expect(forbiddenResponse).toHaveBeenCalledWith(
+      event,
+      '扫码借用入口未配置访问凭证',
+    );
     expect(verifyPublicMetrologyBorrowToken).not.toHaveBeenCalled();
   });
 

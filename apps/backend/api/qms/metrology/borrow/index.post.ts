@@ -1,15 +1,12 @@
 import { METROLOGY_PERMISSION_CODES } from '@qgs/shared';
 import { defineEventHandler, readBody } from 'h3';
 import { z } from 'zod';
+import { handleBorrowRouteError } from '~/modules/metrology/borrow/metrology-borrow-route-error';
 import { MetrologyBorrowService } from '~/modules/metrology/borrow/metrology-borrow.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
-import {
-  badRequestResponse,
-  internalServerErrorResponse,
-  useResponseSuccess,
-} from '~/utils/response';
+import { useResponseSuccess } from '~/utils/response';
 
 const borrowSchema = z.record(z.string(), z.unknown());
 
@@ -23,9 +20,6 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('metrology-borrow-create', error, undefined, event);
-    if (error instanceof Error) {
-      return badRequestResponse(event, error.message);
-    }
-    return internalServerErrorResponse(event, '新建借用记录失败');
+    return handleBorrowRouteError(event, error, '新建借用记录失败');
   }
 });
