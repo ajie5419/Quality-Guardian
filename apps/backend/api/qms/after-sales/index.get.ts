@@ -26,15 +26,17 @@ export default defineValidatedHandler(
     const pageSize = Math.min(normalizePageValue(query.pageSize, 20), 100);
 
     try {
-      const list = await AfterSalesService.getList({
+      const { items, total } = await AfterSalesService.getList({
         ...params,
+        page,
+        pageSize,
         userContext: {
           userId: String(userinfo.id || userinfo.userId || ''),
           username: userinfo.username,
         },
         dataScope: event.context.dataScope,
       });
-      return usePageResponseSuccess(page, pageSize, list);
+      return usePageResponseSuccess(page, pageSize, items, { total });
     } catch (error: unknown) {
       logApiError('after-sales', error, undefined, event);
       return internalServerErrorResponse(

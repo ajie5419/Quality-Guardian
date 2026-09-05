@@ -14,6 +14,11 @@ import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
+const analyticsAccess = {
+  dataScope: { deptIds: [], module: 'after-sales', scopeType: 'ALL' as const },
+  user: { userId: 'user-1', username: 'admin' },
+};
+
 vi.mock('~/utils/prisma', () => {
   const afterSales = {
     aggregate: vi.fn(),
@@ -23,6 +28,7 @@ vi.mock('~/utils/prisma', () => {
     findUnique: vi.fn(),
     groupBy: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
   };
   return {
     default: {
@@ -34,7 +40,14 @@ vi.mock('~/utils/prisma', () => {
         ]),
       },
       $queryRaw: vi.fn(),
-      $transaction: vi.fn((callback) => callback({ after_sales: afterSales })),
+      $transaction: vi.fn((callback) =>
+        callback({
+          after_sales: afterSales,
+          quality_loss_index_jobs: {
+            createMany: vi.fn().mockResolvedValue({ count: 1 }),
+          },
+        }),
+      ),
     },
   };
 });
@@ -45,6 +58,7 @@ vi.mock('~/modules/data-scope/data-scope.service', () => ({
       ...where,
       scoped: true,
     })),
+    buildScopedWhere: vi.fn(async (_module: string, where: unknown) => where),
   },
 }));
 
@@ -143,10 +157,13 @@ describe('after-sales core helpers and services', () => {
       since: new Date('2026-01-01T00:00:00.000Z'),
       supplierIds: ['supplier-1'],
     });
-    await AfterSalesService.getWeeklyReportIssues({
-      end: new Date('2026-01-07T00:00:00.000Z'),
-      start: new Date('2026-01-01T00:00:00.000Z'),
-    });
+    await AfterSalesService.getWeeklyReportIssues(
+      {
+        end: new Date('2026-01-07T00:00:00.000Z'),
+        start: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      analyticsAccess,
+    );
     await AfterSalesService.getVehicleFailureRecords({
       end: new Date('2026-01-31T00:00:00.000Z'),
       productCategoryId: 'vehicle-product',
@@ -160,14 +177,20 @@ describe('after-sales core helpers and services', () => {
       productTypeSnapshots: ['车辆产品'],
       vehicleDeptIds: [],
     });
-    await AfterSalesService.getReportPeriodMetrics({
-      end: new Date('2026-01-31T00:00:00.000Z'),
-      start: new Date('2026-01-01T00:00:00.000Z'),
-    });
-    await AfterSalesService.getStatsForDashboard({
-      weekStart: new Date('2026-01-01T00:00:00.000Z'),
-      yearStart: new Date('2026-01-01T00:00:00.000Z'),
-    });
+    await AfterSalesService.getReportPeriodMetrics(
+      {
+        end: new Date('2026-01-31T00:00:00.000Z'),
+        start: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      analyticsAccess,
+    );
+    await AfterSalesService.getStatsForDashboard(
+      {
+        weekStart: new Date('2026-01-01T00:00:00.000Z'),
+        yearStart: new Date('2026-01-01T00:00:00.000Z'),
+      },
+      analyticsAccess,
+    );
 
     expect(prisma.after_sales.update).toHaveBeenCalledWith({
       where: { id: 'as-1' },
@@ -239,13 +262,16 @@ describe('after-sales core helpers and services', () => {
       AfterSalesService.updateByRoute('as-404', { laborTravelCost: 10 }),
     ).rejects.toThrow('AFTER_SALES_NOT_FOUND');
 
-    vi.mocked(prisma.after_sales.update).mockResolvedValue({
-      supplierBrand: 'Supplier A',
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValue({
+      id: 'as-1',
       supplierBrandId: 'supplier-1',
+    } as never);
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
+      count: 1,
     } as never);
     await AfterSalesService.deleteRecord('as-1', 'user-1');
 
-    expect(prisma.after_sales.update).toHaveBeenCalledWith({
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledWith({
       where: { id: 'as-1' },
       data: {
         isDeleted: true,
@@ -266,6 +292,62 @@ describe('after-sales core helpers and services', () => {
       ['supplier-1'],
       'after-sales.deleted',
     );
+  });
+
+  it('versioned user delete keys the update by the client version and increments it', async () => {
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValue({
+      id: 'as-1',
+      supplierBrandId: 'supplier-1',
+      version: 1,
+    } as never);
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
+
+    await AfterSalesService.deleteRecord('as-1', 'user-1', undefined, 1);
+
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledWith({
+      where: { id: 'as-1', version: 1 },
+      data: {
+        isDeleted: true,
+        updatedAt: expect.any(Date),
+        version: { increment: 1 },
+      },
+    });
+  });
+
+  it('stale user delete returns 409 and never removes the newer edit', async () => {
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValue({
+      id: 'as-1',
+      supplierBrandId: 'supplier-1',
+      version: 2,
+    } as never);
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
+      count: 0,
+    } as never);
+
+    await expect(
+      AfterSalesService.deleteRecord('as-1', 'user-1', undefined, 1),
+    ).rejects.toMatchObject({
+      code: 'OPTIMISTIC_LOCK_CONFLICT',
+      httpStatus: 409,
+    });
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('out-of-scope delete reports 404, never 409 leaking object existence', async () => {
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValue(null);
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
+      count: 0,
+    } as never);
+
+    await expect(
+      AfterSalesService.deleteRecord('as-b', 'user-b', undefined, 1),
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      httpStatus: 404,
+    });
+    expect(prisma.after_sales.updateMany).not.toHaveBeenCalled();
   });
 
   it('builds chart aggregation from grouped rows, department names, report months, and scoped queries', async () => {
@@ -293,9 +375,9 @@ describe('after-sales core helpers and services', () => {
         dimension: 'responsibleDept',
         metric: 'totalLoss',
         top: 1,
-        userContext: { userId: 'u-1', username: 'admin' },
         year: 2026,
       },
+      analyticsAccess,
     );
 
     expect(grouped).toEqual([
@@ -308,29 +390,26 @@ describe('after-sales core helpers and services', () => {
     ]);
     expect(DataScopeService.buildAfterSalesWhere).toHaveBeenCalled();
 
-    vi.mocked(prisma.after_sales.findMany).mockResolvedValue([
+    (prisma.after_sales.groupBy as any).mockResolvedValue([
       {
         occurDate: new Date('2026-01-01T00:00:00.000Z'),
-        laborTravelCost: 20,
-        materialCost: 80,
-        quantity: 2,
-        runningHours: 10,
+        _sum: { laborTravelCost: 20, materialCost: 80 },
       },
       {
         occurDate: new Date('2026-01-20T00:00:00.000Z'),
-        laborTravelCost: 5,
-        materialCost: 15,
-        quantity: 1,
-        runningHours: 4,
+        _sum: { laborTravelCost: 5, materialCost: 15 },
       },
     ] as never);
 
     await expect(
-      AfterSalesChartAggregationService.getChartAggregation({
-        dimension: 'reportMonth',
-        metric: 'totalLoss',
-        year: 2026,
-      }),
+      AfterSalesChartAggregationService.getChartAggregation(
+        {
+          dimension: 'reportMonth',
+          metric: 'totalLoss',
+          year: 2026,
+        },
+        analyticsAccess,
+      ),
     ).resolves.toEqual([
       {
         id: '2026-01',
@@ -346,7 +425,10 @@ describe('after-sales core helpers and services', () => {
       new Error('db unavailable') as never,
     );
 
-    const stats = await AfterSalesAnalyticsService.getStats({ year: 2026 });
+    const stats = await AfterSalesAnalyticsService.getStats(
+      { year: 2026 },
+      analyticsAccess,
+    );
 
     expect(stats.kpi).toEqual({ avgTime: 0, cost: 0, open: 0, total: 0 });
     expect(stats.defectDistribution).toEqual([]);

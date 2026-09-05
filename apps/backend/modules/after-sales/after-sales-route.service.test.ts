@@ -61,6 +61,7 @@ const {
 vi.mock('~/utils/prisma', () => {
   const afterSales = {
     create: vi.fn(),
+    findFirst: vi.fn(),
     findMany: vi.fn(),
     findUnique: vi.fn(),
     update: vi.fn(),
@@ -103,6 +104,20 @@ vi.mock('~/utils/api-logger', () => ({
 vi.mock('~/utils/prisma-error', () => ({
   isPrismaNotFoundError,
 }));
+
+vi.mock('~/utils/business-error', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('~/utils/business-error')>();
+  return {
+    ...actual,
+    isBusinessError: (error: unknown) =>
+      error instanceof Error && error.name === 'BusinessError',
+    businessErrorResponse: vi.fn((_event: any, error: any) => ({
+      message: error.message,
+      type: 'not_found',
+    })),
+  };
+});
 
 vi.mock('~/utils/response', () => ({
   badRequestResponse,
@@ -149,7 +164,7 @@ vi.mock('~/modules/after-sales/after-sales.service', () => ({
 }));
 
 function event() {
-  return { context: { dataScope: { mode: 'ALL' } } } as any;
+  return { context: { dataScope: { scopeType: 'ALL', deptIds: [] } } } as any;
 }
 
 describe('after-sales route services', () => {
@@ -259,16 +274,20 @@ describe('after-sales route services', () => {
       laborTravelCost: 20,
       materialCost: 80,
       photos: ['/new.png'],
+      version: 1,
     });
-    vi.mocked(prisma.after_sales.findUnique).mockResolvedValue({
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValue({
       laborTravelCost: 1,
       materialCost: 2,
+      version: 1,
     } as never);
-    vi.mocked(prisma.after_sales.update).mockResolvedValue({} as never);
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
+      count: 1,
+    } as never);
 
     expect(await handler(event())).toEqual({ data: null, type: 'success' });
-    expect(prisma.after_sales.update).toHaveBeenCalledWith({
-      where: { id: 'as-1' },
+    expect(prisma.after_sales.updateMany).toHaveBeenCalledWith({
+      where: { id: 'as-1', version: 1 },
       data: expect.objectContaining({ materialCost: 80, laborTravelCost: 20 }),
     });
     expect(registerReferencesFromAttachments).toHaveBeenCalledWith({
@@ -288,18 +307,18 @@ describe('after-sales route services', () => {
     expect(await handler(event())).toEqual({ message: 'missing id' });
 
     getRequiredRouterParam.mockReturnValue('as-1');
-    readBody.mockResolvedValue({ materialCost: 10 });
-    vi.mocked(prisma.after_sales.findUnique).mockResolvedValueOnce(null);
+    readBody.mockResolvedValue({ materialCost: 10, version: 1 });
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValueOnce(null);
     expect(await handler(event())).toEqual({
       message: '售后记录不存在',
       type: 'not_found',
     });
 
-    vi.mocked(prisma.after_sales.findUnique).mockResolvedValueOnce({
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValueOnce({
       laborTravelCost: 0,
       materialCost: 0,
     } as never);
-    vi.mocked(prisma.after_sales.update).mockRejectedValueOnce(
+    vi.mocked(prisma.after_sales.updateMany).mockRejectedValueOnce(
       new Error('not found') as never,
     );
     isPrismaNotFoundError.mockReturnValueOnce(true);
@@ -308,11 +327,11 @@ describe('after-sales route services', () => {
       type: 'not_found',
     });
 
-    vi.mocked(prisma.after_sales.findUnique).mockResolvedValueOnce({
+    vi.mocked(prisma.after_sales.findFirst).mockResolvedValueOnce({
       laborTravelCost: 0,
       materialCost: 0,
     } as never);
-    vi.mocked(prisma.after_sales.update).mockRejectedValueOnce(
+    vi.mocked(prisma.after_sales.updateMany).mockRejectedValueOnce(
       new Error('db') as never,
     );
     expect(await handler(event())).toEqual({
@@ -341,6 +360,9 @@ describe('after-sales route services', () => {
         metric: 'count',
         top: 3,
         year: 2026,
+      }),
+      expect.objectContaining({
+        user: expect.objectContaining({ userId: 'u-1' }),
       }),
     );
 

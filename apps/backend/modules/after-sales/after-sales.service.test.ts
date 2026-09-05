@@ -4,6 +4,11 @@ import { DeptService } from '~/modules/dept';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import prisma from '~/utils/prisma';
 
+const analyticsAccess = {
+  dataScope: { deptIds: [], module: 'after-sales', scopeType: 'ALL' as const },
+  user: { userId: 'user-1', username: 'admin' },
+};
+
 // Mock prisma
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -112,7 +117,10 @@ describe('afterSalesService', () => {
         .mockResolvedValueOnce(new Map([['supplier-a', 'Brand A']]))
         .mockResolvedValueOnce(new Map([['dept-quality', 'Quality']]));
 
-      const stats = await AfterSalesService.getStats({ year: 2024 });
+      const stats = await AfterSalesService.getStats(
+        { year: 2024 },
+        analyticsAccess,
+      );
 
       expect(stats.kpi.total).toBe(10);
       expect(stats.kpi.open).toBe(5);
@@ -167,8 +175,8 @@ describe('afterSalesService', () => {
 
       const result = await AfterSalesService.getList({});
 
-      expect(result).toHaveLength(1);
-      const item = result[0];
+      expect(result.items).toHaveLength(1);
+      const item = result.items[0];
       expect(item.id).toBe('AS-1');
       expect(item.qualityLoss).toBe(150);
       expect(item.responsibleDept).toBe('Renamed Quality');
@@ -218,7 +226,7 @@ describe('afterSalesService', () => {
 
       const result = await AfterSalesService.getList({});
 
-      expect(result[0]).toMatchObject({
+      expect(result.items[0]).toMatchObject({
         defectType: '缺陷-新',
         defectSubtype: '缺陷子类-新',
         productType: '产品类型-新',
@@ -267,6 +275,59 @@ describe('afterSalesService', () => {
       expect(where.AND).toContainEqual({
         OR: expect.arrayContaining([{ respDeptId: { in: ['dept-quality'] } }]),
       });
+    });
+
+    it('paginates in the database and counts with the same scoped where', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+      (prisma.after_sales.count as any).mockResolvedValue(42);
+
+      const result = await AfterSalesService.getList({
+        page: 2,
+        pageSize: 20,
+      });
+
+      expect(result.total).toBe(42);
+      const findManyArgs = (prisma.after_sales.findMany as any).mock
+        .calls[0][0];
+      expect(findManyArgs.skip).toBe(20);
+      expect(findManyArgs.take).toBe(20);
+      expect(findManyArgs.orderBy).toEqual([
+        { createdAt: 'desc' },
+        { id: 'desc' },
+      ]);
+      expect((prisma.after_sales.count as any).mock.calls[0][0].where).toEqual(
+        findManyArgs.where,
+      );
+    });
+
+    it('caps interactive page size at the project maximum', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({ page: 1, pageSize: 500 });
+
+      const findManyArgs = (prisma.after_sales.findMany as any).mock
+        .calls[0][0];
+      expect(findManyArgs.take).toBe(100);
+      expect(findManyArgs.skip).toBe(0);
+    });
+
+    it('selects a bounded list DTO without unused long text columns', async () => {
+      (prisma.after_sales.findMany as any).mockResolvedValue([]);
+
+      await AfterSalesService.getList({ page: 1, pageSize: 20 });
+
+      const findManyArgs = (prisma.after_sales.findMany as any).mock
+        .calls[0][0];
+      expect(findManyArgs.select).toBeDefined();
+      // Fields the list/detail/edit flow renders must stay selected.
+      expect(findManyArgs.select.photos).toBe(true);
+      expect(findManyArgs.select.solution).toBe(true);
+      expect(findManyArgs.select.issueDescription).toBe(true);
+      expect(findManyArgs.select.version).toBe(true);
+      // Long text / internal columns nobody renders must not be loaded.
+      expect(findManyArgs.select.actualSolution).toBeUndefined();
+      expect(findManyArgs.select.remarks).toBeUndefined();
+      expect(findManyArgs.select.feedbackDept).toBeUndefined();
     });
   });
 });

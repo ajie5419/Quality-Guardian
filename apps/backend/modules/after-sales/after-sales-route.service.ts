@@ -1,4 +1,8 @@
+import type { Prisma } from '@prisma/client';
+import type { AccessScope } from '~/modules/data-scope';
+
 import { QMS_DEFAULT_VALUES } from '@qgs/shared';
+import { createScopedRepository } from '~/modules/data-scope';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import {
   buildImportRowError,
@@ -20,16 +24,38 @@ import {
 import { buildGovernedAfterSalesCreateData } from './after-sales-payload';
 
 export const AfterSalesRouteService = {
-  async batchDelete(ids: string[]) {
+  async batchDelete(
+    ids: string[],
+    userinfo?: {
+      id?: number | string;
+      userId?: number | string;
+      username?: string;
+    },
+    scope?: AccessScope,
+  ) {
     const result = await prisma.$transaction(async (tx) => {
-      const existing = await tx.after_sales.findMany({
-        where: { id: { in: ids } },
-        select: { id: true, supplierBrandId: true },
-      });
-      const result = await tx.after_sales.updateMany({
-        where: { id: { in: ids } },
-        data: { isDeleted: true, updatedAt: new Date() },
-      });
+      const txRepo = createScopedRepository('after-sales', tx.after_sales);
+      const access = {
+        user: {
+          id: userinfo?.id ?? userinfo?.userId ?? '',
+          username: userinfo?.username,
+        },
+        scope,
+      };
+      const existing = await txRepo.findManyAccessible(
+        {
+          where: { id: { in: ids }, isDeleted: false },
+          select: { id: true, supplierBrandId: true },
+        },
+        access,
+      );
+      const result = await txRepo.updateAccessible(
+        {
+          where: { id: { in: ids } },
+          data: { isDeleted: true, updatedAt: new Date() },
+        },
+        access,
+      );
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
         existing.map((item) => item.supplierBrandId),
@@ -56,15 +82,16 @@ export const AfterSalesRouteService = {
   async create(
     body: Record<string, unknown>,
     userinfo: { id?: number | string; realName?: string; username?: string },
+    client?: Prisma.TransactionClient,
   ) {
-    const serialNumber = await getNextAfterSalesSerialNumber();
+    const serialNumber = await getNextAfterSalesSerialNumber(client ?? prisma);
     const createData = await buildGovernedAfterSalesCreateData(body, {
       createdBy: String(userinfo.id || '') || undefined,
       defaultWorkOrderNumber: QMS_DEFAULT_VALUES.UNKNOWN_WORK_ORDER,
       id: createAfterSalesId(),
       serialNumber,
     });
-    const created = await prisma.$transaction(async (tx) => {
+    const createRow = async (tx: Prisma.TransactionClient) => {
       const created = await tx.after_sales.create({ data: createData });
       await MetricRefreshQueue.enqueueSupplierScores(
         tx,
@@ -77,7 +104,30 @@ export const AfterSalesRouteService = {
         'after-sales.created',
       );
       return created;
-    });
+    };
+    const created = client
+      ? await createRow(client)
+      : await prisma.$transaction(createRow);
+    if (!client) {
+      await AfterSalesRouteService.applyCreatePostCommit(
+        body,
+        created,
+        userinfo,
+      );
+    }
+    return created;
+  },
+
+  /**
+   * Post-commit side effects of an after-sales create. Idempotency handlers
+   * call this only when the request was NOT replayed, so a network retry never
+   * re-registers file references or writes a duplicate audit row.
+   */
+  async applyCreatePostCommit(
+    body: Record<string, unknown>,
+    created: { id: string; projectName?: null | string },
+    userinfo: { id?: number | string; realName?: string; username?: string },
+  ) {
     await FileStorageService.registerReferencesFromAttachments({
       attachments: body.photos,
       bizId: String(created.id),
@@ -89,7 +139,6 @@ export const AfterSalesRouteService = {
       targetId: String(created.id),
       detailsVariables: { id: created.id, projectName: created.projectName },
     });
-    return created;
   },
 
   async importItems(

@@ -152,20 +152,23 @@ describe('afterSalesService – adversarial', () => {
   describe('getList', () => {
     it('returns empty array when no records', async () => {
       (prisma.after_sales.findMany as any).mockResolvedValue([]);
+      (prisma.after_sales.count as any).mockResolvedValue(0);
 
       const result = await AfterSalesService.getList({});
 
-      expect(result).toEqual([]);
+      expect(result).toEqual({ items: [], total: 0 });
     });
 
     it('returns records when found', async () => {
       (prisma.after_sales.findMany as any).mockResolvedValue([
         { id: 'AS-001', claimStatus: 'OPEN' },
       ]);
+      (prisma.after_sales.count as any).mockResolvedValue(1);
 
       const result = await AfterSalesService.getList({});
 
-      expect(result).toHaveLength(1);
+      expect(result.items).toHaveLength(1);
+      expect(result.total).toBe(1);
     });
 
     it('filters supplier portrait records by canonical supplier ID', async () => {

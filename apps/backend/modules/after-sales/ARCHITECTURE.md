@@ -39,4 +39,17 @@
 - 批量导入允许用一级、二级名称解析，但只能在对应分类域和父分类内精确匹配；缺失或父子不匹配时返回逐行错误。
 - 列表筛选、统计和动态图表使用新的分类域 ID。车辆故障率以产品分类 ID 为主路径，并对尚未回填 ID 的存量记录精确匹配已声明的历史产品名称快照；旧 `productTypeId`、`productSubtypeId`、`defectTypeId`、`defectSubtypeId` 仅为迁移兼容保留，不再作为新统计的身份键。
 
+## 乐观锁契约（OPTIMISTIC-LOCK-001）
+
+- `after_sales.version`（`Int @default(1)`）是交互式编辑的乐观锁令牌：列表/详情响应携带 `version`，编辑（PUT）与删除（DELETE）必须提交客户端读取到的 `version`，缺失或非法 → 400。
+- 用户编辑与删除统一走 `updateAccessibleVersioned`（scoped repository），原子执行 `updateMany({ where: { id, version: expectedVersion, ...scopeWhere }, data: { ..., version: { increment: 1 } } })`；count≠1 时仅做只读 scoped 存在性复查：不存在/无权限 → 404（不泄露对象存在），存在但版本过期 → 409 `OPTIMISTIC_LOCK_CONFLICT`（不覆盖新版本）。
+- 系统清理路径（`expectedVersion` 省略）继续走非版本化 scoped 软删，不被用户乐观锁规则阻塞。
+- 审计记录 `oldVersion`/`newVersion`；冲突失败不写业务审计。
+
+## 创建入口幂等（IDEMPOTENCY-KEY-001 / PHASE-2）
+
+- `POST /qms/after-sales` 强制 `Idempotency-Key`，operationKey = `qms.after-sales.create`，窗口 5 分钟。
+- claim 行与 `after_sales.create` 同一事务（`withRequestIdempotency`）； `serialNumber` 生成与业务 P2002 重试语义不变。
+- 首次提交后仅一次 `applyCreatePostCommit`（文件引用 + 审计）；replay 不重复副作用。
+
 通用规则见 `docs/master-data-identity-governance.md`。

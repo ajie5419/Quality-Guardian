@@ -3,6 +3,7 @@ import type {
   AfterSalesParams,
   AfterSalesStats,
 } from '@qgs/shared';
+import type { AccessScope, AnalyticsAccessContext } from '~/modules/data-scope';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
 
 import type {
@@ -16,49 +17,25 @@ import { Prisma } from '@prisma/client';
 import { formatDate, tryParsePhotos } from '@qgs/shared';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { DeptService } from '~/modules/dept';
-import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
-import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { resolveCanonicalClassificationName } from '~/utils/classification-resolver';
-import { parseResponsibleDepartments } from '~/utils/department-multi';
+import { INTERACTIVE_PAGE_SIZE_MAX } from '~/utils/export-constants';
 import prisma from '~/utils/prisma';
 
 import { AfterSalesAnalyticsService } from './after-sales-analytics.service';
+import { deleteAfterSalesRecord } from './after-sales-delete.service';
 import { AfterSalesIntegrationService } from './after-sales-integration.service';
+import {
+  AFTER_SALES_LIST_SELECT,
+  getResponsibleDepartmentsForResponse,
+} from './after-sales-list-dto';
 import { buildGovernedAfterSalesUpdateData } from './after-sales-payload';
 import {
   buildAfterSalesDateRange,
   buildAfterSalesExplicitDateRange,
 } from './after-sales-query';
 import { normalizeAfterSalesClaimStatus } from './after-sales-status';
-
-function getResponsibleDepartmentsForResponse(
-  item: {
-    respDept: null | string;
-    responsibleDepartments: null | string;
-  },
-  currentResponsibleDepartmentName?: null | string,
-): string[] {
-  const responsibleDepartments = parseResponsibleDepartments(
-    item.responsibleDepartments,
-  );
-  const snapshotResponsibleDepartment = String(item.respDept || '').trim();
-  if (currentResponsibleDepartmentName) {
-    const remainingDepartments = responsibleDepartments.includes(
-      snapshotResponsibleDepartment,
-    )
-      ? responsibleDepartments.filter(
-          (department) => department !== snapshotResponsibleDepartment,
-        )
-      : responsibleDepartments.slice(1);
-    return [currentResponsibleDepartmentName, ...remainingDepartments];
-  }
-  if (responsibleDepartments.length > 0) {
-    return responsibleDepartments;
-  }
-  return snapshotResponsibleDepartment ? [snapshotResponsibleDepartment] : [];
-}
 
 function appendAndCondition(
   where: Prisma.after_salesWhereInput,
@@ -85,8 +62,11 @@ export const AfterSalesService = {
     return AfterSalesIntegrationService.getSupplierScoringData(params);
   },
 
-  async getWeeklyReportIssues(params: { end: Date; start: Date }) {
-    return AfterSalesIntegrationService.getWeeklyReportIssues(params);
+  async getWeeklyReportIssues(
+    params: { end: Date; start: Date },
+    access: AnalyticsAccessContext,
+  ) {
+    return AfterSalesIntegrationService.getWeeklyReportIssues(params, access);
   },
 
   async getVehicleFailureRecords(params: {
@@ -108,12 +88,18 @@ export const AfterSalesService = {
     return AfterSalesIntegrationService.findEarliestVehicleFailureDate(params);
   },
 
-  async getReportPeriodMetrics(params: { end: Date; start: Date }) {
-    return AfterSalesIntegrationService.getReportPeriodMetrics(params);
+  async getReportPeriodMetrics(
+    params: { end: Date; start: Date },
+    access: AnalyticsAccessContext,
+  ) {
+    return AfterSalesIntegrationService.getReportPeriodMetrics(params, access);
   },
 
-  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
-    return AfterSalesIntegrationService.getStatsForDashboard(params);
+  async getStatsForDashboard(
+    params: { weekStart: Date; yearStart: Date },
+    access: AnalyticsAccessContext,
+  ) {
+    return AfterSalesIntegrationService.getStatsForDashboard(params, access);
   },
 
   async updateByRoute(
@@ -140,6 +126,9 @@ export const AfterSalesService = {
       if (costsChanged && !current) {
         throw new Error('AFTER_SALES_NOT_FOUND');
       }
+      // qms-arch-allow R-SCOPE: legacy after-sales update path (b168); the id
+      // is the endpoint id param and current callers are tests only. Migrate
+      // to updateAccessible in the dedicated after-sales write special.
       const updated = await tx.after_sales.update({
         where: { id },
         data: updateData,
@@ -160,25 +149,29 @@ export const AfterSalesService = {
   /**
    * Calculate After-Sales KPI and Statistics
    */
-  async getStats(params?: {
-    dateMode?: AfterSalesDateMode;
-    dateValue?: string;
-    year?: number;
-  }): Promise<AfterSalesStats> {
-    return AfterSalesAnalyticsService.getStats(params);
+  async getStats(
+    params?: {
+      dateMode?: AfterSalesDateMode;
+      dateValue?: string;
+      year?: number;
+    },
+    access?: AnalyticsAccessContext,
+  ): Promise<AfterSalesStats> {
+    return AfterSalesAnalyticsService.getStats(params, access);
   },
 
-  async getChartAggregation(params: {
-    dataScope?: ResolvedDataScope;
-    dateMode?: AfterSalesDateMode;
-    dateValue?: string;
-    dimension: AfterSalesChartDimension;
-    metric: AfterSalesChartMetric;
-    top?: number;
-    userContext?: { userId: string; username?: string };
-    year?: number;
-  }): Promise<AfterSalesChartAggregateItem[]> {
-    return AfterSalesAnalyticsService.getChartAggregation(params);
+  async getChartAggregation(
+    params: {
+      dateMode?: AfterSalesDateMode;
+      dateValue?: string;
+      dimension: AfterSalesChartDimension;
+      metric: AfterSalesChartMetric;
+      top?: number;
+      year?: number;
+    },
+    access?: AnalyticsAccessContext,
+  ): Promise<AfterSalesChartAggregateItem[]> {
+    return AfterSalesAnalyticsService.getChartAggregation(params, access);
   },
 
   /**
@@ -189,9 +182,11 @@ export const AfterSalesService = {
       dataScope?: ResolvedDataScope;
       dateMode?: AfterSalesDateMode;
       dateValue?: string;
+      page?: number;
+      pageSize?: number;
       userContext?: { userId: string; username?: string };
     },
-  ): Promise<AfterSalesItem[]> {
+  ): Promise<{ items: AfterSalesItem[]; total: number }> {
     const {
       dateMode,
       dateValue,
@@ -201,6 +196,8 @@ export const AfterSalesService = {
       endDate,
       handler,
       partName,
+      page,
+      pageSize,
       projectName,
       productCategoryId,
       productSubcategoryId,
@@ -337,22 +334,32 @@ export const AfterSalesService = {
       );
     }
 
-    const list = await prisma.after_sales.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        defectCategory: { select: { name: true } },
-        defectSubcategory: { select: { name: true } },
-        productCategory: { select: { name: true } },
-        productSubcategory: { select: { name: true } },
-      },
-    });
+    const safePage = Math.max(Number(page) || 1, 1);
+    const safePageSize = Math.min(
+      Math.max(Number(pageSize) || 20, 1),
+      INTERACTIVE_PAGE_SIZE_MAX,
+    );
+    const skip = (safePage - 1) * safePageSize;
+
+    // Server-side pagination (PERF-QMS-001 / PHASE-1A): the same scoped where
+    // drives both the page and the count, so the page, the total and the
+    // DataScope contract can never drift.
+    const [list, total] = await Promise.all([
+      prisma.after_sales.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+        select: AFTER_SALES_LIST_SELECT,
+        skip,
+        take: safePageSize,
+      }),
+      prisma.after_sales.count({ where }),
+    ]);
     const departmentNames = await DeptService.resolveActiveNamesByIds(
       list.map((item) => item.respDeptId),
     );
 
     // Map to frontend expectation with formatted dates
-    return list.map((item) => {
+    const items = list.map((item) => {
       const materialCost = Number(item.materialCost) || 0;
       const laborTravelCost = Number(item.laborTravelCost) || 0;
       const currentResponsibleDepartmentName = departmentNames.get(
@@ -411,43 +418,19 @@ export const AfterSalesService = {
         runningHours: Number(item.runningHours) || 0,
       } as AfterSalesItem;
     });
+
+    return { items, total };
   },
 
   /**
    * Soft delete a record with audit logging
    */
-  async deleteRecord(id: string, userId: string): Promise<void> {
-    await prisma.$transaction(async (tx) => {
-      const deleted = await tx.after_sales.update({
-        where: { id },
-        data: {
-          isDeleted: true,
-          updatedAt: new Date(),
-        },
-      });
-      await MetricRefreshQueue.enqueueSupplierScores(
-        tx,
-        [deleted.supplierBrandId],
-        'after-sales.deleted',
-      );
-      await QualityLossIndexQueue.enqueue(
-        tx,
-        [{ source: 'EXTERNAL', sourcePk: deleted.id }],
-        'after-sales.deleted',
-      );
-      return deleted;
-    });
-
-    await FileStorageService.softDeleteReferences({
-      bizId: id,
-      bizType: 'after_sales',
-    });
-
-    // Record audit log
-    await SystemLogService.auditLog('after-sales', 'delete', {
-      userId,
-      targetId: id,
-      detailsVariables: {},
-    });
+  async deleteRecord(
+    id: string,
+    userId: string,
+    scope?: AccessScope,
+    expectedVersion?: number,
+  ): Promise<void> {
+    return deleteAfterSalesRecord(id, userId, scope, expectedVersion);
   },
 };
