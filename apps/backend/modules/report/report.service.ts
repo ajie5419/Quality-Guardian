@@ -1,4 +1,5 @@
 import type { IssueItem, WeeklyReportData } from '@qgs/shared';
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
 
 import {
   createIdentityAggregateItem,
@@ -8,6 +9,7 @@ import {
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
 import { AfterSalesAPI } from '~/modules/after-sales';
+import { requireAnalyticsUser } from '~/modules/data-scope';
 import { DeptService } from '~/modules/dept';
 import { InspectionService } from '~/modules/inspection';
 import { QualityClassificationService } from '~/modules/quality-classification';
@@ -101,8 +103,10 @@ export const ReportService = {
     startDate: string,
     endDate: string,
     author?: Partial<WeeklyReportData['author']>,
+    access?: AnalyticsAccessContext,
   ): Promise<WeeklyReportData> {
     try {
+      requireAnalyticsUser(access);
       const start = new Date(startDate);
       const end = new Date(endDate);
       if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
@@ -116,24 +120,33 @@ export const ReportService = {
       // Detailed implementation might require specific business logic on what constitutes "tracking".
       // Here we fetch issues created before start date but still open, or closed within range.
       const trackingIssuesRaw =
-        await QualityLossService.getWeeklyTrackingIssues({
-          closedStatuses: CLOSED_TRACKING_STATUSES,
-          end,
-          start,
-          take: 20,
-        });
+        await QualityLossService.getWeeklyTrackingIssues(
+          {
+            closedStatuses: CLOSED_TRACKING_STATUSES,
+            end,
+            start,
+            take: 20,
+          },
+          access,
+        );
 
       // 2. Fetch Internal Issues (This Week)
-      const internalIssuesRaw = await InspectionService.getWeeklyReportIssues({
-        end,
-        start,
-      });
+      const internalIssuesRaw = await InspectionService.getWeeklyReportIssues(
+        {
+          end,
+          start,
+        },
+        access,
+      );
 
       // 3. Fetch External Issues (This Week)
-      const externalIssuesRaw = await AfterSalesAPI.getWeeklyReportIssues({
-        end,
-        start,
-      });
+      const externalIssuesRaw = await AfterSalesAPI.getWeeklyReportIssues(
+        {
+          end,
+          start,
+        },
+        access,
+      );
 
       const departmentNames = await DeptService.resolveActiveNamesByIds([
         ...trackingIssuesRaw.map((item) => item.respDeptId),

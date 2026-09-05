@@ -2,7 +2,10 @@ import { defineEventHandler, getQuery } from 'h3';
 import { z } from 'zod';
 import { ReportSummaryService } from '~/modules/report/report-summary.service';
 import { logApiError } from '~/utils/api-logger';
-import { getCurrentUser } from '~/utils/current-user';
+import {
+  getAnalyticsAccessContext,
+  getCurrentUser,
+} from '~/utils/current-user';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -18,12 +21,15 @@ export default defineEventHandler(async (event) => {
   const userinfo = getCurrentUser(event);
   const query = dailySummaryQuerySchema.parse(getQuery(event));
   try {
-    const data = await ReportSummaryService.getDailySummaryFromQuery({
-      date: query.date,
-      realName: userinfo.realName,
-      user: query.user,
-      username: userinfo.username,
-    });
+    const data = await ReportSummaryService.getDailySummaryFromQuery(
+      {
+        date: query.date,
+        realName: userinfo.realName,
+        user: query.user,
+        username: userinfo.username,
+      },
+      getAnalyticsAccessContext(event),
+    );
     return useResponseSuccess(data);
   } catch (error: unknown) {
     if (ReportSummaryService.isValidationError(error)) {

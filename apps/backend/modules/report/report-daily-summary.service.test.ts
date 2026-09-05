@@ -36,15 +36,20 @@ vi.mock('~/utils/process-resolver', () => ({
   resolveCanonicalProcessName: vi.fn().mockReturnValue(''),
 }));
 
+const testAccess = { user: { userId: 'u1', username: 'admin' } };
+
 describe('reportDailySummaryService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('returns daily summary with default values for empty inspections', async () => {
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result).toHaveProperty('date');
     expect(result).toHaveProperty('inspections');
@@ -60,27 +65,39 @@ describe('reportDailySummaryService', () => {
   });
 
   it('uses realName as reporter when provided', async () => {
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      realName: 'Alice',
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        realName: 'Alice',
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.reporter).toBe('Alice');
   });
 
-  it('falls back to user field for reporter when realName is not provided', async () => {
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      user: 'operator',
-      username: 'admin',
-    });
+  it('ignores the arbitrary user param and reports under the current user', async () => {
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        user: 'operator',
+        username: 'admin',
+      },
+      testAccess,
+    );
 
-    expect(result.reporter).toBe('operator');
+    // SEC-ANALYTICS-SCOPE-001: the legacy `user` query parameter could
+    // address an arbitrary username (cross-user read); row filters and the
+    // reporter label now always derive from the current user.
+    expect(result.reporter).toBe('admin');
   });
 
   it('falls back to username when neither realName nor user is provided', async () => {
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.reporter).toBe('admin');
   });
@@ -99,9 +116,12 @@ describe('reportDailySummaryService', () => {
       },
     ]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.inspections).toHaveLength(1);
     expect(result.inspections[0].process).toBe('进货检验');
@@ -125,9 +145,12 @@ describe('reportDailySummaryService', () => {
       },
     ]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.inspections[0].result).toBe('不合格');
     expect(result.inspections[0].partName).toBe('Frame');
@@ -148,9 +171,12 @@ describe('reportDailySummaryService', () => {
       },
     ]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.inspections[0].process).toBe('发货检验');
     expect(result.inspections[0].partName).toBe('Motor');
@@ -173,10 +199,13 @@ describe('reportDailySummaryService', () => {
       },
     ]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      date: '2026-06-15',
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        date: '2026-06-15',
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.issues).toHaveLength(1);
     expect(result.issues[0].description).toBe('Surface scratch');
@@ -207,10 +236,13 @@ describe('reportDailySummaryService', () => {
       },
     ]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      date: '2026-06-15',
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        date: '2026-06-15',
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.issues[0]).toMatchObject({
       dept: 'Renamed Department',
@@ -223,9 +255,12 @@ describe('reportDailySummaryService', () => {
     (InspectionService.getDailyReportInspections as any).mockResolvedValue([]);
     (InspectionService.getDailyReportIssues as any).mockResolvedValue([]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.archiveStats).toEqual({
       archivedCount: 0,
@@ -241,9 +276,12 @@ describe('reportDailySummaryService', () => {
     (InspectionService.getDailyReportInspections as any).mockResolvedValue([]);
     (InspectionService.getDailyReportIssues as any).mockResolvedValue([]);
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.documentItems).toEqual([]);
     expect(result.engineeringTodos).toEqual([]);
@@ -260,9 +298,12 @@ describe('reportDailySummaryService', () => {
       summary: '{"summary":"content"}',
     });
 
-    const result = await ReportDailySummaryService.getDailySummaryFromQuery({
-      username: 'admin',
-    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        username: 'admin',
+      },
+      testAccess,
+    );
 
     expect(result.summary).toBe('Existing report');
   });
