@@ -6,45 +6,32 @@ import type {
   WorkOrderParams,
   WorkOrderSummaryItem,
 } from '@qgs/shared';
-import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
+import type {
+  AnalyticsAccessContext,
+  ResolvedDataScope,
+} from '~/modules/data-scope';
 
 import { Prisma } from '@prisma/client';
-import { createIdentityAggregateItem, QMS_DEFAULT_VALUES } from '@qgs/shared';
-import { DataScopeService } from '~/modules/data-scope/data-scope.service';
-import { WorkOrderRequirementService } from '~/modules/work-order-requirement';
-import { addYearsToDate } from '~/modules/work-order/work-order-query';
+import {
+  addYearsToDate,
+  createIdentityAggregateItem,
+  QMS_DEFAULT_VALUES,
+} from '@qgs/shared';
+import { DataScopeService } from '~/modules/data-scope';
 import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
+import { EXPORT_QUERY_TAKE } from '~/utils/export-constants';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import {
-  buildKeywordOr,
-  formatDateString,
-  parsePagination,
-} from '~/utils/query-helpers';
+import { buildKeywordOr, parsePagination } from '~/utils/query-helpers';
 
-import { mapToDisplayStatus, WORK_ORDER_STATUS } from './work-order-status';
+import {
+  buildScopedWorkOrderWhere,
+  mapWorkOrderItems,
+  WO_CONSTANTS,
+} from './work-order-list-dto';
 
 // 创建模块级 logger
 const logger = createModuleLogger('WorkOrderService');
-
-// 抽离常量
-const WO_CONSTANTS = {
-  DEFAULT_PAGE: 1,
-  DEFAULT_PAGE_SIZE: 20,
-  DEFAULT_WARRANTY_YEARS: 1,
-  STATUS: WORK_ORDER_STATUS,
-};
-
-const getWarrantyStatus = (deliveryDate: Date | null) => {
-  if (!deliveryDate) {
-    return '否';
-  }
-  const expiryDate = addYearsToDate(
-    deliveryDate,
-    WO_CONSTANTS.DEFAULT_WARRANTY_YEARS,
-  );
-  return new Date() <= expiryDate ? '是' : '否';
-};
 
 /**
  * 获取指定年份的起止时间
@@ -182,15 +169,23 @@ export const WorkOrderService = {
     });
   },
 
-  async countCreatedSince(date: Date) {
+  async countCreatedSince(date: Date, access?: AnalyticsAccessContext) {
+    const where = await buildScopedWorkOrderWhere(
+      {
+        createdAt: { gte: date },
+        isDeleted: false,
+      },
+      access,
+    );
     return prisma.work_orders.count({
-      where: { createdAt: { gte: date }, isDeleted: false },
+      where,
     });
   },
 
-  async getWorkspaceWorkOrders() {
+  async getWorkspaceWorkOrders(access?: AnalyticsAccessContext) {
+    const where = await buildScopedWorkOrderWhere({ isDeleted: false }, access);
     return prisma.work_orders.findMany({
-      where: { isDeleted: false },
+      where,
       orderBy: { createdAt: 'desc' },
       select: {
         createdAt: true,
@@ -220,21 +215,33 @@ export const WorkOrderService = {
     });
   },
 
-  async getStatsForDashboard(params: {
-    weekStart: Date;
-    yearStart: Date;
-  }): Promise<WorkOrderDashboardSummary> {
+  async getStatsForDashboard(
+    params: {
+      weekStart: Date;
+      yearStart: Date;
+    },
+    access?: AnalyticsAccessContext,
+  ): Promise<WorkOrderDashboardSummary> {
     const baseWhere = { isDeleted: false };
+    const yearWhere = await buildScopedWorkOrderWhere(
+      { ...baseWhere, createdAt: { gte: params.yearStart } },
+      access,
+    );
+    const weekWhere = await buildScopedWorkOrderWhere(
+      { ...baseWhere, createdAt: { gte: params.weekStart } },
+      access,
+    );
+    const recentWhere = await buildScopedWorkOrderWhere(baseWhere, access);
     const [yearAggregate, weekCount, recentWorkOrders] = await Promise.all([
       prisma.work_orders.aggregate({
-        where: { ...baseWhere, createdAt: { gte: params.yearStart } },
+        where: yearWhere,
         _count: { workOrderNumber: true },
       }),
       prisma.work_orders.count({
-        where: { ...baseWhere, createdAt: { gte: params.weekStart } },
+        where: weekWhere,
       }),
       prisma.work_orders.findMany({
-        where: baseWhere,
+        where: recentWhere,
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: {
@@ -284,42 +291,7 @@ export const WorkOrderService = {
         }),
       ]);
 
-      const workOrderNumbers = workOrders
-        .map((item) => String(item.workOrderNumber || '').trim())
-        .filter(Boolean);
-      const requirementSummaryMap =
-        await WorkOrderRequirementService.getSummaryByWorkOrderNumbers(
-          workOrderNumbers,
-        );
-
-      // 5. 数据映射与返回
-      const items: WorkOrderItem[] = workOrders.map((wo) => {
-        const requirementSummary = requirementSummaryMap.get(
-          wo.workOrderNumber,
-        ) || {
-          confirmedRequirements: 0,
-          overdueUnconfirmedRequirements: 0,
-          plannedRequirements: 0,
-        };
-        return {
-          ...wo,
-          confirmedRequirements: requirementSummary.confirmedRequirements,
-          id: wo.workOrderNumber,
-          deliveryDate: formatDateString(wo.deliveryDate),
-          effectiveTime: formatDateString(wo.effectiveTime),
-          createTime: wo.createdAt ? wo.createdAt.toISOString() : null,
-          overdueUnconfirmedRequirements:
-            requirementSummary.overdueUnconfirmedRequirements,
-          plannedRequirements: requirementSummary.plannedRequirements,
-          status: mapToDisplayStatus(wo.status),
-          warrantyStatus: getWarrantyStatus(wo.deliveryDate),
-          projectName: wo.projectName || null,
-          customerName: wo.customerName || null,
-          division: wo.division || null,
-          multiStationEnabled: Boolean(wo.multiStationEnabled),
-          quantity: wo.quantity || 0,
-        };
-      });
+      const items = await mapWorkOrderItems(workOrders);
 
       const summary: WorkOrderSummaryItem[] = summaryData.map((s) => ({
         status: s.status,
@@ -338,20 +310,59 @@ export const WorkOrderService = {
     }
   },
 
+  /**
+   * Bounded export read (PERF-QMS-001 / PHASE-1A): same filters and DataScope
+   * as the interactive list but reads at most EXPORT_QUERY_TAKE rows and
+   * never goes through the interactive page-size cap (100).
+   */
+  async getListForExport(
+    params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
+  ): Promise<{ items: WorkOrderItem[]; total: number }> {
+    const whereCondition = await buildWorkOrderWhereCondition(params);
+    const [workOrders, total] = await Promise.all([
+      prisma.work_orders.findMany({
+        where: whereCondition,
+        orderBy: { createdAt: 'desc' },
+        take: EXPORT_QUERY_TAKE,
+      }),
+      prisma.work_orders.count({ where: whereCondition }),
+    ]);
+    const items = await mapWorkOrderItems(workOrders);
+    return { items, total };
+  },
+
   async getDashboardStats(
     params: Omit<WorkOrderListParams, 'page' | 'pageSize'>,
   ): Promise<WorkOrderDashboardStats> {
     const whereCondition = await buildWorkOrderWhereCondition(params);
-    const summary = await prisma.work_orders.findMany({
-      where: whereCondition,
-      select: {
-        status: true,
-        divisionId: true,
-        quantity: true,
-        projectId: true,
-        deliveryDate: true,
-      },
-    });
+    // Database aggregation (PERF-QMS-001 / PHASE-1B): status/division counts
+    // and the warranty quantity sums are computed with groupBy so the endpoint
+    // never loads every work order into Node. The warranty subset is the same
+    // rows getWarrantyStatus() would accept: deliveryDate within the last
+    // DEFAULT_WARRANTY_YEARS.
+    const warrantyCutoff = addYearsToDate(
+      new Date(),
+      -WO_CONSTANTS.DEFAULT_WARRANTY_YEARS,
+    );
+    const [statusGroups, divisionGroups, warrantyGroups] = await Promise.all([
+      prisma.work_orders.groupBy({
+        by: ['status'],
+        where: whereCondition,
+        _count: { workOrderNumber: true },
+      }),
+      prisma.work_orders.groupBy({
+        by: ['divisionId'],
+        where: whereCondition,
+        _count: { workOrderNumber: true },
+      }),
+      prisma.work_orders.groupBy({
+        by: ['divisionId', 'projectId'],
+        where: {
+          AND: [whereCondition, { deliveryDate: { gte: warrantyCutoff } }],
+        },
+        _sum: { quantity: true },
+      }),
+    ]);
     const divisionProjectMap = new Map<null | string, number>();
     const divisionWarrantyMap = new Map<
       null | string,
@@ -361,31 +372,36 @@ export const WorkOrderService = {
     let completed = 0;
     let inProgress = 0;
 
-    for (const item of summary) {
-      total += 1;
-      const normalizedStatus = String(item.status || '').toUpperCase();
-      if (normalizedStatus === 'COMPLETED') completed += 1;
-      if (normalizedStatus === 'IN_PROGRESS') inProgress += 1;
-
-      const divisionId = String(item.divisionId || '').trim() || null;
-      const projectId = String(item.projectId || '').trim() || null;
-      const quantity = Number(item.quantity) || 0;
-      divisionProjectMap.set(
-        divisionId,
-        (divisionProjectMap.get(divisionId) || 0) + 1,
-      );
-      if (getWarrantyStatus(item.deliveryDate) === '是') {
-        const current = divisionWarrantyMap.get(divisionId) || {
-          projects: new Map<null | string, number>(),
-          warrantyCount: 0,
-        };
-        current.projects.set(
-          projectId,
-          (current.projects.get(projectId) || 0) + quantity,
-        );
-        current.warrantyCount += quantity;
-        divisionWarrantyMap.set(divisionId, current);
+    for (const group of statusGroups) {
+      total += group._count.workOrderNumber;
+      const normalizedStatus = String(group.status || '').toUpperCase();
+      if (normalizedStatus === 'COMPLETED') {
+        completed += group._count.workOrderNumber;
       }
+      if (normalizedStatus === 'IN_PROGRESS') {
+        inProgress += group._count.workOrderNumber;
+      }
+    }
+    for (const group of divisionGroups) {
+      divisionProjectMap.set(
+        String(group.divisionId || '').trim() || null,
+        group._count.workOrderNumber,
+      );
+    }
+    for (const group of warrantyGroups) {
+      const divisionId = String(group.divisionId || '').trim() || null;
+      const projectId = String(group.projectId || '').trim() || null;
+      const quantity = Number(group._sum.quantity) || 0;
+      const current = divisionWarrantyMap.get(divisionId) || {
+        projects: new Map<null | string, number>(),
+        warrantyCount: 0,
+      };
+      current.projects.set(
+        projectId,
+        (current.projects.get(projectId) || 0) + quantity,
+      );
+      current.warrantyCount += quantity;
+      divisionWarrantyMap.set(divisionId, current);
     }
 
     const [divisionNames, projectNames] = await Promise.all([
