@@ -301,7 +301,7 @@ describe('reportWriteService (SEC-REPORT-WRITE-001)', () => {
         VehicleCommissioningDailyReportStorageService.upsertDailySummary,
       ).mockResolvedValue({
         date: new Date('2026-06-15'),
-        reporter: 'Alice',
+        reporter: 'alice',
       } as any);
 
       const result = await ReportWriteService.saveDailySummary({
@@ -310,12 +310,12 @@ describe('reportWriteService (SEC-REPORT-WRITE-001)', () => {
         userinfo: makeUser(),
       });
 
-      expect(result.reporter).toBe('Alice');
+      expect(result.reporter).toBe('alice');
       expect(
         VehicleCommissioningDailyReportStorageService.upsertDailySummary,
       ).toHaveBeenCalledWith({
         date: expect.any(Date),
-        reporter: 'Alice',
+        reporter: 'alice',
         reportText: 'test',
         summary: JSON.stringify({ summary: 'test' }),
       });

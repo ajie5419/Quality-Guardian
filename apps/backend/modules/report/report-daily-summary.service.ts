@@ -20,6 +20,7 @@ import { ReportQueryValidationError } from './report-query-validation-error';
 import {
   formatReportDate,
   getReportDayRange,
+  parseReportDate,
   resolveReportQueryDate,
 } from './report-utils';
 
@@ -57,6 +58,9 @@ export const ReportDailySummaryService = {
       throw new ReportQueryValidationError('Invalid date parameter');
     }
     const queryDate = formatReportDate(parsedQueryDate);
+    const storageDate = parseReportDate(queryDate);
+    if (!storageDate)
+      throw new ReportQueryValidationError('Invalid date parameter');
     // The legacy `user` query parameter could address an arbitrary username
     // (cross-user daily report read). Row filters now always derive from the
     // current user; the param is kept only for API-shape compatibility.
@@ -189,13 +193,24 @@ export const ReportDailySummaryService = {
       };
     });
     const dailyArchive = await loadDailyArchiveTasks(inspections);
-    const existingReport =
+    let existingReport =
       await VehicleCommissioningDailyReportStorageService.findDailyReportByDateReporter(
         {
-          date: new Date(queryDate),
+          date: storageDate,
           reporter: queryUser,
         },
       );
+    // Older records used UTC midnight. Only fall back within the same unique
+    // username; display-name recovery could expose a namesake's report.
+    if (!existingReport) {
+      existingReport =
+        await VehicleCommissioningDailyReportStorageService.findDailyReportByDateReporter(
+          {
+            date: new Date(queryDate),
+            reporter: queryUser,
+          },
+        );
+    }
     const storedContent = parseDailySummaryContent(existingReport?.summary);
     return {
       archiveStats: dailyArchive.stats,

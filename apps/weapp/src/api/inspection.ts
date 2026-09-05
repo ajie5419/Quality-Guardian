@@ -92,10 +92,14 @@ export function closeInspectionRequest(
 }
 
 // Submit a new inspection request
-export function submitInspectionRequest(data: Record<string, unknown>) {
+export function submitInspectionRequest(
+  data: Record<string, unknown>,
+  operationId: string,
+) {
   return request<unknown>({
     url: '/api/qms/inspection/requests/v2',
     method: 'POST',
+    header: { 'Idempotency-Key': operationId },
     data,
   });
 }

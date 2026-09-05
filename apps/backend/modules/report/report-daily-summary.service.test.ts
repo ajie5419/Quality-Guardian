@@ -1,5 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ReportDailySummaryService } from '~/modules/report/report-daily-summary.service';
+import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
+
+import { ReportWriteService } from './report-write.service';
+
+vi.mock('~/utils/prisma', () => ({ default: {} }));
+vi.mock('~/modules/system-log', () => ({
+  SystemLogService: { auditLog: vi.fn() },
+}));
 
 vi.mock('~/modules/inspection', () => ({
   InspectionService: {
@@ -19,6 +27,7 @@ vi.mock('~/modules/inspection/inspection-form', () => ({
 vi.mock('~/modules/vehicle-commissioning/daily-report-storage.service', () => ({
   VehicleCommissioningDailyReportStorageService: {
     findDailyReportByDateReporter: vi.fn().mockResolvedValue(null),
+    upsertDailySummary: vi.fn(),
   },
 }));
 
@@ -43,6 +52,44 @@ describe('reportDailySummaryService', () => {
     vi.clearAllMocks();
   });
 
+  it('reads back a saved summary using username even when the display name differs', async () => {
+    const storage = VehicleCommissioningDailyReportStorageService;
+    const rows = new Map<string, any>();
+    vi.mocked(storage.upsertDailySummary).mockImplementationOnce(
+      async (input) => {
+        rows.set(`${input.date.toISOString()}:${input.reporter}`, input);
+        return input as any;
+      },
+    );
+    vi.mocked(storage.findDailyReportByDateReporter).mockImplementationOnce(
+      async (input) =>
+        rows.get(`${input.date.toISOString()}:${input.reporter}`) ?? null,
+    );
+    await ReportWriteService.saveDailySummary({
+      date: '2026-09-05',
+      summary: 'Saved content',
+      userinfo: {
+        id: 'u1',
+        username: 'admin',
+        realName: 'Different Name',
+        roles: [],
+      } as any,
+    });
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        date: '2026-09-05',
+        username: 'admin',
+        realName: 'Different Name',
+        user: 'someone-else',
+      },
+      testAccess,
+    );
+    expect(result.summary).toBe('Saved content');
+    expect(result.reporter).toBe('Different Name');
+    expect([...rows.keys()]).toHaveLength(1);
+    expect([...rows.keys()][0]).toMatch(/:admin$/);
+  });
+
   it('returns daily summary with default values for empty inspections', async () => {
     const result = await ReportDailySummaryService.getDailySummaryFromQuery(
       {
@@ -62,6 +109,31 @@ describe('reportDailySummaryService', () => {
     expect(result.inspections).toEqual([]);
     expect(result.issues).toEqual([]);
     expect(result.reporter).toBe('admin');
+  });
+
+  it('reads legacy midnight records without falling back to display-name ownership', async () => {
+    const lookup = vi.mocked(
+      VehicleCommissioningDailyReportStorageService.findDailyReportByDateReporter,
+    );
+    lookup
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ reportText: 'Legacy content' } as any);
+    const result = await ReportDailySummaryService.getDailySummaryFromQuery(
+      {
+        date: '2026-09-05',
+        username: 'admin',
+        realName: 'Shared Name',
+      },
+      testAccess,
+    );
+    expect(result.summary).toBe('Legacy content');
+    expect(lookup).toHaveBeenLastCalledWith({
+      date: new Date('2026-09-05'),
+      reporter: 'admin',
+    });
+    expect(
+      lookup.mock.calls.every(([input]) => input.reporter === 'admin'),
+    ).toBe(true);
   });
 
   it('uses realName as reporter when provided', async () => {

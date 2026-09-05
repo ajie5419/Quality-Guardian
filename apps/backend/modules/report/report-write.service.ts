@@ -306,11 +306,9 @@ export const ReportWriteService = {
     const reportDate = parseReportDate(input.date);
     if (!reportDate)
       throw new BusinessError(ErrorCode.VALIDATION, '无效的日期', 400);
-    // The reporter always derives from the authenticated user; the legacy
-    // `user` body field can no longer impersonate another reporter.
-    const reporter = String(
-      input.userinfo.realName || input.userinfo.username || '',
-    ).trim();
+    // Match the existing daily-summary read key. Display names are not unique;
+    // legacy name-keyed rows require reviewed recovery, never an online fallback.
+    const reporter = String(input.userinfo.username || '').trim();
     if (!reporter) {
       throw new BusinessError(ErrorCode.FORBIDDEN, '缺少报告人身份', 403);
     }

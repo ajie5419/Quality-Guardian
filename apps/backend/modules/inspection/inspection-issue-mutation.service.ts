@@ -204,8 +204,11 @@ export const InspectionIssueMutationService = {
           canonicalBody.responsibleWelderId ?? current.responsibleWelderId,
           canonicalBody.responsibleWelder ?? current.responsibleWelder,
         );
-      const updateResult = await tx.quality_records.updateMany({
-        where: ownershipWhere,
+      // Nested canonical relation connects require update, not updateMany.
+      // Keep ownership/scope in the write predicate; Prisma rejects a lost
+      // match with P2025 before any derived jobs can be enqueued.
+      await tx.quality_records.update({
+        where: { id, AND: ownershipWhere },
         data: responsibility
           ? {
               ...updateData,
@@ -215,9 +218,6 @@ export const InspectionIssueMutationService = {
             }
           : { ...updateData, responsibleWelderId },
       });
-      if (updateResult && updateResult.count !== 1) {
-        throw new BusinessError('FORBIDDEN', '记录不在当前数据权限范围内', 403);
-      }
       if (sourceContext.transaction !== tx) {
         throw new BusinessError(
           'FORBIDDEN',
