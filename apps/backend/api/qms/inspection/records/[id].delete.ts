@@ -4,6 +4,7 @@ import { InspectionService } from '~/modules/inspection/inspection.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
   internalServerErrorResponse,
@@ -21,7 +22,10 @@ export default defineEventHandler(async (event) => {
       event,
       INSPECTION_RECORD_PERMISSION_CODES.DELETE,
     );
-    await InspectionService.delete(id);
+    await InspectionService.delete(id, {
+      scope: event.context.dataScope,
+      user: userinfo,
+    });
     await recordBusinessAuditLog(event, {
       userId: userinfo?.id,
       action: 'DELETE',
@@ -33,6 +37,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('inspection-delete', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, 'Inspection record not found');
     }

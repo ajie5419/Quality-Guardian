@@ -4,6 +4,7 @@ import { InspectionService } from '~/modules/inspection/inspection.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { parseNonEmptyIdList } from '~/utils/id-list';
 import {
   badRequestResponse,
@@ -23,7 +24,10 @@ export default defineEventHandler(async (event) => {
       return badRequestResponse(event, 'IDs required');
     }
 
-    const result = await InspectionService.batchDelete(ids);
+    const result = await InspectionService.batchDelete(ids, {
+      scope: event.context.dataScope,
+      user: userinfo,
+    });
     await recordBusinessAuditLog(event, {
       userId: userinfo?.id,
       action: 'DELETE',
@@ -37,6 +41,7 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ successCount: result.count });
   } catch (error: unknown) {
     logApiError('inspection-batch-delete', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
     return internalServerErrorResponse(
       event,
       'Failed to batch delete inspection records',
