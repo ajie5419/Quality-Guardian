@@ -75,6 +75,27 @@ describe('inspectionRequestDispatchService.dispatchRequest', () => {
     });
   });
 
+  it('fails closed when an HTTP event has no resolved data scope', async () => {
+    vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue(null);
+
+    await expect(
+      InspectionRequestDispatchService.dispatchRequest(
+        { context: {} } as any,
+        'req-1',
+        { inspectorId: 'inspector-1' },
+        userinfo,
+      ),
+    ).rejects.toMatchObject({ httpStatus: 404 });
+
+    expect(prisma.qms_inspection_requests.findFirst).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          AND: [{ id: 'req-1', isDeleted: false }, { id: '__none__' }],
+        },
+      }),
+    );
+  });
+
   it('rejects dispatch when the request is already closed', async () => {
     vi.mocked(prisma.qms_inspection_requests.findFirst).mockResolvedValue({
       id: 'req-1',
