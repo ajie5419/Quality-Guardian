@@ -320,6 +320,95 @@ describe('inspectionRequestCloseService', () => {
     });
   });
 
+  it('uses the pre-read status as the strict close CAS anchor', async () => {
+    const guardUpdateMany = vi.fn().mockResolvedValue({ count: 1 });
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+      mockRequest,
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        qms_inspection_request_inspections: {
+          createMany: vi.fn().mockResolvedValue({ count: 1 }),
+        },
+        qms_inspection_requests: {
+          findUnique: vi.fn().mockResolvedValue({
+            linkedIssueId: null,
+            linkedIssueNo: null,
+            linkedIssueStatus: null,
+          }),
+          update: vi.fn().mockResolvedValue({
+            ...mockRequest,
+            status: 'CLOSED',
+          }),
+          updateMany: guardUpdateMany,
+        },
+        qms_task_dispatches: {
+          updateMany: vi.fn(),
+        },
+        inspections: {
+          findMany: vi.fn().mockResolvedValue([
+            {
+              supplierId: 'supplier-1',
+              teamId: 'team-1',
+            },
+          ]),
+        },
+      }),
+    );
+
+    await InspectionRequestCloseService.closeRequest(
+      {} as any,
+      'req-1',
+      {
+        attachments: [],
+        result: 'PASS',
+      },
+      mockUserInfo,
+    );
+
+    // The guard must anchor on the exact pre-read status, not `not: CLOSED`:
+    // a concurrent FAIL close leaves INSPECTING behind, so `not: CLOSED`
+    // would let the second close pass and run effects twice.
+    expect(guardUpdateMany).toHaveBeenCalledWith({
+      data: { status: 'INSPECTING' },
+      where: {
+        id: 'req-1',
+        isDeleted: false,
+        status: 'PENDING',
+      },
+    });
+  });
+
+  it('rejects a concurrent close when the CAS guard misses and never runs effects', async () => {
+    (prisma.qms_inspection_requests.findFirst as any).mockResolvedValue(
+      mockRequest,
+    );
+    (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+      cb({
+        qms_inspection_requests: {
+          updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+        },
+      }),
+    );
+    const { syncCloseAttachments, syncCloseIssueEffects } = await import(
+      '~/modules/inspection/inspection-request-close-effects.service'
+    );
+
+    await expect(
+      InspectionRequestCloseService.closeRequest(
+        {} as any,
+        'req-1',
+        { attachments: [], result: 'PASS' },
+        mockUserInfo,
+      ),
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: '报检任务已检验完成',
+    });
+    expect(syncCloseAttachments).not.toHaveBeenCalled();
+    expect(syncCloseIssueEffects).not.toHaveBeenCalled();
+  });
+
   it('backfills a historical responsibility from the top-level PASS input', async () => {
     const historicalRequest = {
       ...mockRequest,

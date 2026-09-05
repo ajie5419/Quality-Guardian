@@ -2,6 +2,8 @@ import type { Prisma } from '@prisma/client';
 import type { InspectionIssueResponsibilityType } from '@qgs/shared';
 import type { UserSession } from '~/utils/jwt-utils';
 
+import type { AuthorizedSourceContext } from './inspection-request-close-effects.service';
+
 import {
   INSPECTION_ISSUE_RESPONSIBILITY_TYPE,
   normalizeInspectionIssueResponsibilityType,
@@ -54,9 +56,16 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     work_order?: null | { projectName?: null | string };
     workOrderNumber: string;
   };
+  sourceContext?: AuthorizedSourceContext;
   tx: Prisma.TransactionClient;
   userinfo: UserSession;
 }): Promise<CloseLinkedIssueCreateResult> {
+  if (
+    options.sourceContext &&
+    options.sourceContext.transaction !== options.tx
+  ) {
+    throw new Error('Close derived write transaction mismatch');
+  }
   const linkedInspection = await findInspectionForIssue(
     options.inspectionId,
     options.tx,
@@ -90,6 +99,8 @@ export async function buildCloseLinkedIssueCreateResult(options: {
     userinfo: options.userinfo,
   });
   const responsibility = requireCanonicalCloseResponsibility(options.request);
+  // qms-arch-allow R-SCOPE: close-flow linked-issue responsibility write; the
+  // record was created in the same transaction by InspectionIssueCreateService.
   const record = await options.tx.quality_records.update({
     data: responsibility,
     where: { id: created.record.id },

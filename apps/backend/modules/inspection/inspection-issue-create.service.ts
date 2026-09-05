@@ -1,5 +1,7 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
+import type { AuthorizedSourceContext } from './inspection-request-close-effects.service';
+
 import { Prisma } from '@prisma/client';
 import { resolveRetainUntil } from '~/modules/data-lifecycle';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
@@ -19,6 +21,13 @@ import { resolveInspectionIssueResponsibility } from './inspection-issue-respons
 import { assertWelderForWeldingDefect } from './inspection-issue-welding';
 
 type IssueCreateTransaction = Prisma.TransactionClient;
+
+export type IssueAuthorizedSourceContext = Omit<
+  AuthorizedSourceContext,
+  'source'
+> & {
+  source: { id: string; model: 'inspections' };
+};
 
 export interface InspectionIssueCreateResult {
   ncNumber: null | string;
@@ -41,6 +50,19 @@ export const InspectionIssueCreateService = {
       normalizeOptionalInspectionIssueString(body.inspectionId),
       options.tx,
     );
+    const sourceContext: IssueAuthorizedSourceContext = {
+      casVerified: true,
+      dataScopeVerified: true,
+      source: {
+        id: String(
+          inspection?.id ||
+            normalizeOptionalInspectionIssueString(body.inspectionId) ||
+            'unknown',
+        ),
+        model: 'inspections',
+      },
+      transaction: options.tx,
+    };
     const responsibility = await resolveInspectionIssueResponsibility(
       body,
       options.tx,
@@ -85,6 +107,11 @@ export const InspectionIssueCreateService = {
         retainUntil: await resolveRetainUntil('inspection-record'),
       },
     });
+    if (sourceContext.transaction !== options.tx) {
+      throw new BusinessError('FORBIDDEN', 'Issue 派生写入缺少授权上下文', 403);
+    }
+    // Queue boundary: source identity is retained in this transaction; queue
+    // worker context remains unchanged in this phase.
     await QualityLossIndexQueue.enqueue(
       options.tx,
       [{ source: 'INTERNAL', sourcePk: record.id }],

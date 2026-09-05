@@ -1141,7 +1141,7 @@ describe('inspection-request-close adversarial', () => {
 
       expect(txMock.qms_inspection_requests.updateMany).toHaveBeenCalledWith({
         data: { status: 'INSPECTING' },
-        where: { id: 'req-1', isDeleted: false, status: { not: 'CLOSED' } },
+        where: { id: 'req-1', isDeleted: false, status: 'PENDING' },
       });
       const guardOrder =
         txMock.qms_inspection_requests.updateMany.mock.invocationCallOrder[0];

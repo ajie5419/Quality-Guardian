@@ -60,6 +60,8 @@ vi.mock('~/modules/inspection/inspection-route.service', () => ({
 }));
 
 describe('inspection-request-close.post.handler', () => {
+  const event = { context: { dataScope: undefined } } as any;
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -68,7 +70,7 @@ describe('inspection-request-close.post.handler', () => {
     const mockResult = { id: 'req-1', status: 'CLOSED' };
     (InspectionRouteService.closeRequest as any).mockResolvedValue(mockResult);
 
-    const _result = await handler({} as any);
+    const _result = await handler(event);
 
     expect(InspectionRouteService.closeRequest).toHaveBeenCalled();
     expect(useResponseSuccess).toHaveBeenCalledWith(mockResult);
@@ -79,7 +81,7 @@ describe('inspection-request-close.post.handler', () => {
       new BusinessError('VALIDATION', '检验结果必须为合格或不合格', 400),
     );
 
-    const _result = await handler({} as any);
+    const _result = await handler(event);
 
     expect(badRequestResponse).toHaveBeenCalledWith(
       expect.anything(),
@@ -92,7 +94,7 @@ describe('inspection-request-close.post.handler', () => {
       new BusinessError('NOT_FOUND', '报检任务不存在', 404),
     );
 
-    const _result = await handler({} as any);
+    const _result = await handler(event);
 
     expect(notFoundResponse).toHaveBeenCalledWith(
       expect.anything(),
@@ -105,7 +107,7 @@ describe('inspection-request-close.post.handler', () => {
       new Error('something broke'),
     );
 
-    const _result = await handler({} as any);
+    const _result = await handler(event);
 
     expect(internalServerErrorResponse).toHaveBeenCalledWith(
       expect.anything(),
