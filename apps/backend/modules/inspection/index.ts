@@ -2,6 +2,7 @@ export { InspectionClassificationResolutionService } from './inspection-classifi
 export { InspectionCoreService } from './inspection-core.service';
 export { InspectionDepartmentResolutionService } from './inspection-department-resolution.service';
 export { InspectionIdentityResolutionService } from './inspection-identity-resolution.service';
+export { InspectionIssueStatsService } from './inspection-issue-stats.service';
 export {
   INSPECTION_MATERIAL_PERMISSION_CODES,
   InspectionMaterialRequestService,
