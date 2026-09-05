@@ -32,4 +32,5 @@ scheduler/
 - 调度器只做调度，业务规则留在各业务模块 service
 - handler 必须幂等；失败必须 logger.error + 记录 lastError
 - 多实例部署防重：`lastRunAt` 的 updateMany CAS（同一分钟内只触发一次）
+- 唯一任务身份（SCHEDULER-INTEGRITY-001）：`cron_jobs.jobKey @unique`，定义落库必须走 `upsert({ where: { jobKey } })`，禁止退回 find→create；代码注册表是 definition 唯一来源
 - 新任务：key 全局唯一（`<module>.<action>`），并登记进 `docs/scheduler-design.md` §3

@@ -2581,7 +2581,10 @@ enum quality_plans_planStatus {
 // @module scheduler
 model cron_jobs {
   id          String    @id @default(cuid())
-  jobKey      String
+  // Unique job identity (SCHEDULER-INTEGRITY-001): the code registry is the
+  // single source of truth; sync upserts by jobKey, so one definition row can
+  // never be duplicated by concurrent instance startup.
+  jobKey      String    @unique
   cronExpr    String
   description String?
   enabled     Boolean   @default(true)
@@ -2592,7 +2595,6 @@ model cron_jobs {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@index([jobKey, isDeleted])
   @@index([enabled, isDeleted])
 }
 

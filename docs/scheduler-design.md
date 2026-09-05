@@ -45,7 +45,7 @@ modules/supplier/cron/monthly-snapshot.ts     ← 业务任务 3：供应商月�
 ```prisma
 model cron_jobs {
   id          String    @id @default(cuid())
-  jobKey      String    // 唯一任务键（如 'metrology.due-reminder'）
+  jobKey      String    @unique // 全局唯一任务键（如 'metrology.due-reminder'）
   cronExpr    String    // cron 表达式（5 段：分 时 日 月 周）
   description String?
   enabled     Boolean   @default(true)
@@ -56,10 +56,11 @@ model cron_jobs {
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
-  @@index([jobKey, isDeleted])
   @@index([enabled, isDeleted])
 }
 ```
+
+> **唯一任务身份（SCHEDULER-INTEGRITY-001）**：`jobKey @unique` 保证同一个 jobKey 全库最多一条定义行，多实例并发启动不会重复建行。迁移 `20260820160000_add_cron_jobs_jobkey_unique` 会先对历史重复行做一次性 reconcile（保留最早一行并合并 enabled/lastRunAt/lastStatus/lastError）再加唯一索引。
 
 > 与 `metric_refresh_jobs` 的分工：`cron_jobs` 是**调度定义**（何时跑），`metric_refresh_jobs` 是**任务执行队列**（跑什么、可重试）。调度器到点后把具体工作**投递进租约队列**消费，保持与现有 worker 完全一致的幂等/重试语义。简单任务也可直接同步执行（见 2.4）。
 
@@ -87,7 +88,11 @@ model cron_jobs {
   3. 更新 lastRunAt / lastStatus / lastError
 ```
 
-**防止重复触发**：`lastRunAt` 记录上次执行，同一分钟内只触发一次；多实例部署时用 `updateMany({ where: { id, lastRunAt: 旧值 } })` CAS 抢占（与现有队列 lease 机制同思路）。
+**定义落库（原子 upsert）**：启动时 `syncCronJobDefinitions()` 以代码注册表为唯一来源，对每个 jobKey 执行 `upsert({ where: { jobKey }, create, update: { cronExpr, description, enabled: true, isDeleted: false } })`——不存在则创建、存在则更新同一行、软删行原地复活；非法 cron 表达式跳过（不创建/不启用）。注册表中已移除的 job 只做 `enabled = false`（不物理删除），保证历史可查、可人工恢复。
+
+**防止重复触发（执行抢占）**：`lastRunAt` 记录上次执行，同一分钟内只触发一次；多实例部署时用 `updateMany({ where: { id, enabled: true, isDeleted: false, lastRunAt: null | 早于本分钟 } })` CAS 抢占（与现有队列 lease 机制同思路）——两个实例只有一个 `count = 1`，另一个 `count = 0` 跳过。
+
+**失败与重试语义**：claim 成功即写入 `lastRunAt`；handler 失败只写 `lastStatus = 'error'` / `lastError`，不回滚 `lastRunAt`。重试策略为 **NEXT SCHEDULE**（at-most-once per minute，下一次 cron 匹配时再执行），本框架不引入重试队列。
 
 ### 2.5 注册表 API（业务模块使用）
 
