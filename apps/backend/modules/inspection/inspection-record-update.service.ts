@@ -2,6 +2,10 @@ import type { inspection_result } from '@prisma/client';
 
 import type { InspectionRecordInput } from './inspection-record-types';
 
+import {
+  assertScopedWriteAffected,
+  createScopedRepository,
+} from '~/modules/data-scope';
 import { FileStorageService } from '~/modules/file-storage/file-storage.service';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
@@ -25,7 +29,17 @@ import {
 import { resolveInspectionTemplateBinding } from './inspection-template-binding.service';
 
 export const InspectionRecordUpdateService = {
-  async update(id: string, data: InspectionRecordInput) {
+  async update(
+    id: string,
+    data: InspectionRecordInput,
+    access?: {
+      scope?: {
+        deptIds?: string[];
+        scopeType?: 'ALL' | 'DEPT' | 'SELF';
+      };
+      user?: { id?: number | string; username?: string };
+    },
+  ) {
     const overallResult = InspectionRecordRules.resolveOverallResult(data);
     const quantitySummary = InspectionRecordRules.normalizeQuantitySummary({
       quantity: data.quantity,
@@ -39,24 +53,38 @@ export const InspectionRecordUpdateService = {
     );
 
     const result = await prisma.$transaction(async (tx) => {
-      const previousInspection = await tx.inspections.findUnique({
-        where: { id },
-        select: {
-          category: true,
-          incomingType: true,
-          partId: true,
-          partName: true,
-          processId: true,
-          processName: true,
-          supplierName: true,
-          supplierId: true,
-          team: true,
-          teamId: true,
-          templateId: true,
-          templateName: true,
-          workOrderNumber: true,
+      const txRepo = createScopedRepository('inspection', tx.inspections);
+      const accessContext = {
+        user: {
+          id: access?.user?.id ?? '',
+          username: access?.user?.username,
         },
-      });
+        scope: access?.scope,
+      };
+      const previousInspection = await txRepo.findAccessible(
+        {
+          where: { id, isDeleted: false },
+          select: {
+            category: true,
+            incomingType: true,
+            partId: true,
+            partName: true,
+            processId: true,
+            processName: true,
+            supplierName: true,
+            supplierId: true,
+            team: true,
+            teamId: true,
+            templateId: true,
+            templateName: true,
+            workOrderNumber: true,
+          },
+        },
+        accessContext,
+      );
+      if (!previousInspection) {
+        throw new BusinessError('NOT_FOUND', '检验记录不存在', 404);
+      }
       const previousCanonicalProcessName = previousInspection
         ? await resolveCanonicalProcessNameById(
             tx,
@@ -167,46 +195,82 @@ export const InspectionRecordUpdateService = {
       });
 
       // 1. Update Main
-      const inspection = await tx.inspections.update({
-        where: { id },
-        data: {
-          workOrderNumber: data.workOrderNumber,
-          materialName: data.materialName,
-          incomingType: data.incomingType,
-          processId: resolvedProcessId,
-          teamId: teamIdentity?.id ?? null,
-          level1Component: data.level1Component,
-          level2Component: data.level2Component,
-          ...governedFields,
-          ...governedCanonicalIds,
-          supplierId: supplierIdentity?.id ?? null,
-          supplierName: supplierIdentity?.name ?? null,
-          documents: data.documents,
-          hasDocuments: data.hasDocuments,
-          selfCheckDocuments: data.selfCheckDocuments,
-          hasSelfCheckDocuments: data.hasSelfCheckDocuments,
-          packingListArchived: data.packingListArchived,
-          quantity: quantitySummary.quantity,
-          qualifiedQuantity: quantitySummary.qualifiedQuantity,
-          unqualifiedQuantity: quantitySummary.unqualifiedQuantity,
-          inspector: data.inspector,
-          templateId:
-            data.templateId === undefined
-              ? (templateBinding.templateId ?? previousInspection?.templateId)
-              : normalizeOptionalString(data.templateId),
-          templateName:
-            data.templateName === undefined
-              ? (templateBinding.templateName ??
-                previousInspection?.templateName)
-              : normalizeOptionalString(data.templateName),
-          inspectionDate: data.inspectionDate
-            ? new Date(data.inspectionDate)
-            : undefined,
-          reportDate: data.reportDate ? new Date(data.reportDate) : null,
-          result: overallResult,
-          remarks: data.remarks,
+      const updated = await txRepo.updateAccessible(
+        {
+          where: { id },
+          data: {
+            workOrderNumber: data.workOrderNumber,
+            materialName: data.materialName,
+            incomingType: data.incomingType,
+            processId: resolvedProcessId,
+            teamId: teamIdentity?.id ?? null,
+            level1Component: data.level1Component,
+            level2Component: data.level2Component,
+            ...governedFields,
+            ...governedCanonicalIds,
+            supplierId: supplierIdentity?.id ?? null,
+            supplierName: supplierIdentity?.name ?? null,
+            documents: data.documents,
+            hasDocuments: data.hasDocuments,
+            selfCheckDocuments: data.selfCheckDocuments,
+            hasSelfCheckDocuments: data.hasSelfCheckDocuments,
+            packingListArchived: data.packingListArchived,
+            quantity: quantitySummary.quantity,
+            qualifiedQuantity: quantitySummary.qualifiedQuantity,
+            unqualifiedQuantity: quantitySummary.unqualifiedQuantity,
+            inspector: data.inspector,
+            templateId:
+              data.templateId === undefined
+                ? (templateBinding.templateId ?? previousInspection?.templateId)
+                : normalizeOptionalString(data.templateId),
+            templateName:
+              data.templateName === undefined
+                ? (templateBinding.templateName ??
+                  previousInspection?.templateName)
+                : normalizeOptionalString(data.templateName),
+            inspectionDate: data.inspectionDate
+              ? new Date(data.inspectionDate)
+              : undefined,
+            reportDate: data.reportDate ? new Date(data.reportDate) : null,
+            result: overallResult,
+            remarks: data.remarks,
+          },
         },
-      });
+        accessContext,
+      );
+      assertScopedWriteAffected(updated.count, '检验记录');
+      const inspection = await txRepo.findAccessible(
+        {
+          where: { id },
+          select: {
+            category: true,
+            documents: true,
+            hasDocuments: true,
+            hasSelfCheckDocuments: true,
+            id: true,
+            incomingType: true,
+            inspector: true,
+            inspectionDate: true,
+            level1Component: true,
+            level2Component: true,
+            materialName: true,
+            processId: true,
+            processName: true,
+            projectName: true,
+            remarks: true,
+            result: true,
+            selfCheckDocuments: true,
+            supplierId: true,
+            supplierName: true,
+            teamId: true,
+            workOrderNumber: true,
+          },
+        },
+        accessContext,
+      );
+      if (!inspection) {
+        throw new BusinessError('NOT_FOUND', '检验记录不存在', 404);
+      }
 
       // 2. Replace Items (Delete all & Create new)
       await tx.inspection_items.deleteMany({
@@ -282,12 +346,14 @@ export const InspectionRecordUpdateService = {
         bizId: String(inspection.id),
         bizType: 'inspection_record',
         fieldName: 'documents',
+        tx,
       });
       await FileStorageService.registerReferencesFromAttachments({
         attachments: inspection.selfCheckDocuments,
         bizId: String(inspection.id),
         bizType: 'inspection_record',
         fieldName: 'selfCheckDocuments',
+        tx,
       });
       await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
         tx,

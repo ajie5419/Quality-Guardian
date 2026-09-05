@@ -73,9 +73,13 @@ describe('inspection-record-id.put.handler', () => {
     };
     (InspectionService.update as any).mockResolvedValue(mockResult);
 
-    const result = await handler({} as any);
+    const result = await handler({ context: {} } as any);
 
-    expect(InspectionService.update).toHaveBeenCalledWith('insp-1', {});
+    expect(InspectionService.update).toHaveBeenCalledWith(
+      'insp-1',
+      {},
+      { scope: undefined, user: { id: 'user-1' } },
+    );
     expect(result).toEqual(
       expect.objectContaining({ statusCode: 200, data: mockResult }),
     );
@@ -86,7 +90,7 @@ describe('inspection-record-id.put.handler', () => {
     (isPrismaNotFoundError as any).mockReturnValue(true);
     (InspectionService.update as any).mockRejectedValue(new Error('not found'));
 
-    const result = await handler({} as any);
+    const result = await handler({ context: {} } as any);
 
     expect(result).toEqual(expect.objectContaining({ statusCode: 404 }));
   });
@@ -98,7 +102,7 @@ describe('inspection-record-id.put.handler', () => {
       new Error('something broke'),
     );
 
-    const result = await handler({} as any);
+    const result = await handler({ context: {} } as any);
 
     expect(result).toEqual(expect.objectContaining({ statusCode: 500 }));
   });
