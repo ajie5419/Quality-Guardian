@@ -8,6 +8,8 @@ import prisma from '~/utils/prisma';
 export async function getInspectorActiveTaskCounts(): Promise<
   Map<string, number>
 > {
+  // qms-arch-allow R-SCOPE-AGG: M-G08 user-management workload counts are
+  // system-wide per-inspector tallies by design, no business rows exposed
   const rows = await prisma.qms_inspection_requests.groupBy({
     by: ['inspectorId'],
     where: {
