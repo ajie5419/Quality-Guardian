@@ -107,8 +107,11 @@ export async function getSupplierQualityIssues(
   }>(`${QMS_API.SUPPLIER}/${id}/quality-issues`, { params });
 }
 
-export async function deleteSupplier(id: string) {
-  return requestClient.delete(`${QMS_API.SUPPLIER}/${id}`);
+export async function deleteSupplier(id: string, version?: number) {
+  // OPTIMISTIC-LOCK-001: user deletes carry the version the client read.
+  return requestClient.delete(`${QMS_API.SUPPLIER}/${id}`, {
+    params: { version },
+  });
 }
 
 export async function createSupplierMutation(data: Partial<SupplierItem>) {
