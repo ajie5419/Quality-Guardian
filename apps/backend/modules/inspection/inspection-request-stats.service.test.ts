@@ -1,8 +1,26 @@
-import { describe, expect, it, vi } from 'vitest';
+import type {
+  PeriodClosedGroup,
+  PeriodSubmittedGroup,
+} from './inspection-request-stats-period';
+
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DeptService } from '~/modules/dept';
 import prisma from '~/utils/prisma';
 
+import {
+  inspectionRequestDurationMinutes as durationMinutes,
+  formatInspectionRequestStatsDate as formatShanghaiDate,
+} from './inspection-request-stats-date';
 import { InspectionRequestStatsService } from './inspection-request-stats.service';
+
+const testAccess = { user: { userId: 'u1', username: 'u1' } };
+
+// All fixtures are queried with startDate/endDate 2026-06-01, which resolves
+// to the fixed Shanghai-midnight range below.
+const testRange = {
+  end: new Date('2026-06-02T00:00:00+08:00'),
+  start: new Date('2026-06-01T00:00:00+08:00'),
+};
 
 const identityMocks = vi.hoisted(() => ({
   resolveCanonicalIds: vi.fn(),
@@ -29,9 +47,13 @@ vi.mock('~/modules/dept', () => ({
 
 vi.mock('~/utils/prisma', () => ({
   default: {
+    $queryRaw: vi.fn().mockResolvedValue([]),
+    departments: {
+      findMany: vi.fn(),
+    },
     qms_inspection_requests: {
       count: vi.fn().mockResolvedValue(0),
-      findMany: vi.fn().mockResolvedValue([]),
+      findMany: vi.fn(),
     },
     processes: {
       findMany: vi.fn().mockResolvedValue([]),
@@ -41,6 +63,8 @@ vi.mock('~/utils/prisma', () => ({
     },
   },
 }));
+
+type RequestFixture = ReturnType<typeof makeRequest>;
 
 function makeRequest(overrides: Record<string, unknown> = {}) {
   const now = new Date('2026-06-01T10:00:00+08:00');
@@ -72,6 +96,8 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
     priority: 3,
     processId: null,
     processName,
+    responsibilityType: null,
+    responsibleDepartmentId: null,
     quantity: 1,
     reporter: 'user1',
     requestNo: 'R001',
@@ -93,11 +119,121 @@ function makeRequest(overrides: Record<string, unknown> = {}) {
   };
 }
 
-describe('inspectionRequestStatsService.getRequestStats', () => {
-  function setupMocks(requests: ReturnType<typeof makeRequest>[]) {
-    vi.mocked(prisma.qms_inspection_requests.findMany).mockResolvedValue(
-      requests as any,
+/**
+ * Test-side mirror of the DB pre-aggregation (PERF-QMS-001 / PHASE-2A): the
+ * submitted GROUP BY uses the same identity/classification dimensions as
+ * classifyPeriodSubmittedRow, so the group path must equal the per-row path.
+ */
+function toSubmittedGroups(requests: RequestFixture[]): PeriodSubmittedGroup[] {
+  const groups = new Map<string, PeriodSubmittedGroup>();
+  for (const row of requests) {
+    if (
+      !(row.submittedAt >= testRange.start && row.submittedAt < testRange.end)
+    )
+      continue;
+    if (row.status === 'CANCELLED') continue;
+    const group = {
+      category: (row.category ?? null) as PeriodSubmittedGroup['category'],
+      hasLinkedIssue: Boolean(row.linkedIssueId || row.linkedIssueNo),
+      inspectionResult: row.inspectionResult as string,
+      processId: (row.processId ?? null) as null | string,
+      requestCount: 0,
+      responsibilityType: (row.responsibilityType ?? null) as null | string,
+      responsibleDepartmentId: (row.responsibleDepartmentId ?? null) as
+        | null
+        | string,
+      status: row.status as string,
+      submittedDate: formatShanghaiDate(row.submittedAt),
+      supplierId: (row.supplierId ?? null) as null | string,
+      teamId: (row.teamId ?? null) as null | string,
+    };
+    const key = JSON.stringify([
+      group.submittedDate,
+      group.category,
+      group.responsibilityType,
+      group.supplierId,
+      group.teamId,
+      group.responsibleDepartmentId,
+      group.processId,
+      group.status,
+      group.inspectionResult,
+      group.hasLinkedIssue,
+    ]);
+    const existing = groups.get(key);
+    if (existing) existing.requestCount += 1;
+    else groups.set(key, { ...group, requestCount: 1 });
+  }
+  return [...groups.values()];
+}
+
+/**
+ * Test-side mirror of the DB closed GROUP BY + SUM(duration): keyed by the
+ * closed classification dimensions, with totalTaskMinutes = SUM of the
+ * per-row floored minute durations.
+ */
+function toClosedGroups(requests: RequestFixture[]): PeriodClosedGroup[] {
+  const groups = new Map<string, PeriodClosedGroup>();
+  for (const row of requests) {
+    if (!row.closedAt) continue;
+    if (!(row.closedAt >= testRange.start && row.closedAt < testRange.end))
+      continue;
+    if (row.status !== 'CLOSED') continue;
+    const inspector = row.inspector as
+      | null
+      | undefined
+      | { realName?: null | string; username?: null | string };
+    const group = {
+      category: (row.category ?? null) as PeriodClosedGroup['category'],
+      closedDate: formatShanghaiDate(row.closedAt),
+      inspectorId: (row.inspectorId ?? null) as null | string,
+      inspectorRealName: inspector?.realName ?? null,
+      inspectorUsername: inspector?.username ?? null,
+      requestCount: 0,
+      supplierId: (row.supplierId ?? null) as null | string,
+      teamId: (row.teamId ?? null) as null | string,
+      totalTaskMinutes: 0,
+    };
+    const key = JSON.stringify([
+      group.closedDate,
+      group.category,
+      group.supplierId,
+      group.teamId,
+      group.inspectorId,
+      group.inspectorRealName,
+      group.inspectorUsername,
+    ]);
+    const taskMinutes = durationMinutes(
+      row.dispatchedAt || row.submittedAt,
+      row.closedAt,
     );
+    const existing = groups.get(key);
+    if (existing) {
+      existing.requestCount += 1;
+      existing.totalTaskMinutes += taskMinutes;
+    } else {
+      groups.set(key, {
+        ...group,
+        requestCount: 1,
+        totalTaskMinutes: taskMinutes,
+      });
+    }
+  }
+  return [...groups.values()];
+}
+
+describe('inspectionRequestStatsService.getRequestStats', () => {
+  function setupMocks(
+    requests: RequestFixture[],
+    options: { active?: Array<Record<string, unknown>> } = {},
+  ) {
+    const submittedGroups = toSubmittedGroups(requests);
+    const closedGroups = toClosedGroups(requests);
+    vi.mocked(prisma.$queryRaw).mockImplementation((async (query: unknown) => {
+      const sql = JSON.stringify(query);
+      if (sql.includes('activeTaskCount')) return options.active ?? [];
+      if (sql.includes('closedDate')) return closedGroups as never;
+      return submittedGroups as never;
+    }) as never);
     vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
     vi.mocked(prisma.users.findMany).mockResolvedValue([]);
     identityMocks.resolveSupplierNamesByIds.mockResolvedValue(
@@ -131,10 +267,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       { businessUnit: null, id: 'dept-machining', name: 'Machining BU' },
     ]);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byDepartment).toEqual([
       {
@@ -171,10 +310,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       { count: 1, team: '班组A', teamId: 'team-a' },
@@ -200,10 +342,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.bySupplier).toEqual([
       { count: 2, supplierId: 'supplier-x', team: '供应商X' },
@@ -222,10 +367,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.bySupplier).toEqual([
       { count: 1, supplierId: 'supplier-x', team: '供应商X' },
@@ -246,12 +394,25 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
         status: 'DISPATCHED',
       }),
     ];
-    setupMocks(requests);
-
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
+    setupMocks(requests, {
+      active: [
+        {
+          activeTaskCount: 1,
+          earliestStartAt: new Date('2026-06-01T10:00:00+08:00'),
+          inspectorId: 'inspector-1',
+          inspectorRealName: '张三',
+          inspectorUsername: 'zhangsan',
+        },
+      ],
     });
+
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.inspectorStatus).toContainEqual(
       expect.objectContaining({
@@ -287,18 +448,27 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       status: 'CLOSED',
       inspectionResult: 'PASS',
     });
-    // periodRequests gets both rows; activeInspectorRequests (status-filtered
-    // query) only gets the dispatched one.
-    vi.mocked(prisma.qms_inspection_requests.findMany)
-      .mockResolvedValueOnce([unclosed, closed] as never)
-      .mockResolvedValueOnce([unclosed] as never);
-    vi.mocked(prisma.qms_inspection_requests.count).mockResolvedValue(0);
-    vi.mocked(prisma.users.findMany).mockResolvedValue([]);
-
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
+    // The active raw aggregate (status-filtered) only counts the dispatched
+    // one; the closed GROUP BY only carries the CLOSED request.
+    setupMocks([unclosed, closed], {
+      active: [
+        {
+          activeTaskCount: 1,
+          earliestStartAt: new Date('2026-06-01T10:00:00+08:00'),
+          inspectorId: 'inspector-1',
+          inspectorRealName: '张三',
+          inspectorUsername: 'zhangsan',
+        },
+      ],
     });
+
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     const row = result.inspectorStatus.find(
       (item) => item.inspectorId === 'inspector-1',
@@ -330,10 +500,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.reinspectionRateByTeam).toHaveLength(1);
     expect(result.reinspectionRateByTeam[0]).toMatchObject({
@@ -363,10 +536,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.reinspectionRateBySupplier).toHaveLength(1);
     expect(result.reinspectionRateBySupplier[0]).toMatchObject({
@@ -403,10 +579,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     // Only the closed request counts as inspected; the in-flight FAIL and
     // the dispatched-but-unclosed PASS requests stay out of both numerator
@@ -428,10 +607,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.bySupplier).toEqual([]);
     expect(result.reinspectionRateBySupplier).toEqual([]);
@@ -449,10 +631,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.historyByTeam).toEqual([
       { count: 1, team: '班组A', teamId: 'team-a' },
@@ -475,10 +660,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       ]),
     );
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       { count: 1, team: '结构 BU2', teamId: 'team-spaced' },
@@ -496,10 +684,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       new Map([['team-structure', '结构 BU2']]),
     );
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       { count: 2, team: '结构 BU2', teamId: 'team-structure' },
@@ -527,10 +718,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       ]),
     );
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       { count: 1, team: '装配 BU', teamId: 'team-1' },
@@ -554,10 +748,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       new Map([['team-legacy', 'team-a']]),
     );
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       { count: 2, team: '结构 BU2', teamId: 'team-a' },
@@ -579,10 +776,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([]);
     expect(result.byDepartment).toEqual([
@@ -603,10 +803,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     setupMocks(requests);
     identityMocks.resolveTeamNamesByIds.mockResolvedValue(new Map());
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      endDate: '2026-06-01',
-      startDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        endDate: '2026-06-01',
+        startDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       {
@@ -629,10 +832,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      endDate: '2026-06-01',
-      startDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        endDate: '2026-06-01',
+        startDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.bySupplier).toEqual([
       { count: 2, supplierId: null, team: 'Unresolved supplier' },
@@ -650,10 +856,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      endDate: '2026-06-01',
-      startDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        endDate: '2026-06-01',
+        startDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       { count: 1, team: '班组A', teamId: 'team-a' },
@@ -681,10 +890,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       new Map([['supplier-1', 'Canonical supplier']]),
     );
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.bySupplier).toEqual([
       {
@@ -719,10 +931,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byInspector).toEqual([
       { count: 1, inspector: '张三', inspectorId: 'inspector-1' },
@@ -749,10 +964,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.todaySubmittedIncomingCount).toBe(2);
     expect(result.todaySubmittedProcessCount).toBe(2);
@@ -786,10 +1004,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
     ];
     setupMocks(requests);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.todayClosedIncomingCount).toBe(1);
     expect(result.todayClosedProcessCount).toBe(2);
@@ -812,10 +1033,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       { businessUnit: null, id: 'dept-machining', name: 'Machining BU' },
     ]);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       {
@@ -858,10 +1082,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       { businessUnit: null, id: 'dept-a', name: '班组A' },
     ]);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byTeam).toEqual([
       {
@@ -871,6 +1098,7 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       },
     ]);
   });
+
   it('falls back to the process master department when a request has no responsibility department snapshot', async () => {
     const request = makeRequest({
       id: 'process-fallback',
@@ -890,10 +1118,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       { businessUnit: null, id: 'dept-machining', name: 'Machining BU' },
     ]);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byDepartment).toEqual([
       {
@@ -925,10 +1156,13 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       { id: 'proc-unconfigured', responsibleDepartmentId: null },
     ] as any);
 
-    const result = await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
-    });
+    const result = await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
 
     expect(result.byDepartment).toEqual([
       expect.objectContaining({
@@ -937,20 +1171,219 @@ describe('inspectionRequestStatsService.getRequestStats', () => {
       }),
     ]);
   });
-  it('loads only fields required by the statistics calculation', async () => {
+
+  it('never loads full period rows: period stats are DB pre-aggregated', async () => {
     setupMocks([]);
 
-    await InspectionRequestStatsService.getRequestStats({
-      startDate: '2026-06-01',
-      endDate: '2026-06-01',
+    await InspectionRequestStatsService.getRequestStats(
+      {
+        startDate: '2026-06-01',
+        endDate: '2026-06-01',
+      },
+      testAccess,
+    );
+
+    expect(prisma.qms_inspection_requests.findMany).not.toHaveBeenCalled();
+    const rawSql = vi
+      .mocked(prisma.$queryRaw)
+      .mock.calls.map((call) => JSON.stringify(call))
+      .join(' ');
+    expect(rawSql).toContain('GROUP BY');
+    // Every raw aggregate query embeds the request-domain scope fragment.
+    expect(rawSql).toContain('request_row');
+  });
+
+  describe('data scope (SEC-INSPECTION-REQUEST-ANALYTICS-001)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
     });
 
-    const [periodQuery, activeInspectorQuery] = vi.mocked(
-      prisma.qms_inspection_requests.findMany,
-    ).mock.calls;
-    expect(periodQuery?.[0]).toHaveProperty('select');
-    expect(periodQuery?.[0]).not.toHaveProperty('include');
-    expect(activeInspectorQuery?.[0]).toHaveProperty('select');
-    expect(activeInspectorQuery?.[0]).not.toHaveProperty('include');
+    const deptAAccess = {
+      dataScope: {
+        deptIds: ['dept-a'],
+        module: 'inspection',
+        scopeType: 'DEPT' as const,
+      },
+      user: { userId: 'u-dept-a', username: 'user-a' },
+    };
+    const selfAccess = {
+      dataScope: {
+        deptIds: [],
+        module: 'inspection',
+        scopeType: 'SELF' as const,
+      },
+      user: { userId: 'u-self', username: 'self-a' },
+    };
+    const allAccess = {
+      dataScope: {
+        deptIds: [],
+        module: 'inspection',
+        scopeType: 'ALL' as const,
+      },
+      user: { userId: 'u-all', username: 'admin' },
+    };
+
+    it('applies the department filter to every request query for DEPT scope', async () => {
+      setupMocks([
+        makeRequest({
+          id: 'req-a',
+          responsibleDepartment: 'Dept A',
+          responsibleDepartmentId: 'dept-a',
+        }),
+      ]);
+      vi.mocked(prisma.departments.findMany).mockResolvedValue([
+        { name: 'Dept A' },
+      ] as any);
+      vi.mocked(DeptService.findActiveByIdsOrNames).mockResolvedValue([
+        { businessUnit: null, id: 'dept-a', name: 'Dept A' },
+      ]);
+
+      const result = await InspectionRequestStatsService.getRequestStats(
+        {
+          startDate: '2026-06-01',
+          endDate: '2026-06-01',
+        },
+        deptAAccess,
+      );
+
+      const countCalls = vi.mocked(prisma.qms_inspection_requests.count).mock
+        .calls;
+      const deptFilter = {
+        responsibleDepartment: { in: ['dept-a', 'Dept A'] },
+      };
+      for (const call of countCalls) {
+        expect(call[0].where.AND[1]).toEqual(deptFilter);
+      }
+      const rawSql = vi
+        .mocked(prisma.$queryRaw)
+        .mock.calls.map((call) => JSON.stringify(call))
+        .join(' ');
+      expect(rawSql).toContain('request_row.responsibleDepartment IN');
+      // Only the scoped rows reach the JS aggregation; B rows never appear.
+      expect(result.todaySubmittedCount).toBe(1);
+      expect(result.byDepartment).toEqual([
+        expect.objectContaining({
+          count: 1,
+          department: 'Dept A',
+          responsibleDepartmentId: 'dept-a',
+        }),
+      ]);
+    });
+
+    it('scopes by inspector/reporter ownership for SELF scope', async () => {
+      setupMocks([
+        makeRequest({
+          id: 'mine',
+          inspectorId: 'u-self',
+          status: 'CLOSED',
+          submittedAt: new Date('2026-06-01T09:00:00+08:00'),
+          closedAt: new Date('2026-06-01T11:00:00+08:00'),
+        }),
+      ]);
+
+      await InspectionRequestStatsService.getRequestStats(
+        {
+          startDate: '2026-06-01',
+          endDate: '2026-06-01',
+        },
+        selfAccess,
+      );
+
+      const countCalls = vi.mocked(prisma.qms_inspection_requests.count).mock
+        .calls;
+      for (const call of countCalls) {
+        expect(call[0].where.AND[1]).toEqual({
+          OR: [{ inspectorId: 'u-self' }, { reporterId: 'u-self' }],
+        });
+      }
+      const rawSql = vi
+        .mocked(prisma.$queryRaw)
+        .mock.calls.map((call) => JSON.stringify(call))
+        .join(' ');
+      expect(rawSql).toContain('request_row.inspectorId =');
+      expect(rawSql).toContain('request_row.reporterId =');
+    });
+
+    it('keeps the base where unchanged for ALL scope', async () => {
+      setupMocks([makeRequest({ id: 'req-a' }), makeRequest({ id: 'req-b' })]);
+
+      const result = await InspectionRequestStatsService.getRequestStats(
+        {
+          startDate: '2026-06-01',
+          endDate: '2026-06-01',
+        },
+        allAccess,
+      );
+
+      const countCalls = vi.mocked(prisma.qms_inspection_requests.count).mock
+        .calls;
+      for (const call of countCalls) {
+        expect(call[0].where.AND).toBeUndefined();
+        expect(call[0].where.isDeleted).toBe(false);
+      }
+      const rawSql = vi
+        .mocked(prisma.$queryRaw)
+        .mock.calls.map((call) => JSON.stringify(call))
+        .join(' ');
+      expect(rawSql).not.toContain('request_row.responsibleDepartment IN');
+      expect(rawSql).not.toContain('request_row.inspectorId =');
+      // A + B rows both count under ALL.
+      expect(result.todaySubmittedCount).toBe(2);
+    });
+
+    it('fails closed when the access context is missing a user', async () => {
+      setupMocks([]);
+
+      await expect(
+        InspectionRequestStatsService.getRequestStats(
+          {
+            startDate: '2026-06-01',
+            endDate: '2026-06-01',
+          },
+          {} as any,
+        ),
+      ).rejects.toThrow('Analytics access context is missing a user');
+      await expect(
+        InspectionRequestStatsService.getRequestStats(
+          {
+            startDate: '2026-06-01',
+            endDate: '2026-06-01',
+          },
+          undefined as any,
+        ),
+      ).rejects.toThrow('Analytics access context is missing a user');
+      expect(prisma.$queryRaw).not.toHaveBeenCalled();
+    });
+
+    it('fails closed to an empty set when no department candidate resolves', async () => {
+      setupMocks([]);
+      vi.mocked(prisma.departments.findMany).mockResolvedValue([]);
+
+      await InspectionRequestStatsService.getRequestStats(
+        {
+          startDate: '2026-06-01',
+          endDate: '2026-06-01',
+        },
+        {
+          dataScope: {
+            deptIds: [],
+            module: 'inspection',
+            scopeType: 'DEPT' as const,
+          },
+          user: { userId: 'u-dept-a', username: 'user-a' },
+        },
+      );
+
+      const countCalls = vi.mocked(prisma.qms_inspection_requests.count).mock
+        .calls;
+      for (const call of countCalls) {
+        expect(call[0].where.AND[1]).toEqual({ id: '__none__' });
+      }
+      const rawSql = vi
+        .mocked(prisma.$queryRaw)
+        .mock.calls.map((call) => JSON.stringify(call))
+        .join(' ');
+      expect(rawSql).toContain('AND 1 = 0');
+    });
   });
 });

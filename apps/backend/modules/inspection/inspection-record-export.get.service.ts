@@ -4,26 +4,37 @@ import {
 } from '~/modules/inspection/inspection-record';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { logApiDebug, logApiError, logApiWarn } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import { defineValidatedHandler } from '~/utils/define-validated-handler';
+import {
+  EXPORT_LIMIT_EXCEEDED_MESSAGE,
+  exportLimitExceededError,
+  isExportLimitExceeded,
+} from '~/utils/export-constants';
 import {
   badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
 
-const MAX_EXPORT_ROWS = 20_000;
 export default defineValidatedHandler(
   inspectionRecordListQuerySchema,
   async (event, query) => {
     const startedAt = Date.now();
     try {
+      const userinfo = getCurrentUser(event);
+      const scope = event.context.dataScope;
       const params = parseInspectionRecordListQuery(query);
-      const result = await InspectionService.findAll({
-        ...params,
-        forExport: true,
-      });
+      const result = await InspectionService.findAllForExport(
+        {
+          ...params,
+        },
+        scope && userinfo
+          ? { scope, user: { id: userinfo.id, username: userinfo.username } }
+          : undefined,
+      );
 
-      if ((result.total || 0) > MAX_EXPORT_ROWS) {
+      if (isExportLimitExceeded(result.items)) {
         logApiWarn('inspection-records-export', 'export rows exceed limit', {
           count: result.total,
           filters: params,
@@ -32,7 +43,8 @@ export default defineValidatedHandler(
         });
         return badRequestResponse(
           event,
-          `导出数据量超过上限（${MAX_EXPORT_ROWS} 条），请缩小筛选范围后重试`,
+          EXPORT_LIMIT_EXCEEDED_MESSAGE,
+          exportLimitExceededError(),
         );
       }
 

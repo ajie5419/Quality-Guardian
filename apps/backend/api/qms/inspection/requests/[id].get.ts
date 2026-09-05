@@ -1,6 +1,7 @@
 import { defineEventHandler } from 'h3';
 import { InspectionRequestQueryService } from '~/modules/inspection/inspection-request-query.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   notFoundResponse,
@@ -13,7 +14,13 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') return id;
 
   try {
-    const request = await InspectionRequestQueryService.getRequestDetail(id);
+    const user = getCurrentUser(event);
+    const request = await InspectionRequestQueryService.getRequestDetail(id, {
+      dataScope: event.context.dataScope,
+      permission: 'QMS:Inspection:Requests:List',
+      scopeIdentity: event.context.dataScope ?? {},
+      user,
+    });
     if (!request) return notFoundResponse(event, '报检任务不存在');
     return useResponseSuccess(request);
   } catch (error) {
