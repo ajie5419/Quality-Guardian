@@ -10,6 +10,10 @@
  *   FORBIDDEN     → permission denied (403)
  *   UNAUTHORIZED  → expired / missing session → redirect to login
  *   CONFLICT      → state conflict / concurrent write → refresh and retry
+ *   IDEMPOTENCY_KEY_REUSED → same Idempotency-Key sent with a different
+ *                            request fingerprint → refresh and retry (409)
+ *   IDEMPOTENCY_REQUEST_IN_PROGRESS → duplicate Idempotency-Key still being
+ *                                     processed (409)
  *   BAD_REQUEST   → malformed request
  *   DUPLICATE     → duplicate entity / unique violation (409)
  *   BUSINESS      → generic business failure → warning toast
@@ -24,6 +28,8 @@ export const ErrorCode = {
   FORBIDDEN: 'FORBIDDEN',
   UNAUTHORIZED: 'UNAUTHORIZED',
   CONFLICT: 'CONFLICT',
+  IDEMPOTENCY_KEY_REUSED: 'IDEMPOTENCY_KEY_REUSED',
+  IDEMPOTENCY_REQUEST_IN_PROGRESS: 'IDEMPOTENCY_REQUEST_IN_PROGRESS',
   BAD_REQUEST: 'BAD_REQUEST',
   DUPLICATE: 'DUPLICATE',
   BUSINESS: 'BUSINESS',
@@ -39,6 +45,8 @@ export const ERROR_UX_LEVEL = {
   FORBIDDEN: 'error',
   UNAUTHORIZED: 'error',
   CONFLICT: 'warning',
+  IDEMPOTENCY_KEY_REUSED: 'warning',
+  IDEMPOTENCY_REQUEST_IN_PROGRESS: 'warning',
   BAD_REQUEST: 'error',
   DUPLICATE: 'warning',
   BUSINESS: 'warning',
