@@ -8,6 +8,14 @@ import prisma from '~/utils/prisma';
 
 export type QualityLossIndexSource = keyof typeof quality_loss_index_source;
 
+export interface SystemDerivedWriteContext {
+  actor: 'SYSTEM' | 'USER';
+  authorizationEvidence: string;
+  retryMetadata: { attempt?: number; idempotencyKey?: string };
+  source: { id: string; model: string };
+  traceId: string;
+}
+
 export interface QualityLossIndexQueueClient {
   quality_loss_index_jobs: Pick<
     Prisma.TransactionClient['quality_loss_index_jobs'],
@@ -18,6 +26,7 @@ export interface QualityLossIndexQueueClient {
 export interface QualityLossIndexJobKey {
   source: QualityLossIndexSource;
   sourcePk: string;
+  sourceContext?: SystemDerivedWriteContext;
 }
 
 export interface ClaimedQualityLossIndexJob extends QualityLossIndexJobKey {
@@ -42,7 +51,19 @@ function normalizedKeys(values: QualityLossIndexJobKey[]) {
   for (const value of values) {
     const sourcePk = String(value.sourcePk || '').trim();
     if (!sourcePk) continue;
-    unique.set(`${value.source}:${sourcePk}`, { ...value, sourcePk });
+    const sourceContext = value.sourceContext ?? {
+      actor: 'SYSTEM' as const,
+      authorizationEvidence: 'queue-entry-source-key',
+      retryMetadata: {},
+      source: { id: sourcePk, model: value.source },
+      traceId: `${value.source}:${sourcePk}`,
+    };
+    if (sourceContext.source.id !== sourcePk) continue;
+    unique.set(`${value.source}:${sourcePk}`, {
+      ...value,
+      sourceContext,
+      sourcePk,
+    });
   }
   return [...unique.values()];
 }
@@ -130,6 +151,16 @@ export const QualityLossIndexQueue = {
           jobCount: result.count,
           source: candidate.source,
           sourcePk: candidate.sourcePk,
+          sourceContext: {
+            actor: 'SYSTEM',
+            authorizationEvidence: 'queue-job-claim',
+            retryMetadata: { attempt: candidate.attempts + 1 },
+            source: {
+              id: candidate.sourcePk,
+              model: candidate.source,
+            },
+            traceId: `${candidate.source}:${candidate.sourcePk}`,
+          },
         });
       }
     }

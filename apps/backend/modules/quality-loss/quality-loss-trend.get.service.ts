@@ -3,6 +3,7 @@ import { defineEventHandler, getQuery } from 'h3';
 import { QUALITY_LOSS_SOURCE } from '~/modules/quality-loss/quality-loss-status';
 import { QualityLossService } from '~/modules/quality-loss/quality-loss.service';
 import { logApiError } from '~/utils/api-logger';
+import { getCurrentUser } from '~/utils/current-user';
 import {
   internalServerErrorResponse,
   useResponseSuccess,
@@ -34,6 +35,12 @@ export default defineEventHandler(async (event) => {
   const period = query.period as string;
 
   try {
+    const userinfo = getCurrentUser(event);
+    const userContext = {
+      userId: String(userinfo.id || userinfo.userId || ''),
+      username: userinfo.username,
+    };
+    const dataScope = event.context.dataScope;
     if (period) {
       const range = getPeriodRangeFromTrend(period, granularity);
       if (!range) return useResponseSuccess({ drillDown: [], period });
@@ -41,6 +48,8 @@ export default defineEventHandler(async (event) => {
       const rows = await QualityLossService.getDrillDown(
         range.start,
         range.end,
+        userContext,
+        dataScope,
       );
       const details = rows
         .filter((row) => Number(row.amount) > 0)
@@ -67,7 +76,11 @@ export default defineEventHandler(async (event) => {
     }
 
     return useResponseSuccess(
-      await QualityLossService.getTrendData(granularity as 'month' | 'week'),
+      await QualityLossService.getTrendData(
+        granularity as 'month' | 'week',
+        userContext,
+        dataScope,
+      ),
     );
   } catch (error: unknown) {
     const errorMessage =

@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AfterSalesAPI } from '~/modules/after-sales';
+import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
   default: {
@@ -117,6 +118,28 @@ vi.mock('@qgs/shared', () => ({
   }),
   normalizeQualityLossSource: vi.fn((source: any) => source || 'Manual'),
   normalizeQualityLossStatus: vi.fn((status: any) => status || 'Pending'),
+  parseQualityLossStatus: vi.fn((status: any) => {
+    const normalized = String(status || '')
+      .trim()
+      .toUpperCase();
+    if (['CLOSED', 'COMPLETED', 'CONFIRMED'].includes(normalized)) {
+      return 'Confirmed';
+    }
+    if (
+      [
+        'CLAIMING',
+        'IN_PROGRESS',
+        'NEGOTIATING',
+        'PROCESSING',
+        'SUBMITTED',
+      ].includes(normalized)
+    ) {
+      return 'Processing';
+    }
+    if (normalized === 'RESOLVED') return 'Resolved';
+    if (normalized === 'PENDING') return 'Pending';
+    return null;
+  }),
   QUALITY_LOSS_SOURCE: {
     COMMISSIONING: 'Commissioning',
     EXTERNAL: 'External',
@@ -136,6 +159,16 @@ vi.mock('@qgs/shared', () => ({
 describe('quality-loss-route-update.service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(prisma.quality_losses.findFirst).mockResolvedValue({
+      createdBy: 'user-1',
+      respDept: null,
+    } as never);
+    vi.mocked(prisma.after_sales.findUnique).mockResolvedValue({
+      createdBy: 'user-1',
+      division: null,
+      feedbackDept: null,
+      respDept: null,
+    } as never);
   });
 
   it('should update manual record via transaction', async () => {
@@ -148,7 +181,10 @@ describe('quality-loss-route-update.service', () => {
     vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
       const tx = {
         quality_losses: {
-          update: vi.fn().mockResolvedValue({ id: 'manual-1' }),
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'manual-1', status: 'Pending' }),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
         quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       };
@@ -172,22 +208,14 @@ describe('quality-loss-route-update.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
-    const update = vi.fn().mockResolvedValue({
-      actualClaim: 0,
-      amount: 100,
-      createdBy: 'user-1',
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    const findFirst = vi.fn().mockResolvedValue({
       id: 'manual-1',
-      isDeleted: false,
-      occurDate: new Date(),
-      partName: '主梁',
-      projectName: '1000t 架桥机',
-      respDept: 'QA',
       status: 'Pending',
-      workOrderNumber: 'WO-468624',
     });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback({
-        quality_losses: { update },
+        quality_losses: { findFirst, updateMany },
         quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
@@ -203,7 +231,7 @@ describe('quality-loss-route-update.service', () => {
     });
 
     expect(result).toEqual({ ok: true });
-    expect(update).toHaveBeenCalledWith(
+    expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           partId: 'part-1',
@@ -222,19 +250,20 @@ describe('quality-loss-route-update.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
-    const update = vi.fn().mockResolvedValue({
-      id: 'manual-1',
-      respDept: 'Current Quality',
-      respDeptId: 'dept-qa',
-    });
     const findFirst = vi.fn().mockResolvedValue({
       id: 'dept-qa',
       name: 'Current Quality',
     });
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback({
         departments: { findFirst },
-        quality_losses: { update },
+        quality_losses: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'manual-1', status: 'Pending' }),
+          updateMany,
+        },
         quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
@@ -254,7 +283,7 @@ describe('quality-loss-route-update.service', () => {
       where: { id: 'dept-qa', isDeleted: false, status: 1 },
       select: { id: true, name: true },
     });
-    expect(update).toHaveBeenCalledWith(
+    expect(updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
           respDept: 'Current Quality',
@@ -270,10 +299,15 @@ describe('quality-loss-route-update.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
-    const update = vi.fn().mockResolvedValue({ id: 'manual-1' });
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback({
-        quality_losses: { update },
+        quality_losses: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'manual-1', status: 'Pending' }),
+          updateMany,
+        },
         quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
@@ -289,7 +323,7 @@ describe('quality-loss-route-update.service', () => {
       userId: 'user-1',
     });
 
-    const data = update.mock.calls[0]?.[0]?.data;
+    const data = updateMany.mock.calls[0]?.[0]?.data;
     expect(data).not.toHaveProperty('respDept');
     expect(data).not.toHaveProperty('respDeptId');
   });
@@ -300,11 +334,11 @@ describe('quality-loss-route-update.service', () => {
     );
     const prismaModule = await import('~/utils/prisma');
     const prisma = prismaModule.default;
-    const update = vi.fn();
+    const updateMany = vi.fn();
     vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
       callback({
         departments: { findFirst: vi.fn().mockResolvedValue(null) },
-        quality_losses: { update },
+        quality_losses: { findFirst: vi.fn(), updateMany },
         quality_loss_index_jobs: prisma.quality_loss_index_jobs,
       }),
     );
@@ -324,7 +358,7 @@ describe('quality-loss-route-update.service', () => {
         ok: false,
       }),
     );
-    expect(update).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
   });
 
   it('should update external record via AfterSalesService', async () => {
@@ -426,6 +460,88 @@ describe('quality-loss-route-update.service', () => {
     );
   });
 
+  it('rejects an illegal quality-loss status transition with CONFLICT', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        quality_losses: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'manual-1', status: 'Confirmed' }),
+          updateMany,
+        },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
+    );
+
+    await expect(
+      QualityLossRouteUpdateService.updateByRouteId({
+        body: { amount: 100, lossSource: 'Manual', status: 'Pending' },
+        id: 'QL-2026-001',
+        userId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns CONFLICT when the CAS claim loses a concurrent status change', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        quality_losses: {
+          findFirst: vi
+            .fn()
+            .mockResolvedValueOnce({ id: 'manual-1', status: 'Pending' })
+            .mockResolvedValueOnce({ id: 'manual-1', status: 'Processing' }),
+          updateMany,
+        },
+        quality_loss_index_jobs: prisma.quality_loss_index_jobs,
+      }),
+    );
+
+    await expect(
+      QualityLossRouteUpdateService.updateByRouteId({
+        body: { amount: 100, lossSource: 'Manual', status: 'Confirmed' },
+        id: 'QL-2026-001',
+        userId: 'user-1',
+      }),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'Pending' }),
+      }),
+    );
+  });
+
+  it('rejects unknown status text on the write path with BAD_REQUEST', async () => {
+    const { QualityLossRouteUpdateService } = await import(
+      '~/modules/quality-loss/quality-loss-route-update.service'
+    );
+    const prismaModule = await import('~/utils/prisma');
+    const prisma = prismaModule.default;
+
+    const result = await QualityLossRouteUpdateService.updateByRouteId({
+      body: { amount: 100, lossSource: 'Manual', status: 'bogus' },
+      id: 'QL-2026-001',
+      userId: 'user-1',
+    });
+
+    expect(result).toEqual(
+      expect.objectContaining({ code: 'BAD_REQUEST', ok: false }),
+    );
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
   describe('ownership guard', () => {
     it('rejects SELF scope when manual record belongs to another user', async () => {
       const { QualityLossRouteUpdateService } = await import(
@@ -466,7 +582,10 @@ describe('quality-loss-route-update.service', () => {
       vi.mocked(prisma.$transaction).mockImplementation(async (cb: any) => {
         const tx = {
           quality_losses: {
-            update: vi.fn().mockResolvedValue({ id: 'manual-1' }),
+            findFirst: vi
+              .fn()
+              .mockResolvedValue({ id: 'manual-1', status: 'Pending' }),
+            updateMany: vi.fn().mockResolvedValue({ count: 1 }),
           },
           quality_loss_index_jobs: prisma.quality_loss_index_jobs,
         };

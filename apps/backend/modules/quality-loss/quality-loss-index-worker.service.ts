@@ -1,3 +1,5 @@
+import type { SystemDerivedWriteContext } from './quality-loss-index-queue.service';
+
 import { hostname } from 'node:os';
 import process from 'node:process';
 
@@ -25,6 +27,23 @@ const sourceByJobSource = {
   MANUAL: 'Manual',
 } as const;
 
+function contextForJob(job: {
+  attempts: number;
+  source: keyof typeof sourceByJobSource;
+  sourceContext?: SystemDerivedWriteContext;
+  sourcePk: string;
+}): SystemDerivedWriteContext {
+  return (
+    job.sourceContext ?? {
+      actor: 'SYSTEM',
+      authorizationEvidence: 'legacy-queue-job',
+      retryMetadata: { attempt: job.attempts },
+      source: { id: job.sourcePk, model: job.source },
+      traceId: `${job.source}:${job.sourcePk}`,
+    }
+  );
+}
+
 let started = false;
 let running: null | Promise<{ batches: number; processed: number }> = null;
 
@@ -44,6 +63,17 @@ async function drain(options: DrainOptions = {}) {
       // Completed rows are idempotent upserts. If a later row fails, retrying
       // the whole claimed batch favors durable convergence over bookkeeping.
       for (const job of jobs) {
+        const context = contextForJob(job);
+        logger.info(
+          {
+            actor: context.actor,
+            retryAttempt: context.retryMetadata.attempt,
+            sourceId: context.source.id,
+            sourceModel: context.source.model,
+            traceId: context.traceId,
+          },
+          'quality-loss index job execution started',
+        );
         await QualityLossIndexService.rebuildOne(
           sourceByJobSource[job.source],
           job.sourcePk,

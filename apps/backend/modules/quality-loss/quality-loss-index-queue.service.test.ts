@@ -54,7 +54,19 @@ describe('quality loss index queue', () => {
     await expect(
       QualityLossIndexQueue.claim({ now, workerId: 'worker-a' }),
     ).resolves.toEqual([
-      { attempts: 2, jobCount: 3, source: 'EXTERNAL', sourcePk: 'as-1' },
+      {
+        attempts: 2,
+        jobCount: 3,
+        source: 'EXTERNAL',
+        sourcePk: 'as-1',
+        sourceContext: {
+          actor: 'SYSTEM',
+          authorizationEvidence: 'queue-job-claim',
+          retryMetadata: { attempt: 2 },
+          source: { id: 'as-1', model: 'EXTERNAL' },
+          traceId: 'EXTERNAL:as-1',
+        },
+      },
     ]);
     expect(prismaMock.quality_loss_index_jobs.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
