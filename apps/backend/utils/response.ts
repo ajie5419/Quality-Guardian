@@ -97,6 +97,14 @@ export function unAuthorizedResponse(event: H3Event<EventHandlerRequest>) {
   return useResponseError('Unauthorized Exception', 'Unauthorized Exception');
 }
 
+export function methodNotAllowedResponse(
+  event: H3Event<EventHandlerRequest>,
+  message = 'Method Not Allowed',
+) {
+  setResponseStatus(event, 405);
+  return useResponseError(message);
+}
+
 export function internalServerErrorResponse(
   event: H3Event<EventHandlerRequest>,
   message: string,

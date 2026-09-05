@@ -13,7 +13,6 @@ B-E2|apps/backend/modules/inspection/inspection-issue-mutation.service.ts|catch-
 B-E2|apps/backend/modules/inspection/inspection-project-document-sync.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/inspection/inspection-public-query.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/inspection/inspection-record-create.service.ts|catch-without-error-log|1
-B-E2|apps/backend/modules/inspection/inspection-record-query.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/inspection/inspection-record-types.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/inspection/inspection-request-close.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/inspection/inspection-request-create.service.ts|catch-without-error-log|1
@@ -47,7 +46,7 @@ B-E2|apps/backend/modules/vehicle-commissioning/vehicle-commissioning.service.ts
 B-E2|apps/backend/modules/welder/welder.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/work-order/work-order-aggregate.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/work-order/work-order-requirement-route.service.ts|catch-without-error-log|1
-B-E2|apps/backend/modules/work-order/work-order-route.service.ts|catch-without-error-log|3
+B-E2|apps/backend/modules/work-order/work-order-route.service.ts|catch-without-error-log|1
 B-E2|apps/backend/utils/department-multi.ts|catch-without-error-log|1
 B-E2|apps/backend/utils/jwt-utils.ts|catch-without-error-log|2
 B-E2|apps/backend/utils/logger.ts|catch-without-error-log|2
@@ -95,15 +94,15 @@ B-EC|apps/backend/modules/inspection/inspection-record-update.service.ts|error-c
 B-EC|apps/backend/modules/inspection/inspection-record-update.service.ts|error-code-TEAM_ID_REQUIRED|2
 B-EC|apps/backend/modules/inspection/inspection-request-create-responsibility.service.ts|error-code-INVALID_INSPECTION_REQUEST_RESPONSIBILITY|6
 B-EC|apps/backend/modules/inspection/inspection-request-create.post.service.ts|error-code-INSPECTION_REQUEST_V2_REQUIRED|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-COMPONENT_NAME_REQUIRED|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-INSPECTION_REQUEST_IDENTITY_REQUIRED|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-INSPECTION_REQUEST_RESPONSIBILITY_UNRESOLVED|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-INVALID_INSPECTION_CATEGORY|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-INVALID_MATERIAL_IDENTITY|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-INVALID_STATION_SELECTION|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-MATERIAL_INPUT_MODE_MISMATCH|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-SUPPLIER_ID_REQUIRED|1
-B-EC|apps/backend/modules/inspection/inspection-request-create.service.ts|error-code-TEAM_ID_REQUIRED|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-COMPONENT_NAME_REQUIRED|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-INSPECTION_REQUEST_IDENTITY_REQUIRED|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-INSPECTION_REQUEST_RESPONSIBILITY_UNRESOLVED|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-INVALID_INSPECTION_CATEGORY|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-INVALID_MATERIAL_IDENTITY|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-INVALID_STATION_SELECTION|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-MATERIAL_INPUT_MODE_MISMATCH|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-SUPPLIER_ID_REQUIRED|1
+B-EC|apps/backend/modules/inspection/inspection-request-create-payload.ts|error-code-TEAM_ID_REQUIRED|1
 B-EC|apps/backend/modules/inspection/inspection-request-dispatch.service.ts|error-code-MATERIAL_APPROVAL_PENDING|1
 B-EC|apps/backend/modules/inspection/inspection-request-dispatch.service.ts|error-code-MATERIAL_APPROVAL_REJECTED|1
 B-EC|apps/backend/modules/inspection/inspection-request-dispatch.service.ts|error-code-MATERIAL_ID_REQUIRED|1
@@ -298,6 +297,7 @@ B-M1|apps/backend/modules/planning/routes/bom/projects/[id].delete.service.ts|im
 B-M1|apps/backend/modules/planning/routes/bom/projects/index.get.service.ts|import-~/modules/system/metadata|1
 B-M1|apps/backend/modules/planning/routes/inspection-forms/[id].delete.service.ts|import-~/modules/file-storage/file-storage.service|1
 B-M1|apps/backend/modules/planning/routes/inspection-forms/[id].put.service.ts|import-~/modules/inspection/inspection-route.service|1
+B-M1|apps/backend/modules/metric-governance/metric-problem-closure-adapter.ts|import-~/modules/inspection/inspection-issue-stats.service|2
 B-M1|apps/backend/modules/planning/routes/inspection-forms/index.get.service.ts|import-~/modules/inspection/inspection-form|1
 B-M1|apps/backend/modules/planning/routes/inspection-forms/index.post.service.ts|import-~/modules/file-storage/file-storage.service|1
 B-M1|apps/backend/modules/planning/routes/inspection-forms/index.post.service.ts|import-~/modules/inspection/inspection-form|1
@@ -335,6 +335,7 @@ B-M1|apps/backend/modules/report/pass-rate.ts|import-~/modules/inspection/qualit
 B-M1|apps/backend/modules/report/report-daily-summary.service.ts|import-~/modules/inspection/inspection-form|1
 B-M1|apps/backend/modules/report/report-daily-summary.service.ts|import-~/modules/vehicle-commissioning/daily-report-storage.service|1
 B-M1|apps/backend/modules/report/report-route.service.ts|import-~/modules/vehicle-commissioning/daily-report-storage.service|1
+B-M1|apps/backend/modules/report/report-write.service.ts|import-~/modules/vehicle-commissioning/daily-report-storage.service|1
 B-M1|apps/backend/modules/report/report.service.ts|import-~/modules/dept/dept-tree|1
 B-M1|apps/backend/modules/report/vehicle-failure-rate.service.ts|import-~/modules/dept/dept.service|1
 B-M1|apps/backend/modules/report/vehicle-failure-rate.service.ts|import-~/modules/work-order/work-order-query|1
@@ -432,6 +433,8 @@ B-TEST2|apps/backend/modules/supervision/supervision-project-issue.service.test.
 B-TEST2|apps/backend/modules/supplier/supplier-scoring-adversarial.test.ts
 B-TEST2|apps/backend/modules/system-log/audit-log.service.test.ts
 B-TEST2|apps/backend/modules/work-order/work-order-adversarial.test.ts
+R-SCOPE|apps/backend/modules/inspection/inspection-archive-task.service.ts|bare-id-write-inspection_archive_tasks.update|1
+R-SCOPE|apps/backend/modules/inspection/inspection-route.service.ts|bare-id-write-inspection_form_templates.update|1
 R2|apps/web-antd/src/views/qms/planning/inspection-forms/components/TemplateModal.vue|349
 R3|apps/web-antd/src/views/qms/after-sales/index.vue|680
 R3|apps/web-antd/src/views/qms/file-center/index.vue|512

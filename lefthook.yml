@@ -74,14 +74,10 @@ pre-commit:
       stage_fixed: true
 
 pre-push:
-  parallel: true
   commands:
-    typecheck:
-      run: pnpm run check:type
-    qms-arch:
-      run: pnpm run check:qms-arch
-    docs-drift:
-      run: pnpm run check:docs-drift
+    checks:
+      use_stdin: true
+      run: node scripts/run-pre-push.mjs
 
 post-merge:
   files: git diff-tree -r --name-only --no-commit-id ORIG_HEAD HEAD
