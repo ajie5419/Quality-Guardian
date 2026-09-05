@@ -26,6 +26,7 @@ export default defineEventHandler(async (event) => {
       all: query.all,
       level: query.level ? Number.parseInt(query.level, 10) : undefined,
       parentId: query.parentId,
+      scope: event.context.dataScope,
       status: query.status,
       userinfo,
     });

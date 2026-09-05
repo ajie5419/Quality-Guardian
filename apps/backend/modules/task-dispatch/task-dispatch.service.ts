@@ -1,3 +1,6 @@
+import type { AccessScope } from '~/modules/data-scope';
+
+import { createScopedRepository, DataScopeService } from '~/modules/data-scope';
 import {
   buildTaskDispatchCreateData,
   getTaskDispatchArchiveFilter,
@@ -8,6 +11,8 @@ import {
   resolveTaskDispatchStatusFilter,
   TASK_DISPATCH_STATUS,
 } from '~/modules/task-dispatch/task-dispatch-rules';
+import { assertTaskDispatchTransition } from '~/modules/task-dispatch/task-dispatch-state';
+import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 
@@ -23,9 +28,21 @@ export function getTaskDispatchErrorMessage(message: string) {
   return null;
 }
 
+function buildTaskDispatchAccess(
+  userId: string,
+  userinfo: { username?: string },
+  scope?: AccessScope,
+) {
+  return {
+    scope,
+    user: { id: userId, username: userinfo.username },
+  };
+}
+
 export const TaskDispatchService = {
   async create(input: {
     body: Record<string, unknown>;
+    scope?: AccessScope;
     userinfo: {
       id?: number | string;
       userId?: number | string;
@@ -37,6 +54,11 @@ export const TaskDispatchService = {
       prisma,
     );
     if (!currentUserId) throw new Error('CURRENT_USER_NOT_FOUND');
+    const access = buildTaskDispatchAccess(
+      currentUserId,
+      input.userinfo,
+      input.scope,
+    );
     const assigneeId = String(input.body.assigneeId || '').trim();
     if (!assigneeId) throw new Error('ASSIGNEE_NOT_FOUND');
     const assignee = await prisma.users.findFirst({
@@ -57,15 +79,50 @@ export const TaskDispatchService = {
     if (Number(input.body.level) === 2 && !parentId) {
       throw new Error('LEVEL_TWO_PARENT_REQUIRED');
     }
-    if (parentId) {
-      const parentTask = await prisma.qms_task_dispatches.findUnique({
-        where: { id: parentId },
-        select: { level: true },
-      });
-      if (!parentTask) throw new Error('PARENT_NOT_FOUND');
-      if (parentTask.level !== 1) throw new Error('PARENT_LEVEL_INVALID');
-    }
     return prisma.$transaction(async (tx) => {
+      const scopedTasks = createScopedRepository(
+        'task-dispatch',
+        tx.qms_task_dispatches,
+      );
+      if (parentId) {
+        const parentTask = await scopedTasks.findAccessible(
+          {
+            where: { id: parentId },
+            select: { id: true, level: true },
+          },
+          access,
+        );
+        if (!parentTask) {
+          throw new BusinessError('NOT_FOUND', '父任务不存在', 404);
+        }
+        if (parentTask.level !== 1) {
+          throw new Error('PARENT_LEVEL_INVALID');
+        }
+        const promotion = await scopedTasks.updateAccessible(
+          {
+            where: { id: parentId, status: TASK_DISPATCH_STATUS.PENDING },
+            data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
+          },
+          access,
+        );
+        if (promotion.count !== 1) {
+          const freshParent = await scopedTasks.findAccessible(
+            {
+              where: { id: parentId },
+              select: { id: true },
+            },
+            access,
+          );
+          if (!freshParent) {
+            throw new BusinessError('NOT_FOUND', '父任务不存在', 404);
+          }
+          throw new BusinessError(
+            'CONFLICT',
+            '父任务状态已变化，请刷新后重试',
+            409,
+          );
+        }
+      }
       const base = buildTaskDispatchCreateData(input.body, {
         assigneeId: assignee.id,
         assignorId: currentUserId,
@@ -76,12 +133,6 @@ export const TaskDispatchService = {
           ...buildGovernedWriteFieldsForTable('qms_task_dispatches', base),
         },
       });
-      if (parentId) {
-        await tx.qms_task_dispatches.updateMany({
-          where: { id: parentId, status: TASK_DISPATCH_STATUS.PENDING },
-          data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
-        });
-      }
       return created;
     });
   },
@@ -89,6 +140,7 @@ export const TaskDispatchService = {
     all?: string;
     level?: number;
     parentId?: string;
+    scope?: AccessScope;
     status?: string;
     userinfo: {
       id?: number | string;
@@ -112,13 +164,19 @@ export const TaskDispatchService = {
         false,
       parentId: input.parentId,
     });
-    const tasks = await prisma.qms_task_dispatches.findMany({
-      where: {
+    const where = await DataScopeService.buildScopedWhere(
+      'task-dispatch',
+      {
         ...assigneeFilter,
         ...(input.level ? { level: input.level } : {}),
         ...(statusFilter ? { status: statusFilter } : {}),
         ...getTaskDispatchArchiveFilter(),
       },
+      { userId: currentUserId, username: input.userinfo.username },
+      input.scope,
+    );
+    const tasks = await prisma.qms_task_dispatches.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         users_qms_task_dispatches_assignorIdTousers: true,
@@ -209,10 +267,66 @@ export const TaskDispatchService = {
     ]);
     return { overdue: 0, pendingLevel1, pendingLevel2, processing };
   },
-  async updateStatus(id: string, status: string) {
-    return prisma.qms_task_dispatches.update({
-      where: { id },
-      data: { status, updatedAt: new Date() },
-    });
+  async updateStatus(
+    id: string,
+    status: string,
+    userinfo: {
+      id?: number | string;
+      userId?: number | string;
+      username?: string;
+    },
+    scope?: AccessScope,
+  ) {
+    const currentUserId = await resolveTaskDispatchCurrentUserId(
+      userinfo,
+      prisma,
+    );
+    if (!currentUserId) {
+      throw new BusinessError('FORBIDDEN', '无法识别当前操作人身份', 403);
+    }
+    const repo = createScopedRepository(
+      'task-dispatch',
+      prisma.qms_task_dispatches,
+    );
+    const access = buildTaskDispatchAccess(currentUserId, userinfo, scope);
+    const current = await repo.findAccessible(
+      {
+        where: { id },
+        select: { id: true, status: true },
+      },
+      access,
+    );
+    if (!current) {
+      throw new BusinessError('NOT_FOUND', '任务不存在', 404);
+    }
+    assertTaskDispatchTransition(current.status, status);
+    const result = await repo.updateAccessible(
+      {
+        where: { id, status: current.status },
+        data: { status, updatedAt: new Date() },
+      },
+      access,
+    );
+    if (result.count !== 1) {
+      const fresh = await repo.findAccessible(
+        {
+          where: { id },
+          select: { id: true, status: true },
+        },
+        access,
+      );
+      if (!fresh) {
+        throw new BusinessError('NOT_FOUND', '任务不存在', 404);
+      }
+      throw new BusinessError('CONFLICT', '任务状态已变化，请刷新后重试', 409);
+    }
+    const updated = await repo.findAccessible(
+      {
+        where: { id },
+        select: { id: true, status: true, updatedAt: true },
+      },
+      access,
+    );
+    return updated ?? { id, status };
   },
 };

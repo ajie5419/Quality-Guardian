@@ -15,6 +15,7 @@ vi.mock('~/utils/prisma', () => ({
     qms_task_dispatches: {
       count: vi.fn(),
       createMany: vi.fn(),
+      findFirst: vi.fn(),
       findMany: vi.fn(),
       findUnique: vi.fn(),
       update: vi.fn(),
@@ -37,6 +38,7 @@ describe('taskDispatchService', () => {
       callback({
         qms_task_dispatches: {
           create: vi.fn().mockResolvedValue({ id: 'task-1' }),
+          findFirst: vi.fn(),
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
       }),
@@ -87,7 +89,11 @@ describe('taskDispatchService', () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 1 });
     (prisma.$transaction as any).mockImplementationOnce((callback: any) =>
       callback({
-        qms_task_dispatches: { create, updateMany },
+        qms_task_dispatches: {
+          create,
+          findFirst: vi.fn().mockResolvedValue({ id: 'parent-1', level: 1 }),
+          updateMany,
+        },
       }),
     );
     (prisma.users.findFirst as any)
@@ -176,21 +182,35 @@ describe('taskDispatchService', () => {
     (prisma.users.findFirst as any)
       .mockResolvedValueOnce({ id: 'assignor-1' })
       .mockResolvedValueOnce({ id: 'assignee-1' });
-    (prisma.qms_task_dispatches.findUnique as any).mockResolvedValueOnce(null);
+    (prisma.$transaction as any).mockImplementationOnce((callback: any) =>
+      callback({
+        qms_task_dispatches: {
+          create: vi.fn(),
+          findFirst: vi.fn().mockResolvedValue(null),
+          updateMany: vi.fn(),
+        },
+      }),
+    );
 
     await expect(
       TaskDispatchService.create({
         body: { assigneeId: 'assignee-1', level: 2, parentId: 'parent-1' },
         userinfo: { id: 'assignor-1' },
       }),
-    ).rejects.toThrow('PARENT_NOT_FOUND');
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', httpStatus: 404 });
 
     (prisma.users.findFirst as any)
       .mockResolvedValueOnce({ id: 'assignor-1' })
       .mockResolvedValueOnce({ id: 'assignee-1' });
-    (prisma.qms_task_dispatches.findUnique as any).mockResolvedValueOnce({
-      level: 2,
-    });
+    (prisma.$transaction as any).mockImplementationOnce((callback: any) =>
+      callback({
+        qms_task_dispatches: {
+          create: vi.fn(),
+          findFirst: vi.fn().mockResolvedValue({ id: 'parent-1', level: 2 }),
+          updateMany: vi.fn(),
+        },
+      }),
+    );
 
     await expect(
       TaskDispatchService.create({
@@ -269,6 +289,48 @@ describe('taskDispatchService', () => {
     });
   });
 
+  it('keeps admin list requests inside SELF scope', async () => {
+    (prisma.users.findFirst as any).mockResolvedValueOnce({ id: 'user-1' });
+    (prisma.qms_task_dispatches.findMany as any).mockResolvedValueOnce([]);
+
+    await TaskDispatchService.list({
+      all: 'true',
+      scope: { scopeType: 'SELF', deptIds: [] },
+      userinfo: { id: 'user-1', roles: ['admin'] },
+    });
+
+    const where = (prisma.qms_task_dispatches.findMany as any).mock.calls[0][0]
+      .where;
+    expect(JSON.stringify(where)).toContain('assigneeId');
+    expect(JSON.stringify(where)).toContain('assignorId');
+    expect(JSON.stringify(where)).toContain('user-1');
+  });
+
+  it('rejects an inaccessible parent before creating a child task', async () => {
+    const create = vi.fn();
+    const findFirst = vi.fn().mockResolvedValue(null);
+    (prisma.users.findFirst as any)
+      .mockResolvedValueOnce({ id: 'assignor-1' })
+      .mockResolvedValueOnce({ id: 'assignee-1' });
+    (prisma.$transaction as any).mockImplementationOnce((callback: any) =>
+      callback({
+        qms_task_dispatches: { create, findFirst, updateMany: vi.fn() },
+      }),
+    );
+
+    await expect(
+      TaskDispatchService.create({
+        body: { assigneeId: 'assignee-1', level: 2, parentId: 'parent-1' },
+        scope: { scopeType: 'SELF', deptIds: [] },
+        userinfo: { id: 'assignor-1' },
+      }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND', httpStatus: 404 });
+    expect(create).not.toHaveBeenCalled();
+    expect(JSON.stringify(findFirst.mock.calls[0][0].where)).toContain(
+      'assignorId',
+    );
+  });
+
   it('seeds demo tasks from first available user and rejects empty user list', async () => {
     (prisma.users.findMany as any).mockResolvedValueOnce([]);
 
@@ -294,11 +356,21 @@ describe('taskDispatchService', () => {
   });
 
   it('returns stats for current user and updates task status', async () => {
-    (prisma.users.findFirst as any).mockResolvedValueOnce({ id: 'user-1' });
+    (prisma.users.findFirst as any).mockResolvedValue({ id: 'user-1' });
     (prisma.qms_task_dispatches.count as any)
       .mockResolvedValueOnce(2)
       .mockResolvedValueOnce(3)
       .mockResolvedValueOnce(4);
+    (prisma.qms_task_dispatches.updateMany as any).mockResolvedValue({
+      count: 1,
+    });
+    (prisma.qms_task_dispatches.findFirst as any)
+      .mockResolvedValueOnce({ id: 'task-1', status: 'PENDING' })
+      .mockResolvedValueOnce({
+        id: 'task-1',
+        status: 'COMPLETED',
+        updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+      });
 
     await expect(TaskDispatchService.stats({ id: 'user-1' })).resolves.toEqual({
       overdue: 0,
@@ -307,11 +379,57 @@ describe('taskDispatchService', () => {
       processing: 4,
     });
 
-    await TaskDispatchService.updateStatus('task-1', 'DONE');
+    await TaskDispatchService.updateStatus(
+      'task-1',
+      'COMPLETED',
+      { id: 'user-1', username: 'tester' },
+      { scopeType: 'ALL', deptIds: [] },
+    );
 
-    expect(prisma.qms_task_dispatches.update).toHaveBeenCalledWith({
-      where: { id: 'task-1' },
-      data: { status: 'DONE', updatedAt: expect.any(Date) },
+    expect(prisma.qms_task_dispatches.updateMany).toHaveBeenCalledWith({
+      where: { id: 'task-1', status: 'PENDING' },
+      data: { status: 'COMPLETED', updatedAt: expect.any(Date) },
+    });
+  });
+
+  it('rejects an illegal task status jump with 409 conflict', async () => {
+    (prisma.users.findFirst as any).mockResolvedValue({ id: 'user-1' });
+    (prisma.qms_task_dispatches.findFirst as any).mockResolvedValue({
+      id: 'task-1',
+      status: 'COMPLETED',
+    });
+
+    await expect(
+      TaskDispatchService.updateStatus(
+        'task-1',
+        'PENDING',
+        { id: 'user-1', username: 'tester' },
+        { scopeType: 'ALL', deptIds: [] },
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(prisma.qms_task_dispatches.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the CAS claim loses a concurrent status change', async () => {
+    (prisma.users.findFirst as any).mockResolvedValue({ id: 'user-1' });
+    (prisma.qms_task_dispatches.findFirst as any)
+      .mockResolvedValueOnce({ id: 'task-1', status: 'PENDING' })
+      .mockResolvedValueOnce({ id: 'task-1', status: 'PROCESSING' });
+    (prisma.qms_task_dispatches.updateMany as any).mockResolvedValue({
+      count: 0,
+    });
+
+    await expect(
+      TaskDispatchService.updateStatus(
+        'task-1',
+        'COMPLETED',
+        { id: 'user-1', username: 'tester' },
+        { scopeType: 'ALL', deptIds: [] },
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(prisma.qms_task_dispatches.updateMany).toHaveBeenCalledWith({
+      where: { id: 'task-1', status: 'PENDING' },
+      data: { status: 'COMPLETED', updatedAt: expect.any(Date) },
     });
   });
 });
