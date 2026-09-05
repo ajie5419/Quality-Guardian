@@ -32,6 +32,10 @@ import {
   updateVehicleCommissioningIssue,
 } from '#/api/qms/vehicle-commissioning';
 import { getDeptList } from '#/api/system/dept';
+import {
+  isIdempotencyReusedError,
+  useCreateOperationId,
+} from '#/composables/useCreateOperationId';
 import { useQmsPermissions } from '#/hooks/useQmsPermissions';
 import { convertToTreeSelectData } from '#/types';
 
@@ -62,6 +66,8 @@ type RequiredIssueField = {
 
 export function useVehicleCommissioningPage() {
   const { canDelete } = useQmsPermissions('QMS:VehicleCommissioning');
+  const { acquire: acquireOperationId, reset: resetOperationId } =
+    useCreateOperationId();
   const deptRawData = ref<Dept[]>([]);
   const deptTreeData = ref<TreeSelectNode[]>([]);
   const loadingIssues = ref(false);
@@ -512,13 +518,16 @@ export function useVehicleCommissioningPage() {
         await updateVehicleCommissioningIssue(issueEditId.value, payload);
         message.success('问题更新成功');
       } else {
-        await createVehicleCommissioningIssue(payload);
+        await createVehicleCommissioningIssue(payload, acquireOperationId());
         message.success('问题创建成功');
+        resetOperationId();
       }
       issueModalOpen.value = false;
       await loadIssues();
-    } catch (error) {
-      console.error(error);
+    } catch (error: unknown) {
+      if (isIdempotencyReusedError(error)) {
+        resetOperationId();
+      }
       message.error('保存问题失败');
     }
   }

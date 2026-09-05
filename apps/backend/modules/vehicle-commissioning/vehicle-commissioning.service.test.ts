@@ -427,12 +427,22 @@ describe('vehicleCommissioningService', () => {
     const { SystemLogService } = await import(
       '~/modules/system-log/system-log.service'
     );
-    vi.mocked(prisma.vehicle_commissioning_issues.update).mockResolvedValue({
-      ...createdRow,
-      id: 'issue-1',
-      issuePhoto: '["/b.png"]',
-      status: 'CLOSED',
-    } as never);
+    vi.mocked(prisma.vehicle_commissioning_issues.findFirst)
+      .mockResolvedValueOnce({
+        id: 'issue-1',
+        status: 'OPEN',
+      } as never)
+      .mockResolvedValueOnce({
+        ...createdRow,
+        id: 'issue-1',
+        issuePhoto: '["/b.png"]',
+        status: 'CLOSED',
+      } as never);
+    vi.mocked(prisma.vehicle_commissioning_issues.updateMany).mockResolvedValue(
+      {
+        count: 1,
+      } as never,
+    );
 
     const result = await VehicleCommissioningService.updateIssueFromBody(
       'issue-1',
@@ -444,14 +454,16 @@ describe('vehicleCommissioningService', () => {
     );
 
     expect(result).toEqual(expect.objectContaining({ id: 'issue-1' }));
-    expect(prisma.vehicle_commissioning_issues.update).toHaveBeenCalledWith({
-      where: { id: 'issue-1' },
-      data: expect.objectContaining({
-        closedAt: expect.any(Date),
-        issuePhoto: '["/b.png"]',
-        status: 'CLOSED',
-      }),
-    });
+    expect(prisma.vehicle_commissioning_issues.updateMany).toHaveBeenCalledWith(
+      {
+        where: { id: 'issue-1', status: 'OPEN' },
+        data: expect.objectContaining({
+          closedAt: expect.any(Date),
+          issuePhoto: '["/b.png"]',
+          status: 'CLOSED',
+        }),
+      },
+    );
     expect(SystemLogService.auditLog).toHaveBeenCalledWith(
       'vehicle-commissioning',
       'issueUpdate',
@@ -465,6 +477,68 @@ describe('vehicleCommissioningService', () => {
       bizType: 'vehicle_commissioning_issue',
       fieldName: 'photos',
     });
+  });
+
+  it('rejects an illegal vehicle-commissioning status jump with 409', async () => {
+    vi.mocked(prisma.vehicle_commissioning_issues.findFirst).mockResolvedValue({
+      id: 'issue-1',
+      status: 'CLOSED',
+    } as never);
+
+    await expect(
+      VehicleCommissioningService.updateIssueFromBody(
+        'issue-1',
+        { status: 'IN_PROGRESS' },
+        'user-1',
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(
+      prisma.vehicle_commissioning_issues.updateMany,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('returns 409 when the CAS claim loses a concurrent status change', async () => {
+    vi.mocked(prisma.vehicle_commissioning_issues.findFirst)
+      .mockResolvedValueOnce({
+        id: 'issue-1',
+        status: 'OPEN',
+      } as never)
+      .mockResolvedValueOnce({
+        id: 'issue-1',
+        status: 'RESOLVED',
+      } as never);
+    vi.mocked(prisma.vehicle_commissioning_issues.updateMany).mockResolvedValue(
+      {
+        count: 0,
+      } as never,
+    );
+
+    await expect(
+      VehicleCommissioningService.updateIssueFromBody(
+        'issue-1',
+        { status: 'CLOSED' },
+        'user-1',
+      ),
+    ).rejects.toMatchObject({ code: 'CONFLICT', httpStatus: 409 });
+    expect(prisma.vehicle_commissioning_issues.updateMany).toHaveBeenCalledWith(
+      {
+        where: { id: 'issue-1', status: 'OPEN' },
+        data: expect.objectContaining({ status: 'CLOSED' }),
+      },
+    );
+  });
+
+  it('rejects unknown status text on the write path with 400', async () => {
+    await expect(
+      VehicleCommissioningService.updateIssueFromBody(
+        'issue-1',
+        { status: 'garbage' },
+        'user-1',
+      ),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', httpStatus: 400 });
+    expect(
+      prisma.vehicle_commissioning_issues.updateMany,
+    ).not.toHaveBeenCalled();
   });
 
   it('normalizes vehicle commissioning issue formatting helpers', () => {

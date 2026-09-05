@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { authorizeWrite } from '~/modules/rbac';
 import { VehicleCommissioningService } from '~/modules/vehicle-commissioning/vehicle-commissioning.service';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
@@ -31,6 +32,9 @@ export default defineEventHandler(async (event) => {
       ),
     );
   } catch (error) {
+    if (isBusinessError(error)) {
+      return businessErrorResponse(event, error);
+    }
     logApiError('vehicle-commissioning-issues-update', error, undefined, event);
     return internalServerErrorResponse(event, 'Failed to update issue');
   }

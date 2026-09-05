@@ -20,12 +20,25 @@ export async function getVehicleCommissioningIssues(
   return normalizeListResponse<VehicleCommissioningIssue>(raw);
 }
 
+/**
+ * Create commissioning issue.
+ *
+ * `idempotencyKey` (IDEMPOTENCY-KEY-001 / PHASE-2): one UUID per
+ * user-initiated create attempt; network / button retries of the same attempt
+ * reuse the key.
+ */
 export async function createVehicleCommissioningIssue(
   data: Partial<VehicleCommissioningIssue>,
+  idempotencyKey?: string,
 ) {
   return requestClient.post<VehicleCommissioningIssue>(
     QMS_API.VEHICLE_COMMISSIONING_ISSUES,
     data,
+    {
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : undefined,
+    },
   );
 }
 
