@@ -1,7 +1,22 @@
+import type { AnalyticsAccessContext } from '~/modules/data-scope';
+
 import { Prisma } from '@prisma/client';
+import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import prisma from '~/utils/prisma';
+
+async function buildScopedAfterSalesWhere(
+  baseWhere: Prisma.after_salesWhereInput,
+  access: AnalyticsAccessContext,
+): Promise<Prisma.after_salesWhereInput> {
+  const user = requireAnalyticsUser(access);
+  return DataScopeService.buildAfterSalesWhere(
+    baseWhere,
+    user,
+    access.dataScope,
+  );
+}
 
 function buildAfterSalesVehicleDivisionWhere(vehicleDeptIds: string[]) {
   const divisions = vehicleDeptIds.filter(Boolean);
@@ -67,6 +82,8 @@ export const AfterSalesIntegrationService = {
         where: { id: params.id },
         select: { supplierBrandId: true },
       });
+      // qms-arch-allow R-SCOPE: quality-loss sync side effect; the record id
+      // derives from an already-authorized after-sales mutation.
       const updated = await tx.after_sales.update({
         where: { id: params.id },
         data: {
@@ -132,12 +149,19 @@ export const AfterSalesIntegrationService = {
     return { records, stats, statusStats };
   },
 
-  async getWeeklyReportIssues(params: { end: Date; start: Date }) {
-    return prisma.after_sales.findMany({
-      where: {
+  async getWeeklyReportIssues(
+    params: { end: Date; start: Date },
+    access: AnalyticsAccessContext,
+  ) {
+    const where = await buildScopedAfterSalesWhere(
+      {
         isDeleted: false,
         occurDate: { gte: params.start, lte: params.end },
       },
+      access,
+    );
+    return prisma.after_sales.findMany({
+      where,
     });
   },
 
@@ -180,21 +204,28 @@ export const AfterSalesIntegrationService = {
     return row?.occurDate || null;
   },
 
-  async getReportPeriodMetrics(params: { end: Date; start: Date }): Promise<{
+  async getReportPeriodMetrics(
+    params: { end: Date; start: Date },
+    access: AnalyticsAccessContext,
+  ): Promise<{
     grossCost: number;
     netLoss: number;
     recovered: number;
   }> {
+    const where = await buildScopedAfterSalesWhere(
+      {
+        occurDate: { gte: params.start, lte: params.end },
+        isDeleted: false,
+      },
+      access,
+    );
     const aggregate = await prisma.after_sales.aggregate({
       _sum: {
         actualClaim: true,
         laborTravelCost: true,
         materialCost: true,
       },
-      where: {
-        occurDate: { gte: params.start, lte: params.end },
-        isDeleted: false,
-      },
+      where,
     });
     const grossCost =
       Number(aggregate._sum.materialCost || 0) +
@@ -207,20 +238,31 @@ export const AfterSalesIntegrationService = {
     };
   },
 
-  async getStatsForDashboard(params: { weekStart: Date; yearStart: Date }) {
+  async getStatsForDashboard(
+    params: { weekStart: Date; yearStart: Date },
+    access: AnalyticsAccessContext,
+  ) {
     const baseWhere = { isDeleted: false };
+    const yearWhere = await buildScopedAfterSalesWhere(
+      { ...baseWhere, occurDate: { gte: params.yearStart } },
+      access,
+    );
+    const weekWhere = await buildScopedAfterSalesWhere(
+      { ...baseWhere, occurDate: { gte: params.weekStart } },
+      access,
+    );
     const [yearAggregate, weekAggregate, weekCount] = await Promise.all([
       prisma.after_sales.aggregate({
-        where: { ...baseWhere, occurDate: { gte: params.yearStart } },
+        where: yearWhere,
         _count: { id: true },
         _sum: { materialCost: true, laborTravelCost: true },
       }),
       prisma.after_sales.aggregate({
-        where: { ...baseWhere, occurDate: { gte: params.weekStart } },
+        where: weekWhere,
         _sum: { materialCost: true, laborTravelCost: true },
       }),
       prisma.after_sales.count({
-        where: { ...baseWhere, occurDate: { gte: params.weekStart } },
+        where: weekWhere,
       }),
     ]);
 
