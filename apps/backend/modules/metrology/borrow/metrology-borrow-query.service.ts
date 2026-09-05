@@ -10,6 +10,7 @@ import {
   normalizeMetrologyBorrowStatus,
   startOfToday,
 } from '../metrology-status';
+import { BORROW_RECORD_STATUS } from './metrology-borrow-state';
 
 const BORROW_RECORD_STATUS_LABELS = {
   BORROWED: '已借出',
@@ -152,10 +153,10 @@ async function refreshOverdueStatuses() {
       expectedReturnAt: { lt: startOfToday() },
       isDeleted: false,
       returnedAt: null,
-      status: 'BORROWED',
+      status: BORROW_RECORD_STATUS.BORROWED,
     },
     data: {
-      status: 'OVERDUE',
+      status: BORROW_RECORD_STATUS.OVERDUE,
     },
   });
 }
