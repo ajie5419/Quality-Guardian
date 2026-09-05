@@ -276,12 +276,14 @@ export const InspectionRecordCreateService = {
             bizId: String(inspection.id),
             bizType: 'inspection_record',
             fieldName: 'documents',
+            tx,
           });
           await FileStorageService.registerReferencesFromAttachments({
             attachments: inspection.selfCheckDocuments,
             bizId: String(inspection.id),
             bizType: 'inspection_record',
             fieldName: 'selfCheckDocuments',
+            tx,
           });
           await MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities(
             tx,
