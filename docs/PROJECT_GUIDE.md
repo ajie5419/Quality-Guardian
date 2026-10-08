@@ -217,14 +217,15 @@ pnpm --dir apps/backend exec tsc --noEmit        # 后端类型检查
 
 | 文档 | 内容 | 何时读 |
 | --- | --- | --- |
-| `PROJECT_STATE.md` | 当前状态日报（版本/进度/待办） | 项目状态、实现或交接任务，读取相关段落 |
+| `PROGRESS.md` | 项目进度与待办**明细事实源**（PROJECT_STATE 待办段自本文件同步并回链） | 查进度、逐条待办时读这里 |
+| `PROJECT_STATE.md` | 当前状态日报（版本/进度/短待办镜像，明细回链 `PROGRESS.md`） | 项目状态、实现或交接任务，读取相关段落 |
 | `code_map.md` | 业务模块地图（模块/路由/视图索引） | 定位模块归属 |
 | `CONSTRAINTS.md` | 硬约束全文 | 改代码前或审查相关规则时 |
-| `docs/architecture.md` | 后端目标架构与模块化方案 | 架构决策 |
+| `docs/architecture.md` | 2026-08 架构重构历史方案与新旧对照（现状权威见本档案 §3-4，勿按其 `defineModule` 模式写新代码） | 架构演进/迁移史 |
 | `docs/api-conventions.md` | API 端点规范 | **添加新端点前** |
 | `docs/database.md` | Schema 设计、Migration 规范 | 数据库变更前 |
 | `docs/testing.md` | 测试分层、mock 模板 | 写测试前 |
-| `docs/release-workflow.md` | 发布流程 | 发布/提 PR 前 |
+| `docs/release-workflow.md` | 发布流程，含 deploy 段（Docker 镜像构建、自动部署、回滚）；部署物在 `scripts/deploy/` 与 `infra/docker/` | 发布/提 PR/查部署前 |
 | `docs/after-sales-quality-loss.md` | 售后/质量损失/报表三模块契约 | 改这三条链路前 |
 | `docs/data-contract.md` | **数据契约规范**（字段治理/错误码/命名/前端/影响面） | **新增/改动数据字段、错误码、前端数据消费前** |
 | `docs/metrics/metric-registry.md` | **业务指标定义治理契约**（Metric Code、Definition Version、Owner、冲突、DataScope、审计） | **治理业务指标、定义版本、指标 Owner 或口径冲突前** |
