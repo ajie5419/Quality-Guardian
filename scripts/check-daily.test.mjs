@@ -1,5 +1,11 @@
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 
@@ -28,6 +34,48 @@ it('prose only recommends docs drift without unrelated code gates', () => {
   expect(plan.kinds).toEqual(['文档']);
   expect(plan.commands).toEqual(['pnpm run check:docs-drift']);
   expect(plan.notes.join('\n')).toMatch(/Markdown.*完整提交门禁/u);
+  expect(plan.notes.join('\n')).toContain('本命令未执行 docs-drift');
+  expect(plan.notes.join('\n')).toContain('pnpm run docs:sync');
+  expect(plan.notes.join('\n')).toContain('rtk git diff -- PROJECT_STATE.md');
+  expect(plan.commands).not.toContain('pnpm run docs:sync');
+});
+
+it('only advises on real stale documents and never executes checks or sync', () => {
+  const { root, git, write } = fixture();
+  try {
+    write('README.md');
+    git('add', '.');
+    git('commit', '--quiet', '-m', 'fixture');
+    write('PROJECT_STATE.md', '- 版本: stale\n人工说明：保留审批结论。\n');
+    write(
+      'scripts/check-docs-drift.sh',
+      "echo 'UNEXPECTED_CHECK_EXECUTION'; exit 1",
+    );
+    write(
+      'scripts/sync-project-state.sh',
+      "echo 'UNEXPECTED_SYNC_EXECUTION'; exit 1",
+    );
+    const stateBefore = readFileSync(
+      path.join(root, 'PROJECT_STATE.md'),
+      'utf8',
+    );
+    const result = spawnSync(process.execPath, [script, '--base', 'HEAD'], {
+      cwd: root,
+      encoding: 'utf8',
+    });
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('本命令未执行 docs-drift');
+    expect(result.stdout).toContain('若 check:docs-drift 报 D1 数字漂移');
+    expect(result.stdout).toContain('pnpm run docs:sync');
+    expect(result.stdout).not.toContain('UNEXPECTED_CHECK_EXECUTION');
+    expect(result.stdout).not.toContain('UNEXPECTED_SYNC_EXECUTION');
+    expect(result.stdout).not.toContain('docs drift check PASSED');
+    expect(readFileSync(path.join(root, 'PROJECT_STATE.md'), 'utf8')).toBe(
+      stateBefore,
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 it('backend selects local typecheck, lint and sibling tests', () => {

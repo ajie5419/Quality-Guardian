@@ -4,8 +4,7 @@ import { getPackagesSync } from '@vben/node-utils';
 
 const { packages } = getPackagesSync();
 
-const allowedScopes = [
-  ...packages.map((pkg) => pkg.packageJson.name),
+const generalScopes = [
   'project',
   'style',
   'lint',
@@ -14,6 +13,38 @@ const allowedScopes = [
   'deploy',
   'other',
 ];
+
+const allowedScopes = [
+  ...packages.map((pkg) => pkg.packageJson.name),
+  ...generalScopes,
+];
+
+/**
+ * Render the actual whitelist so removed or renamed packages cannot appear
+ * as valid choices. Message examples use the same list as the blocking rule.
+ */
+export function formatScopeError(scope, scopes) {
+  const packageScopes = scopes.filter((name) => name.startsWith('@'));
+  const aliases = scopes.filter((name) => !name.startsWith('@'));
+  const exampleScope = aliases.includes('project') ? 'project' : scopes[0];
+  return [
+    `Scope "${scope}" 不合法。`,
+    '合法 scope（当前工作区包名及原有通用 scope）：',
+    `  包名：${packageScopes.join(', ') || '无'}`,
+    `  通用：${aliases.join(', ') || '无'}`,
+    '正确提交示例：',
+    ...(exampleScope
+      ? [
+          `  rtk git commit -m "chore(${exampleScope}): improve developer guidance"`,
+        ]
+      : []),
+    ...(packageScopes[0]
+      ? [`  rtk git commit -m "fix(${packageScopes[0]}): handle invalid input"`]
+      : []),
+    '  rtk git commit -m "docs: update development guide"（允许省略 scope）',
+    '请修改提交消息后重试；不要关闭 Commitlint 或扩大允许集合。',
+  ].join('\n');
+}
 
 // precomputed scope
 const scopeComplete = execSync('git status --porcelain || true')
@@ -110,7 +141,7 @@ const userConfig = {
           return [true];
         }
 
-        return [false, `scope must be one of ${allowedScopes.join(', ')}`];
+        return [false, formatScopeError(parsed.scope, allowedScopes)];
       },
     ],
     /**

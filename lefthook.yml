@@ -89,4 +89,5 @@ post-merge:
 commit-msg:
   commands:
     commitlint:
-      run: pnpm exec commitlint --edit $1
+      # Git arguments are Lefthook templates, not shell positional parameters.
+      run: pnpm exec commitlint --edit "{1}"
