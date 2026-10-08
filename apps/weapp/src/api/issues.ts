@@ -68,10 +68,14 @@ export function getInspectionIssue(id: string) {
   });
 }
 
-export function createInspectionIssue(data: InspectionIssuePayload) {
+export function createInspectionIssue(
+  data: InspectionIssuePayload,
+  operationId: string,
+) {
   return request<InspectionIssueRecord>({
     url: '/api/qms/inspection/issues',
     method: 'POST',
+    header: { 'Idempotency-Key': operationId },
     data: data as Record<string, unknown>,
   });
 }

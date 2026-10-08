@@ -15,7 +15,6 @@ import {
   searchWorkOrders,
 } from '@/api/inspection';
 import {
-  createInspectionIssue,
   getIssueSuppliers,
   getIssueWelders,
   getQualityClassificationOptions,
@@ -38,6 +37,8 @@ import {
   normalizeInspectionIssueResponsibilityType,
   QUALITY_CLASSIFICATION_SCOPE,
 } from '@qgs/shared';
+
+import { createIssueSubmission } from './issue-submission';
 
 export interface IssueFormProps {
   initialData?: InspectionIssueRecord;
@@ -215,6 +216,7 @@ export function useIssueForm(
   const supplierOptions = ref<IssueOption[]>([]);
   const welderOptions = ref<IssueOption[]>([]);
   let searchTimer: null | ReturnType<typeof setTimeout> = null;
+  const submitIssue = createIssueSubmission();
 
   const inspector =
     userStore.userInfo?.realName || userStore.userInfo?.username || '';
@@ -589,7 +591,7 @@ export function useIssueForm(
       const response =
         props.mode === 'edit' && props.initialData?.id
           ? await updateInspectionIssue(props.initialData.id, buildPayload())
-          : await createInspectionIssue(buildPayload());
+          : await submitIssue(buildPayload());
       if (response.code !== 0) throw new Error(response.message || '保存失败');
       uni.removeStorageSync(draftKey.value);
       uni.hideLoading();

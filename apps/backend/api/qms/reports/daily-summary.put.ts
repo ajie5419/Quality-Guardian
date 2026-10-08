@@ -10,6 +10,10 @@ import { authorizeWrite } from '~/modules/rbac';
 import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
 import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
+import {
   internalServerErrorResponse,
   useResponseSuccess,
 } from '~/utils/response';
@@ -39,6 +43,8 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     logApiError('daily-summary-save', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     return internalServerErrorResponse(event, '保存日报失败');
   }
 });

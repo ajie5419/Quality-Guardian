@@ -66,10 +66,13 @@ export const AfterSalesRouteService = {
         existing.map((item) => ({ source: 'EXTERNAL', sourcePk: item.id })),
         'after-sales.batch-deleted',
       );
-      return result;
+      return {
+        count: result.count,
+        deletedIds: existing.map((item) => item.id),
+      };
     });
     await Promise.all(
-      ids.map((id) =>
+      result.deletedIds.map((id) =>
         FileStorageService.softDeleteReferences({
           bizId: id,
           bizType: 'after_sales',

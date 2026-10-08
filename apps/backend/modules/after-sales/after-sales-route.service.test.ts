@@ -180,6 +180,10 @@ describe('after-sales route services', () => {
   });
 
   it('batch deletes records and soft deletes file references', async () => {
+    vi.mocked(prisma.after_sales.findMany).mockResolvedValue([
+      { id: 'as-1' },
+      { id: 'as-2' },
+    ] as never);
     vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({
       count: 2,
     } as never);
@@ -188,6 +192,36 @@ describe('after-sales route services', () => {
       AfterSalesRouteService.batchDelete(['as-1', 'as-2']),
     ).resolves.toBe(2);
     expect(softDeleteReferences).toHaveBeenCalledTimes(2);
+  });
+
+  it('cleans references only for accessible records in a mixed batch', async () => {
+    vi.mocked(prisma.after_sales.findMany).mockResolvedValue([
+      { id: 'as-1' },
+    ] as never);
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({ count: 1 });
+
+    await expect(
+      AfterSalesRouteService.batchDelete(
+        ['as-1', 'forbidden', 'missing'],
+        { id: 'u-1' },
+        { scopeType: 'SELF' },
+      ),
+    ).resolves.toBe(1);
+    expect(softDeleteReferences.mock.calls).toEqual([
+      [{ bizId: 'as-1', bizType: 'after_sales' }],
+    ]);
+  });
+
+  it('does not clean references when no accessible records are deleted', async () => {
+    vi.mocked(prisma.after_sales.updateMany).mockResolvedValue({ count: 0 });
+    await expect(
+      AfterSalesRouteService.batchDelete(
+        ['forbidden'],
+        { id: 'u-1' },
+        { scopeType: 'SELF' },
+      ),
+    ).resolves.toBe(0);
+    expect(softDeleteReferences).not.toHaveBeenCalled();
   });
 
   it('creates after-sales records with generated id, governed data, attachments, and audit log', async () => {

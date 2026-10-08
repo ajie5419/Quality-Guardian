@@ -202,7 +202,7 @@ export const InspectionRecordDeleteService = {
       }
 
       await Promise.all(
-        ids.map((id) =>
+        inspections.map(({ id }) =>
           FileStorageService.softDeleteReferences({
             bizId: id,
             bizType: 'inspection_record',
