@@ -15,30 +15,51 @@ api/qms/{domain}/{resource}/
 ## 端点结构模板
 
 ```typescript
-import { defineEventHandler, getQuery, readBody } from 'h3';
-import { verifyAccessToken } from '~/utils/jwt-utils';
-import prisma from '~/utils/prisma';
-import { unAuthorizedResponse, useResponseSuccess } from '~/utils/response';
+import { defineEventHandler, getQuery } from 'h3';
+import {
+  inspectionRequestResponsibilityOptionsQuerySchema,
+  InspectionRequestResponsibilityOptionsService,
+} from '~/modules/inspection';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError, businessErrorResponse } from '~/utils/business-error';
+import { verifyAccessToken } from '~/utils/jwt-utils';
+import {
+  badRequestResponse,
+  internalServerErrorResponse,
+  unAuthorizedResponse,
+  useResponseSuccess,
+} from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  // 1. 认证
   const userinfo = verifyAccessToken(event);
   if (!userinfo) return unAuthorizedResponse(event);
-
-  // 2. 参数解析与校验
-  const query = getQuery(event);
-
   try {
-    // 3. 业务逻辑（调用 modules/ 下的 service）
-    // 4. 返回统一格式
-    return useResponseSuccess(result);
+    const parsed = inspectionRequestResponsibilityOptionsQuerySchema.safeParse(
+      getQuery(event),
+    );
+    if (!parsed.success || !parsed.data.responsibilityType)
+      return badRequestResponse(event, '责任类型不能为空或参数无效');
+    return useResponseSuccess(
+      await InspectionRequestResponsibilityOptionsService.list({
+        ...parsed.data,
+        responsibilityType: parsed.data.responsibilityType,
+      }),
+    );
   } catch (error) {
-    logApiError(event, error, 'endpoint-name');
-    return internalServerErrorResponse(event);
+    logApiError(
+      'inspection-request-responsibility-options',
+      error,
+      undefined,
+      event,
+    );
+    if (error instanceof BusinessError)
+      return businessErrorResponse(event, error);
+    return internalServerErrorResponse(event, '获取责任归属选项失败');
   }
 });
 ```
+
+这是使用现有 schema 和模块公开入口的 GET 最小样板（50 行以内），不在路由访问 Prisma。写入口还必须声明权限，创建入口按所属业务接入幂等；完整报检创建、关闭、关联不合格项样板与定位见 [日常开发指引](development-workflow.md)。
 
 ## 响应格式
 

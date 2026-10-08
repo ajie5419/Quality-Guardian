@@ -2,14 +2,14 @@
 
 ## 测试框架
 
-Vitest 3.2.4，配置在 `apps/backend/vitest.config.ts`
+Vitest，版本以 workspace catalog 为准，当前配置在仓库根 `vitest.config.ts`。
 
 ## 运行命令
 
 ```bash
-pnpm --dir apps/backend exec vitest run                    # 全量
-pnpm --dir apps/backend exec vitest run path/to/file.test.ts  # 单文件
-pnpm --dir apps/backend exec vitest --watch                # 监听模式
+rtk vitest run apps/backend                              # 后端全量
+rtk vitest run apps/backend/modules/supplier/supplier.service.test.ts  # 定向
+pnpm exec vitest --watch                                 # 监听模式
 ```
 
 ## 文件位置
@@ -68,3 +68,5 @@ describe('ServiceName', () => {
 2. 每个 test case 只验证一个行为
 3. 测试描述用英文，写清楚 input → output
 4. 新增业务逻辑必须附带测试，纯重构不要求
+
+报检创建、检验完成与关联不合格项的样板、事务和权限反例清单见 [日常开发指引](development-workflow.md)。日常推荐检查先运行 `pnpm run check:daily`；输出仅为建议，不能代替提交门禁。
