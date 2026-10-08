@@ -2,6 +2,7 @@
 
 ## 当前状态
 
+- **研发降负专项（2026-10-07，未提交）**：架构失败增加逐规则原因/修复/范例/参考和 `--explain`，保留原诊断格式、检测逻辑与 baseline；修复权限子检查提前退出导致详情缺失。新增仅打印建议的 `check:daily`，覆盖分支、暂存、未暂存、未跟踪、删除与改名范围；补充报检→检验完成→关联 NC 样板。工具/CI 定向 47 项、样板与责任选项/关闭 schema 定向 16 项通过；API/Service 虚拟文件类型检查、目标 ESLint/Prettier、changed/full 架构、docs-drift 和 diff 检查通过。根类型门禁通过（Turbo 缓存；weapp 仍为既有 skip）。未运行全量 lint/业务测试或真实页面、数据库、生产验收；未提交、推送或修改 hook/CI。开工时 `.gitignore` 与项目档案已有差异均保留。
 - 已处理：发布分支已完成报检责任、可选 NC 编号、原子关单与主分支质量损失索引队列/versioned release-maintenance 的冲突整合。关联不合格项关闭后在同一事务入队质量损失索引；历史外协 bootstrap 的维护顺序迁移到 manifest/ledger；关单服务拆分为 494 行。最终验证：根目录 Vitest `406/406` 文件、`3379/3379` 用例，后端 Vitest `292/292` 文件、`2656/2656` 用例，`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 和 `rtk git diff --check` 均 PASS。未运行前端 dev/build/start、真实生产发布或数据库维护。
 - 未处理：尚未推送功能分支、创建/合并功能 PR、合并 release-please 发布 PR 或等待生产 deploy；这些操作必须按正式发布流程继续。
 - 进货报检责任契约已收敛：Web、H5 和小程序的进货入口/关单仅保留供应商和外协单位，不再显示或提交责任部门。后端在事务内分别通过独立 canonical 系统设置解析“采购部”和“生产 OBU”，并对创建、历史关单、FAIL 不合格项投影执行同一校验。进货任务列表现在与过程外协一致，在兼容 `team` 展示字段返回 canonical `supplierName`，但不回写 `team` 或伪造 `teamId`。实现提交：`b9b48555`、`bec0103a`、`a84b291f`。最终验证：后端 Vitest `288/288` 文件、`2631/2631` 用例，Web happy-dom Vitest `65/65` 文件、`342/342` 用例，WeApp Vitest `10/10` 文件、`49/49` 用例；`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 和 `rtk git diff --check` 均 PASS。未运行前端 dev/build/start、真实登录页面或生产数据关单。

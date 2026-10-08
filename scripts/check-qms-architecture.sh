@@ -17,7 +17,7 @@ if [[ -z "$NODE_BIN" ]]; then
   done
 fi
 if [[ -z "$NODE_BIN" ]]; then
-  echo "error: node not found" >&2
+  echo "error: node not found; 门禁未执行。请通过项目 proto 工具链恢复 Node 并确认 command -v node，再重跑原命令。" >&2
   exit 1
 fi
 MAX_INDEX_LINES=500
@@ -47,6 +47,7 @@ declare -a BACKEND_TEST_TARGETS=()
 usage() {
   cat <<'USAGE'
 Usage: check-qms-architecture.sh [--changed|--all]
+       check-qms-architecture.sh --explain <rule>
 
 Rules:
   R1: no direct requestClient usage under apps/web-antd/src/views/qms
@@ -115,6 +116,12 @@ Modes:
   --all      Check all tracked files for enabled rules.
 USAGE
 }
+
+[[ "${1:-}" != "--" ]] || shift
+if [[ "${1:-}" == "--explain" ]]; then
+  [[ $# == 2 ]] || { usage; exit 2; }
+  exec "$NODE_BIN" "$SCRIPT_DIR/qms-rule-help.mjs" "$2"
+fi
 
 for arg in "$@"; do
   case "$arg" in
@@ -193,6 +200,15 @@ report_violation() {
   printf '[%s] %s  %s\n' "$rule" "$location" "$message"
   violations=$((violations + 1))
   mark_rule_violation "$rule"
+}
+
+report_checker_failure() {
+  local checker="$1"
+  local output_file="$2"
+  echo "检查器异常：${checker}；门禁未完成，不能按零违规处理。" >&2
+  echo "请按下方原始错误修复脚本/依赖/输入路径后重跑；工具链使用 proto + pnpm。参考 docs/development-workflow.md。" >&2
+  cat "$output_file" "$output_file.stderr" >&2
+  exit 2
 }
 
 collect_changed_files() {
@@ -440,10 +456,10 @@ check_b_auth2() {
   # (repo-wide scan) because it needs the full source tree.
   [[ "$SCOPE" != "all" ]] && return 0
   local out=''
-  out="$("$NODE_BIN" "$SCRIPT_DIR/check-permission-code-declarations.mjs" 2>&1)"
-  local code=$?
-  if (( code != 0 )); then
-    report_violation "B-AUTH2" "scripts/check-permission-code-declarations.mjs:1" "$(echo "$out" | head -1)"
+  if out="$(cd "$ROOT_DIR" && "$NODE_BIN" "$SCRIPT_DIR/check-permission-code-declarations.mjs" 2>&1)"; then
+    return 0
+  else
+    report_violation "B-AUTH2" "scripts/check-permission-code-declarations.mjs:1" "$out"
   fi
 }
 
@@ -541,9 +557,8 @@ check_backend_source_rules() {
     --root "$ROOT_DIR" \
     --baseline "$BASELINE_FILE" \
     --files-from "$files_file" \
-    --identity-files-from "$identity_files_file" >"$output_file"; then
-    echo -e "${RED}Backend source rule checker failed.${NC}"
-    exit 2
+    --identity-files-from "$identity_files_file" >"$output_file" 2>"$output_file.stderr"; then
+    report_checker_failure "$SOURCE_RULE_CHECKER" "$output_file"
   fi
 
   while IFS=$'\t' read -r kind rule location message; do
@@ -669,9 +684,8 @@ check_b_field_naming() {
   fi
 
   local output_file="$TMP_DIR/field-naming-output.txt"
-  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" >"$output_file"; then
-    echo -e "${RED}Field naming rule checker failed.${NC}"
-    exit 2
+  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" >"$output_file" 2>"$output_file.stderr"; then
+    report_checker_failure "$helper" "$output_file"
   fi
 
   while IFS=$'\t' read -r kind rule location message; do
@@ -703,9 +717,8 @@ check_b_mf() {
   fi
   [[ -s "$files_file" ]] || return 0
 
-  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" --files-from "$files_file" >"$output_file"; then
-    echo -e "${RED}Metric registration rule checker failed.${NC}"
-    exit 2
+  if ! "$NODE_BIN" "$helper" --root "$ROOT_DIR" --baseline "$BASELINE_FILE" --files-from "$files_file" >"$output_file" 2>"$output_file.stderr"; then
+    report_checker_failure "$helper" "$output_file"
   fi
 
   while read -r kind rule location message; do
@@ -805,6 +818,11 @@ check_b_auth2
 echo
 if (( violations > 0 )); then
   echo -e "${RED}${violations} violations across ${#violated_rules[@]} rules${NC}"
+  echo
+  echo "修复指引（每条失败规则展示一次；不修改检查条件或历史基线）："
+  "$NODE_BIN" "$SCRIPT_DIR/qms-rule-help.mjs" "${violated_rules[@]}"
+  echo
+  echo "修复后重跑：pnpm run check:qms-arch -- --$SCOPE"
   exit 1
 fi
 

@@ -27,6 +27,7 @@
     "check": "pnpm run check:circular && pnpm run check:dep && pnpm run check:type && pnpm run check:qms-arch && pnpm run check:metric-governance && pnpm run check:docs-drift",
     "check:circular": "vsh check-circular",
     "check:cspell": "cspell lint **/*.ts **/README.md .changeset/*.md --no-progress",
+    "check:daily": "node ./scripts/check-daily.mjs",
     "check:qms-arch": "bash ./scripts/check-qms-architecture.sh",
     "check:qms-arch:all": "bash ./scripts/check-qms-architecture.sh --all",
     "check:prisma-migration": "bash ./scripts/check-prisma-migration.sh",

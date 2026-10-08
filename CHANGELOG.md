@@ -17,6 +17,12 @@
 - 本工作区未启动前端 dev/build/start/serve，未执行完整发布；生产 overlay 未替代源码发布，仍需按正式发布链路纳入此源码改动。
 - 生产 overlay 回滚：保留备份 `/opt/qms/nginx.before-report-title-blue-20260905.conf`，可运行 `bash /opt/qms/rollback-report-title-blue-20260905.sh`（配置发生后续变更时拒绝覆盖）；源码发布后仅删除 `qms-report-title-blue-20260905` 的 `sub_filter` 块。该 selector 精确依赖原 `bg-gray-800` 类，源码移除此类后 overlay 自然不再匹配。没有前端/后端镜像变更或数据库操作。
 
+### 2026-10-07 日常研发检查与样板指引（未提交）
+
+- 架构门禁按失败规则提供原因、修复方法、范例和文档定位，新增 `--explain`；权限子检查失败保留完整诊断，其他检查器异常明确阻断。
+- 新增 `pnpm run check:daily`，按实际改动路径推荐日常检查集合；仅输出建议，不替代提交、Commitlint、hook、CI 或发布门禁。
+- 修正 API 样板中的 Prisma 直连和无效响应调用，补充报检创建、检验完成、关联不合格项的 API/Service/测试示例；不改变业务行为或历史架构基线。验证明细见 `PROGRESS.md`。
+
 ### 2026-09-05 剩余主线回归修复提交收口（本地提交，未推送/发布）
 
 - 将下方主线回归记录中的日报、监造、不合格项写入和小程序报检修复及测试全部纳入本地提交；报检链路及分类回显已在 `17e035e6` 提交。

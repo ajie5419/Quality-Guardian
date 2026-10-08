@@ -1,10 +1,18 @@
 import { spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import {
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
 
 import { describe, expect, it } from 'vitest';
+
+import { formatRuleHelp, ruleHelp } from './qms-rule-help.mjs';
 
 const ROOT_DIR = process.cwd();
 const CHECK_SCRIPT = path.join(ROOT_DIR, 'scripts/check-qms-architecture.sh');
@@ -41,7 +49,10 @@ function createFixture(files: Record<string, string>, baseline = '') {
   return rootDir;
 }
 
-function runCheck(rootDir: string): CheckResult {
+function runCheck(
+  rootDir: string,
+  environment: NodeJS.ProcessEnv = {},
+): CheckResult {
   const result = spawnSync('bash', [CHECK_SCRIPT, '--all'], {
     cwd: ROOT_DIR,
     encoding: 'utf8',
@@ -52,6 +63,7 @@ function runCheck(rootDir: string): CheckResult {
         'scripts/qms-architecture-baseline.txt',
       ),
       QMS_ARCH_ROOT_DIR: rootDir,
+      ...environment,
     },
   });
   return {
@@ -111,7 +123,12 @@ ${filler}
         'B-E2',
       ]) {
         expect(result.output).toContain(`[${rule}]`);
+        expect(result.output).toContain(`规则 ${rule} 原因：`);
       }
+      expect(result.output).toContain('修复：');
+      expect(result.output).toContain('范例：');
+      expect(result.output).toContain('参考：');
+      expect(result.output.match(/规则 B-T1 原因：/g)).toHaveLength(1);
     } finally {
       rmSync(rootDir, { force: true, recursive: true });
     }
@@ -2068,6 +2085,85 @@ export async function loadInspectionRequestStatsData() {
       expect(result.output).not.toContain('[R-DB-AGGREGATION]');
       expect(result.output).not.toContain('[R-SCOPE-RAW]');
       expect(result.output).not.toContain('[R-SCOPE-AGG]');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+});
+
+describe('qms repair guidance', () => {
+  it('covers every detector rule without changing machine record output', () => {
+    for (const file of [
+      'scripts/check-qms-architecture.sh',
+      'scripts/check-qms-source-rules.mjs',
+      'scripts/check-governed-fields.py',
+      'scripts/check-field-naming.mjs',
+      'scripts/check-metric-registration.mjs',
+    ]) {
+      const source = readFileSync(path.join(ROOT_DIR, file), 'utf8');
+      for (const match of source.matchAll(
+        /['"](B-[A-Z0-9-]+|R-[A-Z0-9-]+|R[123])['"]/g,
+      )) {
+        expect(ruleHelp).toHaveProperty(match[1]);
+        expect(formatRuleHelp([match[1]])).toContain('修复：');
+      }
+    }
+  });
+
+  it('explains known rules and rejects unknown rules', () => {
+    const result = spawnSync(
+      'bash',
+      [CHECK_SCRIPT, '--', '--explain', 'B-R1'],
+      {
+        encoding: 'utf8',
+      },
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain('移除路由中的 Prisma import');
+    const unknown = spawnSync('bash', [CHECK_SCRIPT, '--explain', 'UNKNOWN'], {
+      encoding: 'utf8',
+    });
+    expect(unknown.status).toBe(2);
+  });
+
+  it('reports the full permission checker error and remains blocked', () => {
+    const rootDir = createFixture({
+      'apps/web-antd/src/example.vue':
+        "const permission = 'QMS:Missing:Write';",
+    });
+    try {
+      const result = runCheck(rootDir);
+      expect(result.status).toBe(1);
+      expect(result.output).toContain('[B-AUTH2]');
+      expect(result.output).toContain('QMS:Missing:Write');
+      expect(result.output).toContain('规则 B-AUTH2 原因：');
+    } finally {
+      rmSync(rootDir, { force: true, recursive: true });
+    }
+  });
+
+  it('preserves child checker errors and never reports a pass on execution failure', () => {
+    const rootDir = createFixture({
+      'apps/backend/modules/example/example.service.ts':
+        'export const example = 1;',
+    });
+    try {
+      writeFixtureFile(
+        rootDir,
+        'checker-crash.cjs',
+        "process.stdout.write('fixture checker stdout\n'); throw new Error('fixture checker stderr');".replace(
+          'stdout\n',
+          String.raw`stdout\n`,
+        ),
+      );
+      const result = runCheck(rootDir, {
+        NODE_OPTIONS: `--require=${path.join(rootDir, 'checker-crash.cjs')}`,
+      });
+      expect(result.status).toBe(2);
+      expect(result.output).toContain('检查器异常：');
+      expect(result.output).toContain('fixture checker stdout');
+      expect(result.output).toContain('fixture checker stderr');
+      expect(result.output).not.toContain('QMS architecture check passed.');
     } finally {
       rmSync(rootDir, { force: true, recursive: true });
     }
