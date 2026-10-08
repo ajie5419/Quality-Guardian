@@ -178,13 +178,15 @@ describe('inspectionRecordDeleteService', () => {
         }),
       );
 
-      const _result = await InspectionRecordDeleteService.batchDelete(['i-1']);
+      const result = await InspectionRecordDeleteService.batchDelete(
+        ['i-1', 'forbidden', 'missing'],
+        { user: { id: 'u-1' }, scope: { scopeType: 'SELF' } },
+      );
 
-      expect(txUpdateMany).toHaveBeenCalledWith({
-        where: { id: { in: ['i-1'] } },
-        data: { isDeleted: true },
-      });
-      expect(FileStorageService.softDeleteReferences).toHaveBeenCalled();
+      expect(result).toEqual({ count: 1 });
+      expect(
+        vi.mocked(FileStorageService.softDeleteReferences).mock.calls,
+      ).toEqual([[{ bizId: 'i-1', bizType: 'inspection_record' }]]);
       expect(
         MetricRefreshQueue.enqueueSupplierScoresForInspectionIdentities,
       ).toHaveBeenCalledWith(
@@ -197,30 +199,38 @@ describe('inspectionRecordDeleteService', () => {
       );
     });
 
-    it('should handle empty ids array', async () => {
-      const txFindMany = vi.fn().mockResolvedValue([]);
-      const txUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
+    it.each([{ ids: [] }, { ids: ['forbidden', 'missing'] }])(
+      'does not clean references for inaccessible or empty batches: $ids',
+      async ({ ids }) => {
+        const { FileStorageService } = await import(
+          '~/modules/file-storage/file-storage.service'
+        );
+        const txFindMany = vi.fn().mockResolvedValue([]);
+        const txUpdateMany = vi.fn().mockResolvedValue({ count: 0 });
 
-      (prisma.$transaction as any).mockImplementation(async (cb: any) =>
-        cb({
-          inspections: {
-            findMany: txFindMany,
-            updateMany: txUpdateMany,
-          },
-          inspection_archive_tasks: {
-            findMany: vi.fn(),
-            deleteMany: vi.fn(),
-          },
-        }),
-      );
+        (prisma.$transaction as any).mockImplementation(async (cb: any) =>
+          cb({
+            inspections: {
+              findMany: txFindMany,
+              updateMany: txUpdateMany,
+            },
+            inspection_archive_tasks: {
+              findMany: vi.fn(),
+              deleteMany: vi.fn(),
+            },
+          }),
+        );
 
-      const _result = await InspectionRecordDeleteService.batchDelete([]);
+        const result = await InspectionRecordDeleteService.batchDelete(ids);
 
-      expect(txUpdateMany).toHaveBeenCalledWith({
-        where: { id: { in: [] } },
-        data: { isDeleted: true },
-      });
-    });
+        expect(txUpdateMany).toHaveBeenCalledWith({
+          where: { id: { in: ids } },
+          data: { isDeleted: true },
+        });
+        expect(result).toEqual({ count: 0 });
+        expect(FileStorageService.softDeleteReferences).not.toHaveBeenCalled();
+      },
+    );
 
     it('does not publish a change event when the transaction rolls back', async () => {
       const failure = new Error('transaction failed');

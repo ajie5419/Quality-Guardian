@@ -1,7 +1,16 @@
+import { IncomingMessage, ServerResponse } from 'node:http';
+import { Socket } from 'node:net';
+
+import { createEvent } from 'h3';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import deleteReportHandler from '~/api/qms/reports/[id].delete';
+import updateReportHandler from '~/api/qms/reports/[id].put';
+import dailySummaryHandler from '~/api/qms/reports/daily-summary.put';
+import createReportHandler from '~/api/qms/reports/index.post';
 import { ReportRouteService } from '~/modules/report/report-route.service';
 import { ReportWriteService } from '~/modules/report/report-write.service';
 import { VehicleCommissioningDailyReportStorageService } from '~/modules/vehicle-commissioning/daily-report-storage.service';
+import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 
 vi.mock('~/utils/prisma', () => ({
@@ -209,3 +218,88 @@ describe('reportRouteService', () => {
     ).toHaveBeenCalledWith({ skip: 0, take: 10 });
   });
 });
+
+vi.mock('~/modules/rbac', () => ({
+  authorizeWrite: vi.fn().mockResolvedValue({ id: 'u-1' }),
+}));
+vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
+vi.mock('~/utils/route-param', () => ({
+  getRequiredRouterParam: vi.fn(() => 'report-1'),
+}));
+vi.mock('h3', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('h3')>()),
+  readBody: vi
+    .fn()
+    .mockResolvedValue({ date: '2026-10-08', summary: 'Summary' }),
+  getRequestIP: vi.fn(),
+  getRequestHeader: vi.fn(),
+}));
+
+function reportEvent() {
+  const request = new IncomingMessage(new Socket());
+  request.url = '/api/qms/reports';
+  return createEvent(request, new ServerResponse(request));
+}
+
+const writeRoutes = [
+  {
+    name: 'update',
+    handler: updateReportHandler,
+    write: ReportWriteService.updateReport,
+  },
+  {
+    name: 'delete',
+    handler: deleteReportHandler,
+    write: ReportWriteService.deleteReport,
+  },
+  {
+    name: 'create',
+    handler: createReportHandler,
+    write: ReportWriteService.createReport,
+  },
+  {
+    name: 'daily summary',
+    handler: dailySummaryHandler,
+    write: ReportWriteService.saveDailySummary,
+  },
+];
+describe.each(writeRoutes)(
+  'report $name route error responses',
+  ({ handler, write }) => {
+    beforeEach(() => vi.clearAllMocks());
+    it.each([
+      ['BAD_REQUEST', 400],
+      ['FORBIDDEN', 403],
+      ['CONFLICT', 409],
+    ])('preserves %s and HTTP %i', async (code, httpStatus) => {
+      vi.mocked(write).mockRejectedValueOnce(
+        new BusinessError(code, 'Business failure', httpStatus),
+      );
+      const event = reportEvent();
+      expect(await handler(event)).toMatchObject({
+        code: -1,
+        error: { code },
+        message: 'Business failure',
+      });
+      expect(event.node.res.statusCode).toBe(httpStatus);
+    });
+    it('converts legacy business errors', async () => {
+      vi.mocked(write).mockRejectedValueOnce(
+        new Error('NOT_FOUND:Missing report'),
+      );
+      const event = reportEvent();
+      expect(await handler(event)).toMatchObject({
+        code: -1,
+        error: { code: 'NOT_FOUND' },
+        message: 'Missing report',
+      });
+      expect(event.node.res.statusCode).toBe(404);
+    });
+    it('returns HTTP 500 for unknown errors', async () => {
+      vi.mocked(write).mockRejectedValueOnce(new Error('Database unavailable'));
+      const event = reportEvent();
+      await handler(event);
+      expect(event.node.res.statusCode).toBe(500);
+    });
+  },
+);

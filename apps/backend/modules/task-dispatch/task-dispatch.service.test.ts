@@ -91,7 +91,9 @@ describe('taskDispatchService', () => {
       callback({
         qms_task_dispatches: {
           create,
-          findFirst: vi.fn().mockResolvedValue({ id: 'parent-1', level: 1 }),
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'parent-1', level: 1, status: 'PENDING' }),
           updateMany,
         },
       }),
@@ -114,10 +116,105 @@ describe('taskDispatchService', () => {
     });
 
     expect(updateMany).toHaveBeenCalledWith({
-      where: { id: 'parent-1', status: 'PENDING' },
+      where: { id: 'parent-1', status: { in: ['PENDING', 'DISPATCHED'] } },
       data: { status: 'DISPATCHED' },
     });
   });
+
+  it.each(['PENDING', 'DISPATCHED'])(
+    'attaches multiple children to a %s parent',
+    async (status) => {
+      const create = vi.fn().mockResolvedValue({ id: 'child-1' });
+      const updateMany = vi.fn().mockResolvedValue({ count: 1 });
+      const parent = { id: 'parent-1', level: 1, status };
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+        callback({
+          qms_task_dispatches: {
+            create,
+            findFirst: vi.fn(async () => ({ ...parent })),
+            updateMany: updateMany.mockImplementation(async () => {
+              parent.status = 'DISPATCHED';
+              return { count: 1 };
+            }),
+          },
+        }),
+      );
+      vi.mocked(prisma.users.findFirst).mockResolvedValue({
+        id: 'u-1',
+      } as never);
+      const input = {
+        body: { assigneeId: 'u-1', level: 2, parentId: 'parent-1' },
+        userinfo: { id: 'u-1' },
+      };
+      await TaskDispatchService.create(input);
+      await TaskDispatchService.create(input);
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(parent.status).toBe('DISPATCHED');
+    },
+  );
+
+  it.each([
+    ['PROCESSING', 'CONFLICT'],
+    ['COMPLETED', 'CONFLICT'],
+    ['CANCELLED', 'CONFLICT'],
+    ['UNKNOWN', 'BAD_REQUEST'],
+  ])('rejects attaching a child to a %s parent', async (status, code) => {
+    const create = vi.fn();
+    const updateMany = vi.fn();
+    vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+      callback({
+        qms_task_dispatches: {
+          create,
+          updateMany,
+          findFirst: vi
+            .fn()
+            .mockResolvedValue({ id: 'parent-1', level: 1, status }),
+        },
+      }),
+    );
+    vi.mocked(prisma.users.findFirst).mockResolvedValue({ id: 'u-1' } as never);
+    await expect(
+      TaskDispatchService.create({
+        body: { assigneeId: 'u-1', level: 2, parentId: 'parent-1' },
+        userinfo: { id: 'u-1' },
+      }),
+    ).rejects.toMatchObject({ code });
+    expect(create).not.toHaveBeenCalled();
+    expect(updateMany).not.toHaveBeenCalled();
+  });
+
+  it.each([null, { id: 'parent-1', status: 'COMPLETED' }])(
+    'rejects a concurrent parent change before creating a child: %j',
+    async (freshParent) => {
+      const create = vi.fn();
+      vi.mocked(prisma.$transaction).mockImplementation(async (callback: any) =>
+        callback({
+          qms_task_dispatches: {
+            create,
+            updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+            findFirst: vi
+              .fn()
+              .mockResolvedValueOnce({
+                id: 'parent-1',
+                level: 1,
+                status: 'PENDING',
+              })
+              .mockResolvedValueOnce(freshParent),
+          },
+        }),
+      );
+      vi.mocked(prisma.users.findFirst).mockResolvedValue({
+        id: 'u-1',
+      } as never);
+      await expect(
+        TaskDispatchService.create({
+          body: { assigneeId: 'u-1', level: 2, parentId: 'parent-1' },
+          userinfo: { id: 'u-1' },
+        }),
+      ).rejects.toMatchObject({ code: freshParent ? 'CONFLICT' : 'NOT_FOUND' });
+      expect(create).not.toHaveBeenCalled();
+    },
+  );
 
   it('rejects invalid create inputs before writing', async () => {
     await expect(

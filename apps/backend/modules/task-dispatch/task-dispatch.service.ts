@@ -88,7 +88,7 @@ export const TaskDispatchService = {
         const parentTask = await scopedTasks.findAccessible(
           {
             where: { id: parentId },
-            select: { id: true, level: true },
+            select: { id: true, level: true, status: true },
           },
           access,
         );
@@ -98,9 +98,22 @@ export const TaskDispatchService = {
         if (parentTask.level !== 1) {
           throw new Error('PARENT_LEVEL_INVALID');
         }
+        assertTaskDispatchTransition(
+          parentTask.status,
+          TASK_DISPATCH_STATUS.DISPATCHED,
+        );
+        /** Guard both attachable states so concurrent dispatches can share a parent. */
         const promotion = await scopedTasks.updateAccessible(
           {
-            where: { id: parentId, status: TASK_DISPATCH_STATUS.PENDING },
+            where: {
+              id: parentId,
+              status: {
+                in: [
+                  TASK_DISPATCH_STATUS.PENDING,
+                  TASK_DISPATCH_STATUS.DISPATCHED,
+                ],
+              },
+            },
             data: { status: TASK_DISPATCH_STATUS.DISPATCHED },
           },
           access,

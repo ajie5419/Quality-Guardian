@@ -10,6 +10,10 @@ import { authorizeWrite } from '~/modules/rbac';
 import { ReportRouteService } from '~/modules/report/report-route.service';
 import { logApiError } from '~/utils/api-logger';
 import {
+  businessErrorResponse,
+  legacyErrorToBusinessError,
+} from '~/utils/business-error';
+import {
   badRequestResponse,
   internalServerErrorResponse,
   useResponseSuccess,
@@ -37,6 +41,8 @@ export default defineEventHandler(async (event) => {
     );
   } catch (error) {
     logApiError('reports', error, undefined, event);
+    const businessError = legacyErrorToBusinessError(error);
+    if (businessError) return businessErrorResponse(event, businessError);
     return internalServerErrorResponse(event, '创建报告失败');
   }
 });
