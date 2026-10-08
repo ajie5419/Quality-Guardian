@@ -1,6 +1,6 @@
 # 研发降负第二阶段验证记录
 
-日期：2026-10-08。基线：`codex/remove-dept-rank@6ad199065c4131bfd74947919411cbb80aa890ac`。第二阶段门禁已通过，按授权执行独立本地提交；未推送、未改写第一阶段提交。
+日期：2026-10-08。基线：`codex/remove-dept-rank@6ad199065c4131bfd74947919411cbb80aa890ac`。第二阶段四项提交门禁与 60 项定向测试通过，成果已独立本地提交；未推送、未改写第一阶段提交。
 
 ## 第一阶段提交与证据边界
 
@@ -110,8 +110,31 @@ rtk vitest run scripts/check-daily.test.mjs scripts/check-docs-drift.test.ts int
 
 开工基线与两处既有保护文件（`.gitignore`、`docs/PROJECT_GUIDE.md`）经 SHA-256 比对确认逐字节未变。
 
+### 最终提交与真实 hooks 证据
+
+成果提交：
+
+```text
+361e42027cacb5c705d4ff69ad85de50b9638e18
+chore(project): improve docs sync and commitlint guidance
+```
+
+实际执行 `rtk git commit -m "chore(project): improve docs sync and commitlint guidance"`，退出码 0。没有关闭 Lefthook 或使用 `--no-verify`。以 `GIT_TRACE2_EVENT` 记录真实提交过程，按同一 Git 会话的 hook 启动事件和退出事件核对：
+
+| 实际 Git hook                               | 退出码 |
+| ------------------------------------------- | ------ |
+| `.git/hooks/pre-commit`                     | 0      |
+| `.git/hooks/prepare-commit-msg`             | 0      |
+| `.git/hooks/commit-msg .git/COMMIT_EDITMSG` | 0      |
+
+RTK 将提交输出压缩为摘要，未保留各个 Lefthook 子命令的完整控制台输出；以上是实际 hook 进程退出码证据，不将定向测试替代真实提交证明。前后 SHA-256 对比确认 hooks 未修改任何目标文件内容。`rtk git show --format= --name-only HEAD` 核对成果提交恰好包含上列 14 个文件；`rtk git diff --cached --name-only` 为空，`rtk git status --short` 仅剩 `.gitignore` 与 `docs/PROJECT_GUIDE.md` 两处既有改动，二者 SHA-256 与开工一致。
+
+本次最终复验的原始日志、逐条命令与退出码、暂存文件清单、保护文件哈希、实际提交日志及 Git trace 存于 `/var/folders/c5/40f_dvrx0bz9qp74_7849b4c0000gn/T/qgs-phase2-final-D8gAjE`。`checks.json` 中 lint/type/arch/docs/tests 五项退出码均为 0，测试输出为 60 PASS、0 FAIL；临时目录可能被系统清理。根目录忽略边界另通过 ESLint `isPathIgnored` 验证：根生成目录及其子路径为 true；`apps/backend/.dsh-project-memory/probe.json`、`scripts/check-daily.mjs`、`apps/backend/api/index.ts` 为 false，未读取生成目录内容。
+
+为在版本化文档中记录实际成果 hash 和已发生的 hooks 结果，成果提交后仅补充本文件，并按纯文档要求复验格式、diff 与 docs-drift，再以 `docs(project): record phase two commit evidence` 单独本地提交。该证据提交不改成果代码、不改写成果提交；自身 hash 以 `rtk git log -1 --format='%H%n%s'` 和最终交付回报为准，避免文档自引用 hash。
+
 ## 未验证范围与回退边界
 
 此前全量 lint 因本地生成目录失败；按用户授权加入仅针对仓库根目录的忽略后，全量 lint 与四项提交门禁均已通过。没有运行全量业务测试、真实业务页面/移动端、数据库、生产或 GitHub CI；未执行 pre-push，也未推送。没有重演第一阶段真实提交的 pre-commit 全流程，不将当前 commit-msg 补测视为历史 hooks 证据。
 
-本阶段无业务数据写入、不改架构 baseline、不变更 scope 允许集合。回退时只撤销表中本阶段改动，保留第一阶段提交和开工时两处既有差异。第二阶段实现、定向验证及必需提交门禁已完成；实际提交 hash 和 hooks 结果在成果提交后追加到本文，避免将尚未执行的操作写成已通过。
+本阶段无业务数据写入、不改架构 baseline、不变更 scope 允许集合。回退时只撤销表中本阶段改动，保留第一阶段提交和开工时两处既有差异。第二阶段实现、定向验证、必需提交门禁和真实提交 hooks 已完成并通过；业务端到端、生产及 GitHub CI 不在本次验收范围。
