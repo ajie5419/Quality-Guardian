@@ -58,6 +58,7 @@ vite.config.ts.*
 
 # Editor directories and files
 .idea
+/.dsh-project-memory/
 # .vscode
 *.suo
 *.ntvs*
