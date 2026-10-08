@@ -21,6 +21,36 @@ pnpm run check:daily
 
 这是快速反馈分流，不是提交放行器。混合改动合并建议集合；相邻测试仅帮助定位，不证明全部影响面已覆盖。删除源码后应选择仍存在的消费者测试。Markdown 内嵌执行配置或脚本应按代码风险处理，不能只看扩展名。提交仍执行项目档案 §7 的必需集合，Commitlint、Zod、hook、CI 与发布门禁保持原样。
 
+## 文档数字漂移如何修复
+
+`check:daily` 只打印建议，不执行 docs-drift，也不会据此宣布文档已经漂移或已经通过。请先运行：
+
+```bash
+pnpm run check:docs-drift
+```
+
+若实际检查报 D1 版本、模块数或模块 TS 文件数漂移，依次执行：
+
+```bash
+pnpm run docs:sync
+rtk git diff -- PROJECT_STATE.md
+pnpm run check:docs-drift
+```
+
+同步只替换 `PROJECT_STATE.md` 中唯一且顺序正确的 `docs:sync-start/end` 硬数据块；块外的人工业务说明、待办和换行保持原样。文件或标记缺失、重复、倒置时同步失败且不写入；应先核对边界，不能扩大替换范围。提交前审阅同步 diff，而不是手动查数改数。
+
+D2/D3 表示模块地图缺项、文件缺失或条目指向不存在的模块，需按 `code_map.md` 维护规则核对真实目录和职责后人工修改；`docs:sync` 不会替你编写或删除业务说明。缺模块 `ARCHITECTURE.md` 仍只提示，按模块实际职责补充，不提高或降低其阻断等级。
+
+## 提交 scope 报错如何修复
+
+Commitlint 的错误消息直接展示当前工作区实际包名和原有通用 scope，附有使用同一允许集合生成的英文提交示例。以当次消息列出的清单为准；包改名或移除后，提示随工作区变化，不把固定的应用名当作永远合法。
+
+```bash
+rtk git commit -m "chore(project): improve developer guidance"
+```
+
+`project` 是已有的通用 scope；省略 scope 仍按原规则允许。不要为了使用 `tooling` 等未登记 scope 增加白名单或关闭 Commitlint。类型、空主题和标题长度检查仍然阻断违规提交。
+
 ## 看懂门禁失败
 
 ```bash

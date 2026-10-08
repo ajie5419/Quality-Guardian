@@ -52,6 +52,11 @@ export function planChecks(files, root = process.cwd(), uncertain = false) {
   const notes = [
     '这是日常反馈建议，不替代项目档案 §7 的提交、hook、CI 和发布门禁。',
     '请审阅 diff、格式与引用；Markdown 内含可执行配置或脚本时按代码变更运行完整提交门禁。',
+    '本命令未执行 docs-drift，也未判断文档是否漂移。若 check:docs-drift 报 D1 数字漂移，请依次运行：',
+    '  pnpm run docs:sync',
+    '  rtk git diff -- PROJECT_STATE.md',
+    '  pnpm run check:docs-drift',
+    'docs:sync 只更新 PROJECT_STATE.md 的唯一硬数据块，保留人工业务说明；D2/D3 模块地图或缺失文档需按契约人工维护，不能靠数字同步修复。',
   ];
   if (uncertain || kinds.has('工具/共享/配置')) {
     fullChecks.forEach((command) => commands.add(command));
@@ -132,6 +137,22 @@ export function planChecks(files, root = process.cwd(), uncertain = false) {
   }
   if (files.some((file) => /scripts\/check-daily/u.test(file))) {
     commands.add('rtk vitest run scripts/check-daily.test.mjs');
+  }
+  if (
+    files.some((file) =>
+      /scripts\/(?:check-docs-drift|sync-project-state)/u.test(file),
+    )
+  ) {
+    commands.add('rtk vitest run scripts/check-docs-drift.test.ts');
+  }
+  if (
+    files.some((file) =>
+      file.startsWith('internal/lint-configs/commitlint-config/'),
+    )
+  ) {
+    commands.add(
+      'rtk vitest run internal/lint-configs/commitlint-config/index.test.ts',
+    );
   }
   if (kinds.has('后端') || kinds.has('工具/共享/配置')) {
     notes.push(

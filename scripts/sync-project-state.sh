@@ -47,35 +47,23 @@ if [[ ! -f "$STATE_FILE" ]]; then
   exit 1
 fi
 
-# Replace the block between the markers (inclusive) using python3
-# (robust against multiline content; awk chokes on embedded newlines).
-PY="$(command -v python3 || echo /usr/bin/python3)"
-if [[ ! -x "$PY" ]]; then
-  echo "error: python3 not found" >&2
-  exit 1
-fi
+# Reject ambiguous boundaries before writing; preserve human text and its
+# line endings outside the unique generated block.
+SYNC_BLOCK="$block" "$NODE_BIN" --input-type=module - "$STATE_FILE" <<'NODEEOF'
+import { readFileSync, writeFileSync } from 'node:fs';
 
-SYNC_BLOCK="$block" "$PY" - "$STATE_FILE" <<'PYEOF'
-import os
-import sys
-
-path = sys.argv[1]
-block = os.environ["SYNC_BLOCK"]
-with open(path, "r", encoding="utf-8") as fh:
-    text = fh.read()
-
-start = "<!-- docs:sync-start -->"
-end = "<!-- docs:sync-end -->"
-i = text.find(start)
-j = text.find(end)
-if i == -1 or j == -1 or j < i:
-    print(f"error: markers not found in {path}", file=sys.stderr)
-    sys.exit(1)
-
-j += len(end)
-text = text[:i] + block + text[j:]
-with open(path, "w", encoding="utf-8") as fh:
-    fh.write(text)
-PYEOF
+const file = process.argv[2];
+const text = readFileSync(file, 'utf8');
+const start = '<!-- docs:sync-start -->';
+const end = '<!-- docs:sync-end -->';
+const i = text.indexOf(start);
+const j = text.indexOf(end);
+if (i < 0 || j < i || text.indexOf(start, i + start.length) >= 0
+    || text.indexOf(end, j + end.length) >= 0) {
+  console.error(`error: ${file} 必须有唯一且顺序正确的 docs:sync 标记；未修改文件。请保留人工说明并核对标记边界。`);
+  process.exit(1);
+}
+writeFileSync(file, text.slice(0, i) + process.env.SYNC_BLOCK + text.slice(j + end.length), 'utf8');
+NODEEOF
 
 echo "synced PROJECT_STATE.md: v$version, $module_count modules, $module_ts module TS files, $backend_tests backend tests"

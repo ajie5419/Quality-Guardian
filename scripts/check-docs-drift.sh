@@ -6,9 +6,9 @@
 #
 #   D1: PROJECT_STATE.md hard-data block must equal live repository facts
 #      (run `pnpm run docs:sync` to refresh).
-#   D2: every apps/backend/modules/<name>/ directory must appear in
-#      code_map.md AND have an ARCHITECTURE.md (or an explicit skip reason).
+#   D2: every apps/backend/modules/<name>/ directory must appear in code_map.md.
 #   D3: code_map.md must not reference module directories that no longer exist.
+#   D4: missing ARCHITECTURE.md is informational, not blocking.
 #
 # Usage: bash scripts/check-docs-drift.sh
 set -euo pipefail
@@ -18,6 +18,8 @@ STATE_FILE="$ROOT_DIR/PROJECT_STATE.md"
 CODE_MAP="$ROOT_DIR/code_map.md"
 BACKEND_DIR="$ROOT_DIR/apps/backend"
 violations=0
+hard_data_drift=0
+map_drift=0
 
 # Locate node: PATH first, then common install roots.
 NODE_BIN="$(command -v node 2>/dev/null || true)"
@@ -30,6 +32,8 @@ fi
 red() { printf '\033[0;31m%s\033[0m\n' "$1"; }
 green() { printf '\033[0;32m%s\033[0m\n' "$1"; }
 report() { red "  ✗ $1"; violations=$((violations + 1)); }
+report_hard_data() { report "$1"; hard_data_drift=1; }
+report_map() { report "$1"; map_drift=1; }
 
 echo "checking documentation drift..."
 
@@ -43,11 +47,17 @@ if [[ -f "$STATE_FILE" && -n "$NODE_BIN" ]]; then
   stated_modules="$(sed -n 's/^- 后端模块数: //p' "$STATE_FILE" | head -1)"
   stated_module_ts="$(sed -n 's/^- 模块 TS 文件数: //p' "$STATE_FILE" | head -1)"
 
-  [[ "$stated_version" == "$live_version" ]] || report "D1 version drift: PROJECT_STATE says '$stated_version', package.json says '$live_version' (run pnpm run docs:sync)"
-  [[ "$stated_modules" == "$live_modules" ]] || report "D1 module-count drift: PROJECT_STATE says '$stated_modules', actual '$live_modules' (run pnpm run docs:sync)"
-  [[ "$stated_module_ts" == "$live_module_ts" ]] || report "D1 module-TS-file drift: PROJECT_STATE says '$stated_module_ts', actual '$live_module_ts' (run pnpm run docs:sync)"
+  [[ "$stated_version" == "$live_version" ]] || report_hard_data "D1 version drift: PROJECT_STATE says '$stated_version', package.json says '$live_version'"
+  [[ "$stated_modules" == "$live_modules" ]] || report_hard_data "D1 module-count drift: PROJECT_STATE says '$stated_modules', actual '$live_modules'"
+  [[ "$stated_module_ts" == "$live_module_ts" ]] || report_hard_data "D1 module-TS-file drift: PROJECT_STATE says '$stated_module_ts', actual '$live_module_ts'"
 else
-  report "D1 PROJECT_STATE.md missing"
+  if [[ ! -f "$STATE_FILE" ]]; then
+    report "D1 PROJECT_STATE.md missing"
+    echo "  修复：从已审阅版本补齐 PROJECT_STATE.md 及唯一 docs:sync 标记块，保留已有人工业务说明；docs:sync 不负责创建该文件。"
+  else
+    report "D1 Node unavailable; hard-data check did not run"
+    echo "  修复：恢复项目 Node 工具链和 PATH 后重跑；不能将未执行的检查当作通过。"
+  fi
 fi
 
 # --- D2/D3: module dirs <-> code_map "backend business modules" section -----
@@ -66,7 +76,7 @@ if [[ -f "$CODE_MAP" ]]; then
     [[ -n "$dir" ]] || continue
     name="$(basename "$dir")"
     if ! grep -qx "$name" <<<"$code_map_modules"; then
-      report "D2 module '${name}' missing from code_map.md backend-modules section"
+      report_map "D2 module '${name}' missing from code_map.md backend-modules section"
     fi
   done < <(find "$BACKEND_DIR/modules" -mindepth 1 -maxdepth 1 -type d | sort)
 
@@ -74,11 +84,11 @@ if [[ -f "$CODE_MAP" ]]; then
   while IFS= read -r name; do
     [[ -n "$name" ]] || continue
     if [[ ! -d "$BACKEND_DIR/modules/$name" ]]; then
-      report "D3 code_map.md references module '${name}' that no longer exists"
+      report_map "D3 code_map.md references module '${name}' that no longer exists"
     fi
   done <<<"$code_map_modules"
 else
-  report "D2 code_map.md missing"
+  report_map "D2 code_map.md missing"
 fi
 
 # --- D4: missing ARCHITECTURE.md (soft, informational only) ----------------
@@ -95,11 +105,30 @@ fi
 if (( ${#missing_arch[@]} > 0 )); then
   printf '  ⚠ %d module(s) lack ARCHITECTURE.md (informational, not blocking): %s\n' \
     "${#missing_arch[@]}" "$(IFS=,; echo "${missing_arch[*]}")"
+  echo "  指引：按对应模块真实职责补充 ARCHITECTURE.md；docs:sync 只同步数字，不生成业务架构说明。此项仍仅提示。"
 fi
 
 echo ""
 if (( violations > 0 )); then
   red "docs drift check FAILED: $violations violation(s)"
+  if (( hard_data_drift > 0 )); then
+    cat <<'GUIDANCE'
+
+数字漂移修复（无需手动查数或改数）：
+  1. pnpm run docs:sync
+  2. rtk git diff -- PROJECT_STATE.md
+  3. pnpm run check:docs-drift
+docs:sync 只替换唯一 docs:sync-start/end 硬数据块，不改人工业务说明。
+标记缺失或重复时同步会失败，请先核对标记边界；不要扩大替换范围。
+GUIDANCE
+  fi
+  if (( map_drift > 0 )); then
+    echo
+    echo "模块地图修复：按真实模块职责维护 code_map.md 的“后端业务模块”段，再检查 diff 并重跑。"
+    echo "  rtk git diff -- code_map.md"
+    echo "  pnpm run check:docs-drift"
+    echo "docs:sync 不会添加/删除模块说明，不能用同步数字解决 D2/D3。参考 code_map.md 维护规则与 docs/PROJECT_GUIDE.md §5、§10。"
+  fi
   exit 1
 fi
 green "docs drift check PASSED"
