@@ -118,13 +118,17 @@ export function planChecks(files, root = process.cwd(), uncertain = false) {
 
   // Targeted test recommendations for critical business & auth paths
   const criticalTests = new Set();
-  const hasAuthChanges = files.some((file) =>
+  // Include shared and frontend code, but never infer business changes from prose.
+  const codeFiles = files.filter((file) =>
+    /\.(?:[cm]?[jt]sx?|vue)$/u.test(file),
+  );
+  const hasAuthChanges = codeFiles.some((file) =>
     /auth|jwt|token|login|wx-auth/u.test(file),
   );
-  const hasDataScopeChanges = files.some((file) =>
+  const hasDataScopeChanges = codeFiles.some((file) =>
     /data-scope|scoped-repository|rbac/u.test(file),
   );
-  const hasInspectionChainChanges = files.some((file) =>
+  const hasInspectionChainChanges = codeFiles.some((file) =>
     /inspection-request|inspection-issue|inspection-record|non-conformance/u.test(
       file,
     ),
@@ -309,7 +313,14 @@ export function computeGitSnapshot(root = process.cwd()) {
 const processCaches = new WeakMap();
 
 export function executeChecks(commands, options = {}) {
-  const { root = process.cwd(), useCache = true, reuseContext } = options;
+  const {
+    root = process.cwd(),
+    useCache = true,
+    reuseContext,
+    streamOutput = false,
+    onStart,
+    onResult,
+  } = options;
   const initial = readSnapshot(root);
   const contextAllowed =
     reuseContext !== null && typeof reuseContext === 'object';
@@ -320,7 +331,7 @@ export function executeChecks(commands, options = {}) {
   const results = [];
   let allPassed = true;
   const unchanged = () => readSnapshot(root).key === initial.key;
-  for (const command of commands) {
+  for (const [index, command] of commands.entries()) {
     if (!unchanged()) {
       results.push({
         command,
@@ -330,6 +341,7 @@ export function executeChecks(commands, options = {}) {
         stderr: '工作树已变化，旧快照结果无效；请重新生成计划并执行。',
       });
       allPassed = false;
+      onResult?.(results.at(-1), index);
       break;
     }
     const cacheKey = JSON.stringify([initial.key, command]);
@@ -341,14 +353,18 @@ export function executeChecks(commands, options = {}) {
         durationMs: 0,
         exitCode: 0,
       });
+      onResult?.(results.at(-1), index);
       continue;
     }
+    onStart?.(command, index);
     const start = Date.now();
     const res = spawnSync(command, {
       cwd: root,
       shell: true,
       encoding: 'utf8',
       maxBuffer: 16 * 1024 * 1024,
+      // Human CLI output is inherited live; API/JSON callers retain captured logs.
+      stdio: streamOutput ? ['ignore', 'inherit', 'inherit'] : 'pipe',
     });
     const durationMs = Date.now() - start;
     const stable = unchanged();
@@ -364,6 +380,7 @@ export function executeChecks(commands, options = {}) {
         ? res.stderr || res.error?.message
         : `${res.stderr ?? ''}\n工作树在执行中变化，检查结果不能作为当前快照 PASS；请重新执行。`,
     });
+    onResult?.(results.at(-1), index);
     if (!passed) {
       allPassed = false;
       cache.clear();
@@ -393,15 +410,17 @@ export function executeChecks(commands, options = {}) {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const json = process.argv.slice(2).includes('--json');
   try {
     const args = process.argv.slice(2).filter((arg) => arg !== '--');
     if (args.includes('--help') || args.includes('-h')) {
-      process.stdout.write(
-        'Usage: pnpm run check:daily [--base <ref>] [--run | --exec] [--no-cache]\n' +
-          '  默认只打印建议，不执行检查。范围含分支差异、暂存、未暂存和未跟踪文件。\n' +
-          '  --run / --exec: 按推荐顺序执行命令，CLI 不跨进程复用，依赖/工具/环境稳定性不可证明。\n' +
-          '  --no-cache:     强制重新执行全部检查，不使用同快照缓存。\n',
-      );
+      const help =
+        'Usage: pnpm run check:daily [--base <ref>] [--run | --exec] [--no-cache] [--json]\n' +
+        '  默认只打印建议，不执行检查。范围含分支差异、暂存、未暂存和未跟踪文件。\n' +
+        '  --run / --exec: 按推荐顺序执行命令，CLI 不跨进程复用，依赖/工具/环境稳定性不可证明。\n' +
+        '  --no-cache:     强制重新执行全部检查，不使用同快照缓存。\n' +
+        '  --json:         输出单个 JSON 对象，子进程日志收集在结果内。\n';
+      process.stdout.write(json ? `${JSON.stringify({ help })}\n` : help);
       process.exit(0);
     }
 
@@ -421,6 +440,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
           shouldRun = true;
           break;
         }
+        case '--json': {
+          break;
+        }
         case '--no-cache': {
           noCache = true;
           break;
@@ -435,63 +457,101 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const { files, reference } = changedFiles(root, baseRef);
     const plan = planChecks(files, root, !reference);
 
-    process.stdout.write(
-      `基准：${reference ?? '未知（仅工作区可见）'}\n改动：${files.length} 个文件；类型：${plan.kinds.join('、') || '无'}\n\n`,
-    );
+    if (!json)
+      process.stdout.write(
+        `基准：${reference ?? '未知（仅工作区可见）'}\n改动：${files.length} 个文件；类型：${plan.kinds.join('、') || '无'}\n\n`,
+      );
 
     if (shouldRun) {
-      process.stdout.write('开始按计划执行检查...\n\n');
+      if (!json)
+        process.stdout.write(
+          `开始按计划执行检查...\n\n${plan.notes.join('\n')}\n\n`,
+        );
       const runResult = executeChecks(plan.commands, {
         root,
         useCache: !noCache,
+        streamOutput: !json,
+        onStart: json
+          ? undefined
+          : (command, index) =>
+              process.stdout.write(
+                `[${index + 1}/${plan.commands.length}] RUN | ${command}\n`,
+              ),
+        onResult: json
+          ? undefined
+          : (result, index) =>
+              process.stdout.write(
+                `[${index + 1}/${plan.commands.length}] ${result.status} | ${result.command} (${result.durationMs}ms)\n`,
+              ),
       });
-
-      process.stdout.write(
-        '--------------------------------------------------\n',
-      );
-      process.stdout.write(
-        `快照: ${runResult.snapshot?.slice(0, 8) ?? '不完整（禁止复用）'}；${runResult.cacheReason}\n`,
-      );
-      process.stdout.write(
-        '--------------------------------------------------\n',
-      );
-
-      for (const res of runResult.results) {
-        let mark = '✗ FAIL';
-        if (res.status === 'PASS') {
-          mark = '✓ PASS';
-        } else if (res.status === 'SKIP') {
-          mark = '⚡ SKIP (缓存)';
-        }
-        const time = res.durationMs > 0 ? ` (${res.durationMs}ms)` : '';
-        process.stdout.write(`${mark.padEnd(16)} | ${res.command}${time}\n`);
-      }
-
-      process.stdout.write(
-        '--------------------------------------------------\n',
-      );
-      const counts = ['PASS', 'FAIL', 'SKIP'].map(
-        (status) =>
-          `${status}=${runResult.results.filter((result) => result.status === status).length}`,
-      );
-      process.stdout.write(
-        `汇总：${counts.join(' ')} 未执行=${plan.commands.length - runResult.results.length}\n`,
-      );
-      if (runResult.allPassed) {
-        process.stdout.write('🎉 全部检查通过 (日常辅助通过，非门禁替代)\n');
-      } else {
-        const failedItem = runResult.results.find((r) => r.status === 'FAIL');
-        process.stderr.write(
-          `\n❌ 门禁执行失败: ${failedItem.command} (exit: ${failedItem.exitCode})\n`,
+      const failedItem = runResult.results.find((r) => r.status === 'FAIL');
+      process.exitCode = runResult.allPassed ? 0 : failedItem?.exitCode || 1;
+      if (json) {
+        process.stdout.write(
+          `${JSON.stringify({
+            reference,
+            files,
+            ...plan,
+            ...runResult,
+            summary: {
+              PASS: runResult.results.filter((r) => r.status === 'PASS').length,
+              FAIL: runResult.results.filter((r) => r.status === 'FAIL').length,
+              SKIP: runResult.results.filter((r) => r.status === 'SKIP').length,
+              notRun: plan.commands.length - runResult.results.length,
+            },
+          })}\n`,
         );
-        if (failedItem.stdout) {
-          process.stderr.write(`\n--- stdout ---\n${failedItem.stdout}`);
+      } else {
+        process.stdout.write(
+          '--------------------------------------------------\n',
+        );
+        process.stdout.write(
+          `快照: ${runResult.snapshot?.slice(0, 8) ?? '不完整（禁止复用）'}；${runResult.cacheReason}\n`,
+        );
+        process.stdout.write(
+          '--------------------------------------------------\n',
+        );
+
+        for (const res of runResult.results) {
+          let mark = '✗ FAIL';
+          if (res.status === 'PASS') {
+            mark = '✓ PASS';
+          } else if (res.status === 'SKIP') {
+            mark = '⚡ SKIP (缓存)';
+          }
+          const time = res.durationMs > 0 ? ` (${res.durationMs}ms)` : '';
+          process.stdout.write(`${mark.padEnd(16)} | ${res.command}${time}\n`);
         }
-        if (failedItem.stderr) {
-          process.stderr.write(`\n--- stderr ---\n${failedItem.stderr}`);
+
+        process.stdout.write(
+          '--------------------------------------------------\n',
+        );
+        const counts = ['PASS', 'FAIL', 'SKIP'].map(
+          (status) =>
+            `${status}=${runResult.results.filter((result) => result.status === status).length}`,
+        );
+        process.stdout.write(
+          `汇总：${counts.join(' ')} 未执行=${plan.commands.length - runResult.results.length}\n`,
+        );
+        if (runResult.allPassed) {
+          process.stdout.write('🎉 全部检查通过 (日常辅助通过，非门禁替代)\n');
+        } else {
+          process.stderr.write(
+            `\n❌ 门禁执行失败: ${failedItem.command} (exit: ${failedItem.exitCode})\n`,
+          );
+          if (failedItem.stdout) {
+            process.stderr.write(`\n--- stdout ---\n${failedItem.stdout}`);
+          }
+          if (failedItem.stderr) {
+            process.stderr.write(`\n--- stderr ---\n${failedItem.stderr}`);
+          }
+          process.exitCode = failedItem.exitCode || 1;
         }
-        process.exitCode = failedItem.exitCode || 1;
       }
+    } else if (json) {
+      process.stdout.write(
+        `${JSON.stringify({ reference, files, ...plan })}\n`,
+      );
     } else {
       process.stdout.write(
         `${plan.commands.join('\n') || '没有待检查的改动。'}\n\n${plan.notes.join('\n')}\n`,
@@ -501,7 +561,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       );
     }
   } catch (error) {
-    process.stderr.write(`无法生成检查建议：${error.message}\n`);
+    if (json)
+      process.stdout.write(`${JSON.stringify({ error: error.message })}\n`);
+    else process.stderr.write(`无法生成检查建议：${error.message}\n`);
     process.exitCode = 2;
   }
 }

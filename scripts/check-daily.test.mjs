@@ -1,4 +1,4 @@
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import {
   mkdirSync,
   mkdtempSync,
@@ -170,6 +170,41 @@ it('shared, configuration, migration and uncertain changes stay conservative', (
 });
 
 describe('targeted test recommendations for core chains', () => {
+  it.each([
+    'docs/auth-guide.md',
+    'docs/token-data-scope-inspection-request.md',
+    'apps/backend/modules/inspection/non-conformance-ARCHITECTURE.md',
+    'packages/qgs-shared/src/rbac-login.md',
+  ])('does not infer business tests or reminders from prose: %s', (file) => {
+    const plan = planChecks([file]);
+    expect(plan.commands.some((cmd) => cmd.startsWith('rtk vitest'))).toBe(
+      false,
+    );
+    expect(plan.notes.join('\n')).not.toContain('涉及认证或数据权限变更');
+    expect(plan.notes.join('\n')).not.toContain('核心报检-检验-NC');
+  });
+
+  it.each([
+    'packages/qgs-shared/src/domain-modules/qms/system-auth.ts',
+    'packages/qgs-shared/src/login.mjs',
+    'apps/web-antd/src/api/core/auth.ts',
+  ])('retains auth recommendations beyond backend: %s', (file) => {
+    expect(planChecks([file]).commands.join('\n')).toContain('3.auth.test.ts');
+  });
+
+  it('retains shared scope tests and frontend inspection reminders', () => {
+    expect(
+      planChecks([
+        'packages/qgs-shared/src/domain-modules/qms/rbac-config.ts',
+      ]).commands.join('\n'),
+    ).toContain('rbac-authorize.service.test.ts');
+    expect(
+      planChecks([
+        'apps/web-antd/src/api/qms/inspection-request.ts',
+      ]).notes.join('\n'),
+    ).toContain('核心报检-检验-NC');
+  });
+
   it('recommends auth and token test suites when auth files change', () => {
     const plan = planChecks(['apps/backend/middleware/3.auth.ts']);
     expect(
@@ -284,28 +319,33 @@ describe('executeChecks and snapshot cache', () => {
     }
   });
 
-  it('rejects PASS when a command changes the workspace and runs no later checks', () => {
-    const { root, git, write } = fixture();
-    try {
-      write('README.md');
-      git('add', '.');
-      git('commit', '--quiet', '-m', 'fixture');
-      const result = executeChecks(
-        [
-          'node -e "process.exit(0)"',
-          `node -e "require('node:fs').writeFileSync('new-code.js','changed')"`,
-          'node -e "process.exit(0)"',
-        ],
-        { root, reuseContext: {} },
-      );
-      expect(result.allPassed).toBe(false);
-      expect(result.results).toHaveLength(2);
-      expect(result.results.every((item) => item.status === 'FAIL')).toBe(true);
-      expect(result.results[1].stderr).toContain('工作树');
-    } finally {
-      rmSync(root, { recursive: true, force: true });
-    }
-  });
+  it.each([false, true])(
+    'rejects PASS when the workspace changes (streamOutput=%s)',
+    (streamOutput) => {
+      const { root, git, write } = fixture();
+      try {
+        write('README.md');
+        git('add', '.');
+        git('commit', '--quiet', '-m', 'fixture');
+        const result = executeChecks(
+          [
+            'node -e "process.exit(0)"',
+            `node -e "require('node:fs').writeFileSync('new-code.js','changed')"`,
+            'node -e "process.exit(0)"',
+          ],
+          { root, reuseContext: {}, streamOutput },
+        );
+        expect(result.allPassed).toBe(false);
+        expect(result.results).toHaveLength(2);
+        expect(result.results.every((item) => item.status === 'FAIL')).toBe(
+          true,
+        );
+        expect(result.results[1].stderr).toContain('工作树');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
 
   it('requires an explicit stable runtime context and invalidates when it is replaced', () => {
     const { root, git, write } = fixture();
@@ -446,6 +486,10 @@ describe('executeChecks and snapshot cache', () => {
       expect(res.stdout).toContain('全部检查通过');
       expect(res.stdout).toContain('汇总：PASS=1 FAIL=0 SKIP=0 未执行=0');
       expect(res.stdout).toContain('复用已禁用');
+      expect(res.stdout).toContain('[1/1] RUN | pnpm run check:docs-drift');
+      expect(res.stdout).toMatch(/\[1\/1\] PASS.*\(\d+ms\)/u);
+      for (const note of planChecks(['docs/new.md'], root).notes)
+        expect(res.stdout).toContain(note);
       const again = spawnSync(
         process.execPath,
         [script, '--base', 'HEAD', '--run'],
@@ -453,6 +497,213 @@ describe('executeChecks and snapshot cache', () => {
       );
       expect(again.status).toBe(0);
       expect(again.stdout).toContain('汇总：PASS=1 FAIL=0 SKIP=0');
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  });
+
+  it('shows progress and child output before the child finishes', async () => {
+    const { root, git, write } = fixture();
+    let child;
+    try {
+      write('.gitignore', 'release\n');
+      write('README.md');
+      write(
+        'package.json',
+        JSON.stringify({
+          name: 'fixture',
+          scripts: { 'check:docs-drift': 'node wait.cjs' },
+        }),
+      );
+      // An ignored release signal avoids changing the checked Git snapshot.
+      write(
+        'wait.cjs',
+        `const fs = require('node:fs');
+console.log('CHILD_WAITING');
+console.error('CHILD_STDERR');
+const timer = setInterval(() => {
+  if (fs.existsSync('release')) { clearInterval(timer); process.exit(0); }
+}, 20);
+setTimeout(() => process.exit(8), 5000).unref();
+`,
+      );
+      git('add', '.');
+      git('commit', '--quiet', '-m', 'fixture');
+      write('docs/new.md');
+      child = spawn(process.execPath, [script, '--base', 'HEAD', '--run'], {
+        cwd: root,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
+      let output = '';
+      let errors = '';
+      const finished = new Promise((resolve, reject) => {
+        child.on('error', reject);
+        child.on('close', resolve);
+      });
+      child.stderr.on('data', (chunk) => {
+        errors += chunk;
+      });
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('No live output')),
+          4000,
+        );
+        child.stdout.on('data', (chunk) => {
+          output += chunk;
+          if (output.includes('CHILD_WAITING')) {
+            clearTimeout(timeout);
+            resolve();
+          }
+        });
+        child.on('error', (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        });
+        child.on('close', () => {
+          clearTimeout(timeout);
+          reject(new Error('Exited before release'));
+        });
+      });
+      expect(child.exitCode).toBeNull();
+      expect(output).toContain('[1/1] RUN');
+      expect(output).toContain('pnpm run docs:sync');
+      expect(output).not.toContain('[1/1] PASS');
+      write('release');
+      expect(await finished).toBe(0);
+      expect(output).toMatch(/\[1\/1\] PASS.*\(\d+ms\)/u);
+      expect(errors).toContain('CHILD_STDERR');
+    } finally {
+      child?.kill();
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 10_000);
+
+  it.each([0, 42])(
+    'json captures logs, notes and exit code %s without human output',
+    (exitCode) => {
+      const { root, git, write } = fixture();
+      try {
+        write('README.md');
+        write(
+          'package.json',
+          JSON.stringify({
+            name: 'fixture',
+            scripts: {
+              'check:docs-drift': `node -e "console.log('JSON_CHILD_LOG'); console.error('JSON_CHILD_ERROR'); process.exit(${exitCode})"`,
+            },
+          }),
+        );
+        git('add', '.');
+        git('commit', '--quiet', '-m', 'fixture');
+        write('docs/token-data-scope-inspection-request.md');
+        const result = spawnSync(
+          process.execPath,
+          [script, '--base', 'HEAD', '--run', '--json'],
+          {
+            cwd: root,
+            encoding: 'utf8',
+          },
+        );
+        expect(result.status).toBe(exitCode);
+        expect(result.stderr).toBe('');
+        const report = JSON.parse(result.stdout);
+        expect(report.allPassed).toBe(exitCode === 0);
+        expect(report.results[0].status).toBe(exitCode === 0 ? 'PASS' : 'FAIL');
+        expect(report.results[0].stdout).toContain('JSON_CHILD_LOG');
+        expect(report.results[0].stderr).toContain('JSON_CHILD_ERROR');
+        expect(report.notes).toEqual(
+          planChecks(['docs/token-data-scope-inspection-request.md'], root)
+            .notes,
+        );
+        expect(report.summary).toEqual({
+          PASS: exitCode === 0 ? 1 : 0,
+          FAIL: exitCode === 0 ? 0 : 1,
+          SKIP: 0,
+          notRun: 0,
+        });
+        const human = spawnSync(
+          process.execPath,
+          [script, '--base', 'HEAD', '--run'],
+          { cwd: root, encoding: 'utf8' },
+        );
+        expect(human.status).toBe(exitCode);
+        expect(human.stdout).toContain('JSON_CHILD_LOG');
+        expect(human.stderr).toContain('JSON_CHILD_ERROR');
+        expect(human.stdout).toContain(
+          exitCode === 0 ? '[1/1] PASS' : '[1/1] FAIL',
+        );
+        if (exitCode) expect(human.stderr).toContain('(exit: 42)');
+      } finally {
+        rmSync(root, { recursive: true, force: true });
+      }
+    },
+  );
+
+  it('keeps business reminders in execution mode and stops the plan on failure', () => {
+    const { root, git, write } = fixture();
+    try {
+      write('README.md');
+      write(
+        'package.json',
+        JSON.stringify({
+          name: 'fixture',
+          scripts: {
+            lint: 'node -e "process.exit(0)"',
+            'check:type': 'node -e "process.exit(42)"',
+            'check:qms-arch': 'node -e "console.log(\'SHOULD_NOT_RUN\')"',
+            'check:docs-drift': 'node -e "console.log(\'SHOULD_NOT_RUN\')"',
+          },
+        }),
+      );
+      git('add', '.');
+      git('commit', '--quiet', '-m', 'fixture');
+      const source = 'packages/qgs-shared/src/inspection-request.ts';
+      write(source, 'export {};');
+      const result = spawnSync(
+        process.execPath,
+        [script, '--base', 'HEAD', '--run'],
+        {
+          cwd: root,
+          encoding: 'utf8',
+        },
+      );
+      expect(result.status).toBe(42);
+      for (const note of planChecks([source], root).notes)
+        expect(result.stdout).toContain(note);
+      expect(result.stdout).toContain('核心报检-检验-NC');
+      expect(result.stdout).toContain('[1/4] RUN');
+      expect(result.stdout).toContain('[2/4] FAIL');
+      expect(result.stdout).toContain('汇总：PASS=1 FAIL=1 SKIP=0 未执行=2');
+      expect(result.stdout).not.toContain('SHOULD_NOT_RUN');
+      const json = spawnSync(
+        process.execPath,
+        [script, '--base', 'HEAD', '--run', '--json'],
+        {
+          cwd: root,
+          encoding: 'utf8',
+        },
+      );
+      expect(json.status).toBe(42);
+      const report = JSON.parse(json.stdout);
+      expect(report.notes).toEqual(planChecks([source], root).notes);
+      expect(report.summary.notRun).toBe(2);
+      expect(report.results).toHaveLength(2);
+      for (const args of [
+        ['--json'],
+        ['--json', '--help'],
+        ['--json', '--unknown'],
+      ]) {
+        const output = spawnSync(
+          process.execPath,
+          [script, '--base', 'HEAD', ...args],
+          {
+            cwd: root,
+            encoding: 'utf8',
+          },
+        );
+        expect(output.status).toBe(args.includes('--unknown') ? 2 : 0);
+        expect(() => JSON.parse(output.stdout)).not.toThrow();
+      }
     } finally {
       rmSync(root, { recursive: true, force: true });
     }

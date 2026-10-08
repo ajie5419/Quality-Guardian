@@ -19,11 +19,12 @@ pnpm run check:daily -- --run
 pnpm run check:daily -- --base HEAD --run
 ```
 
-- **结构化结果**：依次输出每项执行命令、耗时与通过状态（`✓ PASS`、`⚡ SKIP (缓存)`、`✗ FAIL`）。
+- **过程与结果**：执行前显示 `[序号/总数] RUN` 和命令，执行期间实时透传子进程 stdout/stderr，完成即显示状态和耗时。开始前保留全部计划提示，包括业务提醒及 `docs:sync` 指引；最终汇总为快照核对后的结果，若工作树变化，前面显示的通过结果也会失效。
+- **JSON 输出**：使用 `node scripts/check-daily.mjs --base HEAD --run --json` 输出单个 JSON 对象，包含计划、`notes`、结果、耗时和汇总。此模式不透传日志、不输出人类进度行，子进程 stdout/stderr 收集在每项结果中；建议模式也可使用 `--json`。直接调用 Node 可避免包管理器自身的标题混入 stdout。
 - **受限复用**：取消共享临时目录中的持久缓存。CLI 每次执行均重新检查，因为 Git 快照不能证明 `node_modules`、外部工具或运行环境未变；不会扫描依赖目录或读取环境凭据。`--no-cache` 仍可显式禁止复用。仅供同一进程内的调用方在保证依赖、工具、环境及外部输入固定时，向 `executeChecks` 传入同一个 `reuseContext` 对象进行复用；任一外部条件变化必须换新对象或使用 `useCache: false`，不能把它当作自动验证环境的指纹。
 - **快照与秘密文件**：快照包含 checkout 的真实路径、HEAD、暂存状态和改动源码内容，未跟踪源码的新增、修改、删除均影响快照。只读取受限源码/文档后缀且名称不疑似秘密的普通文件；`.env`、私钥、凭据、未知格式、符号链接或读取失败均禁用复用，不读取其内容。被 Git 忽略的外部文件不在内容指纹内，不能宣称完整指纹。未知路径的元数据只用于变更提示。命令前后重新核对工作树，发现变化即返回失败、使旧结果失效并停止后续检查；这不是持续监控，也不能证明执行过程中发生后又还原的瞬时变化不存在。
 - **边界与定位**：遇到任何失败立即中断并打印完整输出，不吞错误。此复用仅作为日常开发轻量反馈，**绝不替代或绕过** Lefthook hooks、提交门禁及 CI。
-- **实际追加的测试**：认证/Token 路径改动追加存在于当前 checkout 的 `3.auth.test.ts`、`auth.service.test.ts`；DataScope/RBAC 改动追加 `data-scope.service.test.ts`、`scoped-repository.test.ts`、`rbac-authorize.service.test.ts`。默认仅推荐，只有显式执行模式才运行，且未运行的后续项不算通过。
+- **实际追加的测试**：认证/Token 代码路径改动追加存在于当前 checkout 的 `3.auth.test.ts`、`auth.service.test.ts`；DataScope/RBAC 代码改动追加 `data-scope.service.test.ts`、`scoped-repository.test.ts`、`rbac-authorize.service.test.ts`。关键词检测仅使用 JS/TS（含模块及 JSX/TSX 后缀）和 Vue 文件，保留共享包和前端代码；含这些关键词的 `.md` 不触发业务测试或核心链路提醒，文档内嵌可执行内容仍需人工按代码风险选检查。默认仅推荐，只有显式执行模式才运行，且未运行的后续项不算通过。
 - **报检-检验-NC 提示**：目前只追加关注关单 CAS、关联 NC、事务副作用的人工提示，并保留已存在的同名相邻测试推荐；不会自动追加上述全部事务测试，更不表示已覆盖或已运行。应按实际影响补选本页末尾列出的参考用例。
 
 | 改动 | 日常最小反馈 |
