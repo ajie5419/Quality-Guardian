@@ -1,5 +1,6 @@
 import { spawnSync } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import process from 'node:process';
@@ -11,6 +12,10 @@ import { describe, expect, it } from 'vitest';
 import config, { formatScopeError } from './index.mjs';
 
 const aliases = ['project', 'style', 'lint', 'ci', 'dev', 'deploy', 'other'];
+const require = createRequire(import.meta.url);
+const commitlintBin = require.resolve('@commitlint/cli/cli.js');
+const lefthookBin = require.resolve('lefthook/bin/index.js');
+
 const actualScopes = [
   ...getPackagesSync().packages.map((pkg) => pkg.packageJson.name),
   ...aliases,
@@ -18,7 +23,7 @@ const actualScopes = [
 const scopeRule = config.rules['function-rules/scope-enum'][2];
 
 function runCommitlint(message: string) {
-  const result = spawnSync('pnpm', ['exec', 'commitlint'], {
+  const result = spawnSync(process.execPath, [commitlintBin], {
     cwd: process.cwd(),
     encoding: 'utf8',
     input: `${message}\n`,
@@ -62,7 +67,7 @@ describe('commit scope guidance', () => {
     ]) {
       expect(runCommitlint(message).status).toBe(0);
     }
-  });
+  }, 20_000);
 
   it('keeps the existing commit-msg hook blocking invalid scopes without creating a commit', () => {
     const directory = mkdtempSync(path.join(tmpdir(), 'qgs-commit-msg-'));
@@ -74,8 +79,8 @@ describe('commit scope guidance', () => {
       ] as const) {
         writeFileSync(messageFile, `${message}\n`);
         const result = spawnSync(
-          'pnpm',
-          ['exec', 'lefthook', 'run', 'commit-msg', '--', messageFile],
+          process.execPath,
+          [lefthookBin, 'run', 'commit-msg', '--', messageFile],
           { cwd: process.cwd(), encoding: 'utf8' },
         );
         expect(result.status).toBe(expectedStatus);
@@ -86,7 +91,7 @@ describe('commit scope guidance', () => {
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 
   it('keeps CLI scope, type, subject and length violations blocking', () => {
     const invalidScope = runCommitlint(
@@ -104,5 +109,5 @@ describe('commit scope guidance', () => {
     ]) {
       expect(runCommitlint(message).status).toBe(1);
     }
-  });
+  }, 20_000);
 });
