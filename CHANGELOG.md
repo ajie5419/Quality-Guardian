@@ -11,6 +11,93 @@
 - BUG-INSP-4 修复：多表模块 DataScope 字段跨表污染引发 500，重载 `inspections` 表字段并支持模型级字段筛选。
 - 相关模块单测 1442 通过/0 失败，后端/Web 类型检查、`check:qms-arch`、`check:docs-drift` 均通过（全量 vitest 中 `scripts/check-daily.test.mjs` 18 项为存量环境相关失败，非本批引入）。完整证据见 [统一验收报告](docs/web-e2e-verification.md)。仅桌面Web，整车调试按用户指示跳过，移动/微信排除；未提交、推送、部署、改CI或操作生产。
 
+## [0.30.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.29.0...qgs-v0.30.0) (2026-10-10)
+
+
+### Features
+
+* **@qgs/backend:** add governed metric registry ([2d73f49](https://github.com/ajie5419/Quality-Guardian/commit/2d73f4911a28939e3df59ee85ca28c3619804645))
+* **@qgs/backend:** add optimistic lock guard ([4d71f4d](https://github.com/ajie5419/Quality-Guardian/commit/4d71f4d38389a9594025fe578511888e1ec5407a))
+* **@qgs/backend:** add quality-loss state contract ([e27f828](https://github.com/ajie5419/Quality-Guardian/commit/e27f828f554ae53192b6fa9a8b00dda16550c2cd))
+* **@qgs/backend:** add request idempotency foundation ([4a81c5f](https://github.com/ajie5419/Quality-Guardian/commit/4a81c5f48fc207acfd9773a726e2f2f657a7266f))
+* **@qgs/backend:** adopt request idempotency on creates ([5937b83](https://github.com/ajie5419/Quality-Guardian/commit/5937b83aeebcf1a1b1dc58d0de2fb3dbfc729fa2))
+* **@qgs/backend:** complete after-sales scoped contract ([e7115ec](https://github.com/ajie5419/Quality-Guardian/commit/e7115ec309d6ec0f4194516d6cdbda2914aab93f))
+* **@qgs/backend:** complete quality-loss governance ([5b97f75](https://github.com/ajie5419/Quality-Guardian/commit/5b97f75cff10d16749ec80250fb66c6777359d9f))
+* **@qgs/backend:** complete report governance ([c486dd0](https://github.com/ajie5419/Quality-Guardian/commit/c486dd02abece94d7cde88f92b291c348b5911aa))
+* **@qgs/backend:** complete vehicle commissioning scope ([0ff5b93](https://github.com/ajie5419/Quality-Guardian/commit/0ff5b9355dbdf01dcbc9dd988383fdeab06bfab3))
+* **@qgs/backend:** complete work-order scoped analytics ([5cfda47](https://github.com/ajie5419/Quality-Guardian/commit/5cfda4768f3fbf1737861c2aeea7f00503510347))
+* **@qgs/backend:** persist welder welding method attribute end-to-end ([e1801d7](https://github.com/ajie5419/Quality-Guardian/commit/e1801d74f00fb4e3180a6b31524c3e8c2124b56f))
+* **@qgs/shared:** expose qms error contracts ([d7cb645](https://github.com/ajie5419/Quality-Guardian/commit/d7cb64589fc8d09de4dce4899a1af0b62b7b537b))
+* **inspection:** expose process responsible department in inspection settings UI ([1702763](https://github.com/ajie5419/Quality-Guardian/commit/17027632981dcda3c533100172facb2599c35b99))
+* **project:** persist welder welding method attribute end-to-end ([c8aee4a](https://github.com/ajie5419/Quality-Guardian/commit/c8aee4a246babe1d182da7a7353a52a0f39801e0))
+* **project:** stream check daily progress and scope targeted tests to code ([75098cd](https://github.com/ajie5419/Quality-Guardian/commit/75098cdf8c0501f449441674025c28c0f43f4be4))
+* **project:** support check daily runner with scoped snapshot reuse ([0ab8064](https://github.com/ajie5419/Quality-Guardian/commit/0ab80645c5fcdfde363d6f669dbb2e379da27f05))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** align inspection request and record write contracts ([9010f6a](https://github.com/ajie5419/Quality-Guardian/commit/9010f6a3c441bc525c12df368c975d4b4c7ba66a))
+* **@qgs/backend:** align menu, permission and data scope derivation ([d93870e](https://github.com/ajie5419/Quality-Guardian/commit/d93870e45b00c64459ab220acef81e366076b75f))
+* **@qgs/backend:** authorize inspection close effects ([8a208d0](https://github.com/ajie5419/Quality-Guardian/commit/8a208d0877bb45aca7907f68a666ade32d93ebbc))
+* **@qgs/backend:** authorize inspection issue mutations ([a7eb437](https://github.com/ajie5419/Quality-Guardian/commit/a7eb437d10f9dc90f78e212c8851f4ba0a5911e8))
+* **@qgs/backend:** authorize inspection record updates ([7b0c52f](https://github.com/ajie5419/Quality-Guardian/commit/7b0c52f411b67790f93d0694efeab542aa64fefe))
+* **@qgs/backend:** authorize inspection request dispatch ([aed8df8](https://github.com/ajie5419/Quality-Guardian/commit/aed8df8ead03d03e9afc8f469f640f57ce1a30ce))
+* **@qgs/backend:** centralize export row limit ([d43d69e](https://github.com/ajie5419/Quality-Guardian/commit/d43d69e1d07a4206a5b23a5b3301e7e7048a8dee))
+* **@qgs/backend:** complete inspection reporting scope ([668e4fe](https://github.com/ajie5419/Quality-Guardian/commit/668e4fea5e8b22e76d2230e024d26960f2246328))
+* **@qgs/backend:** converge quality loss index in isolated runs ([331e294](https://github.com/ajie5419/Quality-Guardian/commit/331e29434875bc465dfba09f0969349e5bd1f45f))
+* **@qgs/backend:** enforce after-sales object scope ([a899f04](https://github.com/ajie5419/Quality-Guardian/commit/a899f0496f8520a034dbb3cd3da4cb556d9430fa))
+* **@qgs/backend:** enforce data scope on analytics foundations ([5f0114d](https://github.com/ajie5419/Quality-Guardian/commit/5f0114dc6bd282e1d32d1a6ad667c149d7b6760f))
+* **@qgs/backend:** enforce quality-loss scope ([9b3b6ab](https://github.com/ajie5419/Quality-Guardian/commit/9b3b6ab9965d9cfe970c1f7468d715b964dac5ea))
+* **@qgs/backend:** enforce supplier object scope ([b0b3bd5](https://github.com/ajie5419/Quality-Guardian/commit/b0b3bd59580a99a785c1fa270bba7d1b2bc83780))
+* **@qgs/backend:** enforce task dispatch object scope ([1c44292](https://github.com/ajie5419/Quality-Guardian/commit/1c442926a569869738bac29c8f06541f737bee3d))
+* **@qgs/backend:** enforce work order status and error contracts ([ca2a36c](https://github.com/ajie5419/Quality-Guardian/commit/ca2a36cc849cf1483def61d85748f5e51654b254))
+* **@qgs/backend:** enforce work-order object scope ([898cb1f](https://github.com/ajie5419/Quality-Guardian/commit/898cb1f687c9e77556461e5c8f8024faa9f46944))
+* **@qgs/backend:** establish supervision object authorization ([f1bdd9d](https://github.com/ajie5419/Quality-Guardian/commit/f1bdd9d1ea875bb951b56fcc1df5c45f682fefe9))
+* **@qgs/backend:** expose inspection issue stats service ([3429aaa](https://github.com/ajie5419/Quality-Guardian/commit/3429aaa7f6f9e6e3ebaa83b360a25400327d7ffe))
+* **@qgs/backend:** fail closed inspection analytics scope ([85755a8](https://github.com/ajie5419/Quality-Guardian/commit/85755a8af5ee1bc2b864987f0d71be261949afd2))
+* **@qgs/backend:** fail closed inspection request dispatch ([1522780](https://github.com/ajie5419/Quality-Guardian/commit/1522780c3a22f828aca7291947bd44c4793fc7e3))
+* **@qgs/backend:** fail closed public metrology borrow ([01a6ef8](https://github.com/ajie5419/Quality-Guardian/commit/01a6ef82180f6abdf661148dfcf618790996c25e))
+* **@qgs/backend:** guard supplier writes by category and permission ([0bffc12](https://github.com/ajie5419/Quality-Guardian/commit/0bffc12ba2602878d3fb73a0820cc6b160422c6f))
+* **@qgs/backend:** harden scheduler job identity ([737aca1](https://github.com/ajie5419/Quality-Guardian/commit/737aca190225795055cb9c5cd42eb822cfa934e5))
+* **@qgs/backend:** keep inspection attachments transactional ([255d797](https://github.com/ajie5419/Quality-Guardian/commit/255d797d5930acf9551e4b518feb8002f4e97c77))
+* **@qgs/backend:** keep inspection issue mutation within gate ([6330d39](https://github.com/ajie5419/Quality-Guardian/commit/6330d39245512e346a6538c23ef978ea99d6a700))
+* **@qgs/backend:** make inspection request creates idempotent ([c138dd4](https://github.com/ajie5419/Quality-Guardian/commit/c138dd4e6b588d8c8297055fff7e19d47e931dd4))
+* **@qgs/backend:** make supervision issue actions idempotent ([f4d339a](https://github.com/ajie5419/Quality-Guardian/commit/f4d339ac267161209d49636f7f52ff0a40722c07))
+* **@qgs/backend:** normalize after-sales stats route ([01dba48](https://github.com/ajie5419/Quality-Guardian/commit/01dba48e8958f4c315c4e04d69c3da8621a60051))
+* **@qgs/backend:** preserve grouped inspection stats counts ([b96ce9b](https://github.com/ajie5419/Quality-Guardian/commit/b96ce9bf1122708869255780fd6a02ab829f6b02))
+* **@qgs/backend:** scope dashboard analytics ([8a53683](https://github.com/ajie5419/Quality-Guardian/commit/8a536834cf6a21ba6871aae8dacb23fea0ece646))
+* **@qgs/backend:** scope inspection issue analytics ([2433bf4](https://github.com/ajie5419/Quality-Guardian/commit/2433bf42523dec5f51f711898dc7c1e78eb83477))
+* **@qgs/backend:** scope inspection reads and aggregate stats ([6562b65](https://github.com/ajie5419/Quality-Guardian/commit/6562b65733d3dd6f28568e06d0a3adddddd110c5))
+* **@qgs/backend:** scope inspection record deletes ([6e7fbb4](https://github.com/ajie5419/Quality-Guardian/commit/6e7fbb4a6e8776120c7c32a2c81d19053e5ea035))
+* **@qgs/backend:** scope inspection report statistics ([3681a8f](https://github.com/ajie5419/Quality-Guardian/commit/3681a8ffbdafe9800a700e3eea15debe2c2a4ff5))
+* **@qgs/backend:** scope pass-rate analytics ([e2b5307](https://github.com/ajie5419/Quality-Guardian/commit/e2b5307c9961d06ae8d1aad2ca29951f2a76c600))
+* **@qgs/backend:** standardize after sales write error handling ([43f9f2f](https://github.com/ajie5419/Quality-Guardian/commit/43f9f2fed8f030fd763589b50cbf52e62d330ccb))
+* **@qgs/backend:** tighten metrology write permissions and status rules ([34e218c](https://github.com/ajie5419/Quality-Guardian/commit/34e218cd1bca3fd65f3a9e6701056f2d8c707c6a))
+* **@qgs/backend:** translate schema rejections into client errors ([42d39d3](https://github.com/ajie5419/Quality-Guardian/commit/42d39d36b1f01208f91312acd5b54700a30073eb))
+* **@qgs/shared:** keep e2e evidence snapshots out of unit runs ([37fb9dc](https://github.com/ajie5419/Quality-Guardian/commit/37fb9dc67fa7557c6015bd9e5b2bcde437ac460d))
+* **@qgs/shared:** restore unit test collection scope ([3a3b949](https://github.com/ajie5419/Quality-Guardian/commit/3a3b9499744a6f6bf9f7255a4dcc8210a2c96e26))
+* **@qgs/web-antd:** pin isolated e2e proxy target and disable mocks ([ff4b299](https://github.com/ajie5419/Quality-Guardian/commit/ff4b299b982d41edcbfc9f6a184b60f4c9517def))
+* **@qgs/web-antd:** preserve inspection attachments and history ([9ee393a](https://github.com/ajie5419/Quality-Guardian/commit/9ee393a82c719684a264db13fcb8cbcee41869c1))
+* **@qgs/web-antd:** propagate after-sales operation guards ([8dabfb3](https://github.com/ajie5419/Quality-Guardian/commit/8dabfb3a2307423979e9ffab3fbd62702ed6085c))
+* **@qgs/web-antd:** propagate inspection idempotency ([9d1e5b8](https://github.com/ajie5419/Quality-Guardian/commit/9d1e5b8593447842c0c6477c9fbee4837486fab1))
+* **@qgs/web-antd:** propagate inspection request idempotency ([c7dfcee](https://github.com/ajie5419/Quality-Guardian/commit/c7dfceee407fbaf3b83df5beb2ff05b56af63f3f))
+* **@qgs/web-antd:** propagate quality-loss idempotency ([9d6a7c4](https://github.com/ajie5419/Quality-Guardian/commit/9d6a7c4bf2a5c797a0e54321108c41c325b3efea))
+* **@qgs/web-antd:** propagate supplier optimistic lock ([2e48b2c](https://github.com/ajie5419/Quality-Guardian/commit/2e48b2c4ca742c91a107454ce572b2a6d25b98af))
+* **@qgs/web-antd:** propagate work-order optimistic lock ([7f3a6d1](https://github.com/ajie5419/Quality-Guardian/commit/7f3a6d1487d2328de635c84efa9704a6d1fdb276))
+* **@qgs/web-antd:** use blue daily report section headings ([d9f977b](https://github.com/ajie5419/Quality-Guardian/commit/d9f977ba58b601cfd4780591e0c564b6baaccbbe))
+* **@qgs/web-antd:** use blue daily report section headings ([3b5e118](https://github.com/ajie5419/Quality-Guardian/commit/3b5e118cfa452474c2aa369ec2c7e7ad7d129e87))
+* address idempotency, scoped deletion and write errors ([3659414](https://github.com/ajie5419/Quality-Guardian/commit/3659414212510f09cc63f3ac856d6ec6dbe6135e))
+* **inspection:** include department-fallback rows in team ranking and reinspection stats ([a4d7707](https://github.com/ajie5419/Quality-Guardian/commit/a4d7707010f52c65ed81c3296c8e49c9484907bf))
+* **project:** complete mainline regression fixes ([245c477](https://github.com/ajie5419/Quality-Guardian/commit/245c477c1c52db7bd807e88f5dcbd510792aa41d))
+* **project:** configure dedupe window and add action attributes ([41b7df7](https://github.com/ajie5419/Quality-Guardian/commit/41b7df7bf9578e4234c80112ef8005ce1cb56a02))
+* **scripts:** add 成品检验 process responsible department (品质部) to default backfill assignments (rev 3) ([98d18d7](https://github.com/ajie5419/Quality-Guardian/commit/98d18d7825b73c894cc63c1430f654f4a1287e32))
+* **scripts:** expand default process department assignments to all production processes (rev 4) ([4f6188f](https://github.com/ajie5419/Quality-Guardian/commit/4f6188fe982a98981e03f6afab27e2f7b2aa1bfd))
+
+
+### Reverts
+
+* **web-antd:** remove department rank card from inspection dashboard (not requested) ([ac5be64](https://github.com/ajie5419/Quality-Guardian/commit/ac5be642f3c38c4cfc660fa7e1adbd0f1a4983e6))
+
 ### 2026-10-09 桌面Web质量损失E2E与实测缺陷修复（未提交）
 
 - 新增质量损失独立闭环5例真实UI与隔离数据库核验（登记/编辑/状态推进至终态/索赔表预览/软删、角色权限与部门数据范围拒绝、状态机非法逆向与并发CAS拒绝、丢响应重试幂等与同键指纹冲突、批量软删守卫与汇总指标一致）；联合报检、售后、计量、监督、供应商共49/49通过，退出0，Run `44e3527748217171103184a1`，476768 ms，347个指纹文件差异0，专属容器/进程/端口全部回收。
