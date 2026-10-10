@@ -12,6 +12,7 @@ import {
 } from '~/utils/prisma-error';
 import {
   conflictResponse,
+  forbiddenResponse,
   internalServerErrorResponse,
   notFoundResponse,
   useResponseSuccess,
@@ -25,12 +26,21 @@ export default defineEventHandler(async (event) => {
 
   const id = getRequiredRouterParam(event, 'id', '缺少供应商ID');
   if (typeof id !== 'string') return id;
+  const categoryPolicy = (
+    event.context as { supplierWriteCategoryPolicy?: string }
+  ).supplierWriteCategoryPolicy;
 
   try {
     const body = updateSupplierBodySchema.parse(await readBody(event));
     // OPTIMISTIC-LOCK-001: interactive supplier edits carry the version the
     // client read; a missing version would silently degrade to LWW.
     const expectedVersion = requireExpectedVersionBody(body);
+    if (categoryPolicy === 'Outsourcing') {
+      const current = await SupplierService.findById(id);
+      if (!current || current.category !== 'Outsourcing') {
+        return forbiddenResponse(event, '外协管理员只能修改外协单位');
+      }
+    }
     const updated = await SupplierService.updateSupplier(
       id,
       body,

@@ -7,6 +7,7 @@ import { getCurrentUser } from '~/utils/current-user';
 import { requireExpectedVersionQuery } from '~/utils/optimistic-lock';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
+  forbiddenResponse,
   internalServerErrorResponse,
   notFoundResponse,
   useResponseSuccess,
@@ -20,10 +21,19 @@ export default defineEventHandler(async (event) => {
   if (typeof id !== 'string') {
     return id;
   }
+  const categoryPolicy = (
+    event.context as { supplierWriteCategoryPolicy?: string }
+  ).supplierWriteCategoryPolicy;
 
   try {
     // OPTIMISTIC-LOCK-001: user deletes carry the version the client read.
     const expectedVersion = requireExpectedVersionQuery(getQuery(event));
+    if (categoryPolicy === 'Outsourcing') {
+      const current = await SupplierService.findById(id);
+      if (!current || current.category !== 'Outsourcing') {
+        return forbiddenResponse(event, '外协管理员只能删除外协单位');
+      }
+    }
     const deleted = await SupplierService.deleteSupplier(id, expectedVersion, {
       scope: event.context.dataScope,
       user: userinfo,
