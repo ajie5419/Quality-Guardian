@@ -257,6 +257,14 @@ export const SupplierService = {
 
   deleteSupplier: SupplierMutationService.delete,
 
+  /** Category-only read used by category-scoped write authorization guards. */
+  async findById(id: string) {
+    return prisma.suppliers.findFirst({
+      select: { category: true, id: true, name: true },
+      where: { id, isDeleted: false },
+    });
+  },
+
   batchDeleteSuppliers: SupplierMutationService.batchDelete,
 
   batchUpsertSuppliers: SupplierMutationService.batchUpsert,

@@ -3,6 +3,7 @@ import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service'
 import { Prisma } from '@prisma/client';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
+import { QualityLossIndexWorkerService } from '~/modules/quality-loss/quality-loss-index-worker.service';
 import { QUALITY_LOSS_SOURCE } from '~/modules/quality-loss/quality-loss-status';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { BusinessError } from '~/utils/business-error';
@@ -115,6 +116,9 @@ export const QualityLossRecordMaintenanceService = {
       }
       return result;
     });
+    setImmediate(() => {
+      void QualityLossIndexWorkerService.drain().catch(() => {});
+    });
     if (result.count === 0) {
       throw new BusinessError('NOT_FOUND', '质量损失记录不存在', 404);
     }
@@ -164,6 +168,9 @@ export const QualityLossRecordMaintenanceService = {
         );
       }
       return result;
+    });
+    setImmediate(() => {
+      void QualityLossIndexWorkerService.drain().catch(() => {});
     });
 
     await SystemLogService.auditLog('quality-loss', 'batchDelete', {

@@ -17,6 +17,12 @@ export default defineEventHandler(async (event) => {
     const result = await InspectionRequestQueryService.getRequestList(
       userinfo,
       schema.parse(getQuery(event)),
+      {
+        dataScope: event.context.dataScope,
+        permission: 'QMS:Inspection:Requests:List',
+        scopeIdentity: event.context.dataScope ?? {},
+        user: userinfo,
+      },
     );
     return useResponseSuccess(result);
   } catch (error) {

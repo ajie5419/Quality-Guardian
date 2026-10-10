@@ -1,6 +1,7 @@
 import type { EventHandlerRequest, H3Event } from 'h3';
 
 import { createHash } from 'node:crypto';
+import process from 'node:process';
 
 import {
   defineEventHandler,
@@ -11,9 +12,23 @@ import {
 } from 'h3';
 import { conflictResponse } from '~/utils/response';
 
-const DEDUPE_WINDOW_MS = 3000;
+const DEFAULT_DEDUPE_WINDOW_MS = 3000;
 const WRITE_METHODS = new Set(['DELETE', 'PATCH', 'POST', 'PUT']);
 const dedupeTimers = new Map<string, NodeJS.Timeout>();
+
+/**
+ * Window length is a deployment concern, not a constant. Tests need a shorter
+ * window to stay fast; production must keep the historical 3s behaviour.
+ */
+function resolveDedupeWindowMs() {
+  const raw = String(process.env.REQUEST_DEDUPE_WINDOW_MS || '').trim();
+  if (!raw) return DEFAULT_DEDUPE_WINDOW_MS;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    return DEFAULT_DEDUPE_WINDOW_MS;
+  }
+  return parsed;
+}
 
 function sha256(content: string) {
   return createHash('sha256').update(content).digest('hex');
@@ -84,8 +99,9 @@ export default defineEventHandler(async (event) => {
     return conflictResponse(event, '请求重复，请勿重复提交');
   }
 
+  const dedupeWindowMs = resolveDedupeWindowMs();
   const timer = setTimeout(() => {
     dedupeTimers.delete(dedupeKey);
-  }, DEDUPE_WINDOW_MS);
+  }, dedupeWindowMs);
   dedupeTimers.set(dedupeKey, timer);
 });

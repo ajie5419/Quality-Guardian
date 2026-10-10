@@ -238,11 +238,14 @@ async function ensureMenu(declaration: ModuleMenuDeclaration) {
       type: true,
     },
   });
+  // A legacy leaf path may now belong to its catalog. Reusing the parent
+  // would make the menu its own child and remove the whole route subtree.
+  const leafCandidates = candidates.filter((item) => item.id !== parentId);
   const existing =
-    candidates.find(
+    leafCandidates.find(
       (item) =>
         item.name === declaration.name || item.path === declaration.path,
-    ) ?? candidates[0];
+    ) ?? leafCandidates[0];
   const meta = JSON.stringify(declaration.meta);
   let menuId = existing?.id ? String(existing.id) : '';
 
@@ -307,7 +310,23 @@ async function ensureMenu(declaration: ModuleMenuDeclaration) {
   return changed;
 }
 
+let menuSynchronization: null | Promise<void> = null;
+
+/**
+ * Login codes and menu requests can arrive together on a fresh database.
+ * Share one initialization in this server process to avoid duplicate inserts.
+ * Other server processes still require database-level conflict handling.
+ */
 export async function ensureModuleMenus() {
+  if (menuSynchronization === null) {
+    menuSynchronization = synchronizeModuleMenus().finally(() => {
+      menuSynchronization = null;
+    });
+  }
+  return menuSynchronization;
+}
+
+async function synchronizeModuleMenus() {
   const changed = [];
 
   for (const declaration of getMenuDeclarations()) {

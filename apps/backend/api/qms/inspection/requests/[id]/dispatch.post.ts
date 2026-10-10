@@ -18,13 +18,12 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, INSPECTION_REQUEST_PERMISSION_CODES.DISPATCH);
-  const userinfo = getCurrentUser(event);
-
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') return id;
 
   try {
+    await authorizeWrite(event, INSPECTION_REQUEST_PERMISSION_CODES.DISPATCH);
+    const userinfo = getCurrentUser(event);
     const body = parseInspectionRequestDispatchBody(await readBody(event));
     const updated = await InspectionRequestDispatchService.dispatchRequest(
       event,

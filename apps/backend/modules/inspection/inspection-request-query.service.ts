@@ -4,7 +4,6 @@ import type { InspectionAccessContext } from './inspection-access-context';
 import type { RequestListQuery } from './inspection-request-list-query';
 
 import { ErrorCode, INSPECTION_REQUEST_PERMISSION_CODES } from '@qgs/shared';
-import { createScopedRepository } from '~/modules/data-scope';
 import { RbacRoleService } from '~/modules/rbac';
 import { SupplierIdentityService } from '~/modules/supplier-identity';
 import { BusinessError } from '~/utils/business-error';
@@ -12,7 +11,6 @@ import prisma from '~/utils/prisma';
 import { isPrismaSchemaMismatchError } from '~/utils/prisma-error';
 import { buildTeamContainsWhere } from '~/utils/team-resolver';
 
-import { toScopedAccessContext } from './inspection-access-context';
 import {
   mapInspectionRequest,
   normalizeInspectionRequestText,
@@ -25,6 +23,7 @@ import {
   normalizeRequestListQuery,
 } from './inspection-request-list-query';
 import { resolveInspectionRequestIssueResponsibilities } from './inspection-request-responsibility.service';
+import { buildScopedInspectionRequestWhere } from './inspection-request-scope';
 import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
 
 async function buildRequestListWhere(
@@ -198,21 +197,26 @@ async function findLinkedIssues(
 
 export const InspectionRequestQueryService = {
   async getRequestDetail(id: string, access?: InspectionAccessContext) {
+    // Request rows do not have the issue-table responsibleBU/lastEditor fields.
+    const where = access
+      ? await buildScopedInspectionRequestWhere(
+          { id, isDeleted: false },
+          {
+            dataScope: access.dataScope,
+            user: {
+              userId: String(access.user.userId || access.user.id),
+              username: access.user.username,
+            },
+          },
+        )
+      : { id, isDeleted: false };
     const findRequest = (includeWorkOrders: boolean) =>
-      createScopedRepository(
-        'inspection',
-        prisma.qms_inspection_requests,
-      ).findAccessible(
-        {
-          include: includeWorkOrders
-            ? requestQueryIncludeWithWorkOrders
-            : requestQueryInclude,
-          where: { id, isDeleted: false },
-        },
-        access
-          ? toScopedAccessContext(access)
-          : { user: { id: 'system' }, scope: { scopeType: 'ALL' } },
-      );
+      prisma.qms_inspection_requests.findFirst({
+        include: includeWorkOrders
+          ? requestQueryIncludeWithWorkOrders
+          : requestQueryInclude,
+        where,
+      });
     let request;
     try {
       request = await findRequest(true);
@@ -260,6 +264,7 @@ export const InspectionRequestQueryService = {
   async getRequestList(
     userinfo: UserSession,
     rawQuery: Record<string, unknown>,
+    access?: InspectionAccessContext,
   ) {
     const query = normalizeRequestListQuery(rawQuery);
     const userId = String(userinfo?.userId ?? userinfo?.id ?? '');
@@ -279,9 +284,15 @@ export const InspectionRequestQueryService = {
         403,
       );
     }
-    const where = await buildRequestListWhere(userinfo, query, {
+    const baseWhere = await buildRequestListWhere(userinfo, query, {
       isDispatchHolder,
     });
+    const where = access
+      ? await buildScopedInspectionRequestWhere(baseWhere, {
+          dataScope: access.dataScope,
+          user: { userId, username: userinfo.username },
+        })
+      : baseWhere;
     const runQuery = (includeWorkOrders: boolean) =>
       Promise.all([
         prisma.qms_inspection_requests.findMany({

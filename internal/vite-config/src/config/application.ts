@@ -22,7 +22,15 @@ function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
     const { application = {}, vite = {} } = options || {};
     const root = process.cwd();
     const isBuild = command === 'build';
-    const env = loadEnv(mode, root);
+    const isolatedE2E = process.env.QGS_E2E_MODE === 'isolated';
+    const env = isolatedE2E
+      ? Object.fromEntries(
+          Object.entries(process.env).filter(
+            (entry): entry is [string, string] =>
+              entry[0].startsWith('VITE_') && entry[1] !== undefined,
+          ),
+        )
+      : loadEnv(mode, root);
 
     const plugins = await loadApplicationPlugins({
       archiver: true,
@@ -56,6 +64,7 @@ function defineApplicationConfig(userConfigPromise?: DefineApplicationOptions) {
     const { injectGlobalScss = true } = application;
 
     const applicationConfig: UserConfig = {
+      envDir: isolatedE2E ? false : undefined,
       base,
       build: {
         rollupOptions: {

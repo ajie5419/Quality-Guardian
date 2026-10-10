@@ -156,6 +156,7 @@ export const InspectionScoreDataService = {
           baseWhere,
           requireAnalyticsUser(access),
           access.dataScope,
+          'inspections',
         )
       : baseWhere;
     return prisma.inspections.findMany({

@@ -59,7 +59,9 @@
       "dependsOn": ["^build"],
       "outputs": [".nitro/**", ".output/**"]
     },
-    "test:e2e": {},
+    "test:e2e": {
+      "cache": false
+    },
     "dev": {
       "dependsOn": [],
       "outputs": [],

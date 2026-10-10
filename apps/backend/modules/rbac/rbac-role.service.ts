@@ -6,7 +6,10 @@ import {
   isRbacReadV2Enabled,
   isRbacSuperMergeAllCodesEnabled,
 } from '~/modules/rbac/rbac-config';
-import { findMissingPagePermissions } from '~/modules/rbac/rbac-permission-hierarchy';
+import {
+  applyImpliedPermissionCodes,
+  findMissingPagePermissions,
+} from '~/modules/rbac/rbac-permission-hierarchy';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { redis } from '~/utils/redis';
@@ -320,8 +323,10 @@ export const RbacRoleService = {
       where: { roleId: { in: roleIds } },
       include: { permission: true },
     });
-    let codes = uniqueNonEmpty(
-      rolePermissions.map((row) => row.permission?.code || ''),
+    // Derived page codes are expanded here so the menu tree, which reads the
+    // same helper, and the permission-code endpoint never disagree.
+    let codes = applyImpliedPermissionCodes(
+      uniqueNonEmpty(rolePermissions.map((row) => row.permission?.code || '')),
     );
 
     if (isSuper && isRbacSuperMergeAllCodesEnabled()) {
@@ -329,10 +334,12 @@ export const RbacRoleService = {
         where: { authCode: { not: null }, isDeleted: false, status: 1 },
         select: { authCode: true },
       });
-      codes = uniqueNonEmpty([
-        ...codes,
-        ...menuCodes.map((row) => row.authCode || ''),
-      ]);
+      codes = applyImpliedPermissionCodes(
+        uniqueNonEmpty([
+          ...codes,
+          ...menuCodes.map((row) => row.authCode || ''),
+        ]),
+      );
     }
 
     permissionCodesCache.set(userId, {

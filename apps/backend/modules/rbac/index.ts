@@ -1,6 +1,7 @@
 export {
   assertRecordOwnership,
   authorizeWrite,
+  authorizeWriteAnyOf,
 } from './rbac-authorize.service';
 export { isRbacReadV2Enabled } from './rbac-config';
 export {

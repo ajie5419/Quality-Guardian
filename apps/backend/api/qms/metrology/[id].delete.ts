@@ -4,6 +4,7 @@ import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError, businessErrorResponse } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 import {
@@ -14,15 +15,14 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.DELETE);
-  const userinfo = getCurrentUser(event);
-
   const id = getRequiredRouterParam(event, 'id', '缺少计量器具ID');
   if (typeof id !== 'string') {
     return id;
   }
 
   try {
+    await authorizeWrite(event, METROLOGY_PERMISSION_CODES.DELETE);
+    const userinfo = getCurrentUser(event);
     const deleted = await MetrologyService.deleteById(id, userinfo.username);
 
     await recordBusinessAuditLog(event, {
@@ -40,6 +40,8 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess(null);
   } catch (error: unknown) {
     logApiError('metrology-delete', error, undefined, event);
+    if (error instanceof BusinessError)
+      return businessErrorResponse(event, error);
     if (isPrismaNotFoundError(error)) {
       return notFoundResponse(event, '计量器具不存在');
     }

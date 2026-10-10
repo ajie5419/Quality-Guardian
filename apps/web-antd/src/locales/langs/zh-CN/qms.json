@@ -816,6 +816,8 @@
       "expectedReturnAt": "预计归还日期",
       "returnedAt": "归还日期",
       "currentBorrower": "当前借用人",
+      "borrowFailed": "借用失败，请重新检索量具后重试",
+      "returnFailed": "归还申请失败，请重新检索量具后重试",
       "borrowSuccess": "借用登记成功",
       "returnSuccess": "归还登记成功",
       "returnRequestSuccess": "归还申请已提交，请等待保管员确认收到实物",

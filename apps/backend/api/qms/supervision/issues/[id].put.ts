@@ -18,13 +18,13 @@ const updateIssueBodySchema = z
   .object({ photos: z.array(z.any()).optional() })
   .passthrough();
 export default defineEventHandler(async (event) => {
-  const context = buildSupervisionAccessContext(
-    await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT),
-  );
-  const id = getRouterParam(event, 'id');
-  if (!id) return badRequestResponse(event, '无效监造问题ID');
-
   try {
+    const context = buildSupervisionAccessContext(
+      await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT),
+    );
+    const id = getRouterParam(event, 'id');
+    if (!id) return badRequestResponse(event, '无效监造问题ID');
+
     const body = updateIssueBodySchema.parse(await readBody(event));
     const data = await SupervisionService.updateIssue(id, body, context);
     try {

@@ -37,13 +37,13 @@ import { getColumns, getSearchFormSchema } from './data';
 const { t } = useI18n();
 const router = useRouter();
 const { handleApiError } = useErrorHandler();
-const { canCreate, canList, hasAccessByCodes } = useQmsPermissions(
+const { canCreate, hasAccessByCodes } = useQmsPermissions(
   'QMS:Metrology:Borrow',
 );
 
-const canCreateAction = computed(() => canCreate.value || canList.value);
-const canReturnAction = computed(
-  () => hasAccessByCodes(['QMS:Metrology:Borrow:Return']) || canList.value,
+const canCreateAction = canCreate;
+const canReturnAction = computed(() =>
+  hasAccessByCodes(['QMS:Metrology:Borrow:Return']),
 );
 const latestQueryFormValues = ref<Record<string, unknown>>({});
 const overviewLoading = ref(false);

@@ -1,9 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { withRequestIdempotency } from '~/modules/idempotency';
 import { SupervisionIssueService } from '~/modules/supervision/supervision-issue.service';
 
 vi.mock('~/utils/governed-write', () => ({
   buildGovernedCanonicalWritePairForTable: vi.fn().mockResolvedValue({}),
   buildGovernedWriteFieldsForTable: vi.fn().mockReturnValue({}),
+}));
+vi.mock('~/modules/idempotency', async (original) => ({
+  ...(await original<typeof import('~/modules/idempotency')>()),
+  withRequestIdempotency: vi.fn(),
 }));
 
 vi.mock('~/modules/system-log', () => ({
@@ -259,6 +264,81 @@ describe('supervisionIssueService', () => {
   });
 
   describe('createIssueAction', () => {
+    it('replays keyed actions without starting a second business transaction', async () => {
+      const { prisma } = await import('./supervision-shared');
+      const response = { id: 'existing-action', issueId: 'iss-1' };
+      vi.mocked(withRequestIdempotency).mockResolvedValueOnce({
+        replayed: true,
+        response,
+        responseStatus: 200,
+        resourceId: 'existing-action',
+        resourceType: 'supervision_issue_action',
+      });
+      await expect(
+        SupervisionIssueService.createIssueAction(
+          'iss-1',
+          { status: 'CLOSED' },
+          context,
+          'same-form-key',
+        ),
+      ).resolves.toEqual(response);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+      const options = vi.mocked(withRequestIdempotency).mock.calls[0][0];
+      expect(options).toMatchObject({
+        actorKey: 'user:user-1',
+        operationKey: 'qms.supervision.issue-action:iss-1',
+        idempotencyKey: 'same-form-key',
+      });
+      const inaccessible = {
+        supervision_issues: { findFirst: vi.fn().mockResolvedValue(null) },
+      };
+      expect(
+        await options.resourceGuard?.(inaccessible as any, 'existing-action'),
+      ).toBe(false);
+      expect(inaccessible.supervision_issues.findFirst).toHaveBeenCalledWith({
+        select: { id: true },
+        where: { id: 'iss-1', isDeleted: false, createdBy: 'user-1' },
+      });
+    });
+
+    it('runs keyed state claims on the supplied transaction and propagates a lost CAS', async () => {
+      const create = vi
+        .fn()
+        .mockResolvedValue({ id: 'action-1', issueId: 'iss-1' });
+      const updateMany = vi.fn().mockResolvedValue({ count: 0 });
+      vi.mocked(withRequestIdempotency).mockImplementationOnce(
+        async (options) =>
+          options.run({
+            supervision_issues: {
+              findFirst: vi
+                .fn()
+                .mockResolvedValue({ id: 'iss-1', status: 'OPEN' }),
+              updateMany,
+            },
+            supervision_issue_actions: { create },
+          } as any) as any,
+      );
+      await expect(
+        SupervisionIssueService.createIssueAction(
+          'iss-1',
+          { status: 'CLOSED' },
+          context,
+          'new-form-key',
+        ),
+      ).rejects.toMatchObject({ httpStatus: 409 });
+      expect(create).toHaveBeenCalledTimes(1);
+      expect(updateMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: {
+            id: 'iss-1',
+            isDeleted: false,
+            createdBy: 'user-1',
+            status: 'OPEN',
+          },
+        }),
+      );
+    });
+
     it('should create an action within a transaction', async () => {
       const result = await SupervisionIssueService.createIssueAction(
         'iss-1',

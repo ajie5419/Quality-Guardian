@@ -7,6 +7,7 @@ import { AfterSalesAPI } from '~/modules/after-sales';
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
+import { QualityLossIndexWorkerService } from '~/modules/quality-loss/quality-loss-index-worker.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
   assertQualityLossTransition,
@@ -373,6 +374,9 @@ export const QualityLossRouteUpdateService = {
               [{ source: 'MANUAL', sourcePk: current.id }],
               'quality-loss.updated',
             );
+          });
+          setImmediate(() => {
+            void QualityLossIndexWorkerService.drain().catch(() => {});
           });
         }
       }

@@ -17,12 +17,11 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const bodySchema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.EDIT);
-  const userinfo = getCurrentUser(event);
-  const id = getRequiredRouterParam(event, 'id', '请求缺少 ID 参数');
-  if (typeof id !== 'string') return id;
-
   try {
+    await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.EDIT);
+    const userinfo = getCurrentUser(event);
+    const id = getRequiredRouterParam(event, 'id', '请求缺少 ID 参数');
+    if (typeof id !== 'string') return id;
     const body = bodySchema.parse(await readBody(event));
     const result = await QualityLossService.updateByRouteId({
       body,

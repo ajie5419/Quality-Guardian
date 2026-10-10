@@ -109,3 +109,12 @@ export const INSPECTION_MATERIAL_PERMISSION_CODES = {
   LIST: 'QMS:Inspection:MaterialRequests:List',
   REJECT: 'QMS:Inspection:MaterialRequests:Reject',
 } as const;
+
+export const OUTSOURCING_PERMISSION_CODES = {
+  CREATE: 'QMS:Outsourcing:Create',
+  DELETE: 'QMS:Outsourcing:Delete',
+  EDIT: 'QMS:Outsourcing:Edit',
+  EXPORT: 'QMS:Outsourcing:Export',
+  IMPORT: 'QMS:Outsourcing:Import',
+  LIST: 'QMS:Outsourcing:List',
+} as const;

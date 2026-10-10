@@ -11,10 +11,9 @@ import { useResponseSuccess } from '~/utils/response';
 const borrowSchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.BORROW_CREATE);
-  const userinfo = getCurrentUser(event);
-
   try {
+    await authorizeWrite(event, METROLOGY_PERMISSION_CODES.BORROW_CREATE);
+    const userinfo = getCurrentUser(event);
     const body = borrowSchema.parse(await readBody(event));
     await MetrologyBorrowService.borrow(body, userinfo.username);
     return useResponseSuccess(null);

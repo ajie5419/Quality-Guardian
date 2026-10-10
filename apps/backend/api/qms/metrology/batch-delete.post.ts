@@ -5,6 +5,7 @@ import { MetrologyService } from '~/modules/metrology/metrology.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError, businessErrorResponse } from '~/utils/business-error';
 import { getCurrentUser } from '~/utils/current-user';
 import {
   badRequestResponse,
@@ -15,10 +16,9 @@ import {
 const batchDeleteSchema = z.object({ ids: z.array(z.string()).min(1) });
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.DELETE);
-  const userinfo = getCurrentUser(event);
-
   try {
+    await authorizeWrite(event, METROLOGY_PERMISSION_CODES.DELETE);
+    const userinfo = getCurrentUser(event);
     const parsed = batchDeleteSchema.safeParse(await readBody(event));
     if (!parsed.success)
       return badRequestResponse(event, '请提供有效的 ID 列表');
@@ -39,6 +39,8 @@ export default defineEventHandler(async (event) => {
     return useResponseSuccess({ count: result.count });
   } catch (error) {
     logApiError('metrology-batch-delete', error, undefined, event);
+    if (error instanceof BusinessError)
+      return businessErrorResponse(event, error);
     return internalServerErrorResponse(event, '批量删除计量器具失败');
   }
 });

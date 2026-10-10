@@ -166,6 +166,7 @@ export const DataScopeService = {
     baseWhere: T,
     user: UserContext,
     resolvedScope?: ResolvedScopeInput,
+    model?: string,
   ): Promise<T> {
     const config = getDataScopeConfig(module);
     if (!config) {
@@ -175,6 +176,13 @@ export const DataScopeService = {
         403,
       );
     }
+    // One module can span tables with different column names. Select the
+    // field list declared for this model so a shared module scope never
+    // filters on a column the target table does not have.
+    const deptFields =
+      (model && config.deptFieldsByModel?.[model]) || config.deptFields;
+    const selfFields =
+      (model && config.selfFieldsByModel?.[model]) || config.selfFields;
 
     const { scopeType, deptIds } =
       resolvedScope ?? (await resolveScope(user.userId, module));
@@ -196,7 +204,7 @@ export const DataScopeService = {
 
       return combineWhere(
         baseWhere,
-        buildFieldFilter(config.deptFields, (field) => ({
+        buildFieldFilter(deptFields, (field) => ({
           in: isIdentityField(field) ? deptIds : deptCandidates,
         })),
       );
@@ -207,7 +215,7 @@ export const DataScopeService = {
       if (deptCandidates.length === 0) {
         return combineWhere(
           baseWhere,
-          buildFieldFilter(config.selfFields, (field) =>
+          buildFieldFilter(selfFields, (field) =>
             isIdentityField(field) ? user.userId : user.username || '',
           ),
         );
@@ -215,7 +223,7 @@ export const DataScopeService = {
 
       return combineWhere(
         baseWhere,
-        buildFieldFilter(config.deptFields, (field) => ({
+        buildFieldFilter(deptFields, (field) => ({
           in: isIdentityField(field) ? deptIds : deptCandidates,
         })),
       );
@@ -223,7 +231,7 @@ export const DataScopeService = {
 
     return combineWhere(
       baseWhere,
-      buildFieldFilter(config.selfFields, (field) =>
+      buildFieldFilter(selfFields, (field) =>
         isIdentityField(field) ? user.userId : user.username || '',
       ),
     );

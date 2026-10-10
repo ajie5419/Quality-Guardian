@@ -16,7 +16,7 @@ interface DrainOptions {
 }
 
 const DEFAULT_MAX_BATCHES = 20;
-const POLL_INTERVAL_MS = 5000;
+const POLL_INTERVAL_MS = process.env.QGS_E2E_MODE === 'isolated' ? 500 : 5000;
 const logger = createModuleLogger('QualityLossIndexWorker');
 const processWorkerId = `${hostname()}:${process.pid}:${createId()}`;
 
@@ -115,7 +115,12 @@ function runBackgroundDrain() {
 export const QualityLossIndexWorkerService = { drain };
 
 export function startQualityLossIndexWorker() {
-  if (started || process.env.NODE_ENV === 'test') return;
+  if (
+    started ||
+    (process.env.NODE_ENV === 'test' && process.env.QGS_E2E_MODE !== 'isolated')
+  ) {
+    return;
+  }
   started = true;
   setImmediate(() => void runBackgroundDrain());
   const timer = setInterval(() => void runBackgroundDrain(), POLL_INTERVAL_MS);

@@ -56,6 +56,9 @@ export function useWorkOrderActions(options: {
       deliveryDate: row.deliveryDate || '',
       status: row.status,
       effectiveTime: row.effectiveTime || null,
+      // OPTIMISTIC-LOCK-001: the editor echoes this token back on PUT; if the
+      // row copy drops it the backend rejects every UI edit with 400.
+      version: row.version,
     };
     if (editModalRef.value) {
       editModalRef.value.open({

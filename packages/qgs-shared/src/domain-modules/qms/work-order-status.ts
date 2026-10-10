@@ -45,12 +45,28 @@ export function mapWorkOrderStatus(frontendStatus?: unknown): WorkOrderStatus {
     return WORK_ORDER_STATUS.OPEN;
   }
 
-  const normalizedStatus = String(frontendStatus)
-    .toLowerCase()
-    .trim()
-    .replaceAll(/\s+/g, '_');
+  const normalizedStatus = normalizeWorkOrderStatusKey(frontendStatus);
 
   return STATUS_MAPPING_TABLE[normalizedStatus] || WORK_ORDER_STATUS.OPEN;
+}
+
+function normalizeWorkOrderStatusKey(value: unknown) {
+  return String(value).toLowerCase().trim().replaceAll(/\s+/g, '_');
+}
+
+/**
+ * Strict parser for interactive writes. Unlike mapWorkOrderStatus (which
+ * coerces unknown input to OPEN for lenient reads/legacy imports), this
+ * returns null so callers can reject an invalid status with 400 instead of
+ * silently persisting a defaulted value.
+ */
+export function parseWorkOrderStatus(
+  frontendStatus?: unknown,
+): null | WorkOrderStatus {
+  if (frontendStatus === undefined || frontendStatus === null) return null;
+  const raw = String(frontendStatus).trim();
+  if (!raw) return null;
+  return STATUS_MAPPING_TABLE[normalizeWorkOrderStatusKey(raw)] ?? null;
 }
 
 export function mapToDisplayStatus(dbStatus?: null | string): string {

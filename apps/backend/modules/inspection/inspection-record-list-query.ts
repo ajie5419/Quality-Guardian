@@ -85,6 +85,7 @@ export async function applyInspectionScope(
     baseWhere,
     user,
     access.scope,
+    'inspections',
   );
 }
 

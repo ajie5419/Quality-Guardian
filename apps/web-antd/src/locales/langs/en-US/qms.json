@@ -482,6 +482,8 @@
       "expectedReturnAt": "Expected Return Date",
       "returnedAt": "Returned Date",
       "currentBorrower": "Current Borrower",
+      "borrowFailed": "Borrow failed. Search for the instrument again and retry.",
+      "returnFailed": "Return request failed. Search for the instrument again and retry.",
       "borrowSuccess": "Borrow recorded successfully",
       "returnSuccess": "Return recorded successfully",
       "returnRequestSuccess": "Return request submitted. Wait for the custodian to confirm receipt.",

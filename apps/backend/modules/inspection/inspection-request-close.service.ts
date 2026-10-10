@@ -5,13 +5,11 @@ import type { UserSession } from '~/utils/jwt-utils';
 import type { InspectionAccessContext } from './inspection-access-context';
 import type { CloseInspectionRecordLink } from './inspection-request-close-records.service';
 
-import { createScopedRepository } from '~/modules/data-scope';
 import { MetricRefreshQueue } from '~/modules/metric-refresh';
 import { QualityLossIndexQueue } from '~/modules/quality-loss';
 import { recordBusinessAuditLog } from '~/modules/system-log/audit-log';
 import prisma from '~/utils/prisma';
 
-import { toScopedAccessContext } from './inspection-access-context';
 import {
   INSPECTION_REQUEST_STATUS,
   mapInspectionRequest,
@@ -44,6 +42,7 @@ import {
   parseCloseRequestNumber,
   validateCloseRequestBody,
 } from './inspection-request-close.schema';
+import { buildScopedInspectionRequestWhere } from './inspection-request-scope';
 import { inspectionRequestWorkOrdersInclude } from './inspection-request-work-orders';
 
 export { hydrateOutsourcingLinkedIssueResponsibility } from './inspection-request-close-responsibility-hydration';
@@ -59,27 +58,26 @@ export const InspectionRequestCloseService = {
     const explicitInspectionId = normalizeInspectionRequestText(
       body.inspectionId,
     );
-    const scopedAccess = access
-      ? toScopedAccessContext(access)
-      : {
-          user: { id: userinfo.userId || userinfo.id || 'unknown' },
-          scope: { scopeType: 'ALL' as const },
-        };
-    const requestRepo = createScopedRepository(
-      'inspection',
-      prisma.qms_inspection_requests,
-    );
-    const request = (await requestRepo.findAccessible(
-      {
-        include: {
-          process: { select: { name: true } },
-          work_order: { select: { projectName: true } },
-          workOrders: inspectionRequestWorkOrdersInclude,
-        },
-        where: { id, isDeleted: false },
+    const requestWhere = access
+      ? await buildScopedInspectionRequestWhere(
+          { id, isDeleted: false },
+          {
+            dataScope: access.dataScope,
+            user: {
+              userId: String(userinfo.userId || userinfo.id || 'unknown'),
+              username: userinfo.username,
+            },
+          },
+        )
+      : { id, isDeleted: false };
+    const request = (await prisma.qms_inspection_requests.findFirst({
+      include: {
+        process: { select: { name: true } },
+        work_order: { select: { projectName: true } },
+        workOrders: inspectionRequestWorkOrdersInclude,
       },
-      scopedAccess,
-    )) as Prisma.qms_inspection_requestsGetPayload<{
+      where: requestWhere,
+    })) as Prisma.qms_inspection_requestsGetPayload<{
       include: {
         process: true;
         work_order: true;
@@ -137,21 +135,14 @@ export const InspectionRequestCloseService = {
       (await resolveInspectionRequestCurrentUserId(userinfo, prisma));
     const runCloseTransaction = () =>
       prisma.$transaction(async (tx) => {
-        const txRequestRepo = createScopedRepository(
-          'inspection',
-          tx.qms_inspection_requests,
-        );
-        const guard = await txRequestRepo.updateAccessible(
-          {
-            data: { status: INSPECTION_REQUEST_STATUS.INSPECTING },
-            where: {
-              id,
-              isDeleted: false,
-              status: request.status,
-            },
+        // Keep the exact authorized request scope in the transactional CAS.
+        const guard = await tx.qms_inspection_requests.updateMany({
+          data: { status: INSPECTION_REQUEST_STATUS.INSPECTING },
+          where: {
+            ...requestWhere,
+            status: request.status,
           },
-          scopedAccess,
-        );
+        });
         if (guard.count === 0)
           failCloseRequest('BAD_REQUEST', '报检任务已检验完成');
         const authorizedSource = {

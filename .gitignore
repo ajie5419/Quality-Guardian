@@ -74,3 +74,4 @@ task_plan.md
 **/*_output.txt
 typecheck_errors.txt
 dump.rdb
+output/playwright/

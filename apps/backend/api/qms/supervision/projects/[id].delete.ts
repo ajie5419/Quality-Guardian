@@ -12,16 +12,16 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await authorizeWrite(
-    event,
-    SUPERVISION_PERMISSION_CODES.DELETE,
-  );
-  const context = buildSupervisionAccessContext(userinfo);
-  const query = getQuery(event);
-  const id = String(query.id || '').trim();
-  if (!id) return badRequestResponse(event, '项目ID不能为空');
-
   try {
+    const userinfo = await authorizeWrite(
+      event,
+      SUPERVISION_PERMISSION_CODES.DELETE,
+    );
+    const context = buildSupervisionAccessContext(userinfo);
+    const query = getQuery(event);
+    const id = String(query.id || '').trim();
+    if (!id) return badRequestResponse(event, '项目ID不能为空');
+
     await SupervisionProjectService.deleteProject(id, context);
     return useResponseSuccess(null);
   } catch (error) {

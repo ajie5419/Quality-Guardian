@@ -26,7 +26,6 @@ import {
   getMetrologyCalibrationAnnualGrid,
   getMetrologyCalibrationPlanListPage,
   getMetrologyCalibrationPlanOverview,
-  getMetrologyExportList,
   importMetrologyCalibrationPlan,
 } from '#/api/qms/metrology';
 import { useErrorHandler } from '#/hooks/useErrorHandler';
@@ -44,16 +43,17 @@ import CalibrationPlanMonthlyDistributionChart from './components/CalibrationPla
 import CalibrationPlanOverviewCards from './components/CalibrationPlanOverviewCards.vue';
 import CalibrationPlanUpcomingTable from './components/CalibrationPlanUpcomingTable.vue';
 import { getColumns, getSearchFormSchema, getViewOptions } from './data';
+import { loadCalibrationInstrumentOptions } from './instrument-options';
 
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
-const { canCreate, canDelete, canEdit, canImport, canList } = useQmsPermissions(
+const { canCreate, canDelete, canEdit, canImport } = useQmsPermissions(
   'QMS:Metrology:CalibrationPlan',
 );
-const canCreateAction = computed(() => canCreate.value || canList.value);
-const canDeleteAction = computed(() => canDelete.value || canList.value);
-const canEditAction = computed(() => canEdit.value || canList.value);
-const canImportAction = computed(() => canImport.value || canList.value);
+const canCreateAction = canCreate;
+const canDeleteAction = canDelete;
+const canEditAction = canEdit;
+const canImportAction = canImport;
 
 const viewMode = ref<'grid' | 'list'>('list');
 const modalVisible = ref(false);
@@ -102,11 +102,7 @@ function resolveStatusFilter() {
 
 async function loadInstrumentOptions() {
   try {
-    const response = await getMetrologyExportList();
-    instrumentOptions.value = (response.items || []).map((item) => ({
-      label: `${item.instrumentName} / ${item.instrumentCode}`,
-      value: item.id,
-    }));
+    instrumentOptions.value = await loadCalibrationInstrumentOptions();
   } catch (error) {
     handleApiError(error, 'Load Metrology Instrument Options');
   }

@@ -17,12 +17,12 @@ const createProjectBodySchema = z
   .passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await authorizeWrite(
-    event,
-    SUPERVISION_PERMISSION_CODES.CREATE,
-  );
-  const context = buildSupervisionAccessContext(userinfo);
   try {
+    const userinfo = await authorizeWrite(
+      event,
+      SUPERVISION_PERMISSION_CODES.CREATE,
+    );
+    const context = buildSupervisionAccessContext(userinfo);
     const body = createProjectBodySchema.parse(await readBody(event));
     if (!String(body.projectName || '').trim()) {
       return badRequestResponse(event, '项目名称不能为空');

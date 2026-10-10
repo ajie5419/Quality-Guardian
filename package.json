@@ -56,7 +56,7 @@
     "publint": "vsh publint",
     "reinstall": "pnpm clean --del-lock && pnpm install",
     "test:unit": "vitest run --dom",
-    "test:e2e": "turbo run test:e2e",
+    "test:e2e": "pnpm --dir apps/web-antd run test:e2e",
     "update:deps": "npx taze -r -w",
     "version": "pnpm exec changeset version && pnpm install --no-frozen-lockfile",
     "catalog": "pnpx codemod pnpm/catalog"

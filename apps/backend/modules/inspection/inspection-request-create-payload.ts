@@ -13,11 +13,11 @@ import {
   isInspectionRequestAssemblyProcess,
   normalizeInspectionRequestAttachments,
   normalizeInspectionRequestText,
-  normalizeInspectionStationSelection,
   parseInspectionRequestQuantity,
   serializeInspectionStationSelection,
 } from './inspection-request';
 import { resolveInspectionRequestIssueResponsibilities } from './inspection-request-responsibility.service';
+import { assertInspectionRequestStationSelection } from './inspection-request-station-validation';
 import { normalizeInspectionRequestWorkOrderNumbers } from './inspection-request-work-orders';
 
 export type RequestBody = Record<string, unknown>;
@@ -50,6 +50,7 @@ export async function buildCreateRequestPayload(
   identityContract: 'V1' | 'V2',
   _isPublic: boolean,
   machineStationBound = 0,
+  requiresStationSelection = false,
 ) {
   const workOrderNumbers = normalizeInspectionRequestWorkOrderNumbers(body);
   const workOrderNumber =
@@ -180,15 +181,11 @@ export async function buildCreateRequestPayload(
     }
   }
   const quantity = parseInspectionRequestQuantity(body.quantity);
-  const normalizedStationSelection = normalizeInspectionStationSelection(
+  assertInspectionRequestStationSelection(
     body.stationSelection,
+    machineStationBound,
+    requiresStationSelection,
   );
-  if (normalizedStationSelection && machineStationBound < 1) {
-    throw new BusinessError(
-      'INVALID_STATION_SELECTION',
-      'station selection requires a work order with at least one machine',
-    );
-  }
   const stationSelection = serializeInspectionStationSelection(
     body.stationSelection,
     machineStationBound > 0 ? machineStationBound : undefined,

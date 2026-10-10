@@ -15,13 +15,13 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const context = buildSupervisionAccessContext(
-    await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT),
-  );
-  const projectId = getRouterParam(event, 'id');
-  if (!projectId) return badRequestResponse(event, '监造项目不能为空');
-
   try {
+    const context = buildSupervisionAccessContext(
+      await authorizeWrite(event, SUPERVISION_PERMISSION_CODES.EDIT),
+    );
+    const projectId = getRouterParam(event, 'id');
+    if (!projectId) return badRequestResponse(event, '监造项目不能为空');
+
     const body = await readBody(event);
     const { items } = reorderPlanTasksSchema.parse(body) as {
       items: PlanTaskReorderItem[];

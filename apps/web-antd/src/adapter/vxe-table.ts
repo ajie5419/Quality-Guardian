@@ -169,7 +169,11 @@ setupVbenVxeTable({
 
           // 按钮属性
           const btnProps: any = {
+            // Icon-only actions must stay addressable by assistive tech and
+            // by E2E tests; column position is not a stable contract.
+            'aria-label': opt.title || opt.text || opt.label || opt.code,
             danger: opt.danger,
+            'data-action': opt.code,
             onClick: () => {
               if (onClick) {
                 onClick({ code: opt.code, row });

@@ -3,6 +3,8 @@ import { MetrologyImportService } from '~/modules/metrology/metrology-import.ser
 import { MetrologyService } from '~/modules/metrology/metrology.service';
 import prisma from '~/utils/prisma';
 
+import { MetrologyDeleteService } from './metrology-delete.service';
+
 vi.mock('~/utils/prisma', () => ({
   default: {
     measuring_instruments: {
@@ -23,6 +25,9 @@ vi.mock('~/modules/metrology/metrology-import.service', () => ({
   MetrologyImportService: {
     importItems: vi.fn(),
   },
+}));
+vi.mock('./metrology-delete.service', () => ({
+  MetrologyDeleteService: { deleteById: vi.fn(), batchDelete: vi.fn() },
 }));
 
 const baseInstrument = {
@@ -194,14 +199,10 @@ describe('metrologyService', () => {
         updatedBy: 'admin',
       }),
     });
-    expect(prisma.measuring_instruments.update).toHaveBeenCalledWith({
-      where: { id: 'm-1' },
-      data: {
-        isDeleted: true,
-        updatedAt: expect.any(Date),
-        updatedBy: 'admin',
-      },
-    });
+    expect(MetrologyDeleteService.deleteById).toHaveBeenCalledWith(
+      'm-1',
+      'admin',
+    );
   });
 
   it('batch deletes active instruments only', async () => {
@@ -211,14 +212,10 @@ describe('metrologyService', () => {
 
     await MetrologyService.batchDelete(['m-1', 'm-2'], 'admin');
 
-    expect(prisma.measuring_instruments.updateMany).toHaveBeenCalledWith({
-      where: { id: { in: ['m-1', 'm-2'] }, isDeleted: false },
-      data: {
-        isDeleted: true,
-        updatedAt: expect.any(Date),
-        updatedBy: 'admin',
-      },
-    });
+    expect(MetrologyDeleteService.batchDelete).toHaveBeenCalledWith(
+      ['m-1', 'm-2'],
+      'admin',
+    );
   });
 
   it('exports full list without pagination and delegates imports/templates', async () => {

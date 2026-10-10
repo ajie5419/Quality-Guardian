@@ -1,4 +1,5 @@
 import { eventHandler, setResponseStatus } from 'h3';
+import { uniqueNonEmpty } from '~/modules/rbac/rbac-role.service';
 import { RbacService } from '~/modules/rbac/rbac.service';
 import { logApiError } from '~/utils/api-logger';
 import { getCurrentUser } from '~/utils/current-user';
@@ -16,17 +17,9 @@ export default eventHandler(async (event) => {
   try {
     await ensureModuleMenus();
     const codes = await RbacService.getUserPermissionCodes(String(userId));
-    const normalizedCodes = new Set(codes);
-    if (normalizedCodes.has('QMS:Inspection:Requests:List')) {
-      normalizedCodes.add('QMS:Inspection:Dashboard:List');
-    }
-    if (
-      normalizedCodes.has('QMS:Inspection:Requests:Close') ||
-      normalizedCodes.has('QMS:Inspection:Requests:Dispatch')
-    ) {
-      normalizedCodes.add('QMS:Inspection:Requests:List');
-    }
-    return useResponseSuccess([...normalizedCodes]);
+    // getUserPermissionCodes already applies the derived inspection page
+    // codes; only stale/invisible characters still need normalizing.
+    return useResponseSuccess(uniqueNonEmpty(codes));
   } catch (error) {
     logApiError('codes', error, undefined, event);
     setResponseStatus(event, 500);

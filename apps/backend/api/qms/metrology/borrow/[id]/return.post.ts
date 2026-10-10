@@ -12,15 +12,14 @@ import { getRequiredRouterParam } from '~/utils/route-param';
 const returnSchema = z.record(z.string(), z.unknown());
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, METROLOGY_PERMISSION_CODES.BORROW_RETURN);
-  const userinfo = getCurrentUser(event);
-
   const id = getRequiredRouterParam(event, 'id', '缺少借用记录ID');
   if (typeof id !== 'string') {
     return id;
   }
 
   try {
+    await authorizeWrite(event, METROLOGY_PERMISSION_CODES.BORROW_RETURN);
+    const userinfo = getCurrentUser(event);
     const body = returnSchema.parse(await readBody(event));
     await MetrologyBorrowService.confirmReturn(id, body, userinfo.username);
     return useResponseSuccess(null);

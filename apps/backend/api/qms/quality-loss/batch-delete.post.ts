@@ -13,10 +13,9 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.DELETE);
-  const userinfo = getCurrentUser(event);
-
   try {
+    await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.DELETE);
+    const userinfo = getCurrentUser(event);
     const body = (await readBody(event)) as { ids?: unknown };
     const ids = parseNonEmptyIdList(body.ids);
 

@@ -336,7 +336,12 @@ describe('inspectionRequestCreateService', () => {
 
   it('bounds station selection by work order machine count, not form quantity', async () => {
     vi.mocked(assertWorkOrdersExist).mockResolvedValue([
-      { projectName: 'Project A', quantity: 4, workOrderNumber: 'WO-001' },
+      {
+        multiStationEnabled: true,
+        projectName: 'Project A',
+        quantity: 4,
+        workOrderNumber: 'WO-001',
+      },
     ]);
     vi.mocked(normalizeInspectionStationSelection).mockReturnValue({
       indexes: [3],
@@ -371,8 +376,18 @@ describe('inspectionRequestCreateService', () => {
 
   it('bounds station selection by the selected work order machine count', async () => {
     vi.mocked(assertWorkOrdersExist).mockResolvedValue([
-      { projectName: 'Project A', quantity: 2, workOrderNumber: 'WO-001' },
-      { projectName: 'Project B', quantity: 8, workOrderNumber: 'WO-002' },
+      {
+        multiStationEnabled: true,
+        projectName: 'Project A',
+        quantity: 2,
+        workOrderNumber: 'WO-001',
+      },
+      {
+        multiStationEnabled: true,
+        projectName: 'Project B',
+        quantity: 8,
+        workOrderNumber: 'WO-002',
+      },
     ]);
     vi.mocked(normalizeInspectionStationSelection).mockReturnValue({
       indexes: [2],
@@ -407,7 +422,12 @@ describe('inspectionRequestCreateService', () => {
 
   it('rejects station selection when the work order has no machines', async () => {
     vi.mocked(assertWorkOrdersExist).mockResolvedValue([
-      { projectName: 'Project A', quantity: 0, workOrderNumber: 'WO-001' },
+      {
+        multiStationEnabled: false,
+        projectName: 'Project A',
+        quantity: 0,
+        workOrderNumber: 'WO-001',
+      },
     ]);
     vi.mocked(normalizeInspectionStationSelection).mockReturnValue({
       indexes: [1],
@@ -439,6 +459,36 @@ describe('inspectionRequestCreateService', () => {
     );
     expect(prisma.$transaction).not.toHaveBeenCalled();
   });
+
+  it.each([false, true])(
+    'requires station selection before writes in public=%s',
+    async (isPublic) => {
+      vi.mocked(assertWorkOrdersExist).mockResolvedValue([
+        {
+          multiStationEnabled: true,
+          projectName: 'Project A',
+          quantity: 3,
+          workOrderNumber: 'WO-001',
+        },
+      ]);
+      await expect(
+        InspectionRequestCreateService.createRequest(
+          {} as any,
+          null,
+          {
+            category: 'PROCESS',
+            componentName: 'Component A',
+            partId: 'part-1',
+            processId: 'process-1',
+            workOrderNumber: 'WO-001',
+          },
+          isPublic,
+          'V2',
+        ),
+      ).rejects.toMatchObject({ code: 'VALIDATION', httpStatus: 400 });
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    },
+  );
 
   it('should create a request and return mapped result', async () => {
     (prisma.$transaction as any).mockImplementation(async (cb: any) =>

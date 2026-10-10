@@ -1,5 +1,7 @@
 import type { Prisma } from '@prisma/client';
 
+import { formatMetrologyDate } from '../metrology-status';
+
 export const STATUS_LABELS = {
   COMPLETED: '已完成',
   OVERDUE: '超期未完成',
@@ -121,10 +123,7 @@ export function buildPlannedDate(year: number, month: number, day: number) {
 }
 
 export function formatDate(value: Date | null | string | undefined) {
-  if (!value) return null;
-  const date = value instanceof Date ? value : new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toISOString().slice(0, 10);
+  return formatMetrologyDate(value);
 }
 
 export function parseStructuredDateText(text: string) {

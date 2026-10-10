@@ -15,15 +15,15 @@ import {
 const updateProjectBodySchema = z.object({}).passthrough();
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await authorizeWrite(
-    event,
-    SUPERVISION_PERMISSION_CODES.EDIT,
-  );
-  const context = buildSupervisionAccessContext(userinfo);
-  const id = getRouterParam(event, 'id');
-  if (!id) return badRequestResponse(event, '无效监造项目ID');
-
   try {
+    const userinfo = await authorizeWrite(
+      event,
+      SUPERVISION_PERMISSION_CODES.EDIT,
+    );
+    const context = buildSupervisionAccessContext(userinfo);
+    const id = getRouterParam(event, 'id');
+    if (!id) return badRequestResponse(event, '无效监造项目ID');
+
     const body = updateProjectBodySchema.parse(await readBody(event));
     const data = await SupervisionService.updateProject(id, body, context);
     return useResponseSuccess(data);
