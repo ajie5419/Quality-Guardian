@@ -6,9 +6,6 @@ import type {
   DfmeaProject,
   DfmeaProjectStats,
   DfmeaTreeNode,
-  ItpItem,
-  ItpProject,
-  ItpTreeNode,
 } from '@qgs/shared';
 
 import type { QmsImportSummary, QmsListResponse } from '#/api/qms/types';
@@ -333,71 +330,7 @@ export async function importBomItems(data: {
   return requestClient.post<QmsImportSummary>('/qms/planning/bom/import', data);
 }
 
-/**
- * ITP Project APIs
- */
-export async function getItpProjectList() {
-  const page = await getItpProjectListPage();
-  return page.items;
-}
-
-export async function getItpProjectListPage() {
-  return requestClient.get<QmsListResponse<ItpProject>>(
-    '/qms/planning/itp/projects',
-  );
-}
-
-export async function createItpProject(data: Partial<ItpProject>) {
-  return requestClient.post<ItpProject>('/qms/planning/itp/projects', data);
-}
-
-export async function updateItpProject(id: string, data: Partial<ItpProject>) {
-  return requestClient.put<ItpProject>(
-    `/qms/planning/itp/projects/${id}`,
-    data,
-  );
-}
-
-export async function deleteItpProject(id: string) {
-  return requestClient.delete(`/qms/planning/itp/projects/${id}`);
-}
-
-/**
- * ITP Item APIs
- */
-export async function getItpTree() {
-  return requestClient.get<ItpTreeNode[]>('/qms/planning/itp/tree');
-}
-
-export async function getItpList(params?: { projectId?: string }) {
-  const page = await getItpListPage(params);
-  return page.items;
-}
-
-export async function getItpListPage(params?: { projectId?: string }) {
-  return requestClient.get<QmsListResponse<ItpItem>>('/qms/planning/itp', {
-    params,
-  });
-}
-
-export async function createItp(data: Partial<ItpItem>) {
-  return requestClient.post<ItpItem>('/qms/planning/itp', data);
-}
-
-export async function updateItp(id: string, data: Partial<ItpItem>) {
-  return requestClient.put<ItpItem>(`/qms/planning/itp/${id}`, data);
-}
-
-export async function deleteItp(id: string, projectId: string) {
-  return requestClient.delete(`/qms/planning/itp/${id}`, {
-    params: { projectId },
-  });
-}
-
 export namespace QmsPlanningApi {
-  export type ItpProject = import('@qgs/shared').ItpProject;
-  export type ItpItem = import('@qgs/shared').ItpItem;
-  export type ItpTreeNode = import('@qgs/shared').ItpTreeNode;
   export type BomProject = import('@qgs/shared').BomProject;
   export type BomItem = import('@qgs/shared').BomItem;
   export type DfmeaProject = import('@qgs/shared').DfmeaProject;
