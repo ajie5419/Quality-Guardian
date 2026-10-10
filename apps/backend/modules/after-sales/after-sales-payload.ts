@@ -264,6 +264,13 @@ export async function buildGovernedAfterSalesUpdateData(
   const data = withoutLegacyClassificationNames(
     attachResponsibleDepartmentsToAfterSalesData(body, result.data),
   ) as Prisma.after_salesUncheckedUpdateInput;
+  // Prisma requires a string even when an order has no project name.
+  if (body.projectName !== undefined && data.projectName === null) {
+    data.projectName = '';
+  }
+  if (body.workOrderNumber !== undefined && !data.workOrderNumber) {
+    throw new BusinessError('BAD_REQUEST', '工单号不能为空', 400);
+  }
   const canonicalFields = await buildGovernedCanonicalWritePairForTable(
     'after_sales',
     data,

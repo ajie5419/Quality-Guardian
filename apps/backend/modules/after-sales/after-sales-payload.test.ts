@@ -68,6 +68,20 @@ function classified(body: Record<string, unknown>) {
 }
 
 describe('after-sales payload governance helpers', () => {
+  it('preserves required empty project names and the selected order on edits', async () => {
+    const result = await buildGovernedAfterSalesUpdateData({
+      projectName: '',
+      workOrderNumber: 'WO-1',
+    });
+    expect(result.data.projectName).toBe('');
+    expect(result.data.workOrderNumber).toBe('WO-1');
+  });
+
+  it('rejects an empty order instead of passing null to Prisma', async () => {
+    await expect(
+      buildGovernedAfterSalesUpdateData({ workOrderNumber: '' }),
+    ).rejects.toMatchObject({ httpStatus: 400 });
+  });
   it('rejects online name-only classification writes', async () => {
     await expect(
       buildGovernedAfterSalesCreateData(
