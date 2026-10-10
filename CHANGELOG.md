@@ -34,6 +34,28 @@
 - 修复问题处理丢响应超过3秒后重复记录；同次表单稳定请求键、5分钟事务幂等重放、同键不同内容拒绝，新键仍允许合法同内容跟进。
 - 相关单测134通过，前后端类型、目标lint与架构检查通过；独立清理/源码哈希审计通过。完整证据与剩余范围见 [统一验收报告](docs/web-e2e-verification.md)。仅桌面Web，移动/微信排除；未提交、推送、部署、改CI或操作生产。
 
+### 2026-10-09 前端死代码清理（未提交）
+
+**执行内容：**
+- 删除 ITP 旧前端实现：`apps/web-antd/src/views/qms/planning/itp/components/{ItpAssignModal,ItpItemModal,ItpProjectModal}.vue` 与 `composables/useItpNodeMapper.ts`（含自测）。全仓检索无引用；`itp/index.vue` 仅做 `router.replace('/qms/planning/inspection-forms')` 跳转壳，保留以兜底生产库历史菜单 `component=qms/planning/itp/index`。
+- 删除已无消费者的 ITP 前端 API 客户端（`api/qms/planning.ts` 中 10 个 `*Itp*` 函数、`QmsPlanningApi` 内三个 ITP 类型重导出）与 `QMS_API.PLANNING_ITP` 常量。`PLANNING_ITP_IMPORT` 仍由 `api/qms/ai-planning.ts` 使用，保留。后端 `/qms/planning/itp/**` 路由未删除，小程序与外部调用方检索无命中。
+- 连带删除孤儿类型 `planning/types.ts` 的 `ItpProjectForm`（唯一引用者为已删除的 `ItpProjectModal.vue`）。
+- 删除焊工旧组件 `WelderFormModal.vue`、`WelderDetailDrawer.vue` 及删除后变孤儿的 `welder/helpers.ts`。逐字段比对确认 `WelderManagementView.vue` 内联实现已覆盖 `certificationNo`、`employmentStatus`、`examDate`、`examPassed`、班组与姓名必填校验，并直接复用同样的 `normalizeWelderIdentity`/`resolveScoreTagColor` 逻辑；`weldingMethod` 展示/表单/详情已由 `WelderManagementView.vue` 完整内联，旧组件不再有独有能力。
+- 删除 `shared/components/MobilePageShell.vue` 与 `mobile.css` 中 `.qms-mobile-shell*` 三段样式。`QmsPageShell.vue` 已提供同名 `contentClass`/`footerClass`/`pageClass`/`showFooter` 能力与等价样式；样式类名除被删组件外无其他引用。
+- 删除 `inspection/requests/components/legacyResponsibilityDepartment.ts`（含自测）。该兼容逻辑的唯一调用点已在提交 `97b32657` 中被替换为「历史报检任务未保存完整责任归属，请补充后提交」的必填选择流程，功能未缺失。
+
+**验证结果：**
+- `pnpm --dir apps/web-antd run typecheck`：通过（退出码 0）。
+- `pnpm exec eslint`（涉及文件）：通过（退出码 0）。
+- `vitest run --dom apps/web-antd/src`：65 个测试文件 / 335 个用例全部通过（退出码 0）。
+- `pnpm run check:qms-arch`：通过（changed scope，0 violations）。
+- `pnpm run check:docs-drift`：通过。
+- `vsh check-circular`、`vsh check-dep`：退出码 0（既有告警为改动前既存项）。
+
+**遗留问题：**
+- 未做浏览器端验收、未构建、未推送、未发布；`itp/index.vue` 跳转壳与后端 ITP 路由的处置留待后续单独决策。
+
+
 ### 2026-09-05 日报表标题固定蓝色
 
 **执行内容：**

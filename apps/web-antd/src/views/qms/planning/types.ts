@@ -30,16 +30,6 @@ export interface BomFormState {
 }
 
 /**
- * ITP 项目表单
- */
-export interface ItpProjectForm {
-  projectName: string;
-  workOrderId: string;
-  version: string;
-  status: 'active' | 'archived' | 'draft';
-}
-
-/**
  * 项目过滤参数
  */
 export interface ProjectFilterParams {
