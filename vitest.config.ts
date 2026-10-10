@@ -11,7 +11,7 @@ export default defineConfig({
   plugins: [Vue(), VueJsx()],
   test: {
     environment: 'happy-dom',
-    exclude: [...configDefaults.exclude, '**/e2e/**'],
+    exclude: [...configDefaults.exclude, '**/apps/web-antd/e2e/**'],
     alias: {
       '#': path.resolve(__dirname, './apps/web-antd/src'),
       '@': path.resolve(__dirname, './apps/weapp/src'),

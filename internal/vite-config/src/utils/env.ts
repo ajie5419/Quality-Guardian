@@ -38,6 +38,12 @@ async function loadEnv<T = Record<string, string>>(
   match = 'VITE_GLOB_',
   confFiles = getConfFiles(),
 ) {
+  // Isolated E2E must never read developer dotenv files or inherit their targets.
+  if (process.env.QGS_E2E_MODE === 'isolated') {
+    return Object.fromEntries(
+      Object.entries(process.env).filter(([key]) => key.startsWith(match)),
+    ) as T;
+  }
   let envConfig = {};
 
   for (const confFile of confFiles) {
