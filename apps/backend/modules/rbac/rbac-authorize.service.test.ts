@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   assertRecordOwnership,
   authorizeWrite,
+  authorizeWriteAnyOf,
 } from '~/modules/rbac/rbac-authorize.service';
 import { RbacRoleService } from '~/modules/rbac/rbac-role.service';
 import { BusinessError } from '~/utils/business-error';
@@ -107,5 +108,24 @@ describe('assertRecordOwnership', () => {
     expect(() =>
       assertRecordOwnership({ label: '记录', ownerId: null, userId: 'user-1' }),
     ).not.toThrow();
+  });
+});
+describe('authorizeWriteAnyOf', () => {
+  it('passes when any of the declared codes is held by the user', async () => {
+    vi.mocked(getCurrentUser).mockReturnValue({
+      id: 'user-1',
+      username: 'u',
+      realName: 'U',
+      roles: ['user'],
+    } as never);
+    vi.mocked(RbacRoleService.getUserPermissionCodes).mockResolvedValue([
+      'QMS:Outsourcing:Create',
+    ]);
+
+    const user = await authorizeWriteAnyOf({} as never, [
+      'QMS:Supplier:Create',
+      'QMS:Outsourcing:Create',
+    ]);
+    expect(user.id).toBe('user-1');
   });
 });

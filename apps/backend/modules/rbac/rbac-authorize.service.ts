@@ -35,9 +35,9 @@ export function assertRecordOwnership(params: {
  * that declarations exist. Super roles are exempt via
  * getUserPermissionCodes merging all active menu codes.
  */
-export async function authorizeWrite(
+export async function authorizeWriteAnyOf(
   event: H3Event<EventHandlerRequest>,
-  permissionCode: string,
+  permissionCodes: string | string[],
 ): Promise<UserSession> {
   const userinfo = getCurrentUser(event);
   if (!userinfo) {
@@ -47,8 +47,11 @@ export async function authorizeWrite(
   if (!userId) {
     throw new BusinessError(ErrorCode.UNAUTHORIZED, '未登录或登录已过期', 401);
   }
+  const requiredCodes = Array.isArray(permissionCodes)
+    ? permissionCodes
+    : [permissionCodes];
   const codes = await RbacRoleService.getUserPermissionCodes(userId);
-  if (!codes.includes(permissionCode)) {
+  if (!requiredCodes.some((code) => codes.includes(code))) {
     throw new BusinessError(
       ErrorCode.FORBIDDEN,
       '无权限执行此操作，请联系管理员',
@@ -56,4 +59,11 @@ export async function authorizeWrite(
     );
   }
   return userinfo;
+}
+
+export async function authorizeWrite(
+  event: H3Event<EventHandlerRequest>,
+  permissionCode: string,
+): Promise<UserSession> {
+  return authorizeWriteAnyOf(event, [permissionCode]);
 }

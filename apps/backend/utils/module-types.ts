@@ -23,7 +23,15 @@ export interface ModuleMenuDeclaration {
 
 export interface ModuleDataScopeDeclaration {
   deptFields: string[];
+  /**
+   * Optional per-table field overrides. A module can expose several tables
+   * that share one module scope but not the same column names; without an
+   * override the shared field list would reference a missing column and
+   * Prisma would reject the query.
+   */
+  deptFieldsByModel?: Record<string, string[]>;
   selfFields: string[];
+  selfFieldsByModel?: Record<string, string[]>;
   selfFallsBackToDept?: boolean;
 }
 

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  applyImpliedPermissionCodes,
   findMissingPagePermissions,
   getPagePermissionRequirements,
 } from './rbac-permission-hierarchy';
@@ -72,5 +73,44 @@ describe('findMissingPagePermissions', () => {
         [menus[2], { id: 'issues', parentId: 'issues', type: 'catalog' }],
       ),
     ).toEqual([]);
+  });
+});
+
+describe('applyImpliedPermissionCodes', () => {
+  it('grants the inspection dashboard to request list holders', () => {
+    expect(
+      applyImpliedPermissionCodes(['QMS:Inspection:Requests:List']),
+    ).toContain('QMS:Inspection:Dashboard:List');
+  });
+
+  it('grants the request list to dispatch and close holders', () => {
+    expect(
+      applyImpliedPermissionCodes(['QMS:Inspection:Requests:Dispatch']),
+    ).toContain('QMS:Inspection:Requests:List');
+    expect(
+      applyImpliedPermissionCodes(['QMS:Inspection:Requests:Close']),
+    ).toContain('QMS:Inspection:Requests:List');
+  });
+
+  it('reaches the dashboard through a chained implied code', () => {
+    expect(
+      applyImpliedPermissionCodes(['QMS:Inspection:Requests:Close']),
+    ).toContain('QMS:Inspection:Dashboard:List');
+  });
+
+  it('does not invent codes for unrelated permissions', () => {
+    expect(applyImpliedPermissionCodes(['QMS:WorkOrder:List'])).not.toContain(
+      'QMS:Inspection:Dashboard:List',
+    );
+  });
+
+  it('keeps already-granted codes without duplication', () => {
+    const codes = applyImpliedPermissionCodes([
+      'QMS:Inspection:Requests:List',
+      'QMS:Inspection:Dashboard:List',
+    ]);
+    expect(
+      codes.filter((code) => code === 'QMS:Inspection:Dashboard:List'),
+    ).toHaveLength(1);
   });
 });

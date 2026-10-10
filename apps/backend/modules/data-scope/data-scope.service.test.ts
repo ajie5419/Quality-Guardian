@@ -262,6 +262,80 @@ describe('dataScopeService', () => {
     });
   });
 
+  it('uses the per-model department fields when a module spans tables', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([
+      { name: 'E2E Other Department' },
+    ]);
+
+    const where = await DataScopeService.buildScopedWhere(
+      'inspection',
+      { isDeleted: false },
+      { userId: 'u-foreign', username: 'tester' },
+      { scopeType: 'DEPT', deptIds: ['dept-other'] },
+      'inspections',
+    );
+
+    // `responsibleBU` only exists on quality_records; filtering inspections
+    // rows by it would make Prisma reject the whole query.
+    expect(where).toEqual({
+      AND: [
+        { isDeleted: false },
+        {
+          OR: [
+            {
+              responsibleDepartment: {
+                in: ['dept-other', 'E2E Other Department'],
+              },
+            },
+            // Canonical id fields match the department id, not its name.
+            { responsibleDepartmentId: { in: ['dept-other'] } },
+          ],
+        },
+      ],
+    });
+    expect(JSON.stringify(where)).not.toContain('responsibleBU');
+  });
+
+  it('uses the per-model self fields when a module spans tables', async () => {
+    const where = await DataScopeService.buildScopedWhere(
+      'inspection',
+      { isDeleted: false },
+      { userId: 'u-self', username: 'tester' },
+      { scopeType: 'SELF', deptIds: [] },
+      'inspections',
+    );
+
+    expect(where).toEqual({
+      AND: [{ isDeleted: false }, { inspector: 'tester' }],
+    });
+  });
+
+  it('keeps the shared field list for tables without an override', async () => {
+    (prisma.departments.findMany as any).mockResolvedValueOnce([
+      { name: 'QA' },
+    ]);
+
+    const where = await DataScopeService.buildScopedWhere(
+      'inspection',
+      { isDeleted: false },
+      { userId: 'u-dept', username: 'tester' },
+      { scopeType: 'DEPT', deptIds: ['dept-qa'] },
+      'quality_records',
+    );
+
+    expect(where).toEqual({
+      AND: [
+        { isDeleted: false },
+        {
+          OR: [
+            { responsibleDepartment: { in: ['dept-qa', 'QA'] } },
+            { responsibleBU: { in: ['dept-qa', 'QA'] } },
+          ],
+        },
+      ],
+    });
+  });
+
   it('quality-loss DEPT scope filters by canonical department IDs', async () => {
     (prisma.departments.findMany as any).mockResolvedValueOnce([
       { name: 'QA' },
