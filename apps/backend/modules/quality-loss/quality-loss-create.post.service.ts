@@ -7,6 +7,7 @@ import {
 } from '~/modules/idempotency';
 import { resolveQualityLossDepartmentWrite } from '~/modules/quality-loss/quality-loss-department-write';
 import { QualityLossIndexQueue } from '~/modules/quality-loss/quality-loss-index-queue.service';
+import { QualityLossIndexWorkerService } from '~/modules/quality-loss/quality-loss-index-worker.service';
 import { resolveManualQualityLossContext } from '~/modules/quality-loss/quality-loss-manual-context';
 import {
   buildQualityLossCreateDataWithCanonical,
@@ -116,6 +117,9 @@ export default defineEventHandler(async (event) => {
     });
 
     if (!outcome.replayed) {
+      setImmediate(() => {
+        void QualityLossIndexWorkerService.drain().catch(() => {});
+      });
       await SystemLogService.auditLog('quality-loss', 'create', {
         userId: actorKey,
         targetId: outcome.resourceId,

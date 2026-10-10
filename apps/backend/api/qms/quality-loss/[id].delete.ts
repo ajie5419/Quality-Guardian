@@ -12,15 +12,15 @@ import {
 import { getRequiredRouterParam } from '~/utils/route-param';
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.DELETE);
-  const userinfo = getCurrentUser(event);
-
-  const id = getRequiredRouterParam(event, 'id', 'Missing ID');
-  if (typeof id !== 'string') {
-    return id;
-  }
-
   try {
+    await authorizeWrite(event, PERMISSION_CODES.QMS.LOSS_ANALYSIS.DELETE);
+    const userinfo = getCurrentUser(event);
+
+    const id = getRequiredRouterParam(event, 'id', 'Missing ID');
+    if (typeof id !== 'string') {
+      return id;
+    }
+
     await QualityLossService.deleteRecord(id, {
       dataScope: event.context.dataScope,
       userId: String(userinfo.id),
