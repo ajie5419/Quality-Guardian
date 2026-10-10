@@ -11,7 +11,10 @@ export default defineConfig({
   plugins: [Vue(), VueJsx()],
   test: {
     environment: 'happy-dom',
-    exclude: [...configDefaults.exclude, '**/apps/web-antd/e2e/**'],
+    // Keep every directory named e2e out of the unit run: Playwright owns
+    // those specs, and E2E evidence snapshots under output/ must never be
+    // collected as unit tests.
+    exclude: [...configDefaults.exclude, '**/e2e/**'],
     alias: {
       '#': path.resolve(__dirname, './apps/web-antd/src'),
       '@': path.resolve(__dirname, './apps/weapp/src'),
