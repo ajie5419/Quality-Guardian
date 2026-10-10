@@ -123,7 +123,7 @@ function mapWelderImportRow(row: Record<string, unknown>) {
   const welderCode = String(
     welderCodeValue ?? Object.values(row)[1] ?? '',
   ).trim();
-  const welding_method = String(weldingMethodValue ?? '').trim();
+  const weldingMethod = String(weldingMethodValue ?? '').trim();
   if (isHeaderLikeWelderRecord({ code: welderCode, name })) return null;
   if (!name || !team) return null;
 
@@ -138,7 +138,7 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     name,
     team,
     welderCode,
-    welding_method,
+    weldingMethod,
   };
 }
 
@@ -203,7 +203,7 @@ async function readWelderRowsFromFile(file: File) {
     const welderCode = String(line[1] ?? '').trim();
     const name = String(line[2] ?? '').trim();
     const team = String(line[3] ?? '').trim();
-    const welding_method = String(line[4] ?? '').trim();
+    const weldingMethod = String(line[4] ?? '').trim();
     const examDate = String(line[5] ?? '').trim();
     const employmentStatus = String(line[6] ?? '').trim();
     const examPassed = String(line[7] ?? '').trim();
@@ -214,7 +214,7 @@ async function readWelderRowsFromFile(file: File) {
       welderCode,
       name,
       team,
-      welding_method,
+      weldingMethod,
       examDate,
       employmentStatus,
       examPassed,

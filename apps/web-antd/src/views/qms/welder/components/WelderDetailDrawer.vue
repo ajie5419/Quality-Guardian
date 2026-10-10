@@ -261,8 +261,8 @@ defineExpose({ openDetail });
       <Descriptions.Item :label="t('qms.welder.team')">
         {{ detailRecord.team || '-' }}
       </Descriptions.Item>
-      <Descriptions.Item :label="t('qms.welder.welding_method')">
-        {{ detailRecord.welding_method || '-' }}
+      <Descriptions.Item :label="t('qms.welder.weldingMethod')">
+        {{ detailRecord.weldingMethod || '-' }}
       </Descriptions.Item>
       <Descriptions.Item :label="t('qms.welder.examDate')">
         {{

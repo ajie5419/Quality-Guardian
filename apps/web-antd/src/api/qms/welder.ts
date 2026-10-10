@@ -16,7 +16,7 @@ export interface WelderItem {
   teamId?: null | string;
   updatedAt?: string;
   welderCode?: null | string;
-  welding_method?: null | string;
+  weldingMethod?: null | string;
 }
 
 export interface WelderStats {
@@ -54,7 +54,7 @@ export interface WelderWritePayload {
   team: string;
   teamId: string;
   welderCode?: null | string;
-  welding_method?: null | string;
+  weldingMethod?: null | string;
 }
 
 export interface ImportWelderPayload {

@@ -9,7 +9,7 @@ const welderFields = {
   team: z.string().trim().min(1),
   teamId: z.string().trim().min(1),
   welderCode: z.string().nullable().optional(),
-  welding_method: z.string().nullable().optional(),
+  weldingMethod: z.string().nullable().optional(),
 };
 
 export const welderCreateBodySchema = z.object(welderFields).strict();

@@ -1130,6 +1130,7 @@ model welders {
   examPassed       Boolean                  @default(false)
   employmentStatus welder_employment_status @default(ON_DUTY)
   certificationNo  String?
+  weldingMethod    String?
   score            Int                      @default(12)
   isDeleted        Boolean                  @default(false)
   createdAt        DateTime                 @default(now())

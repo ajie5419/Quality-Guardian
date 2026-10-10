@@ -13,6 +13,7 @@ vi.mock('~/utils/prisma', () => ({
             { name: 'welderCode' },
             { name: 'employmentStatus' },
             { name: 'examDate' },
+            { name: 'weldingMethod' },
           ],
         },
       },
@@ -64,6 +65,7 @@ describe('welderService', () => {
       team: 'A',
       teamId: 'team-1',
       welderCode: 'W-001',
+      weldingMethod: 'SMAW',
     });
 
     expect(prisma.welders.create).toHaveBeenCalledWith({
@@ -72,6 +74,7 @@ describe('welderService', () => {
         teamId: 'team-1',
         teamCanonicalId: 'team-canon',
         welderCode: 'W-001',
+        weldingMethod: 'SMAW',
       }),
     });
     expect(resolveTeamIdForWrite).toHaveBeenCalledWith({
@@ -92,6 +95,7 @@ describe('welderService', () => {
       name: 'Alice',
       team: 'A',
       teamId: 'team-1',
+      weldingMethod: 'GTAW',
     });
 
     expect(prisma.welders.update).toHaveBeenCalledWith({
@@ -100,6 +104,7 @@ describe('welderService', () => {
         name: 'Alice',
         teamId: 'team-1',
         teamCanonicalId: 'team-canon',
+        weldingMethod: 'GTAW',
       }),
     });
     expect(resolveTeamIdForWrite).toHaveBeenCalledWith({
@@ -107,6 +112,25 @@ describe('welderService', () => {
       keepExistingWhenNameMissing: true,
       team: 'A',
     });
+  });
+
+  it('normalizes the legacy welding_method input key on write', async () => {
+    vi.mocked(prisma.welders.create).mockResolvedValue({
+      id: 'welder-1',
+    } as never);
+
+    await WelderService.create({
+      name: 'Alice',
+      team: 'A',
+      teamId: 'team-1',
+      welding_method: 'SMAW',
+    });
+
+    expect(prisma.welders.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ weldingMethod: 'SMAW' }),
+    });
+    const createdData = vi.mocked(prisma.welders.create).mock.calls[0]?.[0];
+    expect(createdData?.data).not.toHaveProperty('welding_method');
   });
 
   it('soft deletes welder', async () => {

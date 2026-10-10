@@ -117,6 +117,9 @@ export function buildWelderCreateDataCore(input: Record<string, unknown>) {
     name,
     team,
     welderCode: normalizeWelderString(input.welderCode) ?? null,
+    weldingMethod:
+      normalizeWelderString(input.weldingMethod ?? input.welding_method) ??
+      null,
   };
 }
 
@@ -148,6 +151,11 @@ export function buildWelderUpdateDataCore(input: Record<string, unknown>) {
   if (input.certificationNo !== undefined) {
     updateData.certificationNo =
       normalizeWelderString(input.certificationNo) ?? null;
+  }
+  if (input.weldingMethod !== undefined || input.welding_method !== undefined) {
+    updateData.weldingMethod =
+      normalizeWelderString(input.weldingMethod ?? input.welding_method) ??
+      null;
   }
 
   return updateData;

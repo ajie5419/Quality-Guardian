@@ -42,7 +42,7 @@ const formState = reactive({
   team: '',
   teamId: '',
   welderCode: '',
-  welding_method: '',
+  weldingMethod: '',
 });
 
 function resetForm() {
@@ -50,7 +50,7 @@ function resetForm() {
   formState.welderCode = '';
   formState.team = '';
   formState.teamId = '';
-  formState.welding_method = '';
+  formState.weldingMethod = '';
   formState.examDate = undefined;
   formState.examPassed = false;
   formState.employmentStatus = 'ON_DUTY';
@@ -72,7 +72,7 @@ function openEditModal(row: QmsWelderApi.WelderItem) {
   formState.welderCode = identity.displayWelderCode;
   formState.team = row.team || '';
   formState.teamId = row.teamId || '';
-  formState.welding_method = row.welding_method || '';
+  formState.weldingMethod = row.weldingMethod || '';
   formState.examDate = row.examDate ? dayjs(row.examDate) : undefined;
   formState.examPassed = !!row.examPassed;
   formState.employmentStatus = row.employmentStatus || 'ON_DUTY';
@@ -102,7 +102,7 @@ async function handleModalOk() {
       team: formState.team,
       teamId: formState.teamId,
       welderCode: formState.welderCode || null,
-      welding_method: formState.welding_method || null,
+      weldingMethod: formState.weldingMethod || null,
     };
 
     if (isEditMode.value && currentId.value) {
@@ -166,9 +166,9 @@ defineExpose({
           @resolved="handleTeamChange"
         />
       </Form.Item>
-      <Form.Item :label="t('qms.welder.welding_method')" name="welding_method">
+      <Form.Item :label="t('qms.welder.weldingMethod')" name="weldingMethod">
         <Input
-          v-model:value="formState.welding_method"
+          v-model:value="formState.weldingMethod"
           placeholder="SMAW、GMAW、GTAW、FCAW"
         />
       </Form.Item>

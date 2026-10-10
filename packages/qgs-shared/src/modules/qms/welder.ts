@@ -14,7 +14,7 @@ export interface WelderItem {
   score: number;
   team: string;
   updatedAt?: string;
-  welding_method?: null | string;
+  weldingMethod?: null | string;
 }
 
 export interface WelderStats {
