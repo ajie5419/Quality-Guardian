@@ -257,6 +257,17 @@ export const inspectionModule: ModuleDeclaration = {
   dataScope: {
     deptFields: ['responsibleDepartment', 'responsibleBU'],
     selfFields: ['inspector', 'lastEditor'],
+    // The inspection module spans two tables. `quality_records` carries the
+    // BU/editor columns; `inspections` and `qms_inspection_requests` do not,
+    // so each model filters on the columns it actually has.
+    deptFieldsByModel: {
+      inspections: ['responsibleDepartment', 'responsibleDepartmentId'],
+      qms_inspection_requests: ['responsibleDepartment'],
+    },
+    selfFieldsByModel: {
+      inspections: ['inspector'],
+      qms_inspection_requests: ['reporter'],
+    },
   },
   audit: {
     materialRequestApprove: {

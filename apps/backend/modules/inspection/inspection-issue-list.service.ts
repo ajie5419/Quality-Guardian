@@ -235,6 +235,7 @@ export const InspectionIssueListService = {
         where,
         params.userContext,
         params.dataScope,
+        'quality_records',
       );
     }
     const page = Math.max(Number(params.page) || 1, 1);

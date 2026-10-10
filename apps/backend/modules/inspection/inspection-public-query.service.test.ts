@@ -170,6 +170,7 @@ describe('getTodayIncomingInspections', () => {
     return {
       requestNo: 'IR-20260607-0001',
       partName: '零件A',
+      supplierName: null,
       team: '供应商X',
       workOrderNumber: 'WO-001',
       quantity: 10,
@@ -252,6 +253,53 @@ describe('getTodayIncomingInspections', () => {
       await InspectionPublicQueryService.getTodayIncomingInspections();
 
     expect(result.pendingItems[0]?.reporter).toBe('张');
+  });
+
+  it('shows the canonical supplier name for V2 requests that keep team empty', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({
+        status: 'SUBMITTED',
+        supplierName: 'E2E Supplier',
+        team: null,
+      }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.pendingItems[0]?.supplierName).toBe('E2E Supplier');
+  });
+
+  it('falls back to the legacy team column when supplierName is absent', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([
+      makeRecord({ status: 'SUBMITTED', supplierName: null, team: '供应商X' }),
+    ]);
+
+    const result =
+      await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(result.pendingItems[0]?.supplierName).toBe('供应商X');
+  });
+
+  it('selects the canonical supplier column on the public board query', async () => {
+    (
+      prisma.qms_inspection_requests.findMany as ReturnType<typeof vi.fn>
+    ).mockResolvedValue([]);
+
+    await InspectionPublicQueryService.getTodayIncomingInspections();
+
+    expect(prisma.qms_inspection_requests.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        select: expect.objectContaining({
+          supplierName: true,
+          team: true,
+        }),
+      }),
+    );
   });
 
   it('parses requestInfo JSON into incomingType and notes', async () => {

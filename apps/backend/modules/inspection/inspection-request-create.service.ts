@@ -66,6 +66,8 @@ export const InspectionRequestCreateService = {
       identityContract,
       isPublic,
       machineStationBound,
+      machineStationBound > 1 &&
+        selectedWorkOrder?.multiStationEnabled === true,
     );
     return { payload };
   },

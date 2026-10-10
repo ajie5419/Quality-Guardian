@@ -1,4 +1,4 @@
-import type { AnalyticsAccessContext } from '~/modules/data-scope';
+import type { AccessScope, AnalyticsAccessContext } from '~/modules/data-scope';
 
 import { Prisma } from '@prisma/client';
 import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
@@ -14,9 +14,11 @@ import { DataScopeService, requireAnalyticsUser } from '~/modules/data-scope';
  */
 export async function buildScopedInspectionRequestWhere(
   baseWhere: Prisma.qms_inspection_requestsWhereInput,
-  access?: AnalyticsAccessContext,
+  access?: Omit<AnalyticsAccessContext, 'dataScope'> & {
+    dataScope?: AccessScope;
+  },
 ): Promise<Prisma.qms_inspection_requestsWhereInput> {
-  const user = requireAnalyticsUser(access);
+  const user = requireAnalyticsUser(access ? { user: access.user } : undefined);
   const scope = access?.dataScope;
   if (scope?.scopeType === 'ALL') {
     return baseWhere;

@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { InspectionService } from '~/modules/inspection/inspection.service';
 import { authorizeWrite } from '~/modules/rbac';
 import { logApiError } from '~/utils/api-logger';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import {
   badRequestResponse,
   internalServerErrorResponse,
@@ -17,10 +18,10 @@ const schema = z.object({
 });
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, INSPECTION_RECORD_PERMISSION_CODES.EDIT);
   const id = getRequiredRouterParam(event, 'id', 'ID required');
   if (typeof id !== 'string') return id;
   try {
+    await authorizeWrite(event, INSPECTION_RECORD_PERMISSION_CODES.EDIT);
     const body = schema.parse(await readBody(event));
     const status = body.status.trim().toUpperCase();
     if (!status) return badRequestResponse(event, '缺少归档状态');
@@ -34,8 +35,9 @@ export default defineEventHandler(async (event) => {
     });
     return useResponseSuccess(updated);
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '更新归档状态失败';
     logApiError('inspection-archive-task-status', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
+    const message = error instanceof Error ? error.message : '更新归档状态失败';
     return internalServerErrorResponse(event, message);
   }
 });

@@ -1,5 +1,8 @@
 import type { PrismaClient } from '@prisma/client';
 
+import { ErrorCode } from '@qgs/shared';
+import { BusinessError } from '~/utils/business-error';
+
 import { normalizeInspectionRequestText } from './inspection-request';
 
 export const inspectionRequestWorkOrdersInclude = {
@@ -41,13 +44,22 @@ export async function assertWorkOrdersExist(
 ) {
   const normalized = [...new Set(workOrderNumbers.map((item) => item.trim()))];
   const workOrders = await prisma.work_orders.findMany({
-    select: { projectName: true, quantity: true, workOrderNumber: true },
+    select: {
+      multiStationEnabled: true,
+      projectName: true,
+      quantity: true,
+      workOrderNumber: true,
+    },
     where: { workOrderNumber: { in: normalized } },
   });
   const existing = new Set(workOrders.map((item) => item.workOrderNumber));
   const missing = normalized.filter((item) => !existing.has(item));
   if (missing.length > 0) {
-    throw new Error(`BAD_REQUEST:工单不存在：${missing.join(', ')}`);
+    throw new BusinessError(
+      ErrorCode.BAD_REQUEST,
+      `工单不存在：${missing.join(', ')}`,
+      400,
+    );
   }
   return workOrders;
 }

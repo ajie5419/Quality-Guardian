@@ -45,6 +45,7 @@ function toItem(record: {
   requestNo: string;
   status: string;
   submittedAt: Date;
+  supplierName: null | string;
   team: null | string;
   unqualifiedQuantity: null | number;
   workOrderNumber: string;
@@ -53,7 +54,10 @@ function toItem(record: {
   return {
     requestNo: record.requestNo,
     partName: record.partName,
-    supplierName: record.team ?? '',
+    // V2 requests store the external responsibility in supplierName and keep
+    // the legacy TEAM column empty; older rows only carry team. Reading the
+    // canonical column first keeps the public board from showing "—".
+    supplierName: record.supplierName || record.team || '',
     workOrderNumber: record.workOrderNumber,
     quantity: record.quantity,
     qualifiedQuantity: record.qualifiedQuantity,
@@ -241,6 +245,7 @@ export const InspectionPublicQueryService = {
         },
         requestNo: true,
         partName: true,
+        supplierName: true,
         team: true,
         workOrderNumber: true,
         quantity: true,

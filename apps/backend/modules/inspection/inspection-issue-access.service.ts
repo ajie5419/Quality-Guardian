@@ -24,6 +24,7 @@ export async function buildInspectionIssueScopeWhere(
     where,
     { userId: userContext.userId, username: userContext.username },
     userContext.dataScope,
+    'quality_records',
   );
   // Legacy direct service callers may not yet carry middleware scope. Keep
   // their existing ownership restriction while all HTTP callers provide the
