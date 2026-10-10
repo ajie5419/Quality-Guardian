@@ -15,14 +15,14 @@ import {
 const requirementIdSchema = z.string().trim().min(1);
 
 export default defineEventHandler(async (event) => {
-  await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.DELETE);
-  const userinfo = getCurrentUser(event);
   const idResult = requirementIdSchema.safeParse(getRouterParam(event, 'id'));
   if (!idResult.success) {
     return badRequestResponse(event, 'Requirement ID is required');
   }
 
   try {
+    await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.DELETE);
+    const userinfo = getCurrentUser(event);
     await WorkOrderRouteService.deleteRequirement(
       event,
       idResult.data,

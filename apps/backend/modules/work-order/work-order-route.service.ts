@@ -19,6 +19,7 @@ import {
 } from '~/modules/work-order/work-order-query';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
+import { BusinessError } from '~/utils/business-error';
 import {
   EXPORT_LIMIT_EXCEEDED_MESSAGE,
   isExportLimitExceeded,
@@ -35,7 +36,7 @@ import {
 
 import { buildWorkOrderImportGovernedFields } from './work-order-import-governance';
 import { WorkOrderRequirementRouteService } from './work-order-requirement-route.service';
-import { mapWorkOrderStatus } from './work-order-status';
+import { mapWorkOrderStatus, parseWorkOrderStatus } from './work-order-status';
 import {
   buildScopedWorkOrderWhere,
   deleteWorkOrderVersioned,
@@ -49,6 +50,23 @@ async function buildWorkOrderGovernedFields(input: Record<string, unknown>) {
     input,
   );
   return { ...governedFields, ...canonicalFields };
+}
+
+/**
+ * Interactive work-order writes must reject an unrecognized status instead of
+ * silently defaulting to OPEN, which would persist an unintended value under a
+ * 200 response. Batch import keeps the lenient mapWorkOrderStatus behavior for
+ * legacy spreadsheet values (PRODUCT_DECISION).
+ */
+function resolveInteractiveStatus(status: unknown) {
+  if (status === undefined || status === null || status === '') {
+    return mapWorkOrderStatus(status);
+  }
+  const parsed = parseWorkOrderStatus(status);
+  if (!parsed) {
+    throw new BusinessError('BAD_REQUEST', `无效的工单状态: ${String(status)}`);
+  }
+  return parsed;
 }
 
 export const WorkOrderRouteService = {
@@ -103,7 +121,7 @@ export const WorkOrderRouteService = {
       multiStationEnabled: body.multiStationEnabled === true,
       deliveryDate: parseRequiredDate(body.deliveryDate),
       effectiveTime: parseOptionalDate(body.effectiveTime),
-      status: mapWorkOrderStatus(body.status),
+      status: resolveInteractiveStatus(body.status),
       isDeleted: false,
       updatedAt: new Date(),
     };
@@ -201,7 +219,9 @@ export const WorkOrderRouteService = {
       updateData.effectiveTime = parseOptionalDate(body.effectiveTime);
     if (body.workOrderNumber && body.workOrderNumber !== id)
       updateData.workOrderNumber = body.workOrderNumber;
-    if (body.status) updateData.status = mapWorkOrderStatus(body.status);
+    if (body.status !== undefined && body.status !== null) {
+      updateData.status = resolveInteractiveStatus(body.status);
+    }
     await updateWorkOrderVersioned(
       event,
       id,

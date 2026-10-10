@@ -51,6 +51,7 @@ export async function mapWorkOrderItems(
     projectName: null | string;
     quantity: null | number;
     status: null | string;
+    version: number;
     workOrderNumber: null | string;
   }>,
 ): Promise<WorkOrderItem[]> {
@@ -86,6 +87,10 @@ export async function mapWorkOrderItems(
       division: wo.division || null,
       multiStationEnabled: Boolean(wo.multiStationEnabled),
       quantity: wo.quantity || 0,
+      // OPTIMISTIC-LOCK-001: the interactive editor must echo back the
+      // version it read, otherwise every UI edit is rejected as a missing
+      // lock token.
+      version: wo.version,
     };
   });
 }

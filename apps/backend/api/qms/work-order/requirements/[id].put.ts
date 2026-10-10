@@ -16,13 +16,12 @@ import {
 export default defineValidatedHandler(
   workOrderRequirementMutationBodySchema,
   async (event, body) => {
-    await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.EDIT);
-    const userinfo = getCurrentUser(event);
-
     const id = String(getRouterParam(event, 'id') || '').trim();
     if (!id) return badRequestResponse(event, '无效要求ID');
 
     try {
+      await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.EDIT);
+      const userinfo = getCurrentUser(event);
       return useResponseSuccess(
         await WorkOrderRouteService.updateRequirement(
           event,

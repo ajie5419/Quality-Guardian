@@ -60,6 +60,26 @@ vi.mock('~/utils/governed-write', () => ({
 
 vi.mock('~/modules/work-order/work-order-status', () => ({
   mapWorkOrderStatus: (s: unknown) => String(s || 'OPEN'),
+  // Mirror the real strict parser: known statuses pass through, everything
+  // else is rejected so callers can surface a 400.
+  parseWorkOrderStatus: (s: unknown) => {
+    const value = String(s ?? '')
+      .trim()
+      .toUpperCase()
+      .replaceAll(' ', '_');
+    const known = new Set([
+      'CANCELLED',
+      'CLOSED',
+      'COMPLETED',
+      'IN_PROGRESS',
+      'OPEN',
+      'PENDING',
+    ]);
+    if (!known.has(value)) return null;
+    if (value === 'CLOSED') return 'COMPLETED';
+    if (value === 'PENDING') return 'OPEN';
+    return value;
+  },
 }));
 
 vi.mock('~/utils/prisma-error', () => ({
@@ -357,6 +377,29 @@ describe('workOrderRouteService', () => {
         ),
       ).rejects.toThrow('缺少必填字段');
     });
+
+    /**
+     * Regression: an unrecognized status used to be coerced to OPEN and
+     * persisted under HTTP 200. Interactive create must now reject it.
+     */
+    it('rejects an unknown status instead of defaulting to OPEN', async () => {
+      (prisma.work_orders.findUnique as any).mockResolvedValue(null);
+
+      await expect(
+        WorkOrderRouteService.create(
+          mockEvent(),
+          {
+            customerName: 'Customer',
+            deliveryDate: '2024-06-01',
+            status: 'NOT_A_STATUS',
+            workOrderNumber: 'WO-BAD-STATUS',
+          },
+          mockUserinfo(),
+        ),
+      ).rejects.toThrow('无效的工单状态');
+      expect(prisma.work_orders.create).not.toHaveBeenCalled();
+      expect(prisma.work_orders.update).not.toHaveBeenCalled();
+    });
   });
 
   describe('update', () => {
@@ -414,6 +457,29 @@ describe('workOrderRouteService', () => {
         }),
         where: expect.objectContaining({ workOrderNumber: 'WO-001' }),
       });
+    });
+
+    /**
+     * Regression: interactive update must reject an unrecognized status and
+     * leave the stored row untouched instead of writing a defaulted OPEN.
+     */
+    it('rejects an unknown status on update without writing', async () => {
+      (prisma.work_orders.findFirst as any).mockResolvedValue({
+        customerName: 'Customer',
+        version: 1,
+        workOrderNumber: 'WO-001',
+      });
+
+      await expect(
+        WorkOrderRouteService.update(
+          mockEvent(),
+          'WO-001',
+          { status: 'NOT_A_STATUS' },
+          mockUserinfo(),
+          1,
+        ),
+      ).rejects.toThrow('无效的工单状态');
+      expect(prisma.work_orders.updateMany).not.toHaveBeenCalled();
     });
 
     it('should throw when work order not found', async () => {

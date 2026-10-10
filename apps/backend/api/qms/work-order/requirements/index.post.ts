@@ -14,10 +14,9 @@ import {
 export default defineValidatedHandler(
   workOrderRequirementCreateBodySchema,
   async (event, body) => {
-    await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.CREATE);
-    const userinfo = getCurrentUser(event);
-
     try {
+      await authorizeWrite(event, PERMISSION_CODES.QMS.WORK_ORDER.CREATE);
+      const userinfo = getCurrentUser(event);
       const requirements = 'requirements' in body ? body.requirements : [body];
       return useResponseSuccess(
         await WorkOrderRouteService.createRequirements(
