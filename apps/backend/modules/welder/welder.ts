@@ -31,6 +31,7 @@ export function sanitizeWelderWriteData<T extends Record<string, unknown>>(
     'employmentStatus',
     'examDate',
     'welderCode',
+    'weldingMethod',
   ]);
   const sanitizedEntries = Object.entries(data).filter(([fieldName]) => {
     return !optionalFields.has(fieldName) || hasWelderField(fieldName);
