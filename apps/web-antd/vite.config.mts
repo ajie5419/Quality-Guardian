@@ -39,9 +39,21 @@ function resolveBuildVersion() {
 
 export default defineConfig(async () => {
   const buildVersion = resolveBuildVersion();
+  const isolatedE2E = process.env.QGS_E2E_MODE === 'isolated';
+  const backendOrigin = isolatedE2E
+    ? process.env.QGS_E2E_BACKEND_ORIGIN
+    : 'http://localhost:5320';
+  if (
+    !backendOrigin ||
+    (isolatedE2E && !/^http:\/\/127\.0\.0\.1:\d+$/.test(backendOrigin))
+  ) {
+    throw new Error('Isolated E2E requires a loopback backend origin');
+  }
 
   return {
-    application: {},
+    application: isolatedE2E
+      ? { devtools: false, nitroMock: false, pwa: false }
+      : {},
     vite: {
       define: {
         'import.meta.env.VITE_APP_VERSION': JSON.stringify(buildVersion),
@@ -55,18 +67,19 @@ export default defineConfig(async () => {
         },
       },
       server: {
+        ...(isolatedE2E ? { host: '127.0.0.1', strictPort: true } : {}),
         proxy: {
           '/api': {
             changeOrigin: true,
             rewrite: (path: string) => path.replace(/^\/api/, ''),
             // 真实后端地址 (原 backend-mock 现已重命名为 backend)
-            target: 'http://localhost:5320/api',
+            target: `${backendOrigin}/api`,
             ws: true,
           },
           '/uploads': {
             changeOrigin: true,
             rewrite: (path: string) => path.replace(/^\/uploads/, ''),
-            target: 'http://localhost:5320/uploads',
+            target: `${backendOrigin}/uploads`,
           },
         },
       },
