@@ -5,18 +5,14 @@ import { BusinessError, businessErrorResponse } from '~/utils/business-error';
 
 import handler from './index.post';
 
-vi.mock('h3', () => ({
-  defineEventHandler: (fn: unknown) => fn,
-}));
+vi.mock('h3', () => ({ defineEventHandler: (fn: unknown) => fn }));
 vi.mock('~/modules/rbac', () => ({
   authorizeWrite: vi.fn(),
 }));
 vi.mock('~/modules/quality-loss/quality-loss-create.post.service', () => ({
   default: vi.fn(),
 }));
-vi.mock('~/utils/api-logger', () => ({
-  logApiError: vi.fn(),
-}));
+vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
 vi.mock('~/utils/business-error', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('~/utils/business-error')>();
@@ -27,15 +23,13 @@ vi.mock('~/utils/business-error', async (importOriginal) => {
 });
 
 describe('quality-loss post authorization boundary', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => vi.clearAllMocks());
 
   it('returns a standard 403 response when create authorization fails', async () => {
     const error = new BusinessError('FORBIDDEN', 'Denied', 403);
     vi.mocked(authorizeWrite).mockRejectedValueOnce(error);
     const event = {} as never;
-    const result = await handler(event);
+    const result = await handler(event as never);
     expect(result).toEqual({ code: -1, status: 403 });
     expect(businessErrorResponse).toHaveBeenCalledWith(event, error);
     expect(upstreamHandler).not.toHaveBeenCalled();

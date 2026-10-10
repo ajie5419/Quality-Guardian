@@ -23,9 +23,7 @@ vi.mock('~/utils/api-logger', () => ({
   logApiError: vi.fn(),
   logApiWarn: vi.fn(),
 }));
-vi.mock('~/utils/current-user', () => ({
-  getCurrentUser: vi.fn(),
-}));
+vi.mock('~/utils/current-user', () => ({ getCurrentUser: vi.fn() }));
 vi.mock('~/utils/business-error', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('~/utils/business-error')>();
@@ -36,9 +34,7 @@ vi.mock('~/utils/business-error', async (importOriginal) => {
 });
 
 describe('supplier post authorization boundary', () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-  });
+  beforeEach(() => vi.clearAllMocks());
 
   it('returns a standard 403 response when create authorization fails', async () => {
     const error = new BusinessError('FORBIDDEN', 'Denied', 403);
