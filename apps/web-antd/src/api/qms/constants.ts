@@ -94,7 +94,6 @@ export const QMS_API = {
   // Planning & Knowledge
   PLANNING_DFMEA: '/qms/planning/dfmea',
   PLANNING_BOM: '/qms/planning/bom',
-  PLANNING_ITP: '/qms/planning/itp',
   PLANNING_ITP_IMPORT: '/qms/planning/itp/import',
   AI_GENERATE_ITP: '/qms/ai/generate-itp',
   AI_EXTRACT_TAGS: '/qms/ai/extract-tags',
