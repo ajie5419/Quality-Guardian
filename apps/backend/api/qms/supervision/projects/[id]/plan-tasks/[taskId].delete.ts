@@ -12,16 +12,16 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await authorizeWrite(
-    event,
-    SUPERVISION_PERMISSION_CODES.DELETE,
-  );
-  const context = buildSupervisionAccessContext(userinfo);
-  const projectId = getRouterParam(event, 'id');
-  const taskId = getRouterParam(event, 'taskId');
-  if (!projectId || !taskId) return badRequestResponse(event, '参数不完整');
-
   try {
+    const userinfo = await authorizeWrite(
+      event,
+      SUPERVISION_PERMISSION_CODES.DELETE,
+    );
+    const context = buildSupervisionAccessContext(userinfo);
+    const projectId = getRouterParam(event, 'id');
+    const taskId = getRouterParam(event, 'taskId');
+    if (!projectId || !taskId) return badRequestResponse(event, '参数不完整');
+
     const data = await SupervisionPlanTaskService.deleteTask(
       projectId,
       taskId,

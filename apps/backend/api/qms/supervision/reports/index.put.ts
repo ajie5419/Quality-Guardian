@@ -12,16 +12,16 @@ import {
 } from '~/utils/response';
 
 export default defineEventHandler(async (event) => {
-  const userinfo = await authorizeWrite(
-    event,
-    SUPERVISION_PERMISSION_CODES.EDIT,
-  );
-  const context = buildSupervisionAccessContext(userinfo);
-  const query = getQuery(event);
-  const id = String(query.id || '').trim();
-  if (!id) return badRequestResponse(event, '日报ID不能为空');
-
   try {
+    const userinfo = await authorizeWrite(
+      event,
+      SUPERVISION_PERMISSION_CODES.EDIT,
+    );
+    const context = buildSupervisionAccessContext(userinfo);
+    const query = getQuery(event);
+    const id = String(query.id || '').trim();
+    if (!id) return badRequestResponse(event, '日报ID不能为空');
+
     const body = await readBody(event);
     const data = await SupervisionReportService.updateReport(id, body, context);
     return useResponseSuccess(data);

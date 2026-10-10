@@ -1,3 +1,4 @@
+import type { Prisma } from '@prisma/client';
 import type {
   SupervisionIssue,
   SupervisionIssueAction,
@@ -7,6 +8,10 @@ import type {
 import type { SupervisionAccessContext } from './supervision-access';
 
 import { safeNumber, tryParsePhotos } from '@qgs/shared';
+import {
+  buildRequestFingerprint,
+  withRequestIdempotency,
+} from '~/modules/idempotency';
 import { BusinessError } from '~/utils/business-error';
 import {
   buildGovernedCanonicalWritePairForTable,
@@ -168,8 +173,9 @@ export const SupervisionIssueService = {
     issueId: string,
     payload: Record<string, unknown>,
     context: SupervisionAccessContext,
+    idempotencyKey?: string,
   ) {
-    return prisma.$transaction(async (tx) => {
+    const write = async (tx: Prisma.TransactionClient) => {
       const accessWhere = buildSupervisionAccessWhere('issue', context);
       const current = await tx.supervision_issues.findFirst({
         select: { id: true, status: true },
@@ -247,7 +253,37 @@ export const SupervisionIssueService = {
         targetId: issueId,
       });
       return mapIssueAction(row);
+    };
+    // Legacy callers retain their behavior; keyed UI retries claim and write atomically.
+    if (!idempotencyKey) return prisma.$transaction(write);
+    const result = await withRequestIdempotency({
+      prisma,
+      actorKey: `user:${context.userId}`,
+      operationKey: `qms.supervision.issue-action:${issueId}`,
+      idempotencyKey,
+      requestFingerprint: buildRequestFingerprint(payload),
+      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
+      resourceGuard: async (client) =>
+        Boolean(
+          await client.supervision_issues.findFirst({
+            select: { id: true },
+            where: {
+              id: issueId,
+              isDeleted: false,
+              ...buildSupervisionAccessWhere('issue', context),
+            },
+          }),
+        ),
+      run: async (tx) => {
+        const response = await write(tx);
+        return {
+          resourceId: response.id,
+          resourceType: 'supervision_issue_action',
+          response,
+        };
+      },
     });
+    return result.response;
   },
 
   async listIssueActions(issueId: string) {

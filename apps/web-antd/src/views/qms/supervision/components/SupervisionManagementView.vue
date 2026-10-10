@@ -1087,7 +1087,10 @@ async function submitIssue() {
   await refreshAll();
 }
 
+let actionRequestKey = '';
+
 async function openActionDrawer(issue: SupervisionIssue) {
+  actionRequestKey = crypto.randomUUID();
   editingIssueId.value = issue.id;
   Object.assign(actionForm, {
     actionType: 'FOLLOW_UP',
@@ -1103,14 +1106,18 @@ async function openActionDrawer(issue: SupervisionIssue) {
 
 async function submitAction() {
   if (!editingIssueId.value) return;
-  await createSupervisionIssueAction(editingIssueId.value, {
-    actionType: actionForm.actionType,
-    attachments: uploadUrls(actionForm.attachments),
-    description: actionForm.description,
-    rectificationPhotos: uploadUrls(actionForm.rectificationPhotos),
-    status: actionForm.status,
-    verifyResult: actionForm.verifyResult,
-  });
+  await createSupervisionIssueAction(
+    editingIssueId.value,
+    {
+      actionType: actionForm.actionType,
+      attachments: uploadUrls(actionForm.attachments),
+      description: actionForm.description,
+      rectificationPhotos: uploadUrls(actionForm.rectificationPhotos),
+      status: actionForm.status,
+      verifyResult: actionForm.verifyResult,
+    },
+    actionRequestKey,
+  );
   actionDrawerOpen.value = false;
   message.success('处理记录已保存');
   await refreshAll();

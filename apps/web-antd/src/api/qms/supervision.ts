@@ -151,10 +151,16 @@ export async function createSupervisionIssueAction(
     status?: SupervisionIssue['status'];
     verifyResult?: string;
   },
+  idempotencyKey?: string,
 ) {
   return requestClient.post<SupervisionIssueAction>(
     `${QMS_API.SUPERVISION_ISSUES}/${issueId}/actions`,
     data,
+    {
+      headers: idempotencyKey
+        ? { 'Idempotency-Key': idempotencyKey }
+        : undefined,
+    },
   );
 }
 
