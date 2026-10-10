@@ -55,13 +55,13 @@ import {
 const { t } = useI18n();
 const { handleApiError } = useErrorHandler();
 const { isMobile } = useMobileViewport();
-const { canCreate, canDelete, canEdit, canExport, canImport, canList } =
+const { canCreate, canDelete, canEdit, canExport, canImport } =
   useQmsPermissions('QMS:Metrology');
-const canCreateAction = computed(() => canCreate.value || canList.value);
-const canDeleteAction = computed(() => canDelete.value || canList.value);
-const canEditAction = computed(() => canEdit.value || canList.value);
-const canImportAction = computed(() => canImport.value || canList.value);
-const canExportAction = computed(() => canExport.value || canList.value);
+const canCreateAction = canCreate;
+const canDeleteAction = canDelete;
+const canEditAction = canEdit;
+const canImportAction = canImport;
+const canExportAction = canExport;
 const modalVisible = ref(false);
 const currentRecord = ref<null | QmsMetrologyApi.MetrologyItem>(null);
 const checkedRows = ref<QmsMetrologyApi.MetrologyItem[]>([]);

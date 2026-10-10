@@ -274,6 +274,8 @@ async function handleBorrowSubmit() {
     resetState('');
     emit('success');
   } catch (error) {
+    // Public requests have no global error notifier; retain the form for retry.
+    if (props.publicMode) message.error(t('qms.metrology.borrow.borrowFailed'));
     handleApiError(error, 'Create Metrology Borrow');
   } finally {
     loading.value = false;
@@ -312,6 +314,7 @@ async function handleReturnSubmit() {
     resetState('');
     emit('success');
   } catch (error) {
+    if (props.publicMode) message.error(t('qms.metrology.borrow.returnFailed'));
     handleApiError(error, 'Return Metrology Borrow');
   } finally {
     loading.value = false;

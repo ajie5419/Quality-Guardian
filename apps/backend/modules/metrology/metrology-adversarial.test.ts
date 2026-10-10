@@ -177,6 +177,10 @@ function makeInstrument(overrides: Record<string, unknown> = {}) {
 
 const mockPrisma = vi.mocked(prisma) as any;
 
+beforeEach(() => {
+  mockPrisma.$transaction = vi.fn(async (work) => work(mockPrisma));
+});
+
 // ═══════════════════════════════════════════════
 // Metrology Service — Adversarial Tests
 // ═══════════════════════════════════════════════
@@ -585,14 +589,23 @@ describe('metrologyService — getOverview', () => {
 describe('metrologyService — batchDelete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.measuring_instruments.findMany.mockResolvedValue([]);
     mockPrisma.measuring_instruments.updateMany.mockResolvedValue({ count: 0 });
   });
 
   it('passes ids to updateMany with soft delete', async () => {
+    mockPrisma.measuring_instruments.findMany.mockResolvedValue(
+      ['a', 'b', 'c'].map((id) => makeInstrument({ id })),
+    );
+    mockPrisma.measuring_instruments.updateMany.mockResolvedValue({ count: 3 });
     await MetrologyService.batchDelete(['a', 'b', 'c'], 'admin');
     expect(mockPrisma.measuring_instruments.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: { in: ['a', 'b', 'c'] }, isDeleted: false },
+        where: expect.objectContaining({
+          id: { in: ['a', 'b', 'c'] },
+          isDeleted: false,
+          borrowStatus: 'AVAILABLE',
+        }),
         data: expect.objectContaining({ isDeleted: true, updatedBy: 'admin' }),
       }),
     );
@@ -615,14 +628,21 @@ describe('metrologyService — batchDelete', () => {
 describe('metrologyService — deleteById', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockPrisma.measuring_instruments.update.mockResolvedValue({} as never);
+    mockPrisma.measuring_instruments.findMany.mockResolvedValue([
+      makeInstrument(),
+    ]);
+    mockPrisma.measuring_instruments.updateMany.mockResolvedValue({ count: 1 });
   });
 
   it('soft-deletes by id with updatedBy', async () => {
     await MetrologyService.deleteById('mi-1', 'admin');
-    expect(mockPrisma.measuring_instruments.update).toHaveBeenCalledWith(
+    expect(mockPrisma.measuring_instruments.updateMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: 'mi-1' },
+        where: expect.objectContaining({
+          id: { in: ['mi-1'] },
+          isDeleted: false,
+          borrowStatus: 'AVAILABLE',
+        }),
         data: expect.objectContaining({ isDeleted: true, updatedBy: 'admin' }),
       }),
     );
@@ -1606,6 +1626,7 @@ describe('metrologyService — pagination edge cases', () => {
 describe('metrologyService — batchDelete adversarial', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPrisma.measuring_instruments.findMany.mockResolvedValue([]);
     mockPrisma.measuring_instruments.updateMany.mockResolvedValue({ count: 0 });
   });
 
@@ -1725,16 +1746,22 @@ describe('metrologyService — CRUD adversarial', () => {
   });
 
   it('deleteById: sets updatedAt to current time', async () => {
-    mockPrisma.measuring_instruments.update.mockResolvedValue({} as never);
+    mockPrisma.measuring_instruments.findMany.mockResolvedValue([
+      makeInstrument(),
+    ]);
+    mockPrisma.measuring_instruments.updateMany.mockResolvedValue({ count: 1 });
     const before = Date.now();
     await MetrologyService.deleteById('mi-1');
-    const call = mockPrisma.measuring_instruments.update.mock.calls[0][0];
+    const call = mockPrisma.measuring_instruments.updateMany.mock.calls[0][0];
     expect((call.data.updatedAt as Date).getTime()).toBeGreaterThanOrEqual(
       before - 1000,
     );
   });
 
   it('batchDelete with single ID', async () => {
+    mockPrisma.measuring_instruments.findMany.mockResolvedValue([
+      makeInstrument({ id: 'only-one' }),
+    ]);
     mockPrisma.measuring_instruments.updateMany.mockResolvedValue({ count: 1 });
     await MetrologyService.batchDelete(['only-one'], 'admin');
     const call = mockPrisma.measuring_instruments.updateMany.mock.calls[0][0];

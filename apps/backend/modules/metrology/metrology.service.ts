@@ -4,6 +4,7 @@ import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
 import { buildKeywordOr, parsePagination } from '~/utils/query-helpers';
 
+import { MetrologyDeleteService } from './metrology-delete.service';
 import { MetrologyImportService } from './metrology-import.service';
 import {
   calculateRemainingDays,
@@ -324,14 +325,7 @@ function normalizeMutationPayload(body: MetrologyMutationPayload) {
 
 export const MetrologyService = {
   async batchDelete(ids: string[], username?: string) {
-    return prisma.measuring_instruments.updateMany({
-      where: { id: { in: ids }, isDeleted: false },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-        updatedBy: username || null,
-      },
-    });
+    return MetrologyDeleteService.batchDelete(ids, username);
   },
 
   async create(body: MetrologyMutationPayload, username?: string) {
@@ -346,14 +340,7 @@ export const MetrologyService = {
   },
 
   async deleteById(id: string, username?: string) {
-    return prisma.measuring_instruments.update({
-      where: { id },
-      data: {
-        isDeleted: true,
-        updatedAt: new Date(),
-        updatedBy: username || null,
-      },
-    });
+    return MetrologyDeleteService.deleteById(id, username);
   },
 
   async getList(params: MetrologyListParams) {
