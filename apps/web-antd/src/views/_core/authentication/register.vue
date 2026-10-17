@@ -3,7 +3,7 @@ import type { VbenFormSchema } from '@vben/common-ui';
 import type { Recordable } from '@vben/types';
 
 import { computed, h, ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
 
 import { AuthenticationRegister, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
@@ -12,10 +12,20 @@ import { message } from 'ant-design-vue';
 
 import { getPublicDepartmentsApi } from '#/api/core/auth';
 import { requestClient } from '#/api/request';
+import { withAuthRedirect } from '#/utils/auth-brand';
+import { identityRedirect } from '#/utils/identity-redirect';
 
 defineOptions({ name: 'Register' });
 
 const router = useRouter();
+const route = useRoute();
+// Only a validated bridge redirect is carried back to the login page.
+const loginPath = computed(() =>
+  withAuthRedirect(
+    '/auth/login',
+    identityRedirect(route.query.redirect) ? route.query.redirect : undefined,
+  ),
+);
 const loading = ref(false);
 
 const formSchema = computed((): VbenFormSchema[] => {
@@ -120,7 +130,7 @@ async function handleSubmit(value: Recordable<unknown>) {
       username: val.username,
     });
     message.success('注册成功！请登录');
-    router.push('/auth/login');
+    router.push(loginPath.value);
   } catch (error: unknown) {
     const axiosError = error as { message?: string };
     message.error(axiosError?.message || '注册失败');
@@ -135,6 +145,8 @@ async function handleSubmit(value: Recordable<unknown>) {
     <AuthenticationRegister
       :form-schema="formSchema"
       :loading="loading"
+      :login-path="loginPath"
+      :sub-title="$t('page.auth.registerSubtitle')"
       @submit="handleSubmit"
     />
   </div>

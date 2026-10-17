@@ -36,7 +36,7 @@ const coreRoutes: RouteRecordRaw[] = [
     path: '/identity/authorize',
     component: () =>
       import('#/views/_core/authentication/identity-authorize.vue'),
-    meta: { hideInMenu: true, hideInTab: true, title: '登录履约系统' },
+    meta: { hideInMenu: true, hideInTab: true, title: '统一登录' },
   },
   /**
    * 根路由

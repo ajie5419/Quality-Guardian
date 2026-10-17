@@ -4,7 +4,10 @@
     "register": "注册",
     "codeLogin": "验证码登录",
     "qrcodeLogin": "二维码登录",
-    "forgetPassword": "忘记密码"
+    "forgetPassword": "忘记密码",
+    "loginDestination": "登录后进入 {name}",
+    "loginNeutral": "请输入账号密码登录",
+    "registerSubtitle": "注册后可登录各业务系统"
   },
   "dashboard": {
     "title": "概览",

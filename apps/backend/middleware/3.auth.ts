@@ -71,6 +71,9 @@ export default defineEventHandler(async (event) => {
     ].includes(pathname)
   )
     return;
+  // Public display-name lookup for the bridge login page; returns no identity data.
+  if (event.method === 'GET' && pathname === '/api/identity-bridge/client')
+    return;
   // Read-only fulfillment sync feeds authenticate the same client headers.
   if (
     event.method === 'GET' &&

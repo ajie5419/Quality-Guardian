@@ -10,6 +10,7 @@ import '@vben/styles/antd';
 import { useTitle } from '@vueuse/core';
 
 import { $t, setupI18n } from '#/locales';
+import { AUTH_BRAND_NAME, isAuthBrandRoute } from '#/utils/auth-brand';
 
 import { initComponentAdapter } from './adapter/component';
 import { initSetupVbenForm } from './adapter/form';
@@ -77,9 +78,12 @@ async function bootstrap(namespace: string) {
   // 动态更新标题
   watchEffect(() => {
     if (preferences.app.dynamicTitle) {
-      const routeTitle = router.currentRoute.value.meta?.title;
-      const pageTitle =
-        (routeTitle ? `${$t(routeTitle)} - ` : '') + preferences.app.name;
+      const route = router.currentRoute.value;
+      const routeTitle = route.meta?.title;
+      const appName = isAuthBrandRoute(route.matched)
+        ? AUTH_BRAND_NAME
+        : preferences.app.name;
+      const pageTitle = (routeTitle ? `${$t(routeTitle)} - ` : '') + appName;
       useTitle(pageTitle);
     }
   });

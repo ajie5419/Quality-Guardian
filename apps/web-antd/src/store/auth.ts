@@ -101,7 +101,11 @@ export const useAuthStore = defineStore('auth', () => {
     };
   }
 
-  async function logout(redirect: boolean = true) {
+  /**
+   * @param redirect true returns to the current route after login; a string
+   * returns to that path (used by the identity bridge to switch accounts).
+   */
+  async function logout(redirect: boolean | string = true) {
     try {
       await logoutApi();
     } catch {
@@ -115,7 +119,11 @@ export const useAuthStore = defineStore('auth', () => {
       path: LOGIN_PATH,
       query: redirect
         ? {
-            redirect: encodeURIComponent(router.currentRoute.value.fullPath),
+            redirect: encodeURIComponent(
+              typeof redirect === 'string'
+                ? redirect
+                : router.currentRoute.value.fullPath,
+            ),
           }
         : {},
     });

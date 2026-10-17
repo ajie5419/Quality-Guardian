@@ -2,15 +2,47 @@
 import type { VbenFormSchema } from '@vben/common-ui';
 
 import { computed } from 'vue';
+import { useRoute } from 'vue-router';
 
 import { AuthenticationLogin, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
+import { preferences } from '@vben/preferences';
 
+import { useIdentityClientName } from '#/composables/useIdentityClientName';
 import { useAuthStore } from '#/store';
+import { withAuthRedirect } from '#/utils/auth-brand';
+import {
+  identityRedirect,
+  identityRedirectTarget,
+} from '#/utils/identity-redirect';
 
 defineOptions({ name: 'Login' });
 
 const authStore = useAuthStore();
+const route = useRoute();
+
+// A bridge login is a login whose redirect is the fixed authorize page.
+const isBridge = computed(() =>
+  Boolean(identityRedirect(route.query.redirect)),
+);
+const bridgeName = useIdentityClientName(
+  computed(() => identityRedirectTarget(route.query.redirect)),
+);
+// Same page for every entry; only the subtitle names the destination.
+const subTitle = computed(() => {
+  if (!isBridge.value) {
+    return $t('page.auth.loginDestination', { name: preferences.app.name });
+  }
+  return bridgeName.value
+    ? $t('page.auth.loginDestination', { name: bridgeName.value })
+    : $t('page.auth.loginNeutral');
+});
+const registerPath = computed(() =>
+  withAuthRedirect(
+    '/auth/register',
+    isBridge.value ? route.query.redirect : undefined,
+  ),
+);
 
 // 精简的表单配置 - 只保留用户名和密码
 const formSchema = computed((): VbenFormSchema[] => {
@@ -44,9 +76,10 @@ const formSchema = computed((): VbenFormSchema[] => {
     :show-code-login="false"
     :show-qrcode-login="false"
     :show-forget-password="false"
-    :show-register="true"
+    :register-path="registerPath"
     :show-remember-me="false"
     :show-third-party-login="false"
+    :sub-title="subTitle"
     @submit="authStore.authLogin"
   />
 </template>

@@ -19,5 +19,6 @@ export const exchangeSchema = z
     verifier: z.string().regex(/^[\w.~-]{43,128}$/),
   })
   .strict();
+export const clientLookupSchema = z.object({ clientId, redirectUri });
 export type AuthorizeInput = z.infer<typeof authorizeSchema>;
 export type ExchangeInput = z.infer<typeof exchangeSchema>;
