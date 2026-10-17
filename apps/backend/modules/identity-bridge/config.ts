@@ -49,14 +49,39 @@ export function rejectIdentity(): never {
   );
 }
 
+function sameDigest(left: string, right: string) {
+  return timingSafeEqual(Buffer.from(digest(left)), Buffer.from(digest(right)));
+}
+
 export function authenticateClient(
-  client: BridgeClient,
+  client: Pick<BridgeClient, 'id' | 'secret'>,
   id: string,
   secret: string,
 ) {
-  const same = timingSafeEqual(
-    Buffer.from(digest(secret)),
-    Buffer.from(digest(client.secret)),
-  );
-  if (!same || id !== client.id) rejectIdentity();
+  // Both comparisons always run so timing reveals neither which part failed.
+  const sameSecret = sameDigest(secret, client.secret);
+  const sameId = sameDigest(id, client.id);
+  if (!sameSecret || !sameId) rejectIdentity();
+}
+
+/**
+ * Loads only the confidential client id/secret (no callback), for machine
+ * endpoints that reuse the bridge credentials. Returns null when absent or
+ * invalid so callers fail closed instead of admitting anonymous traffic.
+ */
+export function loadClientCredentials(): null | Pick<
+  BridgeClient,
+  'id' | 'secret'
+> {
+  const value = z
+    .object({
+      id: z.string().min(1).max(128),
+      secret: z.string().min(32).max(256),
+    })
+    .safeParse({
+      id: process.env.QMS_IDENTITY_CLIENT_ID,
+      secret: process.env.QMS_IDENTITY_CLIENT_SECRET,
+    });
+  if (!value.success) return null;
+  return { id: value.data.id, secret: value.data.secret };
 }

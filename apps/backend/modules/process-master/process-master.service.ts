@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import type {
   InspectionRequestProcessCategory,
@@ -10,6 +11,7 @@ import type {
 import { createId } from '@paralleldrive/cuid2';
 import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
+import { buildUpdatedAtCursorWhere } from '~/utils/query-helpers';
 
 const INSPECTION_REQUEST_CATEGORIES = ['INCOMING', 'PROCESS'] as const;
 const INCOMING_TYPE_DICT_TYPE = 'incoming_type';
@@ -141,6 +143,28 @@ async function replaceCategorySelection(
 }
 
 export const ProcessMasterService = {
+  /**
+   * Read-only incremental feed for the fulfillment sync. Deliberately
+   * includes soft-deleted rows so the consumer can replicate deletions.
+   */
+  async listSyncPage(cursor: undefined | UpdatedAtCursor, take: number) {
+    return prisma.processes.findMany({
+      where: buildUpdatedAtCursorWhere(cursor, (afterKey) => ({
+        id: { gt: afterKey },
+      })),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        code: true,
+        id: true,
+        isDeleted: true,
+        name: true,
+        status: true,
+        updatedAt: true,
+      },
+      take,
+    });
+  },
+
   async findActiveById(id: string, client: ProcessReadClient = prisma) {
     return client.processes.findFirst({
       where: { id: id.trim(), isDeleted: false, status: 1 },

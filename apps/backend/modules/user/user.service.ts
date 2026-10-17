@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import { randomBytes } from 'node:crypto';
 
@@ -11,6 +12,7 @@ import { BusinessError } from '~/utils/business-error';
 import { buildGovernedWriteFieldsForTable } from '~/utils/governed-write';
 import { generateAccessToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
+import { buildUpdatedAtCursorWhere } from '~/utils/query-helpers';
 
 async function loadInspectorActiveTaskCounts(): Promise<Map<string, number>> {
   const inspection = await import('~/modules/inspection');
@@ -109,6 +111,29 @@ async function resolveCreateRoleId(roleIds?: string[], roles?: string[]) {
 }
 
 export const UserService = {
+  /**
+   * Read-only incremental feed for the fulfillment sync. Deliberately
+   * includes soft-deleted rows and selects no contact or credential fields.
+   */
+  async listSyncPage(cursor: undefined | UpdatedAtCursor, take: number) {
+    return prisma.users.findMany({
+      where: buildUpdatedAtCursorWhere(cursor, (afterKey) => ({
+        id: { gt: afterKey },
+      })),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        department: true,
+        id: true,
+        isDeleted: true,
+        realName: true,
+        status: true,
+        updatedAt: true,
+        username: true,
+      },
+      take,
+    });
+  },
+
   /**
    * Find all users with pagination
    */

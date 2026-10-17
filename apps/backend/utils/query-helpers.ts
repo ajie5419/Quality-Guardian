@@ -146,4 +146,27 @@ export function formatNumber(
   return Number(num.toFixed(decimals));
 }
 
+/**
+ * Keyset cursor over `(updatedAt, key)` for incremental sync feeds. A cursor
+ * without `afterKey` keeps rows whose `updatedAt` equals `since`, so a caller
+ * that only knows a timestamp never skips rows written in that instant.
+ */
+export interface UpdatedAtCursor {
+  afterKey?: string;
+  since: Date;
+}
+
+export function buildUpdatedAtCursorWhere<TKeyFilter>(
+  cursor: undefined | UpdatedAtCursor,
+  keyAfter: (afterKey: string) => TKeyFilter,
+) {
+  if (!cursor) return {};
+  return {
+    OR: [
+      { updatedAt: { gt: cursor.since } },
+      { AND: [{ updatedAt: cursor.since }, keyAfter(cursor.afterKey ?? '')] },
+    ],
+  };
+}
+
 export { safeNumber };

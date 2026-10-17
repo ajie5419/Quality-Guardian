@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildKeywordOr, parsePagination } from './query-helpers';
+import {
+  buildKeywordOr,
+  buildUpdatedAtCursorWhere,
+  parsePagination,
+} from './query-helpers';
 
 describe('query helpers', () => {
   describe('buildKeywordOr', () => {
@@ -73,6 +77,26 @@ describe('query helpers', () => {
         skip: 100,
         take: 100,
       });
+    });
+  });
+
+  describe('buildUpdatedAtCursorWhere', () => {
+    const since = new Date('2026-10-01T00:00:00.001Z');
+    const byId = (afterKey: string) => ({ id: { gt: afterKey } });
+
+    it('returns an empty filter without a cursor', () => {
+      expect(buildUpdatedAtCursorWhere(undefined, byId)).toEqual({});
+    });
+
+    it('is strictly after (updatedAt, key)', () => {
+      expect(buildUpdatedAtCursorWhere({ afterKey: 'b', since }, byId)).toEqual(
+        {
+          OR: [
+            { updatedAt: { gt: since } },
+            { AND: [{ updatedAt: since }, { id: { gt: 'b' } }] },
+          ],
+        },
+      );
     });
   });
 });

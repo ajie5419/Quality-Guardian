@@ -88,6 +88,8 @@ assertRecordOwnership({
 
 > 豁免清单（刻意公开，无需权限）：/api/qms/public/**（匿名报检）、/api/uploads/**、/api/qms/upload（登录态上传）、/api/system/log/client（客户端日志）、/api/user/preferences/**（用户自服务）、/api/auth/**、/api/telegram/**、/api/webhook/**。
 
+> 机器只读接口：`GET /api/integration/fulfillment/**` 不走 JWT、RBAC 与 data-scope，由 `fulfillment-sync` 模块以身份桥客户端凭据（`X-Identity-Client-Id/Secret`）自行认证，未配置凭据时一律 503。
+
 ## 5. 数据范围（部门/本人隔离）
 
 ### 5.1 现状

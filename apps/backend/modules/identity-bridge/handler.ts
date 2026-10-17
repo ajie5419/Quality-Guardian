@@ -17,6 +17,7 @@ import {
   authenticateClient,
   digest,
   loadBridgeClient,
+  loadClientCredentials,
   rejectIdentity,
 } from './config';
 import { createIdentityBridge } from './identity-bridge.service';
@@ -60,6 +61,26 @@ export async function assertIdentityBridgePermission(
     );
   }
   return client;
+}
+
+/**
+ * Authenticates a machine request by the bridge client headers. Throws 503
+ * when the credentials are not configured and 401 when they do not match.
+ */
+export function assertIdentityClientHeaders(event: H3Event) {
+  const client = loadClientCredentials();
+  if (!client) {
+    throw new BusinessError(
+      ErrorCode.INTERNAL,
+      'Identity client is not configured',
+      503,
+    );
+  }
+  authenticateClient(
+    client,
+    getHeader(event, 'x-identity-client-id') || '',
+    getHeader(event, 'x-identity-client-secret') || '',
+  );
 }
 
 export async function handleIdentityBridge(

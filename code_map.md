@@ -21,6 +21,7 @@
 - **metric-refresh/** — 派生指标刷新任务与重试
 - **master-data-identity/** — 历史身份决策、投影与对账基线
 - **identity-bridge/** — 履约系统身份授权码、凭证核查及撤销（独立客户端认证）
+- **fulfillment-sync/** — 履约系统只读增量同步（工单/供应商与TEAM/工序/部门/用户/报检，复用身份桥客户端认证）
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
 - **part-master/** — Canonical material master data management
 - **planning/** — 质量策划：BOM、DFMEA、ITP、项目文档管理
@@ -51,6 +52,7 @@
 - **ai/** — AI 对话/补全接口
 - **auth/** — 登录、登出、token 刷新、注册与回调（公开路径）
 - **identity-bridge/** — 身份桥接：授权需业务登录态，交换/核查/撤销需专用客户端认证
+- **integration/** — 外部系统机器接口；`fulfillment/` 为履约只读增量同步（GET，身份桥客户端认证，不走 JWT）
 - **files/** — 通用文件上传与下载代理
 - **menu/** — 动态菜单树查询（依据用户权限）
 - **qms/** — QMS 业务路由聚合入口

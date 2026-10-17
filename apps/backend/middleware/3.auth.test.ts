@@ -87,6 +87,19 @@ describe('auth middleware', () => {
     }
   });
 
+  it('leaves only GET fulfillment sync feeds to their own client authentication', async () => {
+    const feed = makeEvent('/api/integration/fulfillment/users', null);
+    await authMiddleware(feed);
+    expect(verifyAccessToken).not.toHaveBeenCalled();
+    for (const [pathname, method] of [
+      ['/api/integration/fulfillment/users', 'POST'],
+      ['/api/integration/other', 'GET'],
+    ]) {
+      const event = makeEvent(pathname, null, method);
+      expect(await authMiddleware(event)).toEqual({ unauthorized: true });
+    }
+  });
+
   it('rejects missing or invalid tokens', async () => {
     const event = makeEvent('/api/qms/inspection/records', null);
     const result = await authMiddleware(event);

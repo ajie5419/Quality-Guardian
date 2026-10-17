@@ -1,3 +1,10 @@
+### 2026-10-17 履约系统只读增量同步接口（未提交）
+
+- 新增 `fulfillment-sync` 模块与 6 个 GET 接口 `/api/integration/fulfillment/{work-orders,suppliers,processes,departments,users,inspections}`：按 `(updatedAt, key)` 升序、严格大于游标、DB 层 `take(limit≤100)`，包含软删除行，`nextCursor` 不足一页时为 null。
+- 复用身份桥客户端凭据（`X-Identity-Client-Id/Secret`，id 与 secret 均定长摘要恒时比较）；未配置返回 503、不符返回 401。`3.auth.ts` 仅对该前缀 GET 跳过 JWT，不走 data-scope。
+- 供应商流合并 `kind='TEAM'`（TEAM 字典行，id 即报检 `teamId`）；报检输出主工单＋关联工单合并的 `workOrderNumbers`；用户不输出手机号、邮箱、企业微信 ID 与密码字段。
+- 各所属模块新增只读 `listSyncPage`（工单、供应商、工序、部门、用户、TEAM、报检），6 张表新增 `(updatedAt, key)` 复合索引迁移。语义要点见模块 ARCHITECTURE.md。未部署、未提交、未操作生产。
+
 ### 2026-10-15 履约系统身份登录桥（未提交）
 
 - 新增独立客户端认证、60 秒一次性码、PKCE S256、MySQL 原子核销与短期不透明集成凭证；身份核查每次直查 ACTIVE／未删除，仅返回 id、姓名和 active。

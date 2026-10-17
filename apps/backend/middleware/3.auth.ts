@@ -71,6 +71,12 @@ export default defineEventHandler(async (event) => {
     ].includes(pathname)
   )
     return;
+  // Read-only fulfillment sync feeds authenticate the same client headers.
+  if (
+    event.method === 'GET' &&
+    pathname.startsWith('/api/integration/fulfillment/')
+  )
+    return;
   if (isPublicPath(pathname)) return;
 
   const user = verifyAccessToken(event);

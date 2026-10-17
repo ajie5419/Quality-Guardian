@@ -1,10 +1,12 @@
 import type { Prisma } from '@prisma/client';
 import type { DeptTreeNode } from '~/modules/dept/dept-tree';
+import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import { createId } from '@paralleldrive/cuid2';
 import { buildDeptTree } from '~/modules/dept/dept-tree';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
+import { buildUpdatedAtCursorWhere } from '~/utils/query-helpers';
 import { redis } from '~/utils/redis';
 
 const logger = createModuleLogger('DeptService');
@@ -47,6 +49,28 @@ interface DeptItem {
 }
 
 export const DeptService = {
+  /**
+   * Read-only incremental feed for the fulfillment sync. Deliberately
+   * includes soft-deleted rows so the consumer can replicate deletions.
+   */
+  async listSyncPage(cursor: undefined | UpdatedAtCursor, take: number) {
+    return prisma.departments.findMany({
+      where: buildUpdatedAtCursorWhere(cursor, (afterKey) => ({
+        id: { gt: afterKey },
+      })),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        id: true,
+        isDeleted: true,
+        name: true,
+        parentId: true,
+        status: true,
+        updatedAt: true,
+      },
+      take,
+    });
+  },
+
   async listActiveOptions(keyword = '') {
     const normalizedKeyword = keyword.trim();
     const departments = await prisma.departments.findMany({
