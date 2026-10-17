@@ -25,6 +25,8 @@ import { authorizeSchema, exchangeSchema } from './schema';
 
 const logger = createModuleLogger('identity-bridge');
 // Burst protection is process-local only; correctness and redemption always depend on MySQL.
+const MAX_BUCKETS = 2048;
+const MAX_REQUESTS_PER_WINDOW = 60;
 const buckets = new Map<string, { count: number; start: number }>();
 function limitRequests(event: H3Event, action: string, clientId: string) {
   if (action !== 'authorize' && action !== 'exchange') return;
@@ -34,15 +36,24 @@ function limitRequests(event: H3Event, action: string, clientId: string) {
   const key = digest(
     `${action}:${clientId.slice(0, 128)}:${getRequestIP(event) || 'unknown'}`,
   );
-  const bucket = buckets.get(key) ?? { start: now, count: 0 };
-  if ((!buckets.has(key) && buckets.size >= 2048) || ++bucket.count > 60) {
+  let bucket = buckets.get(key);
+  if (!bucket) {
+    // A full map evicts its oldest bucket (Map keeps insertion order) so new
+    // sources are never refused just because many others were seen recently.
+    if (buckets.size >= MAX_BUCKETS) {
+      const oldest = buckets.keys().next();
+      if (!oldest.done) buckets.delete(oldest.value);
+    }
+    bucket = { count: 0, start: now };
+    buckets.set(key, bucket);
+  }
+  if (++bucket.count > MAX_REQUESTS_PER_WINDOW) {
     throw new BusinessError(
       ErrorCode.FORBIDDEN,
       'Too many identity requests',
       429,
     );
   }
-  buckets.set(key, bucket);
 }
 
 export async function assertIdentityBridgePermission(

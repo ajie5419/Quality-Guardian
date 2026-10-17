@@ -5,6 +5,7 @@ export const FULFILLMENT_SYNC_MAX_LIMIT = 100;
 export const FULFILLMENT_SYNC_RESOURCES = [
   'work-orders',
   'suppliers',
+  'teams',
   'processes',
   'departments',
   'users',

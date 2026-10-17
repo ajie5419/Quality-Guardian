@@ -1,13 +1,14 @@
 # 履约只读增量同步（fulfillment-sync）
 
-本模块按《R2 QMS → 履约 只读增量同步接口契约（v1）》向外部履约系统提供 6 个只读增量接口。模块不拥有任何表，只编排各主数据/业务模块公开的只读方法并做字段裁剪与游标拼装；不写库、不发事件、不记审计。
+本模块按《R2 QMS → 履约 只读增量同步接口契约（v1）》向外部履约系统提供 7 个只读增量接口。模块不拥有任何表，只编排各主数据/业务模块公开的只读方法并做字段裁剪与游标拼装；不写库、不发事件、不记审计。
 
 ## 端点
 
 | 端点（均为 GET） | 来源（经对方 `index.ts`） | key |
 | --- | --- | --- |
 | `/api/integration/fulfillment/work-orders` | `WorkOrderService.listSyncPage` | `workOrderNumber` |
-| `/api/integration/fulfillment/suppliers` | `SupplierService.listSyncPage` + `TeamIdentityService.listSyncPage` | `id` |
+| `/api/integration/fulfillment/suppliers` | `SupplierService.listSyncPage` | `id` |
+| `/api/integration/fulfillment/teams` | `TeamIdentityService.listSyncPage` | `id` |
 | `/api/integration/fulfillment/processes` | `ProcessMasterService.listSyncPage` | `id` |
 | `/api/integration/fulfillment/departments` | `DeptService.listSyncPage` | `id` |
 | `/api/integration/fulfillment/users` | `UserService.listSyncPage` | `id` |
@@ -28,12 +29,14 @@
 - 查询条件 `updatedAt > since OR (updatedAt = since AND key > afterId)`，`ORDER BY updatedAt ASC, key ASC`，在数据库层 `take(limit)`。只给 `since` 不给 `afterId` 时等价于 `updatedAt >= since`，不会漏掉同一时刻的行。
 - 包含 `isDeleted = true` 的行（这是本模块对"软删除表查询必须过滤 isDeleted"规则的有意例外，供履约同步删除）。
 - `nextCursor` 为本页最后一行的 `{ since: updatedAt, afterId: key }`；本页不足 `limit` 时为 `null`，表示已追平。履约下次应带上一次非空 `nextCursor`，追平后保存最后一行的游标继续轮询。
-- 6 张表新增 `(updatedAt, key)` 复合索引（迁移 `20261017090000_add_fulfillment_sync_cursor_indexes`）。schema 中 `updatedAt` 为 Prisma 默认 `DATETIME(3)`；游标值直接取自数据库返回值，即便某环境实际列为秒精度，`(updatedAt, key)` 复合比较仍然正确，只是同秒行更多地依赖 key 排序。
+- 6 张业务表新增 `(updatedAt, key)` 复合索引（迁移 `20261017090000_add_fulfillment_sync_cursor_indexes`）。schema 中 `updatedAt` 为 Prisma 默认 `DATETIME(3)`；游标值直接取自数据库返回值，即便某环境实际列为秒精度，`(updatedAt, key)` 复合比较仍然正确，只是同秒行更多地依赖 key 排序。
 
 ## 资源语义要点
 
 - **users**：只输出 `id, username, realName, departmentId, isActive, isDeleted, updatedAt`；`departmentId` 来自 `users.department`，存的是 `departments.id` 而非名称；`isActive = status === ACTIVE`。查询 select 本身不取手机号、邮箱、企业微信 ID、微信 openid、密码。
-- **suppliers**：同一游标流合并两类来源。`kind='SUPPLIER'` 来自 `suppliers`；`kind='TEAM'` 来自 `dictionaries`（`dictType='team'`），`id` 即报检 `teamId` 指向的同一个 id，`name` 为 `dictValue`，`status` 为 `ACTIVE`/`INACTIVE`（`status=1` 为 ACTIVE），`category`、`outsourcingMode` 为 null；TEAM 退役即软删除，会以 `isDeleted=true` 输出。两源各自按相同游标 `take(limit)` 后在内存中按 `(updatedAt, id)` 归并、截取 `limit` 行（最多 2×limit 行参与归并，不做全表加载）。
+- **每个接口只读一张表**：游标顺序完全由 MySQL 的 `ORDER BY updatedAt, key` 决定，JS 端不对 key 做任何比较或排序。`id` 列为 `utf8mb4_unicode_ci`（大小写不敏感），与 JS 字符串比较顺序不同（如大写 `SUP-…` 与小写 cuid），跨表在内存中归并会让 `afterId` 跳过另一表的同刻行，因此 TEAM 不再并入供应商流。
+- **suppliers**：只输出 `suppliers` 表行，字段 `id, name, category, outsourcingMode, status, isDeleted, updatedAt`，并保留 `kind='SUPPLIER'` 以兼容 v1 消费方；不再输出 TEAM 行。
+- **teams**：来自 `dictionaries`（`dictType='team'`），输出 `id, name, status, isDeleted, updatedAt`；`id` 即报检 `teamId` 指向的同一个 id，`name` 为 `dictValue`，`status` 为 `ACTIVE`/`INACTIVE`（`status=1` 为 ACTIVE）；TEAM 退役即软删除，会以 `isDeleted=true` 输出。查询走现有 `dictType` 索引后对 TEAM 行排序，TEAM 字典规模小，未新增 `(updatedAt, id)` 索引。
 - **inspections**（报检单 `qms_inspection_requests`）：`workOrderNumbers` 为主工单 + `qms_inspection_request_work_orders` 关联工单，去重、主工单在前；`teamName` 为报检上的 `team` 快照，`supplierName`、`processName`、`partName` 同为报检快照。
   - `inspectionResult` 列默认 `PASS`，**PASS 不代表已检验合格**，需结合 `status`。
   - 关单判不合格（result=FAIL）时写 `inspectionResult=FAIL` 与 `unqualifiedQuantity`，但 **`status` 仍为 `INSPECTING`、`closedAt` 为 null**；复检合格后会被覆盖为 `CLOSED` + `PASS`。

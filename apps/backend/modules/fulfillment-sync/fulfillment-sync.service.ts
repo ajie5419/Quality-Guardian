@@ -24,7 +24,8 @@ export interface FulfillmentSyncPage<T> {
   nextCursor: FulfillmentSyncCursor | null;
 }
 
-export const SUPPLIER_KIND = { SUPPLIER: 'SUPPLIER', TEAM: 'TEAM' } as const;
+// Kept on supplier rows for contract compatibility; TEAM rows have their own feed.
+const SUPPLIER_KIND = 'SUPPLIER' as const;
 const TEAM_ACTIVE_STATUS = 1;
 const TEAM_STATUS_LABEL = { ACTIVE: 'ACTIVE', INACTIVE: 'INACTIVE' } as const;
 
@@ -59,16 +60,6 @@ export function buildSyncPage<T extends { updatedAt: string }>(
   return { items, nextCursor: { afterId: keyOf(last), since: last.updatedAt } };
 }
 
-function compareSyncOrder(
-  left: { id: string; updatedAt: string },
-  right: { id: string; updatedAt: string },
-) {
-  const byTime = Date.parse(left.updatedAt) - Date.parse(right.updatedAt);
-  if (byTime !== 0) return byTime;
-  if (left.id === right.id) return 0;
-  return left.id < right.id ? -1 : 1;
-}
-
 async function listWorkOrders({ cursor, limit }: SyncRequest) {
   const rows = await WorkOrderService.listSyncPage(cursor, limit);
   const items = rows.map((row) => ({
@@ -85,42 +76,37 @@ async function listWorkOrders({ cursor, limit }: SyncRequest) {
 }
 
 /**
- * Suppliers and TEAM rows share one `(updatedAt, id)` stream: each source is
- * fetched with the same cursor and `take(limit)` in the database, and only
- * the at most `2 * limit` candidates are merged here.
+ * Each feed reads exactly one table so MySQL alone defines the
+ * `(updatedAt, id)` order; ids from different tables are never compared in
+ * JS, because the column collation orders them differently from JS strings.
  */
 async function listSuppliers({ cursor, limit }: SyncRequest) {
-  const [suppliers, teams] = await Promise.all([
-    SupplierService.listSyncPage(cursor, limit),
-    TeamIdentityService.listSyncPage(cursor, limit),
-  ]);
-  const items = [
-    ...suppliers.map((row) => ({
-      category: row.category,
-      id: row.id,
-      isDeleted: row.isDeleted,
-      kind: SUPPLIER_KIND.SUPPLIER,
-      name: row.name,
-      outsourcingMode: row.outsourcingMode,
-      status: row.status,
-      updatedAt: iso(row.updatedAt),
-    })),
-    ...teams.map((row) => ({
-      category: null,
-      id: row.id,
-      isDeleted: row.isDeleted,
-      kind: SUPPLIER_KIND.TEAM,
-      name: row.dictValue,
-      outsourcingMode: null,
-      status:
-        row.status === TEAM_ACTIVE_STATUS
-          ? TEAM_STATUS_LABEL.ACTIVE
-          : TEAM_STATUS_LABEL.INACTIVE,
-      updatedAt: iso(row.updatedAt),
-    })),
-  ]
-    .sort(compareSyncOrder)
-    .slice(0, limit);
+  const rows = await SupplierService.listSyncPage(cursor, limit);
+  const items = rows.map((row) => ({
+    category: row.category,
+    id: row.id,
+    isDeleted: row.isDeleted,
+    kind: SUPPLIER_KIND,
+    name: row.name,
+    outsourcingMode: row.outsourcingMode,
+    status: row.status,
+    updatedAt: iso(row.updatedAt),
+  }));
+  return buildSyncPage(items, limit, (item) => item.id);
+}
+
+async function listTeams({ cursor, limit }: SyncRequest) {
+  const rows = await TeamIdentityService.listSyncPage(cursor, limit);
+  const items = rows.map((row) => ({
+    id: row.id,
+    isDeleted: row.isDeleted,
+    name: row.dictValue,
+    status:
+      row.status === TEAM_ACTIVE_STATUS
+        ? TEAM_STATUS_LABEL.ACTIVE
+        : TEAM_STATUS_LABEL.INACTIVE,
+    updatedAt: iso(row.updatedAt),
+  }));
   return buildSyncPage(items, limit, (item) => item.id);
 }
 
@@ -168,6 +154,7 @@ const LOADERS = {
   inspections: listInspections,
   processes: listProcesses,
   suppliers: listSuppliers,
+  teams: listTeams,
   users: listUsers,
   'work-orders': listWorkOrders,
 } satisfies Record<FulfillmentSyncResource, (request: SyncRequest) => unknown>;

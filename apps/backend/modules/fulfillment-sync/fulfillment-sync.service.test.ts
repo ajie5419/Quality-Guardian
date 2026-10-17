@@ -204,11 +204,11 @@ describe('fulfillmentSyncService resource shapes', () => {
     expect(page.items[0]).not.toHaveProperty('team');
   });
 
-  it('interleaves suppliers and TEAM rows by (updatedAt, id) up to limit', async () => {
+  it('serves suppliers from the suppliers table only, never TEAM rows', async () => {
     db.suppliers.findMany.mockResolvedValue([
       {
         category: 'Outsourcing',
-        id: 's2',
+        id: 'SUP-2026-0001',
         isDeleted: false,
         name: 'S',
         outsourcingMode: 'IN_HOUSE_TEAM',
@@ -217,7 +217,7 @@ describe('fulfillmentSyncService resource shapes', () => {
       },
       {
         category: null,
-        id: 's9',
+        id: 'SUP-2026-0009',
         isDeleted: true,
         name: 'S9',
         outsourcingMode: null,
@@ -228,29 +228,79 @@ describe('fulfillmentSyncService resource shapes', () => {
     db.dictionaries.findMany.mockResolvedValue([
       {
         dictValue: 'Team',
-        id: 't1',
+        id: 'ct1',
         isDeleted: false,
         status: 1,
         updatedAt: T1,
       },
-      { dictValue: 'Old', id: 't3', isDeleted: true, status: 0, updatedAt: T1 },
     ]);
     const page = await FulfillmentSyncService.list(
       'suppliers',
-      query({ limit: '3' }),
+      query({ afterId: 'SUP-2026-0000', limit: '2', since: T1.toISOString() }),
     );
-    expect(lastCall(db.dictionaries.findMany).where).toMatchObject({
-      dictType: 'team',
-    });
+    expect(db.dictionaries.findMany).not.toHaveBeenCalled();
+    expect(lastCall(db.suppliers.findMany).take).toBe(2);
     expect(page.items.map((item) => [item.kind, item.id])).toEqual([
-      ['SUPPLIER', 's2'],
-      ['TEAM', 't1'],
-      ['TEAM', 't3'],
+      ['SUPPLIER', 'SUP-2026-0001'],
+      ['SUPPLIER', 'SUP-2026-0009'],
     ]);
-    expect(page.items[2]).toMatchObject({
-      isDeleted: true,
-      status: 'INACTIVE',
+    expect(page.nextCursor).toEqual({
+      afterId: 'SUP-2026-0009',
+      since: T2.toISOString(),
     });
-    expect(page.nextCursor).toEqual({ afterId: 't3', since: T1.toISOString() });
+  });
+
+  it('serves TEAM rows on the teams feed with their own cursor', async () => {
+    db.dictionaries.findMany.mockResolvedValue([
+      {
+        dictValue: 'Team',
+        id: 'ct1',
+        isDeleted: false,
+        status: 1,
+        updatedAt: T1,
+      },
+      {
+        dictValue: 'Old',
+        id: 'ct3',
+        isDeleted: true,
+        status: 0,
+        updatedAt: T1,
+      },
+    ]);
+    const page = await FulfillmentSyncService.list(
+      'teams',
+      query({ afterId: 'ct0', limit: '2', since: T1.toISOString() }),
+    );
+    const args = lastCall(db.dictionaries.findMany);
+    expect(db.suppliers.findMany).not.toHaveBeenCalled();
+    expect(args.where).toEqual({
+      dictType: 'team',
+      OR: [
+        { updatedAt: { gt: T1 } },
+        { AND: [{ updatedAt: T1 }, { id: { gt: 'ct0' } }] },
+      ],
+    });
+    expect(args.orderBy).toEqual([{ updatedAt: 'asc' }, { id: 'asc' }]);
+    expect(args.take).toBe(2);
+    expect(page.items).toEqual([
+      {
+        id: 'ct1',
+        isDeleted: false,
+        name: 'Team',
+        status: 'ACTIVE',
+        updatedAt: T1.toISOString(),
+      },
+      {
+        id: 'ct3',
+        isDeleted: true,
+        name: 'Old',
+        status: 'INACTIVE',
+        updatedAt: T1.toISOString(),
+      },
+    ]);
+    expect(page.nextCursor).toEqual({
+      afterId: 'ct3',
+      since: T1.toISOString(),
+    });
   });
 });

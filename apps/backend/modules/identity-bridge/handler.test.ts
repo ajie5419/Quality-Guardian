@@ -93,6 +93,27 @@ it('keeps signing and exchange quotas separate and never puts identity or revoke
   ).resolves.toMatchObject({ id: 'gc-test' });
 });
 
+it('evicts the oldest bucket instead of refusing new sources when the map is full', async () => {
+  const eventFor = (ip: string) =>
+    ({
+      context: { userId: 'test-user' },
+      headers: {},
+      ip,
+    }) as unknown as H3Event;
+  const first = eventFor(token());
+  for (let i = 0; i < 60; i++)
+    await assertIdentityBridgePermission(first, 'authorize');
+  await expect(
+    assertIdentityBridgePermission(first, 'authorize'),
+  ).rejects.toMatchObject({ httpStatus: 429 });
+  for (let i = 0; i < 2048; i++)
+    await assertIdentityBridgePermission(eventFor(token()), 'authorize');
+  // The exhausted bucket was the oldest one, so it has been evicted.
+  await expect(
+    assertIdentityBridgePermission(first, 'authorize'),
+  ).resolves.toMatchObject({ id: 'gc-test' });
+});
+
 it('explicitly redacts nested client headers, credential and authorization protocol material', () => {
   const value = token();
   const sanitized = sanitizeContext({

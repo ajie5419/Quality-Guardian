@@ -1,8 +1,9 @@
 ### 2026-10-17 履约系统只读增量同步接口（未提交）
 
-- 新增 `fulfillment-sync` 模块与 6 个 GET 接口 `/api/integration/fulfillment/{work-orders,suppliers,processes,departments,users,inspections}`：按 `(updatedAt, key)` 升序、严格大于游标、DB 层 `take(limit≤100)`，包含软删除行，`nextCursor` 不足一页时为 null。
+- 新增 `fulfillment-sync` 模块与 7 个 GET 接口 `/api/integration/fulfillment/{work-orders,suppliers,teams,processes,departments,users,inspections}`：按 `(updatedAt, key)` 升序、严格大于游标、DB 层 `take(limit≤100)`，包含软删除行，`nextCursor` 不足一页时为 null。
 - 复用身份桥客户端凭据（`X-Identity-Client-Id/Secret`，id 与 secret 均定长摘要恒时比较）；未配置返回 503、不符返回 401。`3.auth.ts` 仅对该前缀 GET 跳过 JWT，不走 data-scope。
-- 供应商流合并 `kind='TEAM'`（TEAM 字典行，id 即报检 `teamId`）；报检输出主工单＋关联工单合并的 `workOrderNumbers`；用户不输出手机号、邮箱、企业微信 ID 与密码字段。
+- TEAM 字典行拆为独立 `teams` 接口（id 即报检 `teamId`，输出 `id,name,status,isDeleted,updatedAt`），`suppliers` 只输出供应商表行并保留 `kind='SUPPLIER'`：每个接口只读一张表，避免 MySQL `utf8mb4_unicode_ci` 与 JS 字符串比较顺序不一致导致跨表归并后 `afterId` 跳行；报检输出主工单＋关联工单合并的 `workOrderNumbers`；用户不输出手机号、邮箱、企业微信 ID 与密码字段。
+- 身份桥限流桶满时改为淘汰最早的桶，不再对所有新来源返回 429；单桶超限仍 429。
 - 各所属模块新增只读 `listSyncPage`（工单、供应商、工序、部门、用户、TEAM、报检），6 张表新增 `(updatedAt, key)` 复合索引迁移。语义要点见模块 ARCHITECTURE.md。未部署、未提交、未操作生产。
 
 ### 2026-10-15 履约系统身份登录桥（未提交）
