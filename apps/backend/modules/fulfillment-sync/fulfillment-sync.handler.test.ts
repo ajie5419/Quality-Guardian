@@ -1,0 +1,89 @@
+import { randomBytes } from 'node:crypto';
+
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { handleFulfillmentSyncRequest } from './fulfillment-sync.handler';
+import { FulfillmentSyncService } from './fulfillment-sync.service';
+
+vi.mock('~/utils/prisma', () => ({ default: {} }));
+vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
+vi.mock('./fulfillment-sync.service', () => ({
+  FulfillmentSyncService: { list: vi.fn() },
+}));
+vi.mock('h3', async (original) => ({
+  ...(await original<typeof import('h3')>()),
+  getHeader: (event: any, key: string) => event.headers[key],
+  getQuery: (event: any) => event.query,
+  setHeader: vi.fn(),
+  setResponseStatus: (event: any, status: number) => {
+    event.status = status;
+  },
+}));
+
+let secret: string;
+const makeEvent = (
+  headers: Record<string, string>,
+  query: Record<string, unknown> = {},
+) => ({ headers, query, status: 200 }) as any;
+
+describe('handleFulfillmentSyncRequest authentication', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    secret = randomBytes(32).toString('base64url');
+    vi.stubEnv('QMS_IDENTITY_CLIENT_ID', 'gc-test');
+    vi.stubEnv('QMS_IDENTITY_CLIENT_SECRET', secret);
+    vi.mocked(FulfillmentSyncService.list).mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('returns 401 without client headers and never reads data', async () => {
+    const event = makeEvent({});
+    const body = await handleFulfillmentSyncRequest(event, 'users');
+    expect(event.status).toBe(401);
+    expect(body.code).toBe(-1);
+    expect(FulfillmentSyncService.list).not.toHaveBeenCalled();
+  });
+
+  it('returns 401 for a wrong secret or a wrong client id', async () => {
+    for (const headers of [
+      { 'x-identity-client-id': 'gc-test', 'x-identity-client-secret': 'x' },
+      { 'x-identity-client-id': 'other', 'x-identity-client-secret': secret },
+    ]) {
+      const event = makeEvent(headers);
+      await handleFulfillmentSyncRequest(event, 'users');
+      expect(event.status).toBe(401);
+    }
+    expect(FulfillmentSyncService.list).not.toHaveBeenCalled();
+  });
+
+  it('fails closed with 503 when the client credentials are not configured', async () => {
+    vi.stubEnv('QMS_IDENTITY_CLIENT_SECRET', '');
+    const event = makeEvent({
+      'x-identity-client-id': 'gc-test',
+      'x-identity-client-secret': '',
+    });
+    await handleFulfillmentSyncRequest(event, 'users');
+    expect(event.status).toBe(503);
+    expect(FulfillmentSyncService.list).not.toHaveBeenCalled();
+  });
+
+  it('serves the feed for the configured client and validates the query', async () => {
+    const headers = {
+      'x-identity-client-id': 'gc-test',
+      'x-identity-client-secret': secret,
+    };
+    const ok = makeEvent(headers, { limit: '5' });
+    const body = await handleFulfillmentSyncRequest(ok, 'inspections');
+    expect(ok.status).toBe(200);
+    expect(body).toMatchObject({ code: 0, data: { nextCursor: null } });
+    expect(FulfillmentSyncService.list).toHaveBeenCalledWith('inspections', {
+      limit: 5,
+    });
+    const bad = makeEvent(headers, { limit: '500' });
+    await handleFulfillmentSyncRequest(bad, 'inspections');
+    expect(bad.status).toBe(400);
+  });
+});

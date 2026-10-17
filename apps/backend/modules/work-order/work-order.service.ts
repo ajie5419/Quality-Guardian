@@ -10,6 +10,7 @@ import type {
   AnalyticsAccessContext,
   ResolvedDataScope,
 } from '~/modules/data-scope';
+import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import { Prisma } from '@prisma/client';
 import {
@@ -22,7 +23,11 @@ import { MasterDataGovernanceKernel } from '~/utils/canonical-master-data';
 import { EXPORT_QUERY_TAKE } from '~/utils/export-constants';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
-import { buildKeywordOr, parsePagination } from '~/utils/query-helpers';
+import {
+  buildKeywordOr,
+  buildUpdatedAtCursorWhere,
+  parsePagination,
+} from '~/utils/query-helpers';
 
 import {
   buildScopedWorkOrderWhere,
@@ -158,6 +163,30 @@ export async function buildWorkOrderWhereCondition(
 }
 
 export const WorkOrderService = {
+  /**
+   * Read-only incremental feed for the fulfillment sync. Deliberately
+   * includes soft-deleted rows so the consumer can replicate deletions.
+   */
+  async listSyncPage(cursor: undefined | UpdatedAtCursor, take: number) {
+    return prisma.work_orders.findMany({
+      where: buildUpdatedAtCursorWhere(cursor, (afterKey) => ({
+        workOrderNumber: { gt: afterKey },
+      })),
+      orderBy: [{ updatedAt: 'asc' }, { workOrderNumber: 'asc' }],
+      select: {
+        customerName: true,
+        deliveryDate: true,
+        isDeleted: true,
+        projectName: true,
+        quantity: true,
+        status: true,
+        updatedAt: true,
+        workOrderNumber: true,
+      },
+      take,
+    });
+  },
+
   async findQualityLossReference(workOrderNumber: string) {
     return prisma.work_orders.findFirst({
       where: { isDeleted: false, workOrderNumber },

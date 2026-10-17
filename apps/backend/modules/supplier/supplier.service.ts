@@ -1,5 +1,6 @@
 import type { Prisma } from '@prisma/client';
 import type { ResolvedDataScope } from '~/modules/data-scope/data-scope.service';
+import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import { DataScopeService } from '~/modules/data-scope/data-scope.service';
 import { InspectionService } from '~/modules/inspection';
@@ -11,7 +12,10 @@ import {
 } from '~/modules/supplier/supplier-query';
 import { EXPORT_QUERY_TAKE } from '~/utils/export-constants';
 import prisma from '~/utils/prisma';
-import { buildKeywordOr } from '~/utils/query-helpers';
+import {
+  buildKeywordOr,
+  buildUpdatedAtCursorWhere,
+} from '~/utils/query-helpers';
 
 import { SupplierMutationService } from './supplier-mutation.service';
 
@@ -228,6 +232,29 @@ async function buildSupplierScopedWhere(params: {
 }
 
 export const SupplierService = {
+  /**
+   * Read-only incremental feed for the fulfillment sync. Deliberately
+   * includes soft-deleted rows so the consumer can replicate deletions.
+   */
+  async listSyncPage(cursor: undefined | UpdatedAtCursor, take: number) {
+    return prisma.suppliers.findMany({
+      where: buildUpdatedAtCursorWhere(cursor, (afterKey) => ({
+        id: { gt: afterKey },
+      })),
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        category: true,
+        id: true,
+        isDeleted: true,
+        name: true,
+        outsourcingMode: true,
+        status: true,
+        updatedAt: true,
+      },
+      take,
+    });
+  },
+
   async listActiveOptions(options: { category: string; keyword?: string }) {
     const keyword = String(options.keyword || '').trim();
     const suppliers = await prisma.suppliers.findMany({

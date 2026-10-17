@@ -1,3 +1,18 @@
+### 2026-10-17 履约系统只读增量同步接口（未提交）
+
+- 新增 `fulfillment-sync` 模块与 7 个 GET 接口 `/api/integration/fulfillment/{work-orders,suppliers,teams,processes,departments,users,inspections}`：按 `(updatedAt, key)` 升序、严格大于游标、DB 层 `take(limit≤100)`，包含软删除行，`nextCursor` 不足一页时为 null。
+- 复用身份桥客户端凭据（`X-Identity-Client-Id/Secret`，id 与 secret 均定长摘要恒时比较）；未配置返回 503、不符返回 401。`3.auth.ts` 仅对该前缀 GET 跳过 JWT，不走 data-scope。
+- TEAM 字典行拆为独立 `teams` 接口（id 即报检 `teamId`，输出 `id,name,status,isDeleted,updatedAt`），`suppliers` 只输出供应商表行并保留 `kind='SUPPLIER'`：每个接口只读一张表，避免 MySQL `utf8mb4_unicode_ci` 与 JS 字符串比较顺序不一致导致跨表归并后 `afterId` 跳行；报检输出主工单＋关联工单合并的 `workOrderNumbers`；用户不输出手机号、邮箱、企业微信 ID 与密码字段。
+- 身份桥限流桶满时改为淘汰最早的桶，不再对所有新来源返回 429；单桶超限仍 429。
+- 各所属模块新增只读 `listSyncPage`（工单、供应商、工序、部门、用户、TEAM、报检），6 张表新增 `(updatedAt, key)` 复合索引迁移。语义要点见模块 ARCHITECTURE.md。未部署、未提交、未操作生产。
+
+### 2026-10-15 履约系统身份登录桥（未提交）
+
+- 新增独立客户端认证、60 秒一次性码、PKCE S256、MySQL 原子核销与短期不透明集成凭证；身份核查每次直查 ACTIVE／未删除，仅返回 id、姓名和 active。
+- 新增固定授权页，真实登录后无 QMS 菜单权限的员工也可返回授权；不调用菜单授权码接口，不创建客户端管理表或 UI。
+- 旧 Bearer 及防重复中间件仅对三个精确机器 POST 路径例外，补专用字段日志脱敏、独立签发／交换限流、必要单测与真实浏览器场景。隔离 runner 可通过 `GC_IDENTITY_E2E_ROOT` 接入相邻 GC 源码，生产 HTTPS 校验保持严格。
+- 验证结果以本任务实际日志与实施报告为准；未部署、未提交、未操作生产。
+
 ### 2026-10-10 桌面Web工单管理与检验管理E2E及实测缺陷修复（未提交）
 
 - 新增工单管理5例与检验管理专项补齐4例真实UI与隔离数据库核验（工单登记/版本化编辑/软删、要求板身份契约、权限隔离、重复与非法状态流转、导入导出；今日外购件公开展板、报检看板周期聚合、检验记录多分类/详情/导出、检验记录权限隔离）；联合报检、售后、计量、监督、供应商、质量损失共58/58通过，退出0，Run `41f8110546e552e4832b2b61`，516928 ms，472个指纹文件差异0，专属容器/进程/端口全部回收。

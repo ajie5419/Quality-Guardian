@@ -11,4 +11,5 @@ export { InspectionProcessResolutionService } from './inspection-process-resolut
 export { inspectionRequestResponsibilityOptionsQuerySchema } from './inspection-request-responsibility-options.schema';
 export { InspectionRequestResponsibilityOptionsService } from './inspection-request-responsibility-options.service';
 export { getInspectorActiveTaskCounts } from './inspection-request-stats-workload';
+export { InspectionRequestSyncService } from './inspection-request-sync.service';
 export { InspectionService } from './inspection.service';

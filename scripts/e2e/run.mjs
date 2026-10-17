@@ -137,6 +137,7 @@ if (
   ![
     'after-sales',
     'all',
+    'identity-bridge',
     'inspection',
     'inspection-branches',
     'inspection-management',
@@ -160,7 +161,8 @@ if (
   throw new Error('Unsupported E2E scope');
 }
 const expectedTests = {
-  all: 58,
+  all: 59,
+  'identity-bridge': 1,
   inspection: 20,
   'inspection-branches': 12,
   'inspection-management': 4,
@@ -202,6 +204,9 @@ const [
   refreshSecret,
   metrologyToken,
 ] = secrets;
+const identitySecret = randomBytes(32).toString('base64url');
+const gcSessionKey = randomBytes(32).toString('base64url');
+secrets.push(identitySecret, gcSessionKey);
 // Explicit allowlist: ambient DATABASE_URL, Redis, cloud and notification secrets cannot leak in.
 const env = Object.fromEntries(
   ['PATH', 'HOME', 'TMPDIR', 'LANG', 'LC_ALL'].flatMap((key) =>
@@ -237,6 +242,9 @@ Object.assign(env, {
   VITE_APP_NAMESPACE: `qgs-e2e-${runId}`,
   LOG_LEVEL: 'warn',
   REQUEST_DEDUPE_WINDOW_MS: String(dedupeWindowMs),
+  QMS_IDENTITY_CLIENT_ID: 'gc-e2e',
+  QMS_IDENTITY_CLIENT_SECRET: identitySecret,
+  QMS_IDENTITY_CALLBACK: 'https://gc.e2e.invalid/api/auth/callback',
   QGS_E2E_DEDUPE_WINDOW_MS: String(dedupeWindowMs),
   PLAYWRIGHT_BROWSERS_PATH: join(root, '.cache/playwright'),
 });
@@ -681,6 +689,33 @@ try {
   await writeFile(join(artifactDir, 'backend-build.log'), build);
   const apiPort = await freePort();
   const webPort = await freePort();
+  if (process.env.GC_IDENTITY_E2E_ROOT) {
+    env.GC_IDENTITY_E2E_ROOT = resolve(process.env.GC_IDENTITY_E2E_ROOT);
+    env.GC_IDENTITY_E2E_PORT = String(await freePort());
+    env.GC_IDENTITY_QMS_TLS_PORT = String(await freePort());
+    env.GC_SESSION_KEY = gcSessionKey;
+    env.GC_IDENTITY_E2E_ORIGIN = `https://127.0.0.1:${env.GC_IDENTITY_E2E_PORT}`;
+    env.QMS_IDENTITY_CALLBACK = `${env.GC_IDENTITY_E2E_ORIGIN}/api/auth/callback`;
+    const gcDatabase = `gc_identity_${runId}`;
+    env.MYSQL_PWD = rootPassword;
+    await assertOwnedTargets(env);
+    await command('container', [
+      'exec',
+      '--env',
+      'MYSQL_PWD',
+      env.QGS_E2E_MYSQL_CONTAINER,
+      'mysql',
+      '-uroot',
+      '-e',
+      `CREATE DATABASE ${gcDatabase}; GRANT ALL ON ${gcDatabase}.* TO '${env.MYSQL_USER}'@'%';`,
+    ]);
+    delete env.MYSQL_PWD;
+    env.GC_DATABASE_URL = env.DATABASE_URL.replace(
+      `/${env.MYSQL_DATABASE}`,
+      `/${gcDatabase}`,
+    );
+    secrets.push(env.GC_DATABASE_URL);
+  }
   Object.assign(env, {
     NITRO_HOST: '127.0.0.1',
     NITRO_PORT: apiPort,
@@ -734,6 +769,21 @@ try {
     apiPort,
     webPort,
   });
+  if (env.GC_IDENTITY_E2E_ROOT) {
+    const gcRoot = env.GC_IDENTITY_E2E_ROOT;
+    const identity = launch(
+      join(gcRoot, '.tools/proto-home/tools/node/24.21.0/bin/node'),
+      [tsxCli, join(gcRoot, 'tests/support/identity-browser.mjs')],
+      gcRoot,
+    );
+    identity.logName = 'identity-runtime.log';
+    await waitFor('GC identity runtime', async () => {
+      if (identity.child.exitCode !== null)
+        throw new Error('GC identity runtime exited');
+      return identity.output().includes('IDENTITY_BROWSER_READY');
+    });
+    evidence.stages.push({ name: 'gc-identity-runtime', status: 'passed' });
+  }
   const playwrightCli = join(
     dirname(require.resolve('@playwright/test/package.json')),
     'cli.js',
@@ -747,6 +797,7 @@ try {
       'playwright.config.ts',
       ...{
         all: [],
+        'identity-bridge': ['identity-bridge.spec.ts'],
         'after-sales': ['after-sales.spec.ts'],
         metrology: ['metrology.spec.ts'],
         supervision: ['supervision.spec.ts'],

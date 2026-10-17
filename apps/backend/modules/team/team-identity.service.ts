@@ -1,4 +1,5 @@
 import type { Prisma } from '@prisma/client';
+import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import type {
   TeamIdentityCreateInput,
@@ -12,6 +13,7 @@ import { BusinessError } from '~/utils/business-error';
 import { createModuleLogger } from '~/utils/logger';
 import prisma from '~/utils/prisma';
 import { isPrismaUniqueConstraintError } from '~/utils/prisma-error';
+import { buildUpdatedAtCursorWhere } from '~/utils/query-helpers';
 
 import {
   createTeamIdentity,
@@ -120,6 +122,30 @@ async function retireActiveTeam(
 }
 
 export const TeamIdentityService = {
+  /**
+   * Read-only incremental feed of TEAM rows for the fulfillment sync,
+   * including retired (soft-deleted) teams.
+   */
+  async listSyncPage(cursor: undefined | UpdatedAtCursor, take: number) {
+    return prisma.dictionaries.findMany({
+      where: {
+        dictType: TEAM_DICT_TYPE,
+        ...buildUpdatedAtCursorWhere(cursor, (afterKey) => ({
+          id: { gt: afterKey },
+        })),
+      },
+      orderBy: [{ updatedAt: 'asc' }, { id: 'asc' }],
+      select: {
+        dictValue: true,
+        id: true,
+        isDeleted: true,
+        status: true,
+        updatedAt: true,
+      },
+      take,
+    });
+  },
+
   async resolveActiveDepartmentSourceIdsByTeamIds(
     teamIds: ReadonlyArray<null | string | undefined>,
     client: Pick<Prisma.TransactionClient, 'team_identity_sources'> = prisma,

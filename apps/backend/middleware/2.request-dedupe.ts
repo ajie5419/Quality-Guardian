@@ -79,6 +79,16 @@ export default defineEventHandler(async (event) => {
   const requestUrl = getRequestURL(event);
   const pathname = requestUrl.pathname;
   if (!pathname.startsWith('/api/')) return;
+  // Identity checks repeat on every GC request; redemption has its own MySQL CAS.
+  if (
+    method === 'POST' &&
+    [
+      '/api/identity-bridge/exchange',
+      '/api/identity-bridge/identity',
+      '/api/identity-bridge/revoke',
+    ].includes(pathname)
+  )
+    return;
 
   const contentType = String(getHeader(event, 'content-type') || '');
   if (shouldSkipByContentType(contentType)) return;

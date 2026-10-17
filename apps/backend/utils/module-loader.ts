@@ -16,6 +16,8 @@ import { dataScopeModule } from '~/modules/data-scope/data-scope.module';
 import { deptModule } from '~/modules/dept/dept.module';
 import { dictionaryModule } from '~/modules/dictionary/dictionary.module';
 import { fileStorageModule } from '~/modules/file-storage/file-storage.module';
+import { fulfillmentSyncModule } from '~/modules/fulfillment-sync/fulfillment-sync.module';
+import { identityBridgeModule } from '~/modules/identity-bridge/identity-bridge.module';
 import { inspectionModule } from '~/modules/inspection/inspection.module';
 import { knowledgeModule } from '~/modules/knowledge/knowledge.module';
 import { masterDataIdentityModule } from '~/modules/master-data-identity/master-data-identity.module';
@@ -54,6 +56,8 @@ const MODULE_DECLARATIONS: ModuleDeclaration[] = [
   dictionaryModule,
   fileStorageModule,
   inspectionModule,
+  identityBridgeModule,
+  fulfillmentSyncModule,
   knowledgeModule,
   metricGovernanceModule,
   metricRefreshModule,

@@ -42,13 +42,13 @@ describe('auth middleware', () => {
     vi.useRealTimers();
   });
 
-  function makeEvent(pathname: string, token: null | object) {
+  function makeEvent(pathname: string, token: null | object, method = 'GET') {
     vi.mocked(verifyAccessToken).mockReturnValue(token as never);
     vi.mocked(getRequestURL).mockReturnValue({
       pathname,
     } as never);
     return {
-      method: 'GET',
+      method,
       node: {
         req: {},
         res: { setHeader: vi.fn() },
@@ -61,6 +61,43 @@ describe('auth middleware', () => {
     const event = makeEvent('/api/auth/login', null);
     await authMiddleware(event);
     expect(verifyAccessToken).not.toHaveBeenCalled();
+  });
+
+  it('bypasses the legacy bearer only for the three exact machine POST paths', async () => {
+    for (const action of ['exchange', 'identity', 'revoke']) {
+      vi.mocked(verifyAccessToken).mockClear();
+      const event = makeEvent(`/api/identity-bridge/${action}`, null, 'POST');
+      await authMiddleware(event);
+      expect(verifyAccessToken).not.toHaveBeenCalled();
+      const wrongMethod = makeEvent(`/api/identity-bridge/${action}`, null);
+      expect(await authMiddleware(wrongMethod)).toEqual({ unauthorized: true });
+      const suffix = makeEvent(
+        `/api/identity-bridge/${action}/extra`,
+        null,
+        'POST',
+      );
+      expect(await authMiddleware(suffix)).toEqual({ unauthorized: true });
+    }
+    for (const pathname of [
+      '/api/auth/identity-bridge',
+      '/api/identity-bridge/authorize',
+    ]) {
+      const event = makeEvent(pathname, null, 'POST');
+      expect(await authMiddleware(event)).toEqual({ unauthorized: true });
+    }
+  });
+
+  it('leaves only GET fulfillment sync feeds to their own client authentication', async () => {
+    const feed = makeEvent('/api/integration/fulfillment/users', null);
+    await authMiddleware(feed);
+    expect(verifyAccessToken).not.toHaveBeenCalled();
+    for (const [pathname, method] of [
+      ['/api/integration/fulfillment/users', 'POST'],
+      ['/api/integration/other', 'GET'],
+    ]) {
+      const event = makeEvent(pathname, null, method);
+      expect(await authMiddleware(event)).toEqual({ unauthorized: true });
+    }
   });
 
   it('rejects missing or invalid tokens', async () => {

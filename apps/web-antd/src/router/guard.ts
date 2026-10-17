@@ -7,6 +7,7 @@ import { startProgress, stopProgress } from '@vben/utils';
 
 import { accessRoutes, coreRouteNames } from '#/router/routes';
 import { useAuthStore } from '#/store';
+import { identityRedirect } from '#/utils/identity-redirect';
 import { normalizeHashRedirectPath } from '#/utils/router-redirect';
 
 import { generateAccess } from './access';
@@ -62,6 +63,8 @@ function setupAccessGuard(router: Router) {
 
     const isAuthenticatedLogin =
       to.path === LOGIN_PATH && Boolean(accessStore.accessToken);
+    const bridge = isAuthenticatedLogin && identityRedirect(to.query.redirect);
+    if (bridge) return bridge;
 
     // 基本路由，这些路由不需要进入权限拦截
     if (coreRouteNames.includes(to.name as string) && !isAuthenticatedLogin) {

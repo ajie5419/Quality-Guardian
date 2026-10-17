@@ -7,6 +7,33 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Integration secrets are never persisted in plaintext or accepted as business JWTs.
+model IdentityBridgeCode {
+  id          String   @id
+  hash        String   @unique @db.Char(64)
+  clientId    String   @db.VarChar(128)
+  redirectUri String   @db.VarChar(512)
+  challenge   String   @db.VarChar(43)
+  userId      String   @db.VarChar(128)
+  expiresAt   DateTime @db.DateTime(3)
+  consumedAt  DateTime? @db.DateTime(3)
+  createdAt   DateTime @default(now()) @db.DateTime(3)
+
+  @@index([expiresAt])
+}
+
+model IdentityBridgeCredential {
+  id        String    @id
+  hash      String    @unique @db.Char(64)
+  clientId  String    @db.VarChar(128)
+  userId    String    @db.VarChar(128)
+  expiresAt DateTime  @db.DateTime(3)
+  revokedAt DateTime? @db.DateTime(3)
+  createdAt DateTime  @default(now()) @db.DateTime(3)
+
+  @@index([expiresAt])
+}
+
 model inspections {
   id                      String                               @id @default(cuid())
   serialNumber            String?                              @unique
@@ -310,6 +337,7 @@ model departments {
   version      Int      @default(1)
 
   @@index([parentId])
+  @@index([updatedAt, id])
 }
 
 model dictionaries {
@@ -474,6 +502,7 @@ model processes {
 
   @@index([name])
   @@index([status])
+  @@index([updatedAt, id])
 }
 
 // @module process-master
@@ -1277,6 +1306,7 @@ model suppliers {
   @@index([projectId])
   @@index([buyer])
   @@index([recognizedAt])
+  @@index([updatedAt, id])
 }
 
 // @module supplier-identity
@@ -1871,6 +1901,7 @@ model users {
   @@index([roleId], map: "users_roleId_fkey")
   @@index([wechatWorkId])
   @@index([wxOpenId])
+  @@index([updatedAt, id])
 }
 
 model work_orders {
@@ -1914,6 +1945,7 @@ model work_orders {
   @@index([deliveryDate])
   @@index([status])
   @@index([projectId])
+  @@index([updatedAt, workOrderNumber])
 }
 
 model work_order_requirements {
@@ -2054,6 +2086,7 @@ model qms_inspection_requests {
   @@index([responsibilityType, responsibleDepartmentId], map: "qms_inspection_requests_resp_dept_idx")
   @@index([partId])
   @@index([componentId])
+  @@index([updatedAt, id])
 }
 
 // @module inspection
