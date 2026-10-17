@@ -874,7 +874,7 @@
     "welderCode": "Welder Code",
     "name": "Name",
     "team": "Team",
-    "welding_method": "Welding Method",
+    "weldingMethod": "Welding Method",
     "examDate": "Exam Date",
     "examPassed": "Exam Passed",
     "employmentStatus": "Employment Status",

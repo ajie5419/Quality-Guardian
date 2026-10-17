@@ -91,6 +91,7 @@ const formState = reactive({
   team: '',
   teamId: '',
   welderCode: '',
+  weldingMethod: '',
 });
 
 interface DeductionIssueRow {
@@ -371,6 +372,7 @@ function resetForm() {
   formState.examPassed = false;
   formState.employmentStatus = 'ON_DUTY';
   formState.certificationNo = '';
+  formState.weldingMethod = '';
 }
 
 function openCreateModal() {
@@ -392,6 +394,7 @@ function openEditModal(row: QmsWelderApi.WelderItem) {
   formState.examPassed = !!row.examPassed;
   formState.employmentStatus = row.employmentStatus || 'ON_DUTY';
   formState.certificationNo = row.certificationNo || '';
+  formState.weldingMethod = row.weldingMethod || '';
   modalOpen.value = true;
 }
 
@@ -500,6 +503,12 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     '证号',
     'certificateNo',
   ]);
+  const weldingMethodValue = pickImportValue(row, [
+    'weldingMethod',
+    'welding_method',
+    '焊接方法',
+    '焊法',
+  ]);
   const examDateValue = pickImportValue(row, [
     'examDate',
     '入厂考试时间',
@@ -533,6 +542,7 @@ function mapWelderImportRow(row: Record<string, unknown>) {
   const welderCode = String(
     welderCodeValue ?? Object.values(row)[1] ?? '',
   ).trim();
+  const weldingMethod = String(weldingMethodValue ?? '').trim();
   if (isHeaderLikeWelderRecord({ code: welderCode, name })) return null;
   if (!name || !team) return null;
 
@@ -547,6 +557,7 @@ function mapWelderImportRow(row: Record<string, unknown>) {
     name,
     team,
     welderCode,
+    weldingMethod,
   };
 }
 
@@ -690,6 +701,7 @@ async function handleModalOk() {
       team: formState.team,
       teamId: formState.teamId,
       welderCode: formState.welderCode || null,
+      weldingMethod: formState.weldingMethod || null,
     };
 
     if (isEditMode.value && currentId.value) {
@@ -734,6 +746,12 @@ const gridOptions = computed<VxeGridProps['gridOptions']>(() => ({
       field: 'team',
       title: t('qms.welder.team'),
       minWidth: 120,
+    },
+    {
+      field: 'weldingMethod',
+      title: t('qms.welder.weldingMethod'),
+      minWidth: 140,
+      formatter: ({ cellValue }: { cellValue: string }) => cellValue || '-',
     },
     {
       field: 'examDate',
@@ -1051,6 +1069,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
       >
         <Input v-model:value="formState.certificationNo" />
       </Form.Item>
+      <Form.Item :label="t('qms.welder.weldingMethod')" name="weldingMethod">
+        <Input v-model:value="formState.weldingMethod" />
+      </Form.Item>
     </Form>
   </Modal>
 
@@ -1116,6 +1137,9 @@ const [Grid, gridApi] = useVbenVxeGrid({
       </Descriptions.Item>
       <Descriptions.Item :label="t('qms.welder.certificationNo')">
         {{ detailRecord.certificationNo || '-' }}
+      </Descriptions.Item>
+      <Descriptions.Item :label="t('qms.welder.weldingMethod')">
+        {{ detailRecord.weldingMethod || '-' }}
       </Descriptions.Item>
       <Descriptions.Item :label="t('qms.welder.score')">
         {{ detailRecord.score ?? '-' }}

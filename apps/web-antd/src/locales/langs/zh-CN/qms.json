@@ -720,7 +720,7 @@
     "welderCode": "焊工编号",
     "name": "焊工姓名",
     "team": "所属班组",
-    "welding_method": "焊接方法",
+    "weldingMethod": "焊接方法",
     "examDate": "入厂考试时间",
     "examPassed": "进厂考试通过",
     "employmentStatus": "人员状态",

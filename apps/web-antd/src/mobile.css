@@ -15,30 +15,6 @@ body {
   min-height: 100dvh;
 }
 
-.qms-mobile-shell {
-  min-height: 100dvh;
-  padding-bottom: var(--qms-safe-bottom);
-}
-
-.qms-mobile-shell__content {
-  min-width: 0;
-  padding-right: max(12px, var(--qms-safe-right));
-  padding-left: max(12px, var(--qms-safe-left));
-  overflow-x: hidden;
-}
-
-.qms-mobile-shell__footer {
-  position: sticky;
-  bottom: 0;
-  left: 0;
-  z-index: 20;
-  padding: 10px max(12px, var(--qms-safe-right))
-    calc(10px + var(--qms-safe-bottom)) max(12px, var(--qms-safe-left));
-  background: rgb(255 255 255 / 95%);
-  border-top: 1px solid rgb(229 231 235);
-  backdrop-filter: blur(8px);
-}
-
 .qms-page-shell {
   min-height: 100dvh;
   padding-bottom: var(--qms-safe-bottom);

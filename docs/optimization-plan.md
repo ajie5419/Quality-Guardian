@@ -77,7 +77,8 @@
 2. **baseline 出账**：B-M1 跨模块内部 import（140 条）分批改为走 index；B-E2 silent catch（57 条）逐个补 logger；B-T2 双重断言（8 条）消除；每批出账后收紧 baseline 文件。
 3. **表结构补齐**（migration）：39 张缺 createdBy 的表按业务优先级补字段；16 张缺 isDeleted 的表确认删除语义（file_assets/file_references 若物理删需显式文档化）；`@module` 标签补齐 82 张表。
 4. **前端死代码与重构**：
-   - 删除/收敛：components/Qms/ChartBuilder（保留 useChartCore，两域 fork 改用它）、MobilePageShell、7 个 vue-query 死 hook、legacyResponsibilityDepartment、updateByRoute/savePassRateTargets/invalidateStatsCache 等后端死路径；
+   - 删除/收敛：components/Qms/ChartBuilder（保留 useChartCore，两域 fork 改用它）、7 个 vue-query 死 hook、updateByRoute/savePassRateTargets/invalidateStatsCache 等后端死路径；
+   - 已完成（2026-10-09 前端死代码清理）：ITP 旧前端（`planning/itp/components/*`、`useItpNodeMapper`）与其 API 客户端、焊工旧组件（`WelderFormModal`/`WelderDetailDrawer`/`helpers.ts`，能力已由 `WelderManagementView` 内联覆盖）、`MobilePageShell` 与 `.qms-mobile-shell*` 样式、`legacyResponsibilityDepartment`（其唯一调用点已于 2026-08-14 `97b32657` 被「关闭检验」责任归属必填选择替代）；
    - 神组件拆分：SupervisionManagementView（2384）、WelderManagementView（1228）、WorkOrderAggregateDrawer（1149）、monitor/index.vue（模板 2300 行静态大盘可数据化）；
    - 重复收敛：AfterSalesPhotoUpload vs IssuePhotoUpload、三份 MobileList、ToolbarActions 一族、KPI 卡一族（抽 OverviewStatCards）、状态 UI 色映射单一权威（@qgs/shared）、全局 css 改 scoped、after-sales/issues index.css 合并；
    - 类型安全：22 处 `as unknown as` + 29 处 `as any`（GanttTaskEditor 21 处集中处理）清零。
