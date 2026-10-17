@@ -3,7 +3,7 @@ import type { H3Event } from 'h3';
 import type { BridgeClient } from './config';
 
 import { ErrorCode } from '@qgs/shared';
-import { getHeader, getRequestIP, readBody, setHeader } from 'h3';
+import { getHeader, getQuery, getRequestIP, readBody, setHeader } from 'h3';
 import {
   BusinessError,
   businessErrorResponse,
@@ -19,9 +19,10 @@ import {
   loadBridgeClient,
   loadClientCredentials,
   rejectIdentity,
+  resolveClientName,
 } from './config';
 import { createIdentityBridge } from './identity-bridge.service';
-import { authorizeSchema, exchangeSchema } from './schema';
+import { authorizeSchema, clientLookupSchema, exchangeSchema } from './schema';
 
 const logger = createModuleLogger('identity-bridge');
 // Burst protection is process-local only; correctness and redemption always depend on MySQL.
@@ -130,6 +131,44 @@ export async function handleIdentityBridge(
     )?.[1];
     if (!credential) rejectIdentity();
     return useResponseSuccess(await bridge[action](credential));
+  } catch (error) {
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
+    logger.error('Identity bridge unavailable');
+    return businessErrorResponse(
+      event,
+      new BusinessError(
+        ErrorCode.INTERNAL,
+        'Identity service unavailable',
+        503,
+      ),
+    );
+  }
+}
+
+/**
+ * Public read-only lookup used by the login and authorize pages to label the
+ * target system. Answers only for the registered client id + exact callback;
+ * anything else is a fixed 404 so the page falls back to a neutral label.
+ */
+export function handleIdentityClientLookup(event: H3Event) {
+  setHeader(event, 'Cache-Control', 'no-store');
+  setHeader(event, 'Referrer-Policy', 'no-referrer');
+  try {
+    const input = clientLookupSchema.safeParse(getQuery(event));
+    const name = input.success
+      ? resolveClientName(
+          loadBridgeClient(),
+          input.data.clientId,
+          input.data.redirectUri,
+        )
+      : null;
+    if (!name)
+      throw new BusinessError(
+        ErrorCode.NOT_FOUND,
+        'Identity client not found',
+        404,
+      );
+    return useResponseSuccess({ name });
   } catch (error) {
     if (isBusinessError(error)) return businessErrorResponse(event, error);
     logger.error('Identity bridge unavailable');

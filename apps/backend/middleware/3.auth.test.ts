@@ -87,6 +87,20 @@ describe('auth middleware', () => {
     }
   });
 
+  it('leaves only the exact GET client-name lookup public', async () => {
+    const lookup = makeEvent('/api/identity-bridge/client', null);
+    await authMiddleware(lookup);
+    expect(verifyAccessToken).not.toHaveBeenCalled();
+    for (const [pathname, method] of [
+      ['/api/identity-bridge/client', 'POST'],
+      ['/api/identity-bridge/client/extra', 'GET'],
+      ['/api/identity-bridge/authorize', 'GET'],
+    ]) {
+      const event = makeEvent(pathname, null, method);
+      expect(await authMiddleware(event)).toEqual({ unauthorized: true });
+    }
+  });
+
   it('leaves only GET fulfillment sync feeds to their own client authentication', async () => {
     const feed = makeEvent('/api/integration/fulfillment/users', null);
     await authMiddleware(feed);

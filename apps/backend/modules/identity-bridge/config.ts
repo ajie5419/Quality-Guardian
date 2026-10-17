@@ -53,6 +53,31 @@ function sameDigest(left: string, right: string) {
   return timingSafeEqual(Buffer.from(digest(left)), Buffer.from(digest(right)));
 }
 
+const DEFAULT_CLIENT_NAME = '项目履约系统';
+
+/**
+ * Returns the operator-configured display name of the registered client, but
+ * only when both the client id and the exact callback match the registration.
+ * The name never comes from the caller, so a crafted link cannot relabel the
+ * login page. Returns null on any mismatch.
+ */
+export function resolveClientName(
+  client: Pick<BridgeClient, 'callback' | 'id'>,
+  clientId: string,
+  redirectUri: string,
+): null | string {
+  const sameId = sameDigest(clientId, client.id);
+  const sameCallback = sameDigest(redirectUri, client.callback);
+  if (!sameId || !sameCallback) return null;
+  const name = z
+    .string()
+    .trim()
+    .min(1)
+    .max(64)
+    .safeParse(process.env.QMS_IDENTITY_CLIENT_NAME);
+  return name.success ? name.data : DEFAULT_CLIENT_NAME;
+}
+
 export function authenticateClient(
   client: Pick<BridgeClient, 'id' | 'secret'>,
   id: string,

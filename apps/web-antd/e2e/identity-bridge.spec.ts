@@ -21,8 +21,16 @@ const fixture = JSON.parse(
 const token = () => randomBytes(32).toString('base64url');
 test.use({ ignoreHTTPSErrors: true });
 
+const CLIENT_NAME = process.env.QMS_IDENTITY_CLIENT_NAME || '项目履约系统';
+
+// Bridge logins land on the neutral login page; authorization is silent.
 async function signIn(page: Page) {
-  await page.getByRole('button', { name: '登录 QMS 后继续' }).click();
+  await expect(
+    page.getByRole('heading', { name: `登录 ${CLIENT_NAME}`, exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText('使用 QMS 账号登录', { exact: true }),
+  ).toBeVisible();
   await page
     .getByPlaceholder('请输入用户名')
     .fill(`${process.env.QGS_E2E_USERNAME}_identity`);
@@ -33,15 +41,17 @@ async function signIn(page: Page) {
     .getByRole('button', { name: /登\s*录/ })
     .or(page.locator('button[aria-label="login"]'))
     .click();
-  await expect(
-    page.getByRole('heading', { name: '登录履约系统', exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: '继续', exact: true }),
-  ).toBeVisible();
 }
 
-test('employee with no QMS menus returns to fixed authorization and uses only an integration credential', async ({
+function authorizeResponse(page: Page) {
+  return page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname === '/api/identity-bridge/authorize' &&
+      response.request().method() === 'POST',
+  );
+}
+
+test('employee with no QMS menus signs in on the neutral bridge login and is silently authorized', async ({
   page,
 }, info) => {
   await info.attach('error-context', {
@@ -71,7 +81,6 @@ test('employee with no QMS menus returns to fixed authorization and uses only an
       await page.getByRole('link', { name: '登录', exact: true }).click();
       await signIn(page);
       expect(codesRequests).toBe(0);
-      await page.getByRole('button', { name: '继续', exact: true }).click();
       await expect(
         page.getByText('当前登录：E2E Identity Employee'),
       ).toBeVisible();
@@ -116,8 +125,8 @@ test('employee with no QMS menus returns to fixed authorization and uses only an
       ).toBeVisible();
       const afterLogout = await page.request.get(`${gc}/api/work-orders`);
       expect(afterLogout.status()).toBe(403);
+      // QMS is still signed in, so the second entry is silent.
       await page.getByRole('link', { name: '登录', exact: true }).click();
-      await page.getByRole('button', { name: '继续', exact: true }).click();
       await expect(
         page.getByText('当前登录：E2E Identity Employee'),
       ).toBeVisible();
@@ -142,15 +151,23 @@ test('employee with no QMS menus returns to fixed authorization and uses only an
       });
       return;
     }
-    // Standalone QMS suite verifies its own authorization page and real Nitro endpoints.
+    // Standalone QMS suite verifies its own login page and real Nitro endpoints.
+    await page.goto('/auth/login');
+    await expect(
+      page.getByText('使用 QMS 账号登录', { exact: true }),
+    ).toHaveCount(0);
     const verifier = token();
-    const params = new URLSearchParams({
-      clientId: process.env.QMS_IDENTITY_CLIENT_ID || '',
-      redirectUri: process.env.QMS_IDENTITY_CALLBACK || '',
-      state: token(),
-      challenge: createHash('sha256').update(verifier).digest('base64url'),
-      method: 'S256',
-    });
+    const authorizeParams = (state: string, challengeVerifier: string) =>
+      new URLSearchParams({
+        clientId: process.env.QMS_IDENTITY_CLIENT_ID || '',
+        redirectUri: process.env.QMS_IDENTITY_CALLBACK || '',
+        state,
+        challenge: createHash('sha256')
+          .update(challengeVerifier)
+          .digest('base64url'),
+        method: 'S256',
+      });
+    const params = authorizeParams(token(), verifier);
     await page.route('https://gc.e2e.invalid/**', (route) =>
       route.fulfill({
         status: 200,
@@ -159,14 +176,9 @@ test('employee with no QMS menus returns to fixed authorization and uses only an
       }),
     );
     await page.goto(`/identity/authorize?${params}`);
+    const authorized = authorizeResponse(page);
     await signIn(page);
     expect(codesRequests).toBe(0);
-    const authorized = page.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === '/api/identity-bridge/authorize' &&
-        response.request().method() === 'POST',
-    );
-    await page.getByRole('button', { name: '继续', exact: true }).click();
     const authorization = await authorized;
     const body = await authorization.json();
     const callback = new URL(body.data.callback);
@@ -240,6 +252,27 @@ test('employee with no QMS menus returns to fixed authorization and uses only an
       },
     );
     expect(afterRevoke.status()).toBe(401);
+
+    // prompt=login forces a fresh QMS login even while signed in, once only.
+    const switchState = token();
+    const switchParams = authorizeParams(switchState, token());
+    switchParams.set('prompt', 'login');
+    await page.goto(`/identity/authorize?${switchParams}`);
+    await expect(
+      page.getByRole('heading', { name: `登录 ${CLIENT_NAME}`, exact: true }),
+    ).toBeVisible();
+    expect(decodeURIComponent(decodeURIComponent(page.url()))).not.toContain(
+      'prompt=',
+    );
+    const switched = authorizeResponse(page);
+    await signIn(page);
+    const switchedResponse = await switched;
+    const switchedBody = await switchedResponse.json();
+    const switchedCallback = new URL(switchedBody.data.callback);
+    expect(switchedCallback.searchParams.get('state')).toBe(switchState);
+    await expect(
+      page.getByText('QMS callback observed; standalone provider test only.'),
+    ).toBeVisible();
   } finally {
     await db.users.update({
       where: { id: fixture.identityUserId },

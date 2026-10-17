@@ -1,83 +1,141 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-import { useAccessStore } from '@vben/stores';
+import { LOGIN_PATH } from '@vben/constants';
+import { useAccessStore, useUserStore } from '@vben/stores';
 
-import { authorizeIdentity } from '#/api/core/identity-bridge';
+import { getIdentityClientName } from '#/api/core/identity-bridge';
+import { getUserInfoApi } from '#/api/core/user';
+import { useAuthStore } from '#/store';
+import { identityRedirect } from '#/utils/identity-redirect';
+
+import {
+  authorizeOnce,
+  classifyFailure,
+  parseAuthorizeQuery,
+  verifiedCallback,
+  wantsForcedLogin,
+} from './identity-authorize-flow';
+
+const NETWORK_ERROR = '暂时无法连接 QMS，请检查网络后重试。';
 
 const route = useRoute();
 const router = useRouter();
 const access = useAccessStore();
-const busy = ref(false);
-const error = ref('');
+const userStore = useUserStore();
+const authStore = useAuthStore();
 
-async function proceed() {
-  if (busy.value) return;
+const busy = ref(true);
+const systemName = ref('');
+const error = ref('');
+const accountName = ref('');
+
+// The same authorize URL without `prompt`, so returning here never loops.
+function returnPath() {
+  return identityRedirect(encodeURIComponent(route.fullPath)) ?? route.path;
+}
+
+async function fail(message: string) {
+  error.value = message;
+  busy.value = false;
+  if (accountName.value) return;
+  try {
+    const info = userStore.userInfo ?? (await getUserInfoApi());
+    accountName.value = info.realName || info.username || '';
+  } catch {
+    // The account line is informational only.
+  }
+}
+
+async function enter(retry = false) {
+  busy.value = true;
+  error.value = '';
+  const request = parseAuthorizeQuery(route.query);
+  if (!request) {
+    await fail('登录链接无效，请回到原系统重新进入。');
+    return;
+  }
+  try {
+    const client = await getIdentityClientName(request);
+    systemName.value = client.name;
+  } catch (error_) {
+    await fail(
+      classifyFailure(error_) === 'not-found'
+        ? '无法识别来源系统，请回到原系统重新进入。'
+        : NETWORK_ERROR,
+    );
+    return;
+  }
+  const rejected = `未能进入 ${systemName.value}，请重试或回到原系统重新进入。`;
+  let callback: string;
+  try {
+    ({ callback } = await authorizeOnce(request, retry));
+  } catch (error_) {
+    await fail(
+      classifyFailure(error_) === 'network' ? NETWORK_ERROR : rejected,
+    );
+    return;
+  }
+  const target = verifiedCallback(callback, request);
+  if (!target) {
+    await fail(rejected);
+    return;
+  }
+  window.location.replace(target);
+}
+
+async function switchAccount() {
+  busy.value = true;
+  await authStore.logout(returnPath());
+}
+
+onMounted(async () => {
+  if (wantsForcedLogin(route.query)) {
+    await (access.accessToken
+      ? authStore.logout(returnPath())
+      : router.replace({
+          path: LOGIN_PATH,
+          query: { redirect: encodeURIComponent(returnPath()) },
+        }));
+    return;
+  }
   if (!access.accessToken) {
     await router.replace({
-      path: '/auth/login',
+      path: LOGIN_PATH,
       query: { redirect: encodeURIComponent(route.fullPath) },
     });
     return;
   }
-  busy.value = true;
-  error.value = '';
-  try {
-    const query = route.query;
-    for (const key of [
-      'clientId',
-      'redirectUri',
-      'state',
-      'challenge',
-      'method',
-    ]) {
-      if (typeof query[key] !== 'string')
-        throw new Error('Invalid authorization request');
-    }
-    if (query.method !== 'S256')
-      throw new Error('Invalid authorization method');
-    const { callback } = await authorizeIdentity({
-      clientId: String(query.clientId),
-      redirectUri: String(query.redirectUri),
-      state: String(query.state),
-      challenge: String(query.challenge),
-      method: 'S256',
-    });
-    const target = new URL(callback);
-    const expected = new URL(String(query.redirectUri));
-    if (
-      target.origin !== expected.origin ||
-      target.pathname !== expected.pathname ||
-      target.username ||
-      target.password ||
-      target.hash
-    ) {
-      throw new Error('Invalid authorization callback');
-    }
-    window.location.replace(target.href);
-  } catch {
-    error.value = '授权未完成，请重新登录或从履约系统重新发起。';
-  } finally {
-    busy.value = false;
-  }
-}
+  await enter();
+});
 </script>
 
 <template>
-  <main
-    class="mx-auto mt-16 max-w-lg space-y-6 rounded-lg bg-white p-8 text-gray-900"
-  >
-    <h1 class="text-2xl font-semibold">登录履约系统</h1>
-    <p>履约系统请求确认您的身份。继续后，将使用当前 QMS 账号登录履约系统。</p>
-    <p>履约系统的查看和建单权限由履约系统单独授权。</p>
-    <p v-if="error" role="alert">{{ error }}</p>
-    <button
-      class="rounded bg-blue-700 px-5 py-3 text-white"
-      :disabled="busy"
-      @click="proceed"
-    >
-      {{ busy ? '正在授权…' : access.accessToken ? '继续' : '登录 QMS 后继续' }}
-    </button>
+  <main class="mx-auto mt-16 max-w-lg space-y-6 p-8">
+    <p v-if="busy" class="text-center text-lg" role="status">
+      {{ systemName ? `正在进入 ${systemName}…` : '正在进入…' }}
+    </p>
+    <template v-else>
+      <h1 class="text-2xl font-semibold">无法完成登录</h1>
+      <p role="alert">{{ error }}</p>
+      <p v-if="accountName">当前账号：{{ accountName }}</p>
+      <div class="flex gap-3">
+        <button
+          class="bg-primary rounded px-5 py-2 text-white"
+          type="button"
+          @click="enter(true)"
+        >
+          重试
+        </button>
+        <button
+          class="rounded border px-5 py-2"
+          type="button"
+          @click="switchAccount"
+        >
+          换个账号
+        </button>
+      </div>
+    </template>
   </main>
 </template>

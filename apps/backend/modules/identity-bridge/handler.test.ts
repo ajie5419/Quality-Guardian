@@ -5,8 +5,15 @@ import { randomBytes } from 'node:crypto';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { sanitizeContext } from '~/utils/logger';
 
-import { authenticateClient, loadBridgeClient } from './config';
-import { assertIdentityBridgePermission } from './handler';
+import {
+  authenticateClient,
+  loadBridgeClient,
+  resolveClientName,
+} from './config';
+import {
+  assertIdentityBridgePermission,
+  handleIdentityClientLookup,
+} from './handler';
 import { authorizeSchema, exchangeSchema } from './schema';
 
 vi.mock('~/utils/prisma', () => ({ default: {} }));
@@ -15,6 +22,11 @@ vi.mock('h3', async (original) => ({
   getHeader: (event: { headers: Record<string, string> }, key: string) =>
     event.headers[key],
   getRequestIP: (event: { ip: string }) => event.ip,
+  getQuery: (event: { query: Record<string, string> }) => event.query,
+  setHeader: () => {},
+  setResponseStatus: (event: { status?: number }, status: number) => {
+    event.status = status;
+  },
 }));
 const token = () => randomBytes(32).toString('base64url');
 let secret: string;
@@ -128,4 +140,47 @@ it('explicitly redacts nested client headers, credential and authorization proto
   });
   expect(JSON.stringify(sanitized)).not.toContain(value);
   expect(JSON.stringify(sanitized)).toContain('[REDACTED]');
+});
+
+it('names only the registered client and exact callback, from configuration only', () => {
+  const client = loadBridgeClient();
+  expect(resolveClientName(client, client.id, client.callback)).toBe(
+    '项目履约系统',
+  );
+  vi.stubEnv('QMS_IDENTITY_CLIENT_NAME', '  客户履约平台 ');
+  expect(resolveClientName(client, client.id, client.callback)).toBe(
+    '客户履约平台',
+  );
+  vi.stubEnv('QMS_IDENTITY_CLIENT_NAME', '');
+  expect(resolveClientName(client, client.id, client.callback)).toBe(
+    '项目履约系统',
+  );
+  expect(resolveClientName(client, 'other', client.callback)).toBeNull();
+  expect(
+    resolveClientName(client, client.id, `${client.callback}?next=x`),
+  ).toBeNull();
+});
+
+it('answers the public lookup with the name only and a fixed 404 otherwise', () => {
+  const lookup = (query: Record<string, string>) => {
+    const event = { query } as { query: object; status?: number };
+    const body = handleIdentityClientLookup(event as unknown as H3Event) as {
+      code: number;
+      data: unknown;
+    };
+    return { ...body, status: event.status ?? 200 };
+  };
+  const callback = 'https://gc.example.test/api/auth/callback';
+  expect(lookup({ clientId: 'gc-test', redirectUri: callback })).toMatchObject({
+    code: 0,
+    data: { name: '项目履约系统' },
+  });
+  for (const query of [
+    { clientId: 'gc-other', redirectUri: callback },
+    { clientId: 'gc-test', redirectUri: 'https://evil.test/cb' },
+    { clientId: 'gc-test' },
+    {},
+  ]) {
+    expect(lookup(query)).toMatchObject({ status: 404, data: null });
+  }
 });

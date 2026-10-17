@@ -1,3 +1,10 @@
+### 2026-10-17 身份桥统一登录页与静默授权
+
+- 取消授权确认页：已登录 QMS 时 `/identity/authorize` 立即静默授权并跳回注册 callback，过程中只显示“正在进入 {系统名}…”；同一页面加载内同一 state 只提交一次。失败时显示原因、当前账号以及“重试”“换个账号”，后者退出 QMS 并回到同一授权地址。
+- 来自身份桥的 `/auth/login`（redirect 指向 `/identity/authorize`）改为中性登录页：标题“登录 {系统名}”、副标题“使用 QMS 账号登录”，隐藏 QMS 名称、Logo 与注册入口；普通 QMS 登录不变。
+- 新增授权参数 `prompt=login`：即使已登录也先退出 QMS 再进入登录页，登录回跳地址统一剥离 `prompt`，不会循环。
+- 新增公开只读 `GET /api/identity-bridge/client?clientId&redirectUri`：仅当 client id 与完整 callback 均匹配注册值时返回 `{ name }`，名称来自可选 `QMS_IDENTITY_CLIENT_NAME`（默认“项目履约系统”），否则固定 404；`3.auth.ts` 仅放行该精确 GET 路径。前端仍只跳转后端返回且与注册 callback、本次 state 一致的地址。
+
 ### 2026-10-17 履约系统只读增量同步接口（未提交）
 
 - 新增 `fulfillment-sync` 模块与 7 个 GET 接口 `/api/integration/fulfillment/{work-orders,suppliers,teams,processes,departments,users,inspections}`：按 `(updatedAt, key)` 升序、严格大于游标、DB 层 `take(limit≤100)`，包含软删除行，`nextCursor` 不足一页时为 null。
