@@ -4,7 +4,6 @@ export {
 } from './fulfillment-sync.handler';
 export {
   FULFILLMENT_SYNC_RESOURCES,
-  fulfillmentBomParamsSchema,
   fulfillmentSyncQuerySchema,
 } from './fulfillment-sync.schema';
 export type {
