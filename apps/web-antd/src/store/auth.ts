@@ -14,6 +14,7 @@ import { defineStore } from 'pinia';
 
 import { getAccessCodesApi, getUserInfoApi, loginApi, logoutApi } from '#/api';
 import { $t } from '#/locales';
+import { identityRedirect } from '#/utils/identity-redirect';
 import { normalizeHashRedirectPath } from '#/utils/router-redirect';
 
 export const useAuthStore = defineStore('auth', () => {
@@ -41,6 +42,15 @@ export const useAuthStore = defineStore('auth', () => {
       // 如果成功获取到 accessToken
       if (accessToken) {
         accessStore.setAccessToken(accessToken);
+
+        const bridge = identityRedirect(
+          router.currentRoute.value.query.redirect,
+        );
+        if (bridge) {
+          accessStore.setLoginExpired(false);
+          await router.replace(bridge);
+          return { userInfo: null };
+        }
 
         // 获取用户信息并存储到 accessStore 中
         const [fetchUserInfoResult, accessCodes] = await Promise.all([

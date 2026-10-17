@@ -32,6 +32,8 @@ async function seed() {
     const departmentId = createId();
     const roleId = createId();
     const userId = createId();
+    const identityUserId = createId();
+    const identityRoleId = createId();
     const processId = createId();
     const incomingProcessId = createId();
     const partId = createId();
@@ -66,6 +68,24 @@ async function seed() {
         data: { id: departmentId, name: 'E2E Production' },
       });
       await tx.roles.create({ data: { id: roleId, name: 'e2e-dispatch' } });
+      // Identity integration must also work for employees with no QMS menu grants.
+      await tx.roles.create({
+        data: {
+          id: identityRoleId,
+          name: 'e2e-identity-only',
+          permissions: '[]',
+        },
+      });
+      await tx.users.create({
+        data: {
+          id: identityUserId,
+          username: `${username}_identity`,
+          password: passwordHash,
+          realName: 'E2E Identity Employee',
+          roleId: identityRoleId,
+          department: departmentId,
+        },
+      });
       await tx.users.create({
         data: {
           id: userId,
@@ -822,6 +842,7 @@ async function seed() {
           departmentId,
           roleId,
           userId,
+          identityUserId,
           partId,
           processId,
           incomingProcessId,

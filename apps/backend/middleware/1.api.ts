@@ -14,7 +14,9 @@ export default defineEventHandler(async (event) => {
   requestLogger.trace(
     {
       method: event.method,
-      path: event.path,
+      path: event.path.startsWith('/api/identity-bridge/')
+        ? event.path.split('?')[0]
+        : event.path,
     },
     'request received',
   );

@@ -21,6 +21,15 @@ const SHOULD_LOG_ERROR_STACK = process.env.LOG_ERROR_STACK === '1';
 const REDACTED_VALUE = '[REDACTED]';
 const SENSITIVE_KEY_PATTERN =
   /pass(?:word)?|token|secret|authorization|cookie|api[-_]?key|session/i;
+const IDENTITY_SENSITIVE_KEYS = new Set([
+  'challenge',
+  'code',
+  'credential',
+  'state',
+  'verifier',
+  'x-identity-client-id',
+  'x-identity-client-secret',
+]);
 
 const REQUEST_ID_HEADER = 'x-request-id';
 const TRACE_ID_HEADER = 'x-trace-id';
@@ -149,7 +158,10 @@ function sanitizeValue(value: unknown, state: SanitizerState): unknown {
 
   const next: Record<string, unknown> = {};
   for (const [key, raw] of Object.entries(value)) {
-    if (SENSITIVE_KEY_PATTERN.test(key)) {
+    if (
+      SENSITIVE_KEY_PATTERN.test(key) ||
+      IDENTITY_SENSITIVE_KEYS.has(key.toLowerCase())
+    ) {
       next[key] = REDACTED_VALUE;
       continue;
     }
@@ -317,7 +329,9 @@ export function resolveRequestLogContext(
 
   return {
     method: event.method || event.node.req.method || undefined,
-    path: event.path || event.node.req.url || undefined,
+    path: event.path?.startsWith('/api/identity-bridge/')
+      ? event.path.split('?')[0]
+      : event.path || event.node.req.url || undefined,
     requestId,
     traceId,
     userId: event.context.userId,

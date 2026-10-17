@@ -61,6 +61,16 @@ export default defineEventHandler(async (event) => {
   if (event.method === 'OPTIONS') return;
 
   const pathname = getRequestURL(event).pathname;
+  // These exact POST handlers authenticate the confidential client themselves.
+  if (
+    event.method === 'POST' &&
+    [
+      '/api/identity-bridge/exchange',
+      '/api/identity-bridge/identity',
+      '/api/identity-bridge/revoke',
+    ].includes(pathname)
+  )
+    return;
   if (isPublicPath(pathname)) return;
 
   const user = verifyAccessToken(event);

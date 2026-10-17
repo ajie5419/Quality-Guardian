@@ -31,6 +31,13 @@ const fallbackNotFoundRoute: RouteRecordRaw = {
 
 /** 基本路由，这些路由是必须存在的 */
 const coreRoutes: RouteRecordRaw[] = [
+  {
+    name: 'IdentityAuthorize',
+    path: '/identity/authorize',
+    component: () =>
+      import('#/views/_core/authentication/identity-authorize.vue'),
+    meta: { hideInMenu: true, hideInTab: true, title: '登录履约系统' },
+  },
   /**
    * 根路由
    * 使用基础布局，作为所有页面的父级容器，子级就不必配置BasicLayout。
