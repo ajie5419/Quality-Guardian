@@ -1,34 +1,19 @@
 <script lang="ts" setup>
-import { computed } from 'vue';
-import { useRoute } from 'vue-router';
-
 import { AuthPageLayout } from '@vben/layouts';
 import { preferences } from '@vben/preferences';
 
 import { $t } from '#/locales';
-import { identityRedirect } from '#/utils/identity-redirect';
+import { AUTH_BRAND_NAME } from '#/utils/auth-brand';
 
-const route = useRoute();
-// Bridge logins hide QMS branding; the form itself names the target system.
-const isBridge = computed(() =>
-  Boolean(identityRedirect(route.query.redirect)),
-);
-const appName = computed(() => (isBridge.value ? '' : preferences.app.name));
-const logo = computed(() => (isBridge.value ? '' : preferences.logo.source));
-const pageTitle = computed(() =>
-  isBridge.value ? '' : $t('authentication.pageTitle'),
-);
-const pageDescription = computed(() =>
-  isBridge.value ? '' : $t('authentication.pageDesc'),
-);
+// Every entry (QMS or a bridge client) sees the same shared-login branding.
 </script>
 
 <template>
   <AuthPageLayout
-    :app-name="appName"
-    :logo="logo"
-    :page-description="pageDescription"
-    :page-title="pageTitle"
+    :app-name="AUTH_BRAND_NAME"
+    :logo="preferences.logo.source"
+    :page-description="$t('authentication.pageDesc')"
+    :page-title="AUTH_BRAND_NAME"
   >
     <!-- 自定义工具栏 -->
     <!-- <template #toolbar></template> -->

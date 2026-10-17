@@ -22,15 +22,22 @@ const token = () => randomBytes(32).toString('base64url');
 test.use({ ignoreHTTPSErrors: true });
 
 const CLIENT_NAME = process.env.QMS_IDENTITY_CLIENT_NAME || '项目履约系统';
+const BRAND = '通联项目管理系统';
 
-// Bridge logins land on the neutral login page; authorization is silent.
+// Every entry shares one branded login page; only the destination differs.
+async function expectSharedLogin(page: Page, destination: string) {
+  await expect(page.getByAltText(BRAND).first()).toBeVisible();
+  await expect(page.getByText(BRAND, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('创建账号', { exact: true })).toBeVisible();
+  await expect(
+    page.getByText(`登录后进入 ${destination}`, { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('使用 QMS 账号登录')).toHaveCount(0);
+}
+
+// Bridge logins land on the shared login page; authorization is silent.
 async function signIn(page: Page) {
-  await expect(
-    page.getByRole('heading', { name: `登录 ${CLIENT_NAME}`, exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.getByText('使用 QMS 账号登录', { exact: true }),
-  ).toBeVisible();
+  await expectSharedLogin(page, CLIENT_NAME);
   await page
     .getByPlaceholder('请输入用户名')
     .fill(`${process.env.QGS_E2E_USERNAME}_identity`);
@@ -51,7 +58,7 @@ function authorizeResponse(page: Page) {
   );
 }
 
-test('employee with no QMS menus signs in on the neutral bridge login and is silently authorized', async ({
+test('employee with no QMS menus signs in on the shared branded login and is silently authorized', async ({
   page,
 }, info) => {
   await info.attach('error-context', {
@@ -153,9 +160,7 @@ test('employee with no QMS menus signs in on the neutral bridge login and is sil
     }
     // Standalone QMS suite verifies its own login page and real Nitro endpoints.
     await page.goto('/auth/login');
-    await expect(
-      page.getByText('使用 QMS 账号登录', { exact: true }),
-    ).toHaveCount(0);
+    await expectSharedLogin(page, '质量管理系统');
     const verifier = token();
     const authorizeParams = (state: string, challengeVerifier: string) =>
       new URLSearchParams({
@@ -176,6 +181,12 @@ test('employee with no QMS menus signs in on the neutral bridge login and is sil
       }),
     );
     await page.goto(`/identity/authorize?${params}`);
+    // Register and back again keeps the bridge destination.
+    await expectSharedLogin(page, CLIENT_NAME);
+    await page.getByText('创建账号', { exact: true }).click();
+    await expect(page).toHaveURL(/\/auth\/register\?redirect=/);
+    await page.getByText('去登录', { exact: true }).click();
+    await expect(page).toHaveURL(/\/auth\/login\?redirect=/);
     const authorized = authorizeResponse(page);
     await signIn(page);
     expect(codesRequests).toBe(0);
@@ -258,9 +269,7 @@ test('employee with no QMS menus signs in on the neutral bridge login and is sil
     const switchParams = authorizeParams(switchState, token());
     switchParams.set('prompt', 'login');
     await page.goto(`/identity/authorize?${switchParams}`);
-    await expect(
-      page.getByRole('heading', { name: `登录 ${CLIENT_NAME}`, exact: true }),
-    ).toBeVisible();
+    await expectSharedLogin(page, CLIENT_NAME);
     expect(decodeURIComponent(decodeURIComponent(page.url()))).not.toContain(
       'prompt=',
     );

@@ -6,9 +6,11 @@ import { useRoute } from 'vue-router';
 
 import { AuthenticationLogin, z } from '@vben/common-ui';
 import { $t } from '@vben/locales';
+import { preferences } from '@vben/preferences';
 
 import { useIdentityClientName } from '#/composables/useIdentityClientName';
 import { useAuthStore } from '#/store';
+import { withAuthRedirect } from '#/utils/auth-brand';
 import {
   identityRedirect,
   identityRedirectTarget,
@@ -26,11 +28,19 @@ const isBridge = computed(() =>
 const bridgeName = useIdentityClientName(
   computed(() => identityRedirectTarget(route.query.redirect)),
 );
-const title = computed(() => {
-  if (!isBridge.value) return '';
-  return bridgeName.value ? `登录 ${bridgeName.value}` : '登录';
+// Same page for every entry; only the subtitle names the destination.
+const subTitle = computed(() => {
+  if (!isBridge.value) return `登录后进入 ${preferences.app.name}`;
+  return bridgeName.value
+    ? `登录后进入 ${bridgeName.value}`
+    : '请输入账号密码登录';
 });
-const subTitle = computed(() => (isBridge.value ? '使用 QMS 账号登录' : ''));
+const registerPath = computed(() =>
+  withAuthRedirect(
+    '/auth/register',
+    isBridge.value ? route.query.redirect : undefined,
+  ),
+);
 
 // 精简的表单配置 - 只保留用户名和密码
 const formSchema = computed((): VbenFormSchema[] => {
@@ -64,11 +74,10 @@ const formSchema = computed((): VbenFormSchema[] => {
     :show-code-login="false"
     :show-qrcode-login="false"
     :show-forget-password="false"
-    :show-register="!isBridge"
+    :register-path="registerPath"
     :show-remember-me="false"
     :show-third-party-login="false"
     :sub-title="subTitle"
-    :title="title"
     @submit="authStore.authLogin"
   />
 </template>

@@ -26,7 +26,7 @@ handler 统一返回固定公开错误，存储／配置错误为 503；不记�
 
 1. 履约系统跳转 `/identity/authorize?clientId&redirectUri&state&challenge&method=S256[&prompt=login]`（生产为 hash 路由）。
 2. 带 `prompt=login` 时（履约系统“切换账号”）：已登录则退出 QMS，未登录则直接进入登录页；回跳地址统一剥离 `prompt`，避免再次强制退出。
-3. 未登录时跳转 `/auth/login?redirect=<授权页>`。登录页与认证布局以 redirect 是否为固定授权页（`identityRedirect`）判定身份桥登录：标题“登录 {系统名}”、副标题“使用 QMS 账号登录”，隐藏 QMS 名称、Logo、标语和注册入口；系统名经名称查询接口取得，查不到时只显示“登录”。普通登录页面与行为不变。
+3. 未登录时跳转 `/auth/login?redirect=<授权页>`。登录页与认证布局对所有入口统一显示“通联项目管理系统”品牌、Logo 与注册入口（常量 `AUTH_BRAND_NAME`，仅认证页与授权页使用，登录后 QMS 内部名称不变）。登录页以 redirect 是否为固定授权页（`identityRedirect`）判定身份桥登录，只在副标题区分去向：身份桥为“登录后进入 {系统名}”（系统名经名称查询接口取得，查不到时为“请输入账号密码登录”），直接登录为“登录后进入 质量管理系统”。登录与注册互跳时保留已校验的身份桥 redirect。
 4. 登录成功后直接回到授权页（不拉取菜单权限码）。授权页先查名称（同时提前识别未注册 client／callback，避免 401 触发全局退出），再静默调用 authorize，仅当返回 callback 与请求的注册地址同源同路径、无凭据与 fragment、携带本次 state 与 code 时才 `location.replace`。同一 state 在本次页面加载内只提交一次（模块级缓存，“重试”显式重新提交）。
 5. 失败页显示原因、当前账号、“重试”和“换个账号”（退出 QMS 后回到同一授权地址，即重新显示登录页）。
 
