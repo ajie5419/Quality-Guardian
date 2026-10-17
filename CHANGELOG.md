@@ -1,3 +1,9 @@
+### 2026-10-17 履约系统按工单读取项目 BOM
+
+- 新增只读 `GET /api/integration/fulfillment/work-orders/:workOrderNumber/bom`：返回该工单全部 `project_boms` 行（零件名、零件 ID、图号、材质、数量、单位、备注）及按 `position` 排序的必经工序（`processId`、`processName`），供履约“从 QMS BOM 导入”工件与工序链。未知工单返回空列表。
+- 按需读取而非增量流：BOM 硬删除、子表工序变化不刷新父行 `updated_at`，游标同步会漏数据。认证复用身份桥客户端凭据（与 7 个同步接口相同，未配置 503、不符 401），`3.auth.ts` 既有前缀放行已覆盖。
+- `planning` 模块新增只读 `PlanningBomService.listByWorkOrder`；不改表结构、不写库。
+
 ### 2026-10-17 身份桥统一登录页与静默授权
 
 - 取消授权确认页：已登录 QMS 时 `/identity/authorize` 立即静默授权并跳回注册 callback，过程中只显示“正在进入 {系统名}…”；同一页面加载内同一 state 只提交一次。失败时显示原因、当前账号以及“重试”“换个账号”，后者退出 QMS 并回到同一授权地址。

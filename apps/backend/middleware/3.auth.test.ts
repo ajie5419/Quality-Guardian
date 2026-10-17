@@ -102,8 +102,12 @@ describe('auth middleware', () => {
   });
 
   it('leaves only GET fulfillment sync feeds to their own client authentication', async () => {
-    const feed = makeEvent('/api/integration/fulfillment/users', null);
-    await authMiddleware(feed);
+    for (const pathname of [
+      '/api/integration/fulfillment/users',
+      '/api/integration/fulfillment/work-orders/WO-1/bom',
+    ]) {
+      await authMiddleware(makeEvent(pathname, null));
+    }
     expect(verifyAccessToken).not.toHaveBeenCalled();
     for (const [pathname, method] of [
       ['/api/integration/fulfillment/users', 'POST'],
