@@ -6,7 +6,8 @@
     "qrcodeLogin": "Qr Code Login",
     "forgetPassword": "Forget Password",
     "loginDestination": "Continue to {name} after sign-in",
-    "loginNeutral": "Sign in with your account"
+    "loginNeutral": "Sign in with your account",
+    "registerSubtitle": "One account for all business systems"
   },
   "dashboard": {
     "title": "Dashboard",

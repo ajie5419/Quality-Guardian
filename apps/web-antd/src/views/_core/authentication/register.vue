@@ -146,6 +146,7 @@ async function handleSubmit(value: Recordable<unknown>) {
       :form-schema="formSchema"
       :loading="loading"
       :login-path="loginPath"
+      :sub-title="$t('page.auth.registerSubtitle')"
       @submit="handleSubmit"
     />
   </div>
