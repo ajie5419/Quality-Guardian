@@ -145,7 +145,7 @@ it('explicitly redacts nested client headers, credential and authorization proto
 it('names only the registered client and exact callback, from configuration only', () => {
   const client = loadBridgeClient();
   expect(resolveClientName(client, client.id, client.callback)).toBe(
-    '项目履约系统',
+    '项目履约',
   );
   vi.stubEnv('QMS_IDENTITY_CLIENT_NAME', '  客户履约平台 ');
   expect(resolveClientName(client, client.id, client.callback)).toBe(
@@ -153,7 +153,7 @@ it('names only the registered client and exact callback, from configuration only
   );
   vi.stubEnv('QMS_IDENTITY_CLIENT_NAME', '');
   expect(resolveClientName(client, client.id, client.callback)).toBe(
-    '项目履约系统',
+    '项目履约',
   );
   expect(resolveClientName(client, 'other', client.callback)).toBeNull();
   expect(
@@ -173,7 +173,7 @@ it('answers the public lookup with the name only and a fixed 404 otherwise', () 
   const callback = 'https://gc.example.test/api/auth/callback';
   expect(lookup({ clientId: 'gc-test', redirectUri: callback })).toMatchObject({
     code: 0,
-    data: { name: '项目履约系统' },
+    data: { name: '项目履约' },
   });
   for (const query of [
     { clientId: 'gc-other', redirectUri: callback },

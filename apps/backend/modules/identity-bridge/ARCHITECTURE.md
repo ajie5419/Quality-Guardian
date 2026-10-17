@@ -1,6 +1,6 @@
 # 身份登录桥
 
-本模块只向受控履约系统确认身份，不授予 QMS 业务权限，不创建客户端管理表或管理页面。客户端 id、独立 secret、完整 HTTPS callback 由运维注入 `QMS_IDENTITY_CLIENT_ID`、`QMS_IDENTITY_CLIENT_SECRET`、`QMS_IDENTITY_CALLBACK`；可选 `QMS_IDENTITY_CLIENT_NAME` 为登录页显示的系统名（默认“项目履约系统”，1–64 字）。
+本模块只向受控履约系统确认身份，不授予 QMS 业务权限，不创建客户端管理表或管理页面。客户端 id、独立 secret、完整 HTTPS callback 由运维注入 `QMS_IDENTITY_CLIENT_ID`、`QMS_IDENTITY_CLIENT_SECRET`、`QMS_IDENTITY_CALLBACK`；可选 `QMS_IDENTITY_CLIENT_NAME` 为登录页显示的系统名（默认“项目履约”，与履约系统页眉一致，1–64 字）。
 
 | 端点 | 认证与结果 |
 | --- | --- |

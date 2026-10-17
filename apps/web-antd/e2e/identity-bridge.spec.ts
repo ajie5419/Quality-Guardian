@@ -21,7 +21,7 @@ const fixture = JSON.parse(
 const token = () => randomBytes(32).toString('base64url');
 test.use({ ignoreHTTPSErrors: true });
 
-const CLIENT_NAME = process.env.QMS_IDENTITY_CLIENT_NAME || '项目履约系统';
+const CLIENT_NAME = process.env.QMS_IDENTITY_CLIENT_NAME || '项目履约';
 const BRAND = '通联项目管理系统';
 
 // Every entry shares one branded login page; only the destination differs.
