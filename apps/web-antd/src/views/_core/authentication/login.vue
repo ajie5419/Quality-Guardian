@@ -30,10 +30,12 @@ const bridgeName = useIdentityClientName(
 );
 // Same page for every entry; only the subtitle names the destination.
 const subTitle = computed(() => {
-  if (!isBridge.value) return `登录后进入 ${preferences.app.name}`;
+  if (!isBridge.value) {
+    return $t('page.auth.loginDestination', { name: preferences.app.name });
+  }
   return bridgeName.value
-    ? `登录后进入 ${bridgeName.value}`
-    : '请输入账号密码登录';
+    ? $t('page.auth.loginDestination', { name: bridgeName.value })
+    : $t('page.auth.loginNeutral');
 });
 const registerPath = computed(() =>
   withAuthRedirect(

@@ -4,7 +4,9 @@
     "register": "Register",
     "codeLogin": "Code Login",
     "qrcodeLogin": "Qr Code Login",
-    "forgetPassword": "Forget Password"
+    "forgetPassword": "Forget Password",
+    "loginDestination": "Continue to {name} after sign-in",
+    "loginNeutral": "Sign in with your account"
   },
   "dashboard": {
     "title": "Dashboard",
