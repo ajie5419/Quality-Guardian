@@ -10,6 +10,10 @@ describe('buildFulfillmentRoutes', () => {
     expect(buildFulfillmentRoutes('  ')).toEqual([]);
     expect(buildFulfillmentRoutes('not a url')).toEqual([]);
     expect(buildFulfillmentRoutes('javascript:alert(1)')).toEqual([]);
+    expect(buildFulfillmentRoutes('ftp://fulfillment.example.test')).toEqual(
+      [],
+    );
+    expect(buildFulfillmentRoutes('https://%')).toEqual([]);
   });
 
   it('adds one external menu entry that opens the configured URL', () => {
@@ -18,7 +22,7 @@ describe('buildFulfillmentRoutes', () => {
     );
     expect(rest).toEqual([]);
     expect(route?.meta).toMatchObject({
-      link: 'https://fulfillment.example.test',
+      link: 'https://fulfillment.example.test/',
       title: '项目履约',
     });
   });

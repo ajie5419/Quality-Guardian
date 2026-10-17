@@ -12,13 +12,21 @@ export function buildFulfillmentRoutes(
   url: string | undefined,
 ): RouteRecordRaw[] {
   const value = url?.trim() ?? '';
-  if (!/^https?:\/\/[^\s/]\S*$/i.test(value)) return [];
+  if (!value) return [];
+  let parsed: URL;
+  try {
+    parsed = new URL(value);
+  } catch {
+    // Malformed URL: hide the entry instead of rendering a broken link.
+    return [];
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return [];
   return [
     {
       component: IFrameView,
       meta: {
         icon: 'carbon:delivery',
-        link: value,
+        link: parsed.href,
         order: 1900,
         title: '项目履约',
       },
