@@ -839,7 +839,6 @@ check:prisma-migration / docs-drift 全绿。
 ### 2026-08-20 报检任务列表视图筛选调整：已完成仅 3 天 + 我的检验仅未完成
 
 **执行内容：**
-<<<<<<< HEAD
 - `apps/backend/modules/inspection/inspection-request-query.service.ts`：`closed` scope 增加 `closedAt >= now - 3 天` 过滤（常量 `REQUEST_LIST_CLOSED_WINDOW_DAYS = 3`）；`my-inspection` scope 由"近 7 天窗口"改为只返回分派给当前检验员且未完成的检验单（`status in [DISPATCHED, INSPECTING]`），移除 `sinceDays` 参数（后端 normalize 与前端 API 类型同步删除）。
 - 为满足模块 ≤500 行门禁（B-S1），列表查询辅助逻辑拆出至新文件 `apps/backend/modules/inspection/inspection-request-list-query.ts`，服务文件 510→361 行，无跨模块 API 变化。
 - 更新测试：closed scope 3 天窗口（派单/非派单权限 2 例）、my-inspection 状态过滤无时间窗口。
@@ -853,22 +852,6 @@ check:prisma-migration / docs-drift 全绿。
 
 **遗留问题：**
 - 无（纯查询层调整，无 migration、无数据变更）
-=======
-- `apps/backend/modules/inspection/inspection-request-query.service.ts`：`closed` scope 增加 `closedAt >= now - 3 天` 过滤（新增常量 `REQUEST_LIST_CLOSED_WINDOW_DAYS = 3`）；`my-inspection` scope 由"近 7 天窗口"改为只返回分派给当前检验员且未完成的检验单（`status in [DISPATCHED, INSPECTING]`），移除 `sinceDays` 参数（后端 normalize 与前端 API 类型同步删除）。
-- 为满足模块 ≤500 行门禁（B-S1），将列表查询辅助逻辑拆出至新文件 `apps/backend/modules/inspection/inspection-request-list-query.ts`（`normalizeRequestListQuery / buildRequestListScopeWhere / buildMyRelatedRequestWhere / getRequestListStatusWhere / getRequestListScopeFromQuery` + `RequestListQuery` 类型），服务文件 510→~361 行，无跨模块 API 变化。
-- 更新测试 `inspection-request-query.service.test.ts`：closed scope 断言 3 天窗口（无派单权限 + 派单权限各 1 例）；my-inspection 断言状态过滤且无时间窗口。
-
-**验证结果：**
-- eslint / prettier（本次改动 4 文件）: 通过
-- typecheck（turbo run typecheck，backend + web-antd）: 通过
-- vitest: inspection 模块 748/748 通过（含 query service 20 例）
-- check:qms-arch: 本次改动文件 0 violations
-- check:docs-drift: PASSED
-
-**commit:** 未提交
-
-**遗留问题：**
-- 工作区既有未提交改动（SEC-DATASCOPE-001 批次）存在 2 项与本改动无关的门禁红灯：`scripts/check-qms-source-rules.mjs` prettier 格式问题（819 行风格差异，疑似进行中工作，未代跑 prettier 以免污染 diff）；`R-SCOPE` 在 `task-dispatch.service.ts:86` 仍有 1 处违规。均由该批次负责人处理。
 
 ---
 
@@ -899,7 +882,6 @@ check:prisma-migration / docs-drift 全绿。
 - vehicle-commissioning 聚合无 DataScope 声明（OUT_OF_SCOPE）。
 - daily-summary `user` query 参数为前端兼容保留（服务端已忽略），前端移除后清理。
 - 非 Breaking Change；无数据库 / migration 变化。
->>>>>>> d993f1bf (docs(project): finalize governance baseline)
 
 ---
 
@@ -928,7 +910,6 @@ check:prisma-migration / docs-drift 全绿。
 
 ---
 
-<<<<<<< HEAD
 ## [0.29.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.2...qgs-v0.29.0) (2026-08-20)
 
 
@@ -936,7 +917,7 @@ check:prisma-migration / docs-drift 全绿。
 
 * **@qgs/backend:** restrict completed view to 3 days and my-inspecti… ([98188eb](https://github.com/ajie5419/Quality-Guardian/commit/98188eb7b572efa07ff8ed758f74505a4c2dbde6))
 * **@qgs/backend:** restrict completed view to 3 days and my-inspection to open requests ([6bebf46](https://github.com/ajie5419/Quality-Guardian/commit/6bebf461a3ebc66dae98a892985e2713659c7b7d))
-=======
+
 ### 2026-08-20 SEC-DATASCOPE-002 DataScope Architecture Guard 固化
 
 **执行内容：**
@@ -1035,7 +1016,6 @@ check:prisma-migration / docs-drift 全绿。
 - 待确认决策点：DataScope 生产启用时机、Lifecycle 分层方式、新增 CI 门禁失败策略。
 
 ---
->>>>>>> d993f1bf (docs(project): finalize governance baseline)
 
 ## [0.28.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.28.1...qgs-v0.28.2) (2026-08-19)
 
