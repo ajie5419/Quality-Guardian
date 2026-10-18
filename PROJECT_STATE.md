@@ -9,7 +9,9 @@
 <!-- docs:sync-start -->
 
 - 最后同步时间: 2026-10-17 01:25
+<!-- x-release-please-start-version -->
 - 版本: 0.29.0
+<!-- x-release-please-end -->
 - 后端模块数: 38
 - 模块 TS 文件数: 814
 - 后端测试文件数: 352

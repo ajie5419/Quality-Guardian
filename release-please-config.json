@@ -2,7 +2,13 @@
   "packages": {
     ".": {
       "package-name": "qgs",
-      "release-type": "node"
+      "release-type": "node",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "PROJECT_STATE.md"
+        }
+      ]
     }
   }
 }
