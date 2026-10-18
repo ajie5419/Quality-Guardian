@@ -1,3 +1,4 @@
+import type { WorkOrderBomRow } from '~/modules/planning';
 import type { UpdatedAtCursor } from '~/utils/query-helpers';
 
 import type {
@@ -6,8 +7,10 @@ import type {
 } from './fulfillment-sync.schema';
 
 import { users_status } from '@prisma/client';
+import { parseBomRequiredProcesses } from '@qgs/shared';
 import { DeptService } from '~/modules/dept';
 import { InspectionRequestSyncService } from '~/modules/inspection';
+import { PlanningBomService } from '~/modules/planning';
 import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierService } from '~/modules/supplier';
 import { TeamIdentityService } from '~/modules/team';
@@ -159,8 +162,58 @@ const LOADERS = {
   'work-orders': listWorkOrders,
 } satisfies Record<FulfillmentSyncResource, (request: SyncRequest) => unknown>;
 
+export interface FulfillmentBomProcess {
+  position: number;
+  processId: null | string;
+  processName: string;
+}
+
+/**
+ * Required processes in position order. processName prefers the live process
+ * master name over the snapshot. Rows that predate process identities only
+ * carry the legacy text snapshot; those are returned without a processId.
+ */
+function bomProcesses(row: WorkOrderBomRow): FulfillmentBomProcess[] {
+  if (row.processRequirements.length > 0) {
+    return row.processRequirements.map((item, index) => ({
+      position: index,
+      processId: item.processId || null,
+      processName: item.process?.name || item.processName,
+    }));
+  }
+  return parseBomRequiredProcesses(row.required_processes).map(
+    (processName, position) => ({ position, processId: null, processName }),
+  );
+}
+
+function toBomItem(row: WorkOrderBomRow) {
+  return {
+    id: row.id,
+    material: row.material,
+    partId: row.partId,
+    partName: row.part_name,
+    partNumber: row.part_number,
+    processes: bomProcesses(row),
+    quantity: row.quantity,
+    remarks: row.remarks,
+    unit: row.unit,
+    updatedAt: iso(row.updated_at),
+  };
+}
+
+export type FulfillmentBomItem = ReturnType<typeof toBomItem>;
+
 export const FulfillmentSyncService = {
   async list(resource: FulfillmentSyncResource, query: FulfillmentSyncQuery) {
     return LOADERS[resource](toSyncRequest(query));
+  },
+
+  /**
+   * On-demand BOM read for one work order (not a cursor feed: BOM rows are
+   * hard-deleted and child process rows do not bump the parent updated_at).
+   */
+  async listWorkOrderBom(workOrderNumber: string) {
+    const rows = await PlanningBomService.listByWorkOrder(workOrderNumber);
+    return { items: rows.map((row) => toBomItem(row)), workOrderNumber };
   },
 };

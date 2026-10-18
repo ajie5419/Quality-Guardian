@@ -44,3 +44,7 @@ export const fulfillmentSyncQuerySchema = z
   });
 
 export type FulfillmentSyncQuery = z.infer<typeof fulfillmentSyncQuerySchema>;
+
+export const fulfillmentBomParamsSchema = z.object({
+  workOrderNumber: z.string().trim().min(1).max(191),
+});

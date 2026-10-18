@@ -1,3 +1,9 @@
+### 2026-10-17 履约系统按工单读取项目 BOM
+
+- 新增只读 `GET /api/integration/fulfillment/work-orders/:workOrderNumber/bom`：返回该工单全部 `project_boms` 行（零件名、零件 ID、图号、材质、数量、单位、备注）及按 `position` 排序的必经工序（`processId`、`processName`），供履约“从 QMS BOM 导入”工件与工序链。未知工单返回空列表。
+- 按需读取而非增量流：BOM 硬删除、子表工序变化不刷新父行 `updated_at`，游标同步会漏数据。认证复用身份桥客户端凭据（与 7 个同步接口相同，未配置 503、不符 401），`3.auth.ts` 既有前缀放行已覆盖。
+- `planning` 模块新增只读 `PlanningBomService.listByWorkOrder`；不改表结构、不写库。
+
 ### 2026-10-17 QMS 菜单“项目履约”入口与身份桥默认名称
 
 - 新增菜单“项目履约”：在新标签页打开履约系统。地址取自前端构建变量 `VITE_FULFILLMENT_URL`（仅接受 http/https），未配置或无效时不显示该菜单；生产构建经 `Dockerfile.frontend` 构建参数传入，值来自 GitHub 仓库变量 `VITE_FULFILLMENT_URL`，未设置时菜单隐藏。入口沿用 vben 外链路由（`meta.link`），不写菜单表、不新增权限码，所有登录用户可见（履约系统自行鉴权）。

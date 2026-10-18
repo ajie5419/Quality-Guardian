@@ -2,7 +2,7 @@ import type { H3Event } from 'h3';
 
 import type { FulfillmentSyncResource } from './fulfillment-sync.schema';
 
-import { getQuery, setHeader } from 'h3';
+import { getQuery, getRouterParam, setHeader } from 'h3';
 import { assertIdentityClientHeaders } from '~/modules/identity-bridge';
 import { logApiError } from '~/utils/api-logger';
 import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
@@ -12,7 +12,10 @@ import {
   useResponseSuccess,
 } from '~/utils/response';
 
-import { fulfillmentSyncQuerySchema } from './fulfillment-sync.schema';
+import {
+  fulfillmentBomParamsSchema,
+  fulfillmentSyncQuerySchema,
+} from './fulfillment-sync.schema';
 import { FulfillmentSyncService } from './fulfillment-sync.service';
 
 /**
@@ -38,5 +41,33 @@ export async function handleFulfillmentSyncRequest(
     logApiError(`fulfillment-sync-${resource}`, error, undefined, event);
     if (isBusinessError(error)) return businessErrorResponse(event, error);
     return internalServerErrorResponse(event, 'Fulfillment sync failed');
+  }
+}
+
+/**
+ * GET /api/integration/fulfillment/work-orders/:workOrderNumber/bom — same
+ * client-header authentication as the feeds, checked before any parsing.
+ */
+export async function handleFulfillmentBomRequest(event: H3Event) {
+  setHeader(event, 'Cache-Control', 'no-store');
+  try {
+    assertIdentityClientHeaders(event);
+    const parsed = fulfillmentBomParamsSchema.safeParse({
+      workOrderNumber: getRouterParam(event, 'workOrderNumber', {
+        decode: true,
+      }),
+    });
+    if (!parsed.success) {
+      return badRequestResponse(event, 'Invalid work order number');
+    }
+    return useResponseSuccess(
+      await FulfillmentSyncService.listWorkOrderBom(
+        parsed.data.workOrderNumber,
+      ),
+    );
+  } catch (error) {
+    logApiError('fulfillment-sync-bom', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
+    return internalServerErrorResponse(event, 'Fulfillment BOM read failed');
   }
 }

@@ -14,7 +14,13 @@
 | `/api/integration/fulfillment/users` | `UserService.listSyncPage` | `id` |
 | `/api/integration/fulfillment/inspections` | `InspectionRequestSyncService.listSyncPage` | `id` |
 
-路由文件只调用 `handleFulfillmentSyncRequest(event, resource)`；认证、zod 校验、响应与 `logApiError` 统一在 handler 内完成。
+另有一个按需只读接口（不是增量流）：
+
+| 端点（GET） | 来源（经对方 `index.ts`） | 说明 |
+| --- | --- | --- |
+| `/api/integration/fulfillment/work-orders/:workOrderNumber/bom` | `PlanningBomService.listByWorkOrder` | 该工单全部 BOM 行及按 `position` 排序的必经工序 |
+
+路由文件只调用 `handleFulfillmentSyncRequest(event, resource)` 或 `handleFulfillmentBomRequest(event)`；认证、zod 校验、响应与 `logApiError` 统一在 handler 内完成。
 
 ## 认证
 
@@ -42,6 +48,12 @@
   - 关单判不合格（result=FAIL）时写 `inspectionResult=FAIL` 与 `unqualifiedQuantity`，但 **`status` 仍为 `INSPECTING`、`closedAt` 为 null**；复检合格后会被覆盖为 `CLOSED` + `PASS`。
   - 因此"曾经不合格"只能靠 `linkedIssueId` / `linkedIssueNo` 非空识别，不能只看当前 `inspectionResult`。
 - 时间字段一律 ISO 8601 UTC 字符串；`processes.status`、`departments.status` 原样输出整数（1=启用）。
+
+## 工单 BOM（按需读取）
+
+- 履约在用户点“从 QMS BOM 导入”时实时调用，不做游标同步：`project_boms` 没有软删除（硬删），`project_bom_required_processes` 增删改不刷新父行 `updated_at`，增量流会静默漏掉变化。
+- 响应 `{ workOrderNumber, items }`，每行 `id, partId, partName, partNumber, material, quantity, unit, remarks, updatedAt, processes`；`processes` 为 `[{ position, processId, processName }]`，按 `position, id` 排序后重新编号为 0..n-1；`processName` 优先取工序主数据现名，工序已删（外键 SetNull）时 `processId` 为 null、保留快照名。没有工序身份行的旧数据回退解析 `required_processes` 文本快照，`processId` 一律为 null。
+- 未知工单返回空列表（不报 404）；工单号 trim 后 1–191 字符，否则 400。认证、`Cache-Control: no-store`、错误处理与增量流一致，同样无限流。
 
 ## 已知边界
 

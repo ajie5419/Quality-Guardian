@@ -10,6 +10,7 @@ vi.mock('~/utils/prisma', () => {
     departments: table(),
     dictionaries: table(),
     processes: table(),
+    project_boms: table(),
     qms_inspection_requests: table(),
     suppliers: table(),
     users: table(),
@@ -302,5 +303,86 @@ describe('fulfillmentSyncService resource shapes', () => {
       afterId: 'ct3',
       since: T1.toISOString(),
     });
+  });
+});
+
+describe('fulfillmentSyncService work order BOM', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const bomRow = (overrides: Record<string, unknown> = {}) => ({
+    id: 'bom-1',
+    material: 'Q355B',
+    partId: 'part-1',
+    part_name: '主梁',
+    part_number: 'DWG-001',
+    processRequirements: [],
+    quantity: 2,
+    remarks: null,
+    required_processes: null,
+    unit: 'pcs',
+    updated_at: T1,
+    ...overrides,
+  });
+
+  it('returns an empty list for an unknown work order', async () => {
+    db.project_boms.findMany.mockResolvedValue([]);
+    const result = await FulfillmentSyncService.listWorkOrderBom('WO-NONE');
+    expect(result).toEqual({ items: [], workOrderNumber: 'WO-NONE' });
+    const args = lastCall(db.project_boms.findMany);
+    expect(args.where).toEqual({ work_order_number: 'WO-NONE' });
+    expect(args.select.processRequirements.orderBy).toEqual([
+      { position: 'asc' },
+      { id: 'asc' },
+    ]);
+  });
+
+  it('maps rows and keeps required processes in position order', async () => {
+    db.project_boms.findMany.mockResolvedValue([
+      bomRow({
+        processRequirements: [
+          {
+            position: 0,
+            process: { name: '组焊' },
+            processId: 'prc-weld',
+            processName: '焊接（旧名）',
+          },
+          {
+            position: 3,
+            process: null,
+            processId: null,
+            processName: '涂装',
+          },
+        ],
+      }),
+    ]);
+    const { items } = await FulfillmentSyncService.listWorkOrderBom('WO-1');
+    expect(items).toEqual([
+      {
+        id: 'bom-1',
+        material: 'Q355B',
+        partId: 'part-1',
+        partName: '主梁',
+        partNumber: 'DWG-001',
+        processes: [
+          { position: 0, processId: 'prc-weld', processName: '组焊' },
+          { position: 1, processId: null, processName: '涂装' },
+        ],
+        quantity: 2,
+        remarks: null,
+        unit: 'pcs',
+        updatedAt: '2026-10-01T08:00:00.123Z',
+      },
+    ]);
+  });
+
+  it('falls back to the legacy process snapshot without process ids', async () => {
+    db.project_boms.findMany.mockResolvedValue([
+      bomRow({ required_processes: '["下料","组焊"]' }),
+    ]);
+    const { items } = await FulfillmentSyncService.listWorkOrderBom('WO-1');
+    expect(items[0]?.processes).toEqual([
+      { position: 0, processId: null, processName: '下料' },
+      { position: 1, processId: null, processName: '组焊' },
+    ]);
   });
 });
