@@ -53,7 +53,7 @@ function sameDigest(left: string, right: string) {
   return timingSafeEqual(Buffer.from(digest(left)), Buffer.from(digest(right)));
 }
 
-const DEFAULT_CLIENT_NAME = '项目履约系统';
+const DEFAULT_CLIENT_NAME = '项目履约';
 
 /**
  * Returns the operator-configured display name of the registered client, but
