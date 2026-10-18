@@ -35,7 +35,9 @@ stamp="$(date '+%Y-%m-%d %H:%M')"
 block="<!-- docs:sync-start -->
 
 - 最后同步时间: $stamp
+<!-- x-release-please-start-version -->
 - 版本: $version
+<!-- x-release-please-end -->
 - 后端模块数: $module_count
 - 模块 TS 文件数: $module_ts
 - 后端测试文件数: $backend_tests
