@@ -352,6 +352,23 @@ const customConfig: Linter.Config[] = [
       ],
     },
   },
+  {
+    // crypto.randomUUID() is missing on plain-HTTP pages (production is served
+    // over http://<ip>), so it throws before the request is sent.
+    files: ['apps/web-antd/src/**/**'],
+    ignores: ['apps/web-antd/src/utils/random-id.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        {
+          message:
+            'crypto.randomUUID() only exists on HTTPS/localhost; use randomUuid() from #/utils/random-id.',
+          object: 'crypto',
+          property: 'randomUUID',
+        },
+      ],
+    },
+  },
   // 后端模拟代码，不需要太多规则
   {
     files: ['apps/backend-mock/**/**', 'docs/**/**'],
