@@ -4,6 +4,15 @@
 - 按需读取而非增量流：BOM 硬删除、子表工序变化不刷新父行 `updated_at`，游标同步会漏数据。认证复用身份桥客户端凭据（与 7 个同步接口相同，未配置 503、不符 401），`3.auth.ts` 既有前缀放行已覆盖。
 - `planning` 模块新增只读 `PlanningBomService.listByWorkOrder`；不改表结构、不写库。
 
+## [0.30.1](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.30.0...qgs-v0.30.1) (2026-10-19)
+
+
+### Bug Fixes
+
+* **@qgs/web-antd:** generate idempotency keys on plain-HTTP pages ([3788061](https://github.com/ajie5419/Quality-Guardian/commit/378806109d3b84bc57a232e4da9b7b6111385bed))
+* **@qgs/web-antd:** generate idempotency keys on plain-HTTP pages ([ab344bb](https://github.com/ajie5419/Quality-Guardian/commit/ab344bb07d09cb9572bc1b68f0100763a8217113))
+* **@vben/eslint-config:** keep base restricted properties in web-app override ([e4d8458](https://github.com/ajie5419/Quality-Guardian/commit/e4d8458dacb577159a76d3dbf386d6aaececbc0c))
+
 ## [0.30.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.29.0...qgs-v0.30.0) (2026-10-18)
 
 
