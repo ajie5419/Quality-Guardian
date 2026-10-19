@@ -2,7 +2,10 @@ import type { Linter } from 'eslint';
 
 import type { RestrictedSyntaxSelector } from './rule-options';
 
-import { BASE_RESTRICTED_SYNTAX_SELECTORS } from './rule-options';
+import {
+  BASE_RESTRICTED_PROPERTIES,
+  BASE_RESTRICTED_SYNTAX_SELECTORS,
+} from './rule-options';
 
 interface RestrictedImportPattern {
   group: string[];
@@ -360,6 +363,7 @@ const customConfig: Linter.Config[] = [
     rules: {
       'no-restricted-properties': [
         'error',
+        ...BASE_RESTRICTED_PROPERTIES,
         {
           message:
             'crypto.randomUUID() only exists on HTTPS/localhost; use randomUuid() from #/utils/random-id.',

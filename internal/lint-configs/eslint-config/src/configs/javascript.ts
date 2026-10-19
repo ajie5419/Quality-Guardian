@@ -4,7 +4,10 @@ import js from '@eslint/js';
 import pluginUnusedImports from 'eslint-plugin-unused-imports';
 import globals from 'globals';
 
-import { BASE_RESTRICTED_SYNTAX_SELECTORS } from '../rule-options';
+import {
+  BASE_RESTRICTED_PROPERTIES,
+  BASE_RESTRICTED_SYNTAX_SELECTORS,
+} from '../rule-options';
 
 export async function javascript(): Promise<Linter.Config[]> {
   return [
@@ -108,30 +111,7 @@ export async function javascript(): Promise<Linter.Config[]> {
           { message: 'Use `globalThis` instead.', name: 'global' },
           { message: 'Use `globalThis` instead.', name: 'self' },
         ],
-        'no-restricted-properties': [
-          'error',
-          {
-            message:
-              'Use `Object.getPrototypeOf` or `Object.setPrototypeOf` instead.',
-            property: '__proto__',
-          },
-          {
-            message: 'Use `Object.defineProperty` instead.',
-            property: '__defineGetter__',
-          },
-          {
-            message: 'Use `Object.defineProperty` instead.',
-            property: '__defineSetter__',
-          },
-          {
-            message: 'Use `Object.getOwnPropertyDescriptor` instead.',
-            property: '__lookupGetter__',
-          },
-          {
-            message: 'Use `Object.getOwnPropertyDescriptor` instead.',
-            property: '__lookupSetter__',
-          },
-        ],
+        'no-restricted-properties': ['error', ...BASE_RESTRICTED_PROPERTIES],
         'no-restricted-syntax': ['error', ...BASE_RESTRICTED_SYNTAX_SELECTORS],
         'no-self-assign': ['error', { props: true }],
         'no-self-compare': 'error',
