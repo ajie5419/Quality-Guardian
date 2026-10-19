@@ -1,5 +1,7 @@
 import { ref } from 'vue';
 
+import { randomUuid } from '#/utils/random-uuid';
+
 /**
  * Request-level idempotency (IDEMPOTENCY-KEY-001): one operation id per
  * user-initiated create attempt. `acquire()` generates a fresh UUID on the
@@ -15,7 +17,7 @@ export function useCreateOperationId() {
 
   function acquire(): string {
     if (!operationId.value) {
-      operationId.value = crypto.randomUUID();
+      operationId.value = randomUuid();
     }
     return operationId.value;
   }
