@@ -54,6 +54,7 @@ import {
 } from '#/api/qms/supervision';
 import { getAllUsers } from '#/api/system/user';
 import { useMobileViewport } from '#/hooks/useMobileViewport';
+import { randomUuid } from '#/utils/random-id';
 import QmsFileUpload from '#/views/qms/shared/components/QmsFileUpload.vue';
 import { useDictionaryOptions } from '#/views/qms/shared/composables/useDictionaryOptions';
 import { getUploadResponse } from '#/views/qms/shared/utils/upload-file';
@@ -1090,7 +1091,7 @@ async function submitIssue() {
 let actionRequestKey = '';
 
 async function openActionDrawer(issue: SupervisionIssue) {
-  actionRequestKey = crypto.randomUUID();
+  actionRequestKey = randomUuid();
   editingIssueId.value = issue.id;
   Object.assign(actionForm, {
     actionType: 'FOLLOW_UP',

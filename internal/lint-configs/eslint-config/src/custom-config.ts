@@ -2,7 +2,10 @@ import type { Linter } from 'eslint';
 
 import type { RestrictedSyntaxSelector } from './rule-options';
 
-import { BASE_RESTRICTED_SYNTAX_SELECTORS } from './rule-options';
+import {
+  BASE_RESTRICTED_PROPERTIES,
+  BASE_RESTRICTED_SYNTAX_SELECTORS,
+} from './rule-options';
 
 interface RestrictedImportPattern {
   group: string[];
@@ -349,6 +352,24 @@ const customConfig: Linter.Config[] = [
         'error',
         ...BASE_RESTRICTED_SYNTAX_SELECTORS,
         ...QMS_GOVERNANCE_SYNTAX_SELECTORS,
+      ],
+    },
+  },
+  {
+    // crypto.randomUUID() is missing on plain-HTTP pages (production is served
+    // over http://<ip>), so it throws before the request is sent.
+    files: ['apps/web-antd/src/**/**'],
+    ignores: ['apps/web-antd/src/utils/random-id.ts'],
+    rules: {
+      'no-restricted-properties': [
+        'error',
+        ...BASE_RESTRICTED_PROPERTIES,
+        {
+          message:
+            'crypto.randomUUID() only exists on HTTPS/localhost; use randomUuid() from #/utils/random-id.',
+          object: 'crypto',
+          property: 'randomUUID',
+        },
       ],
     },
   },
