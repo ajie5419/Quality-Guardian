@@ -1,3 +1,9 @@
+### 2026-10-21 A3：Telegram webhook 缺密钥时拒绝请求
+
+- 未配置或空 `TELEGRAM_WEBHOOK_SECRET` 返回 503，已配置但缺头或不匹配返回 401；按 UTF-8 字节长度判断后使用 `timingSafeEqual` 比较，保留非空 `x-tg-secret` 优先于标准 Telegram 请求头的规则。
+- webhook 处理器迁入 inspection 模块，API 只通过公开入口转发；处理器鉴权后再读取 body，使用 Zod 校验回调字段，非法 JSON 或字段返回 400。合法更新保留 `{ ok: true }`，回调继续复用既有异步业务服务与错误日志；配置示例和部署说明同步更新。
+- 验证：2 文件 / 38 项回归、后端类型、目标 ESLint 和增量架构通过；production Nitro + 独占 MySQL + 本地 Telegram API 的 21 个 HTTP 场景通过，4 个合法回调各执行一次，覆盖菜单发送与编辑。Run `f3cd9c367d244c50`，独占资源已回收；未合并、未部署。
+
 ### 2026-10-21 A2：修复错误响应中的内部异常泄漏
 
 - 全局普通异常的 `error` 字段固定为 null，生产响应仅返回通用错误文案；明确的 BusinessError 保留原状态码和受控错误码，development 仍可查看堆栈。

@@ -13,3 +13,4 @@ export { InspectionRequestResponsibilityOptionsService } from './inspection-requ
 export { getInspectorActiveTaskCounts } from './inspection-request-stats-workload';
 export { InspectionRequestSyncService } from './inspection-request-sync.service';
 export { InspectionService } from './inspection.service';
+export { telegramWebhookHandler } from './telegram-webhook.post.service';
