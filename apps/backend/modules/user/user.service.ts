@@ -304,6 +304,7 @@ export const UserService = {
       where: { id },
       data: {
         isDeleted: true,
+        status: 'INACTIVE',
         updatedAt: new Date(),
       },
     });

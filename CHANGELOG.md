@@ -1,3 +1,9 @@
+### 2026-10-21 修复软删除账号登录和刷新（A1 / QGX-03）
+
+- 登录与刷新查询排除软删除账号，删除账号同时设置 INACTIVE；登录凭据失败及失效刷新返回 HTTP 401，登录不区分账号不存在、禁用或删除。
+- 保留现有 access token 账号状态检查及最长 60 秒缓存；补充删除态登录/刷新和缓存过期回归，移除仅断言 Prisma 参数的删除透传测试，删除落库状态通过真实 HTTP/MySQL 验证。
+- 验证：5 文件 / 64 用例、后端 TypeScript、改动文件 ESLint 和增量架构检查通过；独占 MySQL + 实际 H3 登录/刷新/管理员删除/受保护接口验证通过，包含真实等待 60 秒后的旧 access token 拒绝及历史 deleted/ACTIVE 账号拒绝。Run `b42bf9cedf84b532`，独占容器和临时脚本已回收。未执行完整 Nitro、浏览器或生产验收。
+
 ### 2026-10-17 履约系统按工单读取项目 BOM
 
 - 新增只读 `GET /api/integration/fulfillment/work-orders/:workOrderNumber/bom`：返回该工单全部 `project_boms` 行（零件名、零件 ID、图号、材质、数量、单位、备注）及按 `position` 排序的必经工序（`processId`、`processName`），供履约“从 QMS BOM 导入”工件与工序链。未知工单返回空列表。

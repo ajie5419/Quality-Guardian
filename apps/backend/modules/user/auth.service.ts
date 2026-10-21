@@ -1,22 +1,26 @@
 import type { UserSession } from '~/utils/jwt-utils';
 
 import { createId } from '@paralleldrive/cuid2';
+import { ErrorCode } from '@qgs/shared';
 import bcrypt from 'bcrypt';
+import { BusinessError } from '~/utils/business-error';
 import { generateAccessToken, generateRefreshToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 
 export const AuthService = {
   async login(username: string, pass: string) {
     const user = await prisma.users.findUnique({
-      where: { username },
+      where: { username, isDeleted: false },
       include: { roles: true },
     });
-    if (!user) throw new Error('用户名或密码错误');
-    if (user.status !== 'ACTIVE')
-      throw new Error('账号已被禁用，请联系管理员。');
+    if (!user || user.status !== 'ACTIVE') {
+      throw new BusinessError(ErrorCode.UNAUTHORIZED, '用户名或密码错误', 401);
+    }
 
     const isValid = await bcrypt.compare(pass, user.password);
-    if (!isValid) throw new Error('用户名或密码错误');
+    if (!isValid) {
+      throw new BusinessError(ErrorCode.UNAUTHORIZED, '用户名或密码错误', 401);
+    }
 
     let deptName = '';
     if (user.department) {
@@ -45,7 +49,7 @@ export const AuthService = {
 
   async refreshAccessToken(username: string) {
     const dbUser = await prisma.users.findUnique({
-      where: { username },
+      where: { username, isDeleted: false },
       include: { roles: true },
     });
     if (!dbUser || dbUser.status !== 'ACTIVE') return null;

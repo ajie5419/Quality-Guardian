@@ -166,4 +166,19 @@ describe('auth middleware', () => {
     await authMiddleware(event);
     expect(mockPrisma.users.findFirst).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects a previously valid token when the deleted account cache expires', async () => {
+    vi.useFakeTimers();
+    const event = makeEvent('/api/qms/inspection/records', {
+      id: 'deleted-user',
+      username: 'deleted',
+    });
+    mockPrisma.users.findFirst.mockResolvedValue({ status: 'ACTIVE' } as never);
+    await authMiddleware(event);
+
+    mockPrisma.users.findFirst.mockResolvedValue(null);
+    vi.advanceTimersByTime(60_000);
+
+    expect(await authMiddleware(event)).toEqual({ unauthorized: true });
+  });
 });
