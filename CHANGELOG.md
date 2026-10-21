@@ -4,6 +4,20 @@
 - webhook 处理器迁入 inspection 模块，API 只通过公开入口转发；处理器鉴权后再读取 body，使用 Zod 校验回调字段，非法 JSON 或字段返回 400。合法更新保留 `{ ok: true }`，回调继续复用既有异步业务服务与错误日志；配置示例和部署说明同步更新。
 - 验证：2 文件 / 38 项回归、后端类型、目标 ESLint 和增量架构通过；production Nitro + 独占 MySQL + 本地 Telegram API 的 21 个 HTTP 场景通过，4 个合法回调各执行一次，覆盖菜单发送与编辑。Run `f3cd9c367d244c50`，独占资源已回收；未合并、未部署。
 
+## [0.30.2](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.30.1...qgs-v0.30.2) (2026-10-21)
+
+
+### Bug Fixes
+
+* 保留登录失败重试的原始回跳目标 ([f4e6487](https://github.com/ajie5419/Quality-Guardian/commit/f4e6487257a4e2af4224317806342877de3a96fc))
+* 收紧 Telegram webhook 鉴权与输入边界 ([77f6044](https://github.com/ajie5419/Quality-Guardian/commit/77f60442cdc36d62247565a19c46df40cf091b0a))
+* 收紧 Telegram webhook 鉴权与输入边界 ([ad34213](https://github.com/ajie5419/Quality-Guardian/commit/ad3421331bbd7559655ddf14cf4cd85a73435949))
+* 统一不可用账号的密码校验工作量 ([bdea23c](https://github.com/ajie5419/Quality-Guardian/commit/bdea23ce8d6bcd60d8ce20516050c96e247da001))
+* 阻止软删除账号登录和刷新令牌 ([72e21ba](https://github.com/ajie5419/Quality-Guardian/commit/72e21bac685065a1695c8f8b4b346b9699bbb0cb))
+* 阻止软删除账号登录和刷新令牌 ([00689bb](https://github.com/ajie5419/Quality-Guardian/commit/00689bb765362de1f33c7caaae1c77b5f4f49375))
+* 阻止错误响应泄漏内部异常信息 ([65d60c7](https://github.com/ajie5419/Quality-Guardian/commit/65d60c7d4c8c5d7684e9a20bd07ce0300a9ffa49))
+* 阻止错误响应泄漏内部异常信息 ([c116761](https://github.com/ajie5419/Quality-Guardian/commit/c116761f19b259127c2190eea58074754b3fe96d))
+
 ### 2026-10-21 A2：修复错误响应中的内部异常泄漏
 
 - 全局普通异常的 `error` 字段固定为 null，生产响应仅返回通用错误文案；明确的 BusinessError 保留原状态码和受控错误码，development 仍可查看堆栈。
