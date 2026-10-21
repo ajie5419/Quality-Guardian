@@ -2,6 +2,7 @@ import { LoginStatusEnum } from '@qgs/shared';
 import { defineEventHandler, getHeader, readBody, setResponseStatus } from 'h3';
 import { SystemLogService } from '~/modules/system-log/system-log.service';
 import { AuthService } from '~/modules/user/auth.service';
+import { businessErrorResponse, isBusinessError } from '~/utils/business-error';
 import {
   clearRefreshTokenCookie,
   setRefreshTokenCookie,
@@ -76,14 +77,15 @@ export default defineEventHandler(async (event) => {
       ...userPayload,
       accessToken,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '登录失败';
     void recordLoginLog(
       {
         username,
         ip: String(ip),
         userAgent,
         status: LoginStatusEnum.FAIL,
-        message: error.message,
+        message,
       },
       {
         path: event.path,
@@ -93,6 +95,7 @@ export default defineEventHandler(async (event) => {
     );
 
     clearRefreshTokenCookie(event);
-    return forbiddenResponse(event, error.message || '登录失败');
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
+    return forbiddenResponse(event, message);
   }
 });

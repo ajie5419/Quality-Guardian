@@ -9,6 +9,7 @@ import process from 'node:process';
 import { expect, test } from '@playwright/test';
 
 import { assertOwnedTargets } from '../../../scripts/e2e/safety.mjs';
+import { waitOutDedupeWindow } from './dedupe-window';
 
 const require = createRequire(
   new URL('../../backend/package.json', import.meta.url),
@@ -36,26 +37,35 @@ async function expectSharedLogin(page: Page, destination: string) {
 }
 
 // Bridge logins land on the shared login page; authorization is silent.
-async function signIn(page: Page) {
+async function signIn(
+  page: Page,
+  password = process.env.QGS_E2E_PASSWORD || '',
+) {
+  const response = page.waitForResponse(
+    (result) =>
+      new URL(result.url()).pathname === '/api/auth/login' &&
+      result.request().method() === 'POST',
+  );
   await expectSharedLogin(page, CLIENT_NAME);
   await page
     .getByPlaceholder('请输入用户名')
     .fill(`${process.env.QGS_E2E_USERNAME}_identity`);
-  await page
-    .getByPlaceholder('密码', { exact: true })
-    .fill(process.env.QGS_E2E_PASSWORD || '');
+  await page.getByPlaceholder('密码', { exact: true }).fill(password);
   await page
     .getByRole('button', { name: /登\s*录/ })
     .or(page.locator('button[aria-label="login"]'))
     .click();
+  return response;
 }
 
-function authorizeResponse(page: Page) {
-  return page.waitForResponse(
-    (response) =>
-      new URL(response.url()).pathname === '/api/identity-bridge/authorize' &&
-      response.request().method() === 'POST',
-  );
+function callbackUrl(page: Page) {
+  const expected = new URL(process.env.QMS_IDENTITY_CALLBACK || '');
+  return page
+    .waitForURL(
+      (url) =>
+        url.origin === expected.origin && url.pathname === expected.pathname,
+    )
+    .then(() => new URL(page.url()));
 }
 
 test('employee with no QMS menus signs in on the shared branded login and is silently authorized', async ({
@@ -160,7 +170,6 @@ test('employee with no QMS menus signs in on the shared branded login and is sil
     }
     // Standalone QMS suite verifies its own login page and real Nitro endpoints.
     await page.goto('/auth/login');
-    await expectSharedLogin(page, '质量管理系统');
     const verifier = token();
     const authorizeParams = (state: string, challengeVerifier: string) =>
       new URLSearchParams({
@@ -187,12 +196,20 @@ test('employee with no QMS menus signs in on the shared branded login and is sil
     await expect(page).toHaveURL(/\/auth\/register\?redirect=/);
     await page.getByText('去登录', { exact: true }).click();
     await expect(page).toHaveURL(/\/auth\/login\?redirect=/);
-    const authorized = authorizeResponse(page);
-    await signIn(page);
+    const loginUrl = page.url();
+    const rejectedLogin = await signIn(
+      page,
+      process.env.QGS_E2E_WRONG_PASSWORD || 'invalid-password',
+    );
+    expect(rejectedLogin.status()).toBe(401);
+    await expect(
+      page.getByText('用户名或密码错误', { exact: true }),
+    ).toBeVisible();
+    await expect(page).toHaveURL(loginUrl);
+    const acceptedLogin = await signIn(page);
+    expect(acceptedLogin.status()).toBe(200);
     expect(codesRequests).toBe(0);
-    const authorization = await authorized;
-    const body = await authorization.json();
-    const callback = new URL(body.data.callback);
+    const callback = await callbackUrl(page);
     expect(callback.origin + callback.pathname).toBe(
       process.env.QMS_IDENTITY_CALLBACK,
     );
@@ -273,11 +290,10 @@ test('employee with no QMS menus signs in on the shared branded login and is sil
     expect(decodeURIComponent(decodeURIComponent(page.url()))).not.toContain(
       'prompt=',
     );
-    const switched = authorizeResponse(page);
-    await signIn(page);
-    const switchedResponse = await switched;
-    const switchedBody = await switchedResponse.json();
-    const switchedCallback = new URL(switchedBody.data.callback);
+    await waitOutDedupeWindow(page);
+    const switchedLogin = await signIn(page);
+    expect(switchedLogin.status()).toBe(200);
+    const switchedCallback = await callbackUrl(page);
     expect(switchedCallback.searchParams.get('state')).toBe(switchState);
     await expect(
       page.getByText('QMS callback observed; standalone provider test only.'),

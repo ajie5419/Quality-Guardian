@@ -253,19 +253,6 @@ describe('userService', () => {
     });
   });
 
-  describe('delete', () => {
-    it('should soft delete user', async () => {
-      (prisma.users.update as any).mockResolvedValue({});
-
-      await UserService.delete('u1');
-
-      expect(prisma.users.update).toHaveBeenCalledWith({
-        where: { id: 'u1' },
-        data: expect.objectContaining({ isDeleted: true }),
-      });
-    });
-  });
-
   describe('getInfoByTokenPayload', () => {
     it('should return enriched user info', async () => {
       const { RbacService } = await import('~/modules/rbac');

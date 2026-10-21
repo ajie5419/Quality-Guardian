@@ -1,5 +1,7 @@
+import { ErrorCode } from '@qgs/shared';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthService } from '~/modules/user/auth.service';
+import { generateAccessToken, generateRefreshToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 
 const { mockBcryptCompare, mockBcryptHash } = vi.hoisted(() => ({
@@ -67,6 +69,41 @@ describe('authService', () => {
       expect(result.userPayload.deptName).toBe('IT');
     });
 
+    it.each(['ACTIVE', 'INACTIVE'])(
+      'rejects a deleted %s account without issuing tokens',
+      async (status) => {
+        const deletedUser = {
+          id: 'deleted-user',
+          username: 'deleted',
+          password: 'hashed',
+          status,
+          isDeleted: true,
+          roles: { name: 'user' },
+        };
+        vi.mocked(prisma.users.findUnique).mockImplementation(
+          ({ where }) =>
+            Promise.resolve(
+              Object.entries(where).every(
+                ([key, value]) =>
+                  deletedUser[key as keyof typeof deletedUser] === value,
+              )
+                ? deletedUser
+                : null,
+            ) as never,
+        );
+        mockBcryptCompare.mockResolvedValue(true);
+
+        await expect(
+          AuthService.login('deleted', 'pass'),
+        ).rejects.toMatchObject({
+          code: ErrorCode.UNAUTHORIZED,
+          httpStatus: 401,
+        });
+        expect(generateAccessToken).not.toHaveBeenCalled();
+        expect(generateRefreshToken).not.toHaveBeenCalled();
+      },
+    );
+
     it('should throw on non-existent user', async () => {
       (prisma.users.findUnique as any).mockResolvedValue(null);
 
@@ -82,10 +119,33 @@ describe('authService', () => {
         roles: { name: 'user' },
       });
 
-      await expect(AuthService.login('user', 'pass')).rejects.toThrow(
-        '账号已被禁用，请联系管理员。',
-      );
+      await expect(AuthService.login('user', 'pass')).rejects.toMatchObject({
+        code: ErrorCode.UNAUTHORIZED,
+        httpStatus: 401,
+      });
     });
+
+    it.each([null, { id: 'inactive-user', status: 'INACTIVE' }])(
+      'performs cost-12 verification but still rejects an unavailable account on a match',
+      async (user) => {
+        vi.mocked(prisma.users.findUnique).mockResolvedValue(user as never);
+        mockBcryptCompare.mockResolvedValue(true);
+
+        await expect(
+          AuthService.login('unavailable', 'pass'),
+        ).rejects.toMatchObject({
+          code: ErrorCode.UNAUTHORIZED,
+          httpStatus: 401,
+        });
+        expect(mockBcryptCompare).toHaveBeenCalledOnce();
+        expect(mockBcryptCompare).toHaveBeenCalledWith(
+          'pass',
+          expect.stringMatching(/^\$2[aby]\$12\$/),
+        );
+        expect(generateAccessToken).not.toHaveBeenCalled();
+        expect(generateRefreshToken).not.toHaveBeenCalled();
+      },
+    );
 
     it('should throw on wrong password', async () => {
       (prisma.users.findUnique as any).mockResolvedValue({
@@ -134,6 +194,34 @@ describe('authService', () => {
 
       expect(result).toBe('access-token');
     });
+
+    it.each(['ACTIVE', 'INACTIVE'])(
+      'rejects refreshing a deleted %s account without issuing a token',
+      async (status) => {
+        const deletedUser = {
+          id: 'deleted-user',
+          username: 'deleted',
+          status,
+          isDeleted: true,
+          roles: { name: 'user' },
+        };
+        vi.mocked(prisma.users.findUnique).mockImplementation(
+          ({ where }) =>
+            Promise.resolve(
+              Object.entries(where).every(
+                ([key, value]) =>
+                  deletedUser[key as keyof typeof deletedUser] === value,
+              )
+                ? deletedUser
+                : null,
+            ) as never,
+        );
+
+        expect(await AuthService.refreshAccessToken('deleted')).toBeNull();
+        expect(generateAccessToken).not.toHaveBeenCalled();
+        expect(generateRefreshToken).not.toHaveBeenCalled();
+      },
+    );
 
     it('should return null for non-existent user', async () => {
       (prisma.users.findUnique as any).mockResolvedValue(null);

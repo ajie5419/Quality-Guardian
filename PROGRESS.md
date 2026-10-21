@@ -2,6 +2,10 @@
 
 ## 当前状态
 
+- **PR #157 AI 审查整改（2026-10-21）**：采纳登录 401 误入会话恢复及不可用账号跳过 bcrypt 两项意见，分别修复；不恢复仅断言 Prisma 参数的删除透传测试，保留真实 HTTP/MySQL 删除状态证据。6 文件 / 68 项测试、前后端类型、目标 lint/架构通过；真实浏览器错密重试保留受保护页面和身份桥目标，报检 20/20（`7df9dc3bbbdd407c3c1e4e67`）与身份桥 1/1（`9bda394283b4128c13306f4d`）通过，独占资源已回收。修复追加到原 PR，未合并/部署。
+
+- **代码审查 A1 / QGX-03（2026-10-21，本地修复）**：软删除账号不能登录或刷新；删除同步禁用，失效认证返回 401，旧 access token 按既有最长 60 秒缓存失效。相关 5 文件 / 64 用例、后端类型、目标 ESLint、增量架构通过；真实 H3 HTTP + 独占 MySQL 验证正常登录/刷新、管理员删除、历史 deleted/ACTIVE 拒绝及实际 60 秒缓存失效，Run `b42bf9cedf84b532`，资源已回收。未合并或部署；下一项 A2 为普通异常脱敏。
+
 - **研发降负第二阶段（2026-10-08，本地提交）**：docs-drift 提供数字同步、diff 审阅与复验指引，并区分需人工维护的缺文档/地图；daily 明示仅建议、不执行检查。docs:sync 仅替换唯一硬数据块，拒绝异常标记并保留块外人工说明与换行。Commitlint 从实际包名与原有别名生成完整清单，允许集合不变；修复 commit-msg 消息文件参数接线。补充 `eslint.config.mjs` 对 `.dsh-project-memory/**` 的最小忽略后全量 `pnpm lint` 通过。四项提交门禁与 60 项定向测试全部通过，通过标准 hooks 形成独立本地提交，未推送；保留开工两处既有差异。
 - **研发降负第一阶段（2026-10-07 实施，2026-10-08 本地提交 6ad1990）**：架构失败增加逐规则原因/修复/范例/参考和 `--explain`，保留原诊断格式、检测逻辑与 baseline；修复权限子检查提前退出导致详情缺失。新增仅打印建议的 `check:daily`，覆盖分支、暂存、未暂存、未跟踪、删除与改名范围；补充报检→检验完成→关联 NC 样板。工具/CI 定向 47 项、样板与责任选项/关闭 schema 定向 16 项通过；API/Service 虚拟文件类型检查、目标 ESLint/Prettier、changed/full 架构、docs-drift 和 diff 检查通过。根类型门禁在前轮实现时通过（Turbo 缓存；weapp 仍为既有 skip）。第一阶段未运行全量 lint/业务测试或真实页面、数据库、生产验收；提交当轮完整四项门禁与逐项 hooks 日志不足，不能由提交成功推定均通过。未推送；第一阶段未修改 hook/CI。开工时 `.gitignore` 与项目档案已有差异均保留。
 - 已处理：发布分支已完成报检责任、可选 NC 编号、原子关单与主分支质量损失索引队列/versioned release-maintenance 的冲突整合。关联不合格项关闭后在同一事务入队质量损失索引；历史外协 bootstrap 的维护顺序迁移到 manifest/ledger；关单服务拆分为 494 行。最终验证：根目录 Vitest `406/406` 文件、`3379/3379` 用例，后端 Vitest `292/292` 文件、`2656/2656` 用例，`pnpm lint`、`pnpm run check:type`、`pnpm run check:qms-arch`、`pnpm run check:qms-arch:all`、`pnpm run check:prisma-migration` 和 `rtk git diff --check` 均 PASS。未运行前端 dev/build/start、真实生产发布或数据库维护。
