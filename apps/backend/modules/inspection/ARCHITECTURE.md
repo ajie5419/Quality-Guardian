@@ -16,6 +16,8 @@ inspection 是 QMS 的检验域模块，覆盖检验记录、检验表模板、�
 - `inspection-archive-*.service.ts`：归档任务与归档同步。
 - `inspection-request*.service.ts`：报检任务创建、列表、派工、关闭、统计与实时事件。
 - `inspection.module.ts`：菜单、权限、数据范围与审计模板声明。
+- `telegram-webhook.post.service.ts`：公开 `telegramWebhookHandler`，执行 webhook 鉴权、输入校验与异步回调应答；API 通过 `index.ts` 转发。
+- `telegram-webhook.service.ts`：密钥字节比较与更新 schema；`telegram-dispatch.service.ts` 复用校验后的回调类型，保留菜单与派工业务。
 
 ## 报检任务状态机
 

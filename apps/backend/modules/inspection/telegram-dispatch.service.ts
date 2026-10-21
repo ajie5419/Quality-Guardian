@@ -1,3 +1,5 @@
+import type { CallbackQuery } from './telegram-webhook.service';
+
 import process from 'node:process';
 
 import { SystemService } from '~/modules/system';
@@ -125,12 +127,6 @@ export async function dispatchInspectionRequestViaTelegram(
     { inspectorId, priority: 3 },
     actor,
   );
-}
-
-export interface CallbackQuery {
-  data?: string;
-  id: string;
-  message?: { message_id?: number };
 }
 
 /**

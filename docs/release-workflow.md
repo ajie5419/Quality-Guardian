@@ -24,6 +24,14 @@
 1. 合并功能 PR：把需求代码进 `main`。
 2. 合并 release PR：生成版本、tag，并触发生产部署。
 
+## Telegram webhook 配置
+
+启用 Telegram 入站回调时，必须通过部署环境注入非空 `TELEGRAM_WEBHOOK_SECRET`，并把相同值配置为 Telegram `setWebhook` 的 `secret_token`；密钥不要写进仓库、请求示例或日志。标准回调请求头为 `x-telegram-bot-api-secret-token`。已有代理使用的非空 `x-tg-secret` 优先；该请求头为空或不存在时才回退到标准头，不能用正确的标准头覆盖错误的非空代理头。
+
+回调地址为公开可达的 HTTPS `/api/telegram/webhook`，代理必须保留上述请求头和 JSON body。`TELEGRAM_API_BASE` 仅控制出站 Telegram API 地址，不替代 webhook 鉴权。未启用 Telegram 时可以保留空配置，此时 webhook 返回 503，不影响其他业务；已配置密钥但请求头缺失、不匹配时返回 401。处理器在读取 body 和调用回调服务前验证密钥，使用等长 UTF-8 字节的 `timingSafeEqual` 比较。
+
+鉴权通过后，非 JSON 或回调字段类型错误返回 400，不调用回调服务。合法无回调更新及已接受的回调保留 `{ ok: true }` 的协议应答；回调业务继续异步执行，失败写入既有错误日志。部署后分别检查缺头拒绝、正确标准头放行和实际回调；本地验收使用独占数据库与本地 Telegram API 替身，不向真实群组发送消息。
+
 ## 新需求标准流程
 
 1. 从最新 `main` 开功能分支。
