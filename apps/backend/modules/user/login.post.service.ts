@@ -9,7 +9,7 @@ import {
 } from '~/utils/cookie-utils';
 import { createModuleLogger } from '~/utils/logger';
 import {
-  forbiddenResponse,
+  internalServerErrorResponse,
   useResponseError,
   useResponseSuccess,
 } from '~/utils/response';
@@ -78,7 +78,8 @@ export default defineEventHandler(async (event) => {
       accessToken,
     });
   } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : '登录失败';
+    const businessError = isBusinessError(error) ? error : null;
+    const message = businessError?.message || '登录服务暂时不可用，请稍后重试';
     void recordLoginLog(
       {
         username,
@@ -95,7 +96,16 @@ export default defineEventHandler(async (event) => {
     );
 
     clearRefreshTokenCookie(event);
-    if (isBusinessError(error)) return businessErrorResponse(event, error);
-    return forbiddenResponse(event, message);
+    if (businessError) return businessErrorResponse(event, businessError);
+    logger.error(
+      {
+        err: error,
+        path: event.path,
+        requestId: event.context.requestId,
+        traceId: event.context.traceId,
+      },
+      'Login failed',
+    );
+    return internalServerErrorResponse(event, message);
   }
 });

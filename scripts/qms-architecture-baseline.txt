@@ -37,7 +37,7 @@ B-E2|apps/backend/modules/supervision/supervision-report-create.post.service.ts|
 B-E2|apps/backend/modules/supplier/supplier-event-listener.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/system/system-monitoring.service.ts|catch-without-error-log|2
 B-E2|apps/backend/modules/system/system.service.ts|catch-without-error-log|1
-B-E2|apps/backend/modules/user/login.post.service.ts|catch-without-error-log|2
+B-E2|apps/backend/modules/user/login.post.service.ts|catch-without-error-log|1
 B-E2|apps/backend/modules/user/preference.service.ts|catch-without-error-log|2
 B-E2|apps/backend/modules/user/wx-subscribe-message.service.ts|catch-without-error-log|3
 B-E2|apps/backend/modules/vehicle-commissioning/vehicle-commissioning-daily-report.service.ts|catch-without-error-log|1

@@ -21,7 +21,7 @@ const errorHandler: NitroErrorHandler = function (error, event) {
     event.node.res.end(
       JSON.stringify({
         code: -1,
-        error: isBusinessError(error) ? { code: error.code } : error.message,
+        error: isBusinessError(error) ? { code: error.code } : null,
         message: isBusinessError(error)
           ? error.message
           : 'Internal Server Error',

@@ -70,9 +70,14 @@ export default defineEventHandler(async (event) => {
 // 分页
 { code: 0, data: { items: T[], total: number }, error: null, message: 'ok' }
 
-// 失败
-{ code: -1, data: null, error: string, message: string }
+// 业务失败
+{ code: -1, data: null, error: { code: 'VALIDATION' }, message: string }
+
+// 普通服务端异常（路由响应助手）
+{ code: -1, data: null, error: null, message: string }
 ```
+
+业务错误通过 `businessErrorResponse` 保留受控错误码和 HTTP 状态。未处理的普通异常返回 HTTP 500、`error: null` 和通用文案；生产响应不得包含底层 message、stack、cause 或数据库诊断。登录凭据失败返回 401，数据库等基础设施故障返回通用 500，真实原因仅进入既有脱敏日志，登录审计记录不保存底层异常文本。堆栈仅在 development 响应中保留。
 
 ## 硬规则
 
