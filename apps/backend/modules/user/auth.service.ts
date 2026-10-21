@@ -7,18 +7,21 @@ import { BusinessError } from '~/utils/business-error';
 import { generateAccessToken, generateRefreshToken } from '~/utils/jwt-utils';
 import prisma from '~/utils/prisma';
 
+// Non-secret bcrypt target with the same work factor as stored passwords.
+const DUMMY_PASSWORD_HASH =
+  '$2b$12$1whLk25.aqEXCz1c/kOKceJP2IZEfuNULDZWtO7V.Ob8YCl3RF2HS';
+
 export const AuthService = {
   async login(username: string, pass: string) {
     const user = await prisma.users.findUnique({
       where: { username, isDeleted: false },
       include: { roles: true },
     });
-    if (!user || user.status !== 'ACTIVE') {
-      throw new BusinessError(ErrorCode.UNAUTHORIZED, '用户名或密码错误', 401);
-    }
-
-    const isValid = await bcrypt.compare(pass, user.password);
-    if (!isValid) {
+    const isValid = await bcrypt.compare(
+      pass,
+      user?.status === 'ACTIVE' ? user.password : DUMMY_PASSWORD_HASH,
+    );
+    if (!user || user.status !== 'ACTIVE' || !isValid) {
       throw new BusinessError(ErrorCode.UNAUTHORIZED, '用户名或密码错误', 401);
     }
 

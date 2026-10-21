@@ -125,6 +125,28 @@ describe('authService', () => {
       });
     });
 
+    it.each([null, { id: 'inactive-user', status: 'INACTIVE' }])(
+      'performs cost-12 verification but still rejects an unavailable account on a match',
+      async (user) => {
+        vi.mocked(prisma.users.findUnique).mockResolvedValue(user as never);
+        mockBcryptCompare.mockResolvedValue(true);
+
+        await expect(
+          AuthService.login('unavailable', 'pass'),
+        ).rejects.toMatchObject({
+          code: ErrorCode.UNAUTHORIZED,
+          httpStatus: 401,
+        });
+        expect(mockBcryptCompare).toHaveBeenCalledOnce();
+        expect(mockBcryptCompare).toHaveBeenCalledWith(
+          'pass',
+          expect.stringMatching(/^\$2[aby]\$12\$/),
+        );
+        expect(generateAccessToken).not.toHaveBeenCalled();
+        expect(generateRefreshToken).not.toHaveBeenCalled();
+      },
+    );
+
     it('should throw on wrong password', async () => {
       (prisma.users.findUnique as any).mockResolvedValue({
         id: 'u1',
