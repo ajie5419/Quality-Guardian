@@ -50,7 +50,8 @@ async function login(page: Page) {
 }
 
 test('rejects an incorrect password through the login UI', async ({ page }) => {
-  await page.goto('/auth/login');
+  await page.goto('/auth/login?redirect=/qms/inspection/requests');
+  const loginUrl = page.url();
   await page
     .getByPlaceholder('请输入用户名')
     .fill(process.env.QGS_E2E_USERNAME || '');
@@ -61,11 +62,18 @@ test('rejects an incorrect password through the login UI', async ({ page }) => {
   await expect(
     page.getByText('用户名或密码错误', { exact: true }),
   ).toBeVisible();
-  await expect(page).toHaveURL(/\/auth\/login/);
+  await expect(page).toHaveURL(loginUrl);
   await page.screenshot({
     path: `${process.env.QGS_E2E_ARTIFACT_DIR}/login-rejected.png`,
     mask: [page.locator('input')],
   });
+  await page
+    .getByPlaceholder('密码', { exact: true })
+    .fill(process.env.QGS_E2E_PASSWORD || '');
+  await submitLogin(page);
+  await expect(
+    page.getByRole('heading', { name: '报检任务', exact: true }),
+  ).toBeVisible();
 });
 
 test('logs in, logs out and blocks reopening the protected page', async ({

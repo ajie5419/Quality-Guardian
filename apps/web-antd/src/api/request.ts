@@ -23,7 +23,13 @@ const { apiURL } = useAppConfig(import.meta.env, import.meta.env.PROD);
 const NETWORK_ERROR_NOTIFY_COOLDOWN_MS = 15_000;
 let lastNetworkErrorNotifyAt = 0;
 
-function createRequestClient(baseURL: string, options?: RequestClientOptions) {
+function createRequestClient(
+  baseURL: string,
+  {
+    sessionAuthentication = true,
+    ...options
+  }: RequestClientOptions & { sessionAuthentication?: boolean } = {},
+) {
   const client = new RequestClient({
     ...options,
     baseURL,
@@ -65,9 +71,10 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
   // 请求头处理
   client.addRequestInterceptor({
     fulfilled: async (config) => {
-      const accessStore = useAccessStore();
-
-      config.headers.Authorization = formatToken(accessStore.accessToken);
+      if (sessionAuthentication) {
+        const accessStore = useAccessStore();
+        config.headers.Authorization = formatToken(accessStore.accessToken);
+      }
       config.headers['Accept-Language'] = preferences.app.locale;
 
       // 过滤无效参数 (undefined, null, '')，避免 URL 中出现 key=undefined
@@ -91,16 +98,18 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
     }),
   );
 
-  // token过期的处理
-  client.addResponseInterceptor(
-    authenticateResponseInterceptor({
-      client,
-      doReAuthenticate,
-      doRefreshToken,
-      enableRefreshToken: preferences.app.enableRefreshToken,
-      formatToken,
-    }),
-  );
+  // Only protected requests treat a 401 as an expired session.
+  if (sessionAuthentication) {
+    client.addResponseInterceptor(
+      authenticateResponseInterceptor({
+        client,
+        doReAuthenticate,
+        doRefreshToken,
+        enableRefreshToken: preferences.app.enableRefreshToken,
+        formatToken,
+      }),
+    );
+  }
 
   // 通用的错误处理,如果没有进入上面的错误处理逻辑，就会进入这里
   client.addResponseInterceptor(
@@ -164,6 +173,11 @@ function createRequestClient(baseURL: string, options?: RequestClientOptions) {
 
 export const requestClient = createRequestClient(apiURL, {
   responseReturn: 'data',
+});
+
+export const loginRequestClient = createRequestClient(apiURL, {
+  responseReturn: 'data',
+  sessionAuthentication: false,
 });
 
 export const publicRequestClient = new RequestClient({

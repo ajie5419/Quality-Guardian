@@ -1,4 +1,8 @@
-import { baseRequestClient, requestClient } from '#/api/request';
+import {
+  baseRequestClient,
+  loginRequestClient,
+  requestClient,
+} from '#/api/request';
 
 import { CORE_API } from './constants';
 
@@ -29,7 +33,7 @@ export namespace AuthApi {
  * 登录
  */
 export async function loginApi(data: AuthApi.LoginParams) {
-  return requestClient.post<AuthApi.LoginResult>(CORE_API.LOGIN, data);
+  return loginRequestClient.post<AuthApi.LoginResult>(CORE_API.LOGIN, data);
 }
 
 /**
