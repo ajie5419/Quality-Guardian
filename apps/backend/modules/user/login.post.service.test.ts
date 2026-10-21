@@ -11,6 +11,7 @@ const {
   mockSetRefreshTokenCookie,
   mockClearRefreshTokenCookie,
   mockRecordLogin,
+  mockLoggerError,
 } = vi.hoisted(() => ({
   mockReadBody: vi.fn(),
   mockGetHeader: vi.fn(),
@@ -18,6 +19,7 @@ const {
   mockSetRefreshTokenCookie: vi.fn(),
   mockClearRefreshTokenCookie: vi.fn(),
   mockRecordLogin: vi.fn(),
+  mockLoggerError: vi.fn(),
 }));
 
 vi.mock('h3', () => ({
@@ -46,7 +48,7 @@ vi.mock('~/utils/cookie-utils', () => ({
 
 vi.mock('~/utils/logger', () => ({
   createModuleLogger: () => ({
-    error: vi.fn(),
+    error: mockLoggerError,
     info: vi.fn(),
     warn: vi.fn(),
   }),
@@ -109,6 +111,35 @@ describe('loginPostService', () => {
     expect(result.code).toBe(-1);
     expect(result.error).toEqual({ code: ErrorCode.UNAUTHORIZED });
     expect(mockSetResponseStatus).toHaveBeenCalledWith(expect.anything(), 401);
+    expect(mockClearRefreshTokenCookie).toHaveBeenCalled();
+  });
+
+  it.each([
+    new Error('A2_PRIVATE_DATABASE_DIAGNOSTIC'),
+    'A2_PRIVATE_DATABASE_DIAGNOSTIC',
+  ])('returns a generic 500 for infrastructure failures', async (failure) => {
+    vi.mocked(AuthService.login).mockRejectedValue(failure);
+    mockReadBody.mockResolvedValue({ username: 'admin', password: 'pass' });
+
+    const result = await handler(mockEvent());
+
+    expect(mockSetResponseStatus).toHaveBeenCalledWith(expect.anything(), 500);
+    expect(result).toMatchObject({ code: -1, data: null, error: null });
+    expect(JSON.stringify(result)).not.toContain(
+      'A2_PRIVATE_DATABASE_DIAGNOSTIC',
+    );
+    expect(JSON.stringify(mockRecordLogin.mock.calls)).not.toContain(
+      'A2_PRIVATE_DATABASE_DIAGNOSTIC',
+    );
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        err: failure,
+        requestId: 'req-1',
+        traceId: 'trace-1',
+      }),
+      expect.any(String),
+    );
+    expect(mockSetRefreshTokenCookie).not.toHaveBeenCalled();
     expect(mockClearRefreshTokenCookie).toHaveBeenCalled();
   });
 
