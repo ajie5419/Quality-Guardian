@@ -101,13 +101,6 @@ async function readBack(workOrderNumber: string) {
   return toFulfillmentWorkOrder(await requireActiveWorkOrder(workOrderNumber));
 }
 
-/** Clearing the division clears both the snapshot name and the canonical ID. */
-function divisionInput(divisionId: null | string | undefined) {
-  return divisionId === null
-    ? { division: null, divisionId: null }
-    : { divisionId };
-}
-
 export const WorkOrderIntegrationService = {
   async create(event: H3Event, input: FulfillmentWorkOrderCreateInput) {
     const actorUserId = await assertActor(input.actorUserId);
@@ -160,12 +153,17 @@ export const WorkOrderIntegrationService = {
     await assertCanonicalReferences(input);
     const updateData = await buildWorkOrderUpdateData(workOrderNumber, {
       customerNameId: input.customerNameId,
-      ...divisionInput(input.divisionId),
       deliveryDate: input.deliveryDate,
+      divisionId: input.divisionId ?? undefined,
       projectName: input.projectName,
       quantity: input.quantity,
       status: input.status,
     });
+    if (input.divisionId === null) {
+      // The governed helper keeps the stored ID when no name is given, so an
+      // explicit clear must write both halves of the pair itself.
+      Object.assign(updateData, { division: null, divisionId: null });
+    }
     await applyVersionedWorkOrderUpdate(event, {
       actorUserId,
       auditChannel: AUDIT_CHANNEL,

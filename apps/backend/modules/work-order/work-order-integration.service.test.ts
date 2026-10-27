@@ -4,13 +4,15 @@ import prisma from '~/utils/prisma';
 
 import { WorkOrderIntegrationService } from './work-order-integration.service';
 
-const { mockAudit, mockCanonicalPair } = vi.hoisted(() => ({
+const { mockAudit, mockCanonicalPair, mockWriteFields } = vi.hoisted(() => ({
   mockAudit: vi.fn(),
   mockCanonicalPair: vi.fn(),
+  mockWriteFields: vi.fn(),
 }));
 
 vi.mock('~/utils/prisma', () => {
   const client = {
+    $queryRawUnsafe: vi.fn(),
     work_orders: {
       create: vi.fn(),
       findFirst: vi.fn(),
@@ -35,23 +37,20 @@ vi.mock('~/modules/data-scope', () => ({
   DataScopeService: { buildWorkOrderWhere: vi.fn() },
 }));
 vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
-vi.mock('~/utils/canonical-master-data', () => ({
-  MasterDataGovernanceKernel: {
-    resolveCanonicalNameById: vi.fn(
-      async ({ canonicalId }: { canonicalId: string }) =>
-        ({ 'cust-1': '甲客户', 'dept-1': '一事业部' })[canonicalId] ?? null,
-    ),
-  },
+vi.mock('~/utils/redis', () => ({
+  redis: { del: vi.fn(), get: vi.fn(), set: vi.fn() },
 }));
 vi.mock('~/utils/governed-write', () => ({
   buildGovernedCanonicalWritePairForTable: mockCanonicalPair,
-  buildGovernedWriteFieldsForTable: (_table: string, input: any) =>
-    Object.fromEntries(
-      ['customerName', 'division']
-        .filter((key) => input[key] !== undefined)
-        .map((key) => [key, input[key]]),
-    ),
+  buildGovernedWriteFieldsForTable: mockWriteFields,
 }));
+
+/** Canonical names the (mocked) database returns for active IDs. */
+const CANONICAL_NAMES: Record<string, string> = {
+  'cust-1': '甲客户',
+  'dept-1': '一事业部',
+  'dept-2': '二事业部',
+};
 
 const db = prisma as any;
 const event = { context: {}, node: { req: { socket: {} } } } as any;
@@ -88,6 +87,16 @@ const createInput = {
 describe('workOrderIntegrationService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    db.$queryRawUnsafe.mockImplementation(async (_sql: string, id: string) =>
+      CANONICAL_NAMES[id] ? [{ value: CANONICAL_NAMES[id] }] : [],
+    );
+    mockWriteFields.mockImplementation((_table: string, input: any) =>
+      Object.fromEntries(
+        ['customerName', 'division']
+          .filter((key) => input[key] !== undefined)
+          .map((key) => [key, input[key]]),
+      ),
+    );
     vi.mocked(UserService.findExistingById).mockResolvedValue({
       id: 'user-7',
       realName: 'Zhao',
@@ -417,5 +426,82 @@ describe('workOrderIntegrationService', () => {
         httpStatus: 409,
       });
     });
+  });
+});
+
+/**
+ * Regression: the real governed helper turns an explicit `divisionId: null`
+ * into "keep the stored ID", so only the database is mocked here.
+ */
+describe('workOrderIntegrationService with the real governed write', () => {
+  function writtenData() {
+    return db.work_orders.updateMany.mock.calls.at(-1)[0].data;
+  }
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const actual = await vi.importActual<
+      typeof import('~/utils/governed-write')
+    >('~/utils/governed-write');
+    mockCanonicalPair.mockImplementation(
+      actual.buildGovernedCanonicalWritePairForTable,
+    );
+    mockWriteFields.mockImplementation(actual.buildGovernedWriteFieldsForTable);
+    db.$queryRawUnsafe.mockImplementation(async (_sql: string, id: string) =>
+      CANONICAL_NAMES[id] ? [{ value: CANONICAL_NAMES[id] }] : [],
+    );
+    vi.mocked(UserService.findExistingById).mockResolvedValue({
+      id: 'user-7',
+      realName: 'Zhao',
+      username: 'zhao',
+    });
+    db.work_orders.findFirst.mockResolvedValue(row());
+    db.work_orders.updateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('clears both the division name and its canonical ID for divisionId: null', async () => {
+    await WorkOrderIntegrationService.update(event, 'WO-1', {
+      actorUserId: 'user-7',
+      divisionId: null,
+      version: 2,
+    });
+    expect(writtenData()).toMatchObject({ division: null, divisionId: null });
+  });
+
+  it('writes the resolved name and ID when the division changes', async () => {
+    await WorkOrderIntegrationService.update(event, 'WO-1', {
+      actorUserId: 'user-7',
+      divisionId: 'dept-2',
+      version: 2,
+    });
+    expect(writtenData()).toMatchObject({
+      division: '二事业部',
+      divisionId: 'dept-2',
+    });
+  });
+
+  it('leaves the division untouched when divisionId is omitted', async () => {
+    await WorkOrderIntegrationService.update(event, 'WO-1', {
+      actorUserId: 'user-7',
+      customerNameId: 'cust-1',
+      version: 2,
+    });
+    expect(writtenData()).toMatchObject({
+      customerName: '甲客户',
+      customerNameId: 'cust-1',
+    });
+    expect(writtenData()).not.toHaveProperty('division');
+    expect(writtenData()).not.toHaveProperty('divisionId');
+  });
+
+  it('rejects an unknown division ID with 400 before writing', async () => {
+    await expect(
+      WorkOrderIntegrationService.update(event, 'WO-1', {
+        actorUserId: 'user-7',
+        divisionId: 'dept-missing',
+        version: 2,
+      }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST', httpStatus: 400 });
+    expect(db.work_orders.updateMany).not.toHaveBeenCalled();
   });
 });
