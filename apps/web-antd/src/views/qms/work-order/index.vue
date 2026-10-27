@@ -10,7 +10,7 @@ import { useRoute, useRouter } from 'vue-router';
 
 import { useI18n } from '@vben/locales';
 
-import { Button } from 'ant-design-vue';
+import { Alert, Button } from 'ant-design-vue';
 
 import { useVbenVxeGrid } from '#/adapter/vxe-table';
 import { getDeptList } from '#/api/system/dept';
@@ -42,8 +42,14 @@ const { handleApiError } = useErrorHandler();
 const route = useRoute();
 const router = useRouter();
 const { isMobile } = useMobileViewport();
-const { canCreate, canEdit, canDelete, canExport, canImport } =
-  useQmsPermissions('QMS:WorkOrder');
+const { canExport } = useQmsPermissions('QMS:WorkOrder');
+// Work orders are maintained by the fulfillment system; QMS keeps view and
+// export only, so create / edit / import / delete stay hidden for everyone.
+const workOrderWritable = ref(false);
+const canCreate = workOrderWritable;
+const canEdit = workOrderWritable;
+const canDelete = workOrderWritable;
+const canImport = workOrderWritable;
 const deptTreeData = ref<TreeSelectNode[]>([]);
 const deptRawData = ref<SystemDeptApi.Dept[]>([]);
 const isDeptLoading = ref(false);
@@ -207,6 +213,11 @@ watch([currentYear, currentDateMode, currentDate], resetMobilePage);
     <ErrorBoundary>
       <QmsPageShell>
         <div class="flex flex-col gap-3 sm:gap-4">
+          <Alert
+            :message="t('qms.workOrder.maintainedByFulfillment')"
+            show-icon
+            type="info"
+          />
           <WorkOrderCharts
             v-if="showDashboard"
             :stats-data="workOrderStats"

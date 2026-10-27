@@ -112,10 +112,19 @@ export function useWorkOrderGridOptions(options: {
       },
     });
 
+  // The action column only exists while a row action is allowed.
+  const visibleColumns = () =>
+    (getGridColumns() || []).filter(
+      (col) =>
+        col.slots?.default !== 'action' ||
+        options.canEdit.value ||
+        options.canDelete.value,
+    );
+
   const gridOptions = computed<VxeGridProps>(() => ({
     columns: [
       { type: 'checkbox', width: 50 },
-      ...(getGridColumns() || []).map((col) => {
+      ...visibleColumns().map((col) => {
         if (col.field === 'division') {
           return {
             ...col,

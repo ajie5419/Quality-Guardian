@@ -19,55 +19,26 @@ import {
 } from '~/modules/work-order/work-order-query';
 import { WorkOrderService } from '~/modules/work-order/work-order.service';
 import { logApiError } from '~/utils/api-logger';
-import { BusinessError } from '~/utils/business-error';
 import {
   EXPORT_LIMIT_EXCEEDED_MESSAGE,
   isExportLimitExceeded,
 } from '~/utils/export-constants';
-import {
-  buildGovernedCanonicalWritePairForTable,
-  buildGovernedWriteFieldsForTable,
-} from '~/utils/governed-write';
 import prisma from '~/utils/prisma';
-import {
-  isPrismaRequiredValueError,
-  isPrismaUniqueConflictError,
-} from '~/utils/prisma-error';
 
 import { buildWorkOrderImportGovernedFields } from './work-order-import-governance';
 import { WorkOrderRequirementRouteService } from './work-order-requirement-route.service';
-import { mapWorkOrderStatus, parseWorkOrderStatus } from './work-order-status';
+import { mapWorkOrderStatus } from './work-order-status';
 import {
   buildScopedWorkOrderWhere,
   deleteWorkOrderVersioned,
   updateWorkOrderVersioned,
 } from './work-order-versioned-write.service';
-
-async function buildWorkOrderGovernedFields(input: Record<string, unknown>) {
-  const governedFields = buildGovernedWriteFieldsForTable('work_orders', input);
-  const canonicalFields = await buildGovernedCanonicalWritePairForTable(
-    'work_orders',
-    input,
-  );
-  return { ...governedFields, ...canonicalFields };
-}
-
-/**
- * Interactive work-order writes must reject an unrecognized status instead of
- * silently defaulting to OPEN, which would persist an unintended value under a
- * 200 response. Batch import keeps the lenient mapWorkOrderStatus behavior for
- * legacy spreadsheet values (PRODUCT_DECISION).
- */
-function resolveInteractiveStatus(status: unknown) {
-  if (status === undefined || status === null || status === '') {
-    return mapWorkOrderStatus(status);
-  }
-  const parsed = parseWorkOrderStatus(status);
-  if (!parsed) {
-    throw new BusinessError('BAD_REQUEST', `无效的工单状态: ${String(status)}`);
-  }
-  return parsed;
-}
+import {
+  buildWorkOrderGovernedFields,
+  buildWorkOrderUpdateData,
+  createOrRestoreWorkOrder,
+  resolveInteractiveStatus,
+} from './work-order-write.service';
 
 export const WorkOrderRouteService = {
   async batchDelete(event: H3Event, ids: string[], userinfo: UserSession) {
@@ -125,63 +96,26 @@ export const WorkOrderRouteService = {
       isDeleted: false,
       updatedAt: new Date(),
     };
-    try {
-      const existing = await prisma.work_orders.findUnique({
-        where: { workOrderNumber: woNum },
-      });
-      if (existing && !existing.isDeleted)
-        throw new Error(
-          `CONFLICT:工单号 ${woNum} 已存在且未删除，请在工单列表搜索或调整筛选条件后处理`,
-        );
-      const newWO = existing?.isDeleted
-        ? // qms-arch-allow R-SCOPE: create-restore of a soft-deleted work order;
-          // the workOrderNumber uniqueness check replaces scope here
-          // (PRODUCT_DECISION: restore-on-create semantics).
-          await prisma.work_orders.update({
-            where: { workOrderNumber: woNum },
-            data: workOrderData,
-          })
-        : await prisma.work_orders.create({
-            data: {
-              workOrderNumber: woNum,
-              ...workOrderData,
-            },
-          });
-      await recordBusinessAuditLog(event, {
-        userId: userinfo.id,
-        action: existing?.isDeleted ? 'UPDATE' : 'CREATE',
-        targetType: 'work_order',
-        targetId: String(newWO.workOrderNumber),
-        detailsTemplate: existing?.isDeleted
-          ? '恢复工单: {{workOrderNumber}} ({{customerName}})'
-          : '新增工单: {{workOrderNumber}} ({{customerName}})',
-        detailsVariables: {
-          customerName: newWO.customerName,
-          workOrderNumber: newWO.workOrderNumber,
-        },
-      });
-      return {
-        ...newWO,
-        id: newWO.workOrderNumber,
-        createTime: newWO.createdAt
-          .toLocaleString('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-            hour12: false,
-          })
-          .replaceAll('/', '-'),
-      };
-    } catch (error) {
-      if (isPrismaUniqueConflictError(error))
-        throw new Error('CONFLICT:工单号已存在，请使用其他编号');
-      if (isPrismaRequiredValueError(error))
-        throw new Error('BAD_REQUEST:请求参数错误');
-      throw error;
-    }
+    const newWO = await createOrRestoreWorkOrder(
+      event,
+      { data: workOrderData, workOrderNumber: woNum },
+      userinfo.id,
+    );
+    return {
+      ...newWO,
+      id: newWO.workOrderNumber,
+      createTime: newWO.createdAt
+        .toLocaleString('zh-CN', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          hour: '2-digit',
+          minute: '2-digit',
+          second: '2-digit',
+          hour12: false,
+        })
+        .replaceAll('/', '-'),
+    };
   },
   async update(
     event: H3Event,
@@ -190,38 +124,7 @@ export const WorkOrderRouteService = {
     userinfo: UserSession,
     expectedVersion: number,
   ) {
-    const updateData: Record<string, unknown> = { updatedAt: new Date() };
-    if (
-      body.customerName !== undefined ||
-      body.customerNameId !== undefined ||
-      body.division !== undefined ||
-      body.divisionId !== undefined
-    ) {
-      Object.assign(
-        updateData,
-        await buildWorkOrderGovernedFields({
-          customerName: body.customerName,
-          customerNameId: body.customerNameId,
-          division: body.division,
-          divisionId: body.divisionId,
-        }),
-      );
-    }
-    if (body.projectName !== undefined)
-      updateData.projectName = body.projectName;
-    if (body.quantity !== undefined && body.quantity !== null)
-      updateData.quantity = parseWorkOrderQuantity(body.quantity, 1);
-    if (body.multiStationEnabled !== undefined)
-      updateData.multiStationEnabled = body.multiStationEnabled === true;
-    if (body.deliveryDate !== undefined && body.deliveryDate !== null)
-      updateData.deliveryDate = parseRequiredDate(body.deliveryDate);
-    if (body.effectiveTime !== undefined)
-      updateData.effectiveTime = parseOptionalDate(body.effectiveTime);
-    if (body.workOrderNumber && body.workOrderNumber !== id)
-      updateData.workOrderNumber = body.workOrderNumber;
-    if (body.status !== undefined && body.status !== null) {
-      updateData.status = resolveInteractiveStatus(body.status);
-    }
+    const updateData = await buildWorkOrderUpdateData(id, body);
     await updateWorkOrderVersioned(
       event,
       id,

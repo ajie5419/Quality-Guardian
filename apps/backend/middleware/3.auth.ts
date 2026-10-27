@@ -1,4 +1,5 @@
 import { defineEventHandler, getRequestURL } from 'h3';
+import { isFulfillmentWorkOrderWrite } from '~/modules/work-order/work-order-integration-routes';
 import { verifyAccessToken } from '~/utils/jwt-utils';
 import { unAuthorizedResponse } from '~/utils/response';
 
@@ -80,6 +81,8 @@ export default defineEventHandler(async (event) => {
     pathname.startsWith('/api/integration/fulfillment/')
   )
     return;
+  // Fulfillment work-order writes authenticate the same client headers.
+  if (isFulfillmentWorkOrderWrite(event.method, pathname)) return;
   if (isPublicPath(pathname)) return;
 
   const user = verifyAccessToken(event);

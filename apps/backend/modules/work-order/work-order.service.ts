@@ -29,6 +29,7 @@ import {
   parsePagination,
 } from '~/utils/query-helpers';
 
+import { FULFILLMENT_WORK_ORDER_SELECT } from './work-order-fulfillment-dto';
 import {
   buildScopedWorkOrderWhere,
   mapWorkOrderItems,
@@ -173,16 +174,7 @@ export const WorkOrderService = {
         workOrderNumber: { gt: afterKey },
       })),
       orderBy: [{ updatedAt: 'asc' }, { workOrderNumber: 'asc' }],
-      select: {
-        customerName: true,
-        deliveryDate: true,
-        isDeleted: true,
-        projectName: true,
-        quantity: true,
-        status: true,
-        updatedAt: true,
-        workOrderNumber: true,
-      },
+      select: FULFILLMENT_WORK_ORDER_SELECT,
       take,
     });
   },

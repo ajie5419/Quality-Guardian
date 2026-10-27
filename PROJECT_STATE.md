@@ -8,19 +8,21 @@
 
 <!-- docs:sync-start -->
 
-- 最后同步时间: 2026-10-21 22:13
+- 最后同步时间: 2026-10-27 06:46
 <!-- x-release-please-start-version -->
 - 版本: 0.30.1
 <!-- x-release-please-end -->
 - 后端模块数: 38
-- 模块 TS 文件数: 817
-- 后端测试文件数: 354
+- 模块 TS 文件数: 827
+- 后端测试文件数: 357
 
 <!-- docs:sync-end -->
 
 ## 当前进度
 
 <!-- AI 维护：简述当前进行中的工作、目标、当前阶段。 -->
+
+- **履约维护工单（2026-10-27，PR 待合并）**：工单主数据改由履约系统经 `/api/integration/fulfillment/work-orders` 新建/修改/取消（身份桥客户端凭据 + `actorUserId` 审计，复用建单/乐观锁/治理字段逻辑），新增客户列表接口，同步接口加 `customerNameId/division/divisionId/version`；QMS 工单页只留查看/导出，原 5 个写接口返回 403。上线须先备份数据库，QMS 发版后履约紧接着发版。定向单测、类型、架构、docs-drift 通过；桌面 Web E2E（`pnpm test:e2e`，需 macOS container）本环境无法运行，未验收。
 
 - **桌面Web E2E工单管理与检验管理补齐批次（2026-10-10，未提交）**：新增工单管理5例与检验管理专项补齐4例，联合报检20＋售后4＋计量6＋监督6＋供应商8＋质量损失5合计58/58通过，退出0，Run `41f8110546e552e4832b2b61`，516,928 ms；472个指纹文件差异0，专属容器/进程/端口回收；相关模块单测 1442 通过/0 失败，类型/架构/docs-drift检查通过（全量 vitest 中 `scripts/check-daily.test.mjs` 18 项为存量环境相关失败，非本批引入）。本批检出并最小根因修复真实缺陷：① BUG-WO-1 工单 UI 编辑漏传 `version` 导致 400（补齐 version 并在单测断言）；② BUG-WO-2 要求板提交名称而非 ID 错误逃逸为 500；③ BUG-WO-3 工单写路由权限拒绝 500；④ BUG-WO-4 工单非法状态流转未拦截；⑤ BUG-INSP-1 今日外购件展板供应商名称显示破折号；⑥ BUG-INSP-2 检验记录写路由权限拒绝 500；⑦ BUG-INSP-3 报检看板菜单由于权限推导脱节被过滤；⑧ BUG-INSP-4 多表模块 DataScope 字段跨表污染导致 500。整车调试按用户最新指示跳过，移动端与微信端排除，不代表全系统覆盖；保留其他 dirty，未推送/部署/改CI或生产操作。详见 [统一验收报告](docs/web-e2e-verification.md)及[矩阵](docs/web-e2e-business-coverage.md)。
 

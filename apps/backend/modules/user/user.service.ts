@@ -135,6 +135,17 @@ export const UserService = {
   },
 
   /**
+   * Existence check for an acting user named by a trusted integration
+   * client: the user must exist and not be soft-deleted.
+   */
+  async findExistingById(id: string) {
+    return prisma.users.findFirst({
+      where: { id, isDeleted: false },
+      select: { id: true, realName: true, username: true },
+    });
+  },
+
+  /**
    * Find all users with pagination
    */
   async findAll(params: UserQueryParams) {

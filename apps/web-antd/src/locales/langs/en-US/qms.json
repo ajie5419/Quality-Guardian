@@ -50,6 +50,7 @@
     }
   },
   "workOrder": {
+    "maintainedByFulfillment": "Work orders are maintained in the fulfillment system. Create, edit or cancel them there; QMS offers view and export only.",
     "statusLabel": "Status",
     "dateMode": "Dimension",
     "productName": "Product",

@@ -9,6 +9,8 @@ import { BusinessError } from '~/utils/business-error';
 import prisma from '~/utils/prisma';
 import { isPrismaNotFoundError } from '~/utils/prisma-error';
 
+import { withAuditChannel } from './work-order-write.service';
+
 export async function buildScopedWorkOrderWhere(
   baseWhere: Prisma.work_ordersWhereInput,
   event: H3Event,
@@ -24,47 +26,57 @@ export async function buildScopedWorkOrderWhere(
   );
 }
 
+export type WorkOrderScopeWhere = (
+  baseWhere: Prisma.work_ordersWhereInput,
+) => Promise<Prisma.work_ordersWhereInput>;
+
+export interface VersionedWorkOrderUpdate {
+  actorUserId: number | string;
+  /** Write channel appended to the audit details (e.g. 履约系统). */
+  auditChannel?: string;
+  /** Audit template; defaults to the interactive edit wording. */
+  auditTemplate?: string;
+  expectedVersion: number;
+  id: string;
+  /** Row-level scope applied to every read and the write. */
+  scopeWhere: WorkOrderScopeWhere;
+  updateData: Record<string, unknown>;
+  /** Extra state guard applied to the compare-and-set write only. */
+  writeGuard?: Prisma.work_ordersWhereInput;
+}
+
 /**
- * Versioned scoped update (OPTIMISTIC-LOCK-001). The write is keyed by
- * `{ workOrderNumber, version }` plus the resolved DataScope and increments
- * the version atomically, so a stale editor never overwrites a newer edit.
- * A count of 0 is classified 404 (missing/out of scope) or 409 (stale).
+ * Versioned update (OPTIMISTIC-LOCK-001). The write is keyed by
+ * `{ workOrderNumber, version }` plus the caller's scope and increments the
+ * version atomically, so a stale editor never overwrites a newer edit. A
+ * count of 0 is classified 404 (missing/out of scope) or 409 (stale).
  */
-export async function updateWorkOrderVersioned(
+export async function applyVersionedWorkOrderUpdate(
   event: H3Event,
-  id: string,
-  updateData: Record<string, unknown>,
-  userinfo: UserSession,
-  expectedVersion: number,
+  input: VersionedWorkOrderUpdate,
 ): Promise<void> {
+  const { expectedVersion, id, scopeWhere } = input;
   try {
     const current = await prisma.work_orders.findFirst({
-      where: await buildScopedWorkOrderWhere(
-        { workOrderNumber: id, isDeleted: false },
-        event,
-        userinfo,
-      ),
+      where: await scopeWhere({ workOrderNumber: id, isDeleted: false }),
       select: { customerName: true, version: true, workOrderNumber: true },
     });
     if (!current) {
       throw new BusinessError('NOT_FOUND', `工单不存在: ${id}`, 404);
     }
-    const where = await buildScopedWorkOrderWhere(
-      { version: expectedVersion, workOrderNumber: id },
-      event,
-      userinfo,
-    );
+    const where = await scopeWhere({
+      ...input.writeGuard,
+      isDeleted: false,
+      version: expectedVersion,
+      workOrderNumber: id,
+    });
     const result = await prisma.work_orders.updateMany({
       where,
-      data: { ...updateData, version: { increment: 1 } },
+      data: { ...input.updateData, version: { increment: 1 } },
     });
     if (result.count === 0) {
       const exists = await prisma.work_orders.findFirst({
-        where: await buildScopedWorkOrderWhere(
-          { isDeleted: false, workOrderNumber: id },
-          event,
-          userinfo,
-        ),
+        where: await scopeWhere({ isDeleted: false, workOrderNumber: id }),
         select: { workOrderNumber: true },
       });
       if (!exists) {
@@ -80,17 +92,21 @@ export async function updateWorkOrderVersioned(
       throw new BusinessError('NOT_FOUND', `工单不存在: ${id}`, 404);
     }
     await recordBusinessAuditLog(event, {
-      userId: userinfo.id,
+      userId: input.actorUserId,
       action: 'UPDATE',
       targetType: 'work_order',
       targetId: String(id),
-      detailsTemplate: '修改工单: {{workOrderNumber}} ({{customerName}})',
-      detailsVariables: {
-        customerName: current.customerName,
-        workOrderNumber: current.workOrderNumber,
-        oldVersion: current.version,
-        newVersion: expectedVersion + 1,
-      },
+      ...withAuditChannel(
+        input.auditTemplate ??
+          '修改工单: {{workOrderNumber}} ({{customerName}})',
+        {
+          customerName: current.customerName,
+          workOrderNumber: current.workOrderNumber,
+          oldVersion: current.version,
+          newVersion: expectedVersion + 1,
+        },
+        input.auditChannel,
+      ),
     });
   } catch (error) {
     logApiError('work-order', error, undefined, event);
@@ -98,6 +114,24 @@ export async function updateWorkOrderVersioned(
       throw new BusinessError('NOT_FOUND', `工单不存在: ${id}`, 404);
     throw error;
   }
+}
+
+/** QMS interactive edit: versioned update scoped to the session's DataScope. */
+export async function updateWorkOrderVersioned(
+  event: H3Event,
+  id: string,
+  updateData: Record<string, unknown>,
+  userinfo: UserSession,
+  expectedVersion: number,
+): Promise<void> {
+  await applyVersionedWorkOrderUpdate(event, {
+    actorUserId: userinfo.id,
+    expectedVersion,
+    id,
+    scopeWhere: (baseWhere) =>
+      buildScopedWorkOrderWhere(baseWhere, event, userinfo),
+    updateData,
+  });
 }
 
 /**

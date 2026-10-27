@@ -363,7 +363,11 @@ describe('workOrderRouteService', () => {
           { workOrderNumber: 'WO-EXIST', customerName: 'C' },
           mockUserinfo(),
         ),
-      ).rejects.toThrow('已存在且未删除');
+      ).rejects.toMatchObject({
+        code: 'WORK_ORDER_EXISTS',
+        httpStatus: 409,
+        message: expect.stringContaining('已存在且未删除'),
+      });
       expect(prisma.work_orders.create).not.toHaveBeenCalled();
       expect(prisma.work_orders.update).not.toHaveBeenCalled();
     });

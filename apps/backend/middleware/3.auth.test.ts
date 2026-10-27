@@ -112,10 +112,24 @@ describe('auth middleware', () => {
     for (const [pathname, method] of [
       ['/api/integration/fulfillment/users', 'POST'],
       ['/api/integration/other', 'GET'],
+      ['/api/integration/fulfillment/work-orders/WO-1', 'DELETE'],
+      ['/api/integration/fulfillment/work-orders/WO-1/bom', 'POST'],
+      ['/api/integration/fulfillment/work-orders/WO-1/cancel/x', 'POST'],
     ]) {
       const event = makeEvent(pathname, null, method);
       expect(await authMiddleware(event)).toEqual({ unauthorized: true });
     }
+  });
+
+  it('leaves the fulfillment work-order writes to their own client authentication', async () => {
+    for (const [pathname, method] of [
+      ['/api/integration/fulfillment/work-orders', 'POST'],
+      ['/api/integration/fulfillment/work-orders/WO-1', 'PUT'],
+      ['/api/integration/fulfillment/work-orders/WO-1/cancel', 'POST'],
+    ]) {
+      await authMiddleware(makeEvent(pathname, null, method));
+    }
+    expect(verifyAccessToken).not.toHaveBeenCalled();
   });
 
   it('rejects missing or invalid tokens', async () => {

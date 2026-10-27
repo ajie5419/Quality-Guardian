@@ -9,13 +9,14 @@ import type {
 import { users_status } from '@prisma/client';
 import { parseBomRequiredProcesses } from '@qgs/shared';
 import { DeptService } from '~/modules/dept';
+import { DictionaryService } from '~/modules/dictionary';
 import { InspectionRequestSyncService } from '~/modules/inspection';
 import { PlanningBomService } from '~/modules/planning';
 import { ProcessMasterService } from '~/modules/process-master';
 import { SupplierService } from '~/modules/supplier';
 import { TeamIdentityService } from '~/modules/team';
 import { UserService } from '~/modules/user';
-import { WorkOrderService } from '~/modules/work-order';
+import { toFulfillmentWorkOrder, WorkOrderService } from '~/modules/work-order';
 
 export interface FulfillmentSyncCursor {
   afterId: string;
@@ -65,16 +66,8 @@ export function buildSyncPage<T extends { updatedAt: string }>(
 
 async function listWorkOrders({ cursor, limit }: SyncRequest) {
   const rows = await WorkOrderService.listSyncPage(cursor, limit);
-  const items = rows.map((row) => ({
-    customerName: row.customerName,
-    deliveryDate: iso(row.deliveryDate),
-    isDeleted: row.isDeleted,
-    projectName: row.projectName,
-    quantity: row.quantity,
-    status: row.status,
-    updatedAt: iso(row.updatedAt),
-    workOrderNumber: row.workOrderNumber,
-  }));
+  // Same shape as the integration write responses (contract v1).
+  const items = rows.map((row) => toFulfillmentWorkOrder(row));
   return buildSyncPage(items, limit, (item) => item.workOrderNumber);
 }
 
@@ -203,7 +196,33 @@ function toBomItem(row: WorkOrderBomRow) {
 
 export type FulfillmentBomItem = ReturnType<typeof toBomItem>;
 
+const CUSTOMER_DICT_TYPE = 'customer_name';
+
+interface CustomerOption {
+  dictKey: string;
+  id: string;
+}
+
+export interface FulfillmentCustomer {
+  id: string;
+  name: string;
+}
+
 export const FulfillmentSyncService = {
+  /**
+   * Active customers (dictionary customer_name, enabled and not deleted) for
+   * the fulfillment work-order form. `name` is the canonical customer name
+   * that work orders store as their customerName snapshot.
+   */
+  async listCustomers(): Promise<FulfillmentCustomer[]> {
+    const options = (await DictionaryService.getOptions(
+      CUSTOMER_DICT_TYPE,
+    )) as CustomerOption[];
+    return options
+      .map((option) => ({ id: option.id, name: option.dictKey }))
+      .sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  },
+
   async list(resource: FulfillmentSyncResource, query: FulfillmentSyncQuery) {
     return LOADERS[resource](toSyncRequest(query));
   },
