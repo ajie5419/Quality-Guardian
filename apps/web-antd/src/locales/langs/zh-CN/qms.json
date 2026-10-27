@@ -102,6 +102,7 @@
     "addUnit": "新增外协单位"
   },
   "workOrder": {
+    "maintainedByFulfillment": "工单由履约系统维护，请在履约系统新建、修改或取消工单；QMS 仅提供查看与导出。",
     "title": "工单管理",
     "statusLabel": "状态",
     "status": {

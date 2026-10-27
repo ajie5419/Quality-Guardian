@@ -21,7 +21,7 @@
 - **metric-refresh/** — 派生指标刷新任务与重试
 - **master-data-identity/** — 历史身份决策、投影与对账基线
 - **identity-bridge/** — 履约系统身份授权码、凭证核查及撤销（独立客户端认证）
-- **fulfillment-sync/** — 履约系统只读增量同步（工单/供应商/TEAM/工序/部门/用户/报检，复用身份桥客户端认证）
+- **fulfillment-sync/** — 履约系统只读增量同步（工单/供应商/TEAM/工序/部门/用户/报检）与客户列表，复用身份桥客户端认证
 - **metrology/** — 计量器具全生命周期：台账、借用归还、检定计划、到期提醒
 - **part-master/** — Canonical material master data management
 - **planning/** — 质量策划：BOM、DFMEA、ITP、项目文档管理
@@ -42,7 +42,7 @@
 - **user/** — 用户账号、认证（登录/刷新/微信小程序登录绑定）、个人偏好
 - **vehicle-commissioning/** — 车辆调试验收管理（含审批流）
 - **welder/** — 焊工资质台账与评分
-- **work-order/** — 生产工单：创建、状态流转、数据权限过滤
+- **work-order/** — 生产工单：主数据由履约系统经集成写接口维护（QMS 只读/导出）、状态流转、数据权限过滤
 - **work-order-requirement/** — 工单质量要求汇总（关联工单的质检附件与条目）
 
 ## 后端 API 路由
@@ -52,7 +52,7 @@
 - **ai/** — AI 对话/补全接口
 - **auth/** — 登录、登出、token 刷新、注册与回调（公开路径）
 - **identity-bridge/** — 身份桥接：授权需业务登录态，交换/核查/撤销需专用客户端认证
-- **integration/** — 外部系统机器接口；`fulfillment/` 为履约只读增量同步（GET，身份桥客户端认证，不走 JWT）
+- **integration/** — 外部系统机器接口；`fulfillment/` 为履约只读增量同步（GET）及履约维护工单的新建/修改/取消（work-order 模块），均为身份桥客户端认证，不走 JWT
 - **files/** — 通用文件上传与下载代理
 - **menu/** — 动态菜单树查询（依据用户权限）
 - **qms/** — QMS 业务路由聚合入口

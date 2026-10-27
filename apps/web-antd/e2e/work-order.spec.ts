@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import type { APIResponse, Page } from '@playwright/test';
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -18,6 +18,12 @@ const { PrismaClient } = require('@prisma/client');
 
 let db: InstanceType<typeof PrismaClient>;
 const api = `${process.env.QGS_E2E_BACKEND_ORIGIN}/api/qms/work-order`;
+const integration = `${process.env.QGS_E2E_BACKEND_ORIGIN}/api/integration/fulfillment`;
+const clientHeaders = {
+  'x-identity-client-id': process.env.QMS_IDENTITY_CLIENT_ID || '',
+  'x-identity-client-secret': process.env.QMS_IDENTITY_CLIENT_SECRET || '',
+};
+const MANAGED_MESSAGE = '工单由履约系统维护，请到履约系统操作';
 const target = '/qms/work-order';
 const lastLogin = new Map<string, number>();
 
@@ -94,6 +100,21 @@ function marker(label: string) {
   return `E2E-WOUI-${fixture.runId}-${label}`;
 }
 
+async function dataOf(response: APIResponse) {
+  const body = await response.json();
+  return body.data;
+}
+
+async function statusOf(pending: Promise<APIResponse>) {
+  const response = await pending;
+  return response.status();
+}
+
+/** A delivery date inside the default (current-year) list view. */
+function currentYearDate() {
+  return `${new Date().getFullYear()}-12-31`;
+}
+
 async function row(page: Page, code: string) {
   const targetRow = page
     .locator('tr.vxe-body--row')
@@ -103,22 +124,15 @@ async function row(page: Page, code: string) {
   return targetRow;
 }
 
-async function action(page: Page, code: string, name: 'delete' | 'edit') {
-  const visibleRow = await row(page, code);
-  const id = await visibleRow.getAttribute('rowid');
-  const button = page
-    .locator(`.vxe-table--fixed-right-wrapper tr[rowid="${id}"]`)
-    .locator(`[data-action="${name}"]`);
-  await expect(button).toBeVisible();
-  await button.click();
-}
-
 async function snapshot(code: string, stage: string) {
   const result = {
     order: await db.work_orders.findFirst({
       where: { workOrderNumber: code },
       select: {
         customerName: true,
+        customerNameId: true,
+        division: true,
+        divisionId: true,
         isDeleted: true,
         projectName: true,
         quantity: true,
@@ -149,135 +163,237 @@ async function snapshot(code: string, stage: string) {
   return result;
 }
 
-function field(scope: Locator, label: string) {
-  return scope.locator('label').filter({ hasText: label }).locator('..');
-}
-
-/**
- * Registration goes through the real Vben form modal. Department is a
- * TreeSelect, so the seeded production department is picked from the panel.
- */
-async function createOrderUI(
+/** Work orders are created only by the fulfillment system integration. */
+async function createOrderViaFulfillment(
   page: Page,
-  values: {
-    code: string;
-    customer?: string;
-    project?: string;
-    quantity?: number;
-  },
+  code: string,
+  overrides: Record<string, unknown> = {},
 ) {
-  await page
-    .getByRole('button', { name: /新建工单|创建工单/ })
-    .first()
-    .click();
-  const modal = page.locator('[role="dialog"]:visible').first();
-  await expect(modal).toBeVisible();
-
-  const numberInput = field(modal, /工单号|Work Order Number/).locator('input');
-  await numberInput.fill(values.code);
-  const customerInput = field(modal, /客户名称|Customer/).locator('input');
-  await customerInput.fill(values.customer || marker('Customer'));
-  const projectInput = field(modal, /项目名称|Project/).locator('input');
-  await projectInput.fill(values.project || 'E2E Project');
-
-  // Department TreeSelect: open the panel and choose the seeded department.
-  await field(modal, /事业部|Division/)
-    .locator('.ant-select')
-    .click();
-  await page
-    .locator('.ant-select-tree-node-content-wrapper')
-    .getByText('E2E Production', { exact: true })
-    .click();
-
-  const quantityInput = field(modal, /数量|Quantity/).locator('input');
-  await quantityInput.fill(String(values.quantity ?? 5));
-
-  const response = page.waitForResponse(
-    (r) =>
-      new URL(r.url()).pathname === '/api/qms/work-order' &&
-      r.request().method() === 'POST',
-  );
-  await modal.getByRole('button', { name: /确\s*定|确\s*认|OK/ }).click();
-  return response;
+  const response = await page.request.post(`${integration}/work-orders`, {
+    headers: clientHeaders,
+    data: {
+      actorUserId: fixture.userId,
+      customerNameId: fixture.customerId,
+      deliveryDate: currentYearDate(),
+      divisionId: fixture.departmentId,
+      projectName: 'E2E Project',
+      quantity: 5,
+      workOrderNumber: code,
+      ...overrides,
+    },
+  });
+  const body = await response.json();
+  expect(response.status(), body.message).toBe(200);
+  return body.data;
 }
 
-test('work-order UI registration, versioned edit and soft delete keep canonical fields', async ({
+test('work-order page is view/export only and names the fulfillment system', async ({
   page,
 }) => {
+  const code = orderNumber('VIEW');
+  await createOrderViaFulfillment(page, code);
   await login(page);
-  const code = orderNumber('CRUD');
-  const before = await db.work_orders.count({
-    where: { workOrderNumber: code },
-  });
-  expect(before).toBe(0);
 
-  const created = await createOrderUI(page, { code, quantity: 7 });
-  expect(created.status()).toBe(200);
-  const createdBody = await created.json();
-  expect(createdBody.code, createdBody.message).toBe(0);
+  await expect(page.getByText('工单由履约系统维护').first()).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /新建工单|创建工单/ }),
+  ).toHaveCount(0);
+  const visibleRow = await row(page, code);
+  const id = await visibleRow.getAttribute('rowid');
+  await expect(
+    page.locator(`tr[rowid="${id}"] [data-action="edit"]`),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(`tr[rowid="${id}"] [data-action="delete"]`),
+  ).toHaveCount(0);
+});
 
-  const initial = await snapshot(code, 'created');
-  expect(initial.order).toMatchObject({
-    isDeleted: false,
-    projectName: 'E2E Project',
+test('qms work-order write endpoints answer 403 and keep data unchanged', async ({
+  page,
+}) => {
+  const code = orderNumber('LOCKED');
+  await createOrderViaFulfillment(page, code);
+  const token = await login(page);
+  const before = await snapshot(code, 'before-qms-writes');
+  const headers = { Authorization: `Bearer ${token}` };
+
+  for (const request of [
+    {
+      method: 'POST',
+      url: api,
+      data: {
+        customerName: marker('Blocked'),
+        deliveryDate: '2030-01-01',
+        quantity: 1,
+        workOrderNumber: orderNumber('BLOCKED'),
+      },
+    },
+    {
+      method: 'PUT',
+      url: `${api}?id=${code}`,
+      data: { quantity: 11, version: before.order.version },
+    },
+    {
+      method: 'DELETE',
+      url: `${api}?id=${code}&version=${before.order.version}`,
+    },
+    {
+      method: 'POST',
+      url: `${api}/import`,
+      data: { items: [{ customerName: 'X', workOrderNumber: code }] },
+    },
+    { method: 'POST', url: `${api}/batch-delete`, data: { ids: [code] } },
+  ]) {
+    const denied = await page.request.fetch(request.url, {
+      method: request.method,
+      headers,
+      ...(request.data ? { data: request.data } : {}),
+    });
+    expect(denied.status(), `${request.method} ${request.url}`).toBe(403);
+    const deniedBody = await denied.json();
+    expect(deniedBody.message).toBe(MANAGED_MESSAGE);
+  }
+  expect(await snapshot(code, 'after-qms-writes')).toEqual(before);
+  expect(
+    await db.work_orders.count({
+      where: { workOrderNumber: orderNumber('BLOCKED') },
+    }),
+  ).toBe(0);
+});
+
+test('fulfillment integration creates, edits under version lock and cancels', async ({
+  page,
+}) => {
+  const code = orderNumber('SYNC');
+  const unauthenticated = await page.request.post(
+    `${integration}/work-orders`,
+    {
+      data: { workOrderNumber: code },
+    },
+  );
+  expect(unauthenticated.status()).toBe(401);
+
+  const created = await createOrderViaFulfillment(page, code, { quantity: 7 });
+  expect(created).toMatchObject({
+    customerName: 'E2E Customer',
+    customerNameId: fixture.customerId,
+    division: 'E2E Production',
+    divisionId: fixture.departmentId,
     quantity: 7,
+    status: 'OPEN',
+    version: 1,
+    workOrderNumber: code,
+  });
+
+  const duplicate = await page.request.post(`${integration}/work-orders`, {
+    headers: clientHeaders,
+    data: {
+      actorUserId: fixture.userId,
+      customerNameId: fixture.customerId,
+      deliveryDate: currentYearDate(),
+      quantity: 1,
+      workOrderNumber: code,
+    },
+  });
+  expect(duplicate.status()).toBe(409);
+  const duplicateBody = await duplicate.json();
+  expect(duplicateBody.error).toEqual({ code: 'WORK_ORDER_EXISTS' });
+
+  const update = (data: Record<string, unknown>) =>
+    page.request.put(`${integration}/work-orders/${code}`, {
+      headers: clientHeaders,
+      data: { actorUserId: fixture.userId, ...data },
+    });
+  const edited = await update({
+    quantity: 9,
+    status: 'IN_PROGRESS',
     version: 1,
   });
-
-  await action(page, code, 'edit');
-  const editModal = page.locator('[role="dialog"]:visible').first();
-  await expect(editModal).toBeVisible();
-  await field(editModal, /数量|Quantity/)
-    .locator('input')
-    .fill('9');
-  const updateResponse = page.waitForResponse(
-    (r) =>
-      new URL(r.url()).pathname === '/api/qms/work-order' &&
-      r.request().method() === 'PUT',
-  );
-  await editModal.getByRole('button', { name: /确\s*定|确\s*认|OK/ }).click();
-  const updRes = await updateResponse;
-  expect(updRes.status()).toBe(200);
-
-  const edited = await snapshot(code, 'edited');
-  expect(edited.order.version).toBe(2);
-  expect(Number(edited.order.quantity)).toBe(9);
-
-  // Stale editors must not overwrite the newer version.
-  const stale = await page.request.put(`${api}?id=${code}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { quantity: 11, version: 1 },
+  expect(edited.status()).toBe(200);
+  expect(await dataOf(edited)).toMatchObject({
+    quantity: 9,
+    status: 'IN_PROGRESS',
+    version: 2,
   });
-  expect(stale.status()).toBe(409);
-  const missingVersion = await page.request.put(`${api}?id=${code}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { quantity: 12 },
-  });
-  expect(missingVersion.status()).toBe(400);
-  expect(await snapshot(code, 'after-locked-writes')).toEqual(edited);
+  expect(await statusOf(update({ quantity: 11, version: 1 }))).toBe(409);
+  expect(
+    await statusOf(update({ version: 2, workOrderNumber: `${code}-X` })),
+  ).toBe(400);
+  expect(
+    await statusOf(
+      update({ actorUserId: 'missing-user', quantity: 3, version: 2 }),
+    ),
+  ).toBe(400);
+  const afterEdits = await snapshot(code, 'integration-edited');
+  expect(afterEdits.order).toMatchObject({ quantity: 9, version: 2 });
 
-  await action(page, code, 'delete');
-  const deleteResponse = page.waitForResponse(
-    (r) =>
-      new URL(r.url()).pathname === '/api/qms/work-order' &&
-      r.request().method() === 'DELETE',
+  const cancel = () =>
+    page.request.post(`${integration}/work-orders/${code}/cancel`, {
+      headers: clientHeaders,
+      data: { actorUserId: fixture.userId, version: 2 },
+    });
+  const cancelled = await cancel();
+  expect(cancelled.status()).toBe(200);
+  expect(await dataOf(cancelled)).toMatchObject({
+    status: 'CANCELLED',
+    version: 3,
+  });
+  const repeated = await cancel();
+  expect(repeated.status()).toBe(200);
+  expect(await dataOf(repeated)).toMatchObject({
+    status: 'CANCELLED',
+    version: 3,
+  });
+  expect(await statusOf(update({ quantity: 1, version: 3 }))).toBe(400);
+  const afterCancel = await snapshot(code, 'integration-cancelled');
+  expect(afterCancel.order).toMatchObject({
+    status: 'CANCELLED',
+    version: 3,
+  });
+
+  const audits = await db.audit_logs.findMany({
+    where: { targetId: code, targetType: 'work_order' },
+    select: { details: true, userId: true },
+  });
+  expect(audits).toHaveLength(3);
+  expect(
+    audits.every(
+      (entry: { userId: string }) => entry.userId === fixture.userId,
+    ),
+  ).toBe(true);
+
+  const feed = await page.request.get(
+    `${integration}/work-orders?since=${encodeURIComponent(new Date(Date.now() - 3_600_000).toISOString())}`,
+    { headers: clientHeaders },
   );
-  await page
-    .locator('.ant-modal-confirm')
-    .getByRole('button', { name: /确\s*定|确\s*认/ })
-    .click();
-  const delRes = await deleteResponse;
-  expect(delRes.status()).toBe(200);
-  const delSnap = await snapshot(code, 'deleted');
-  expect(delSnap.order.isDeleted).toBe(true);
+  expect(feed.status()).toBe(200);
+  const feedData = await dataOf(feed);
+  const item = (feedData.items || []).find(
+    (entry: { workOrderNumber: string }) => entry.workOrderNumber === code,
+  );
+  expect(item).toMatchObject({
+    customerNameId: fixture.customerId,
+    divisionId: fixture.departmentId,
+    status: 'CANCELLED',
+    version: 3,
+  });
+
+  const customers = await page.request.get(`${integration}/customers`, {
+    headers: clientHeaders,
+  });
+  expect(customers.status()).toBe(200);
+  expect(await dataOf(customers)).toContainEqual({
+    id: fixture.customerId,
+    name: 'E2E Customer',
+  });
 });
 
 test('work-order requirement identity contract rejects names and unknown canonical ids', async ({
   page,
 }) => {
-  await login(page);
   const code = orderNumber('REQ');
-  await createOrderUI(page, { code });
+  await createOrderViaFulfillment(page, code);
+  const token = await login(page);
 
   // V2 identity contract: names alone cannot rebuild the snapshot.
   const nameOnly = await page.request.post(`${api}/requirements`, {
@@ -360,31 +476,12 @@ test('work-order requirement identity contract rejects names and unknown canonic
   expect(afterRevoke.confirmedAt).toBeNull();
 });
 
-test('work-order reader and foreign department cannot write and keep data unchanged', async ({
+test('foreign department cannot see a fulfillment-created work order', async ({
   page,
 }) => {
-  await login(page);
   const code = orderNumber('PERM');
-  await createOrderUI(page, { code });
+  await createOrderViaFulfillment(page, code);
   const before = await snapshot(code, 'before-permissions');
-
-  const readerToken = await login(page, '_reader');
-  await expect(
-    page.getByRole('button', { name: /新建工单|创建工单/ }),
-  ).toHaveCount(0);
-  for (const [method, query] of [
-    ['PUT', `?id=${code}`],
-    ['DELETE', `?id=${code}`],
-  ] as const) {
-    const denied = await page.request.fetch(`${api}${query}`, {
-      method,
-      headers: { Authorization: `Bearer ${readerToken}` },
-      ...(method === 'PUT'
-        ? { data: { quantity: 3, version: before.order.version } }
-        : {}),
-    });
-    expect(denied.status()).toBe(403);
-  }
 
   const foreignToken = await login(page, '_foreign');
   const foreignList = await page.request.get(api, {
@@ -396,104 +493,13 @@ test('work-order reader and foreign department cannot write and keep data unchan
     (item: { workOrderNumber: string }) => item.workOrderNumber === code,
   );
   expect(visible).toBe(false);
-  const crossDepartment = await page.request.put(`${api}?id=${code}`, {
-    headers: { Authorization: `Bearer ${foreignToken}` },
-    data: { quantity: 4, version: before.order.version },
-  });
-  expect([403, 404]).toContain(crossDepartment.status());
   expect(await snapshot(code, 'after-permissions')).toEqual(before);
 });
 
-test('work-order duplicate registration and illegal status are rejected without side effects', async ({
-  page,
-}) => {
-  await login(page);
-  const code = orderNumber('DUP');
-  await createOrderUI(page, { code });
-  const before = await snapshot(code, 'before-duplicate');
-
-  const duplicate = await page.request.post(api, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: {
-      customerName: marker('Duplicate'),
-      deliveryDate: '2030-01-01',
-      projectName: 'E2E Project',
-      quantity: 1,
-      status: 'OPEN',
-      workOrderNumber: code,
-    },
-  });
-  expect(duplicate.status()).toBe(409);
-
-  const illegalStatus = await page.request.put(`${api}?id=${code}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { status: 'NOT_A_STATUS', version: before.order.version },
-  });
-  expect(illegalStatus.status()).toBe(400);
-
-  const missing = await page.request.put(`${api}?id=${code}`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: { quantity: 2 },
-  });
-  expect(missing.status()).toBe(400);
-
-  expect(await snapshot(code, 'after-rejections')).toEqual(before);
-  expect(token).toBeTruthy();
-});
-
-test('work-order import upserts rows and export returns the scoped catalog', async ({
-  page,
-}) => {
-  await login(page);
-  const code = orderNumber('IMPORT');
-  const imported = await page.request.post(`${api}/import`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: {
-      items: [
-        {
-          customerName: marker('Imported'),
-          deliveryDate: '2030-01-01',
-          projectName: 'E2E Project',
-          quantity: 4,
-          status: 'OPEN',
-          workOrderNumber: code,
-        },
-      ],
-    },
-  });
-  expect(imported.status()).toBe(200);
-  const importedSnapshot = await snapshot(code, 'imported');
-  const row = importedSnapshot.order;
-  expect(row).not.toBeNull();
-  expect(row).toMatchObject({
-    customerName: marker('Imported'),
-    isDeleted: false,
-    quantity: 4,
-  });
-
-  // A repeated import upserts the same work order instead of duplicating it.
-  await page.request.post(`${api}/import`, {
-    headers: { Authorization: `Bearer ${token}` },
-    data: {
-      items: [
-        {
-          customerName: marker('ImportedUpdated'),
-          deliveryDate: '2030-01-01',
-          projectName: 'E2E Project',
-          quantity: 6,
-          status: 'OPEN',
-          workOrderNumber: code,
-        },
-      ],
-    },
-  });
-  expect(await db.work_orders.count({ where: { workOrderNumber: code } })).toBe(
-    1,
-  );
-  const persistedOrder = await db.work_orders.findFirst({
-    where: { workOrderNumber: code },
-  });
-  expect(Number(persistedOrder?.quantity)).toBe(6);
+test('work-order export returns the scoped catalog', async ({ page }) => {
+  const code = orderNumber('EXPORT');
+  await createOrderViaFulfillment(page, code, { deliveryDate: '2030-01-01' });
+  const token = await login(page);
 
   const exported = await page.request.get(`${api}/export`, {
     headers: { Authorization: `Bearer ${token}` },

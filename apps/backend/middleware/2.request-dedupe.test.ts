@@ -114,4 +114,21 @@ describe('request dedupe middleware', () => {
     expect(await dedupeMiddleware(makeEvent())).toBeUndefined();
     expect(await dedupeMiddleware(makeEvent())).toBeUndefined();
   });
+
+  it('leaves fulfillment work-order writes to their version compare-and-set', async () => {
+    mockBody.mockResolvedValue({ actorUserId: 'u1', version: 1 });
+    const anonymous = () =>
+      ({ method: 'POST', context: {} }) as unknown as Parameters<
+        typeof dedupeMiddleware
+      >[0];
+    for (const pathname of [
+      '/api/integration/fulfillment/work-orders',
+      '/api/integration/fulfillment/work-orders/WO-1/cancel',
+    ]) {
+      mockURL.mockReturnValue({ pathname } as never);
+      expect(await dedupeMiddleware(anonymous())).toBeUndefined();
+      expect(await dedupeMiddleware(anonymous())).toBeUndefined();
+    }
+    expect(mockBody).not.toHaveBeenCalled();
+  });
 });

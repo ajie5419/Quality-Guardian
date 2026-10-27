@@ -39,12 +39,16 @@ function workOrder(
 ) {
   return {
     customerName: 'C',
+    customerNameId: 'dict-c',
     deliveryDate: new Date('2026-12-01T00:00:00.000Z'),
+    division: 'D',
+    divisionId: 'dept-d',
     isDeleted,
     projectName: 'P',
     quantity: 2,
     status: 'OPEN',
     updatedAt,
+    version: 3,
     workOrderNumber,
   };
 }
@@ -66,6 +70,31 @@ describe('fulfillmentSyncService cursor paging', () => {
     expect(page.items[0]).toMatchObject({
       deliveryDate: '2026-12-01T00:00:00.000Z',
       updatedAt: '2026-10-01T08:00:00.123Z',
+    });
+  });
+
+  it('adds canonical customer/division ids and the version to work-order rows', async () => {
+    db.work_orders.findMany.mockResolvedValue([workOrder('WO-1', T1)]);
+    const page = await FulfillmentSyncService.list('work-orders', query());
+    expect(lastCall(db.work_orders.findMany).select).toMatchObject({
+      customerNameId: true,
+      division: true,
+      divisionId: true,
+      version: true,
+    });
+    expect(page.items[0]).toEqual({
+      customerName: 'C',
+      customerNameId: 'dict-c',
+      deliveryDate: '2026-12-01T00:00:00.000Z',
+      division: 'D',
+      divisionId: 'dept-d',
+      isDeleted: false,
+      projectName: 'P',
+      quantity: 2,
+      status: 'OPEN',
+      updatedAt: '2026-10-01T08:00:00.123Z',
+      version: 3,
+      workOrderNumber: 'WO-1',
     });
   });
 
@@ -383,6 +412,27 @@ describe('fulfillmentSyncService work order BOM', () => {
     expect(items[0]?.processes).toEqual([
       { position: 0, processId: null, processName: '下料' },
       { position: 1, processId: null, processName: '组焊' },
+    ]);
+  });
+});
+
+describe('fulfillmentSyncService customers', () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it('lists enabled, undeleted customer_name entries as id/name sorted by name', async () => {
+    db.dictionaries.findMany.mockResolvedValue([
+      { dictKey: '乙客户', dictValue: 'v2', id: 'c2', sort: 1 },
+      { dictKey: '甲客户', dictValue: 'v1', id: 'c1', sort: 2 },
+    ]);
+    const customers = await FulfillmentSyncService.listCustomers();
+    expect(lastCall(db.dictionaries.findMany).where).toEqual({
+      dictType: 'customer_name',
+      isDeleted: false,
+      status: 1,
+    });
+    expect(customers).toEqual([
+      { id: 'c1', name: '甲客户' },
+      { id: 'c2', name: '乙客户' },
     ]);
   });
 });

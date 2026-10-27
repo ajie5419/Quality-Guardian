@@ -2,6 +2,8 @@
 
 本模块按《R2 QMS → 履约 只读增量同步接口契约（v1）》向外部履约系统提供 7 个只读增量接口。模块不拥有任何表，只编排各主数据/业务模块公开的只读方法并做字段裁剪与游标拼装；不写库、不发事件、不记审计。
 
+> 履约维护工单的写接口（`POST/PUT /api/integration/fulfillment/work-orders…`、`…/cancel`）同在 `/api/integration/fulfillment/` 路径下，但属于 **work-order 模块**（写库、记审计），见 `modules/work-order/ARCHITECTURE.md`「履约写接口」。本模块仍只读。
+
 ## 端点
 
 | 端点（均为 GET） | 来源（经对方 `index.ts`） | key |
@@ -19,14 +21,15 @@
 | 端点（GET） | 来源（经对方 `index.ts`） | 说明 |
 | --- | --- | --- |
 | `/api/integration/fulfillment/work-orders/:workOrderNumber/bom` | `PlanningBomService.listByWorkOrder` | 该工单全部 BOM 行及按 `position` 排序的必经工序 |
+| `/api/integration/fulfillment/customers` | `DictionaryService.getOptions('customer_name')` | 履约新建/修改工单选客户：`[{ id, name }]`，字典启用且未删除，按名称排序；`name` 为工单存的 canonical 客户名（`dictKey`） |
 
-路由文件只调用 `handleFulfillmentSyncRequest(event, resource)` 或 `handleFulfillmentBomRequest(event)`；认证、zod 校验、响应与 `logApiError` 统一在 handler 内完成。
+路由文件只调用 `handleFulfillmentSyncRequest(event, resource)`、`handleFulfillmentBomRequest(event)` 或 `handleFulfillmentCustomersRequest(event)`；认证、zod 校验、响应与 `logApiError` 统一在 handler 内完成。
 
 ## 认证
 
 - 请求头 `X-Identity-Client-Id` / `X-Identity-Client-Secret`，与身份桥同一组凭据（`QMS_IDENTITY_CLIENT_ID` / `QMS_IDENTITY_CLIENT_SECRET`），复用身份桥导出的 `assertIdentityClientHeaders`：id 与 secret 都经 SHA-256 定长摘要后 `timingSafeEqual` 比较，两项比较均执行后再判定。
 - 凭据未配置或不合法（secret 少于 32 字符等）一律 503，凭据不符 401；认证先于参数解析和任何数据库访问，失败不放行。
-- `middleware/3.auth.ts` 仅对 `GET /api/integration/fulfillment/*` 跳过 JWT；其他方法仍要求 Bearer。路径不在 `4.data-scope.ts` 范围前缀内，不做数据权限过滤；`2.request-dedupe.ts` 只拦写方法，GET 不受影响。
+- `middleware/3.auth.ts` 对 `GET /api/integration/fulfillment/*` 跳过 JWT；写方法只放行 work-order 模块的三个工单写接口（精确匹配方法与路径），其他写方法仍要求 Bearer。路径不在 `4.data-scope.ts` 范围前缀内，不做数据权限过滤；`2.request-dedupe.ts` 只拦写方法，GET 不受影响。
 - 响应带 `Cache-Control: no-store`。日志沿用 logger 对两个专用 header 的遮蔽，不记录请求头。
 
 ## 参数、排序与游标
@@ -38,6 +41,8 @@
 - 6 张业务表新增 `(updatedAt, key)` 复合索引（迁移 `20261017090000_add_fulfillment_sync_cursor_indexes`）。schema 中 `updatedAt` 为 Prisma 默认 `DATETIME(3)`；游标值直接取自数据库返回值，即便某环境实际列为秒精度，`(updatedAt, key)` 复合比较仍然正确，只是同秒行更多地依赖 key 排序。
 
 ## 资源语义要点
+
+- **work-orders**：每行 `workOrderNumber, customerName, customerNameId, projectName, division, divisionId, quantity, deliveryDate, status, version, isDeleted, updatedAt`（`customerNameId`、`division`、`divisionId`、`version` 于 2026-10-27 只加字段新增），与工单写接口返回的工单对象同形（`toFulfillmentWorkOrder`）。
 
 - **users**：只输出 `id, username, realName, departmentId, isActive, isDeleted, updatedAt`；`departmentId` 来自 `users.department`，存的是 `departments.id` 而非名称；`isActive = status === ACTIVE`。查询 select 本身不取手机号、邮箱、企业微信 ID、微信 openid、密码。
 - **每个接口只读一张表**：游标顺序完全由 MySQL 的 `ORDER BY updatedAt, key` 决定，JS 端不对 key 做任何比较或排序。`id` 列为 `utf8mb4_unicode_ci`（大小写不敏感），与 JS 字符串比较顺序不同（如大写 `SUP-…` 与小写 cuid），跨表在内存中归并会让 `afterId` 跳过另一表的同刻行，因此 TEAM 不再并入供应商流。

@@ -10,6 +10,7 @@ import {
   getRequestURL,
   readBody,
 } from 'h3';
+import { isFulfillmentWorkOrderWrite } from '~/modules/work-order/work-order-integration-routes';
 import { conflictResponse } from '~/utils/response';
 
 const DEFAULT_DEDUPE_WINDOW_MS = 3000;
@@ -89,6 +90,8 @@ export default defineEventHandler(async (event) => {
     ].includes(pathname)
   )
     return;
+  // Fulfillment writes are guarded by version CAS; cancel retries are idempotent.
+  if (isFulfillmentWorkOrderWrite(method, pathname)) return;
 
   const contentType = String(getHeader(event, 'content-type') || '');
   if (shouldSkipByContentType(contentType)) return;

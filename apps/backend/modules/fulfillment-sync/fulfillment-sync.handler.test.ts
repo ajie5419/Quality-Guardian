@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   handleFulfillmentBomRequest,
+  handleFulfillmentCustomersRequest,
   handleFulfillmentSyncRequest,
 } from './fulfillment-sync.handler';
 import { FulfillmentSyncService } from './fulfillment-sync.service';
@@ -11,7 +12,11 @@ import { FulfillmentSyncService } from './fulfillment-sync.service';
 vi.mock('~/utils/prisma', () => ({ default: {} }));
 vi.mock('~/utils/api-logger', () => ({ logApiError: vi.fn() }));
 vi.mock('./fulfillment-sync.service', () => ({
-  FulfillmentSyncService: { list: vi.fn(), listWorkOrderBom: vi.fn() },
+  FulfillmentSyncService: {
+    list: vi.fn(),
+    listCustomers: vi.fn(),
+    listWorkOrderBom: vi.fn(),
+  },
 }));
 vi.mock('h3', async (original) => ({
   ...(await original<typeof import('h3')>()),
@@ -137,5 +142,38 @@ describe('handleFulfillmentBomRequest', () => {
     const bad = bomEvent(headers, '');
     await handleFulfillmentBomRequest(bad);
     expect(bad.status).toBe(400);
+  });
+});
+
+describe('handleFulfillmentCustomersRequest', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    secret = randomBytes(32).toString('base64url');
+    vi.stubEnv('QMS_IDENTITY_CLIENT_ID', 'gc-test');
+    vi.stubEnv('QMS_IDENTITY_CLIENT_SECRET', secret);
+    vi.mocked(FulfillmentSyncService.listCustomers).mockResolvedValue([
+      { id: 'c1', name: 'A' },
+    ]);
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it('rejects wrong client headers before reading customers', async () => {
+    const event = makeEvent({
+      'x-identity-client-id': 'gc-test',
+      'x-identity-client-secret': 'x',
+    });
+    await handleFulfillmentCustomersRequest(event);
+    expect(event.status).toBe(401);
+    expect(FulfillmentSyncService.listCustomers).not.toHaveBeenCalled();
+  });
+
+  it('serves the customer list for the configured client', async () => {
+    const event = makeEvent({
+      'x-identity-client-id': 'gc-test',
+      'x-identity-client-secret': secret,
+    });
+    const body = await handleFulfillmentCustomersRequest(event);
+    expect(event.status).toBe(200);
+    expect(body).toMatchObject({ code: 0, data: [{ id: 'c1', name: 'A' }] });
   });
 });

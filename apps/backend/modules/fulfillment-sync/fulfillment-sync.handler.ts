@@ -71,3 +71,22 @@ export async function handleFulfillmentBomRequest(event: H3Event) {
     return internalServerErrorResponse(event, 'Fulfillment BOM read failed');
   }
 }
+
+/**
+ * GET /api/integration/fulfillment/customers — read-only customer list for
+ * the fulfillment work-order form; same client-header authentication.
+ */
+export async function handleFulfillmentCustomersRequest(event: H3Event) {
+  setHeader(event, 'Cache-Control', 'no-store');
+  try {
+    assertIdentityClientHeaders(event);
+    return useResponseSuccess(await FulfillmentSyncService.listCustomers());
+  } catch (error) {
+    logApiError('fulfillment-sync-customers', error, undefined, event);
+    if (isBusinessError(error)) return businessErrorResponse(event, error);
+    return internalServerErrorResponse(
+      event,
+      'Fulfillment customer read failed',
+    );
+  }
+}

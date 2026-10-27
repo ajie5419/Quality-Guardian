@@ -1,3 +1,11 @@
+### 2026-10-27 履约系统维护工单，写入 QMS 工单库
+
+- 新增 `POST /api/integration/fulfillment/work-orders`（新建）、`PUT …/work-orders/:workOrderNumber`（修改，禁止改工单号、已取消不可改、乐观锁 `version`）、`POST …/:workOrderNumber/cancel`（取消，幂等）与 `GET /api/integration/fulfillment/customers`（启用客户 `[{ id, name }]`）。认证复用身份桥客户端凭据头；每个写请求带 `actorUserId`，校验用户存在且未删除，审计日志记该用户并标注「来源: 履约系统」。工单号重复返回 409 `WORK_ORDER_EXISTS`（新增错误码），版本冲突 409 `OPTIMISTIC_LOCK_CONFLICT`，参数/客户/事业部/操作人无效 400，均带中文 `message`。
+- 建单、改单抽出为不依赖用户会话的共用函数（`createOrRestoreWorkOrder`、`applyVersionedWorkOrderUpdate`、`buildWorkOrderUpdateData`），QMS 路由服务与履约写接口共用；版本化写入条件增加 `isDeleted: false`。
+- 同步接口 `GET /api/integration/fulfillment/work-orders` 每行增加 `customerNameId`、`division`、`divisionId`、`version`（只加字段）。
+- QMS 工单页隐藏新建、编辑、导入、删除、批量删除，显示「工单由履约系统维护」提示；`api/qms/work-order` 的 `index.post`/`index.put`/`import.post`/`index.delete`/`batch-delete.post` 一律 403「工单由履约系统维护，请到履约系统操作」。工单要求等子功能不变。
+- 验证：后端定向单测、全量后端 vitest、前后端类型检查、改动文件 ESLint/Prettier、`check:qms-arch`、`check:docs-drift` 通过；桌面 Web E2E 规格已按新行为改写，但本环境无 macOS container，未实际执行。上线须先备份数据库，QMS 发版后履约紧接着发版。
+
 ### 2026-10-21 A3：Telegram webhook 缺密钥时拒绝请求
 
 - 未配置或空 `TELEGRAM_WEBHOOK_SECRET` 返回 503，已配置但缺头或不匹配返回 401；按 UTF-8 字节长度判断后使用 `timingSafeEqual` 比较，保留非空 `x-tg-secret` 优先于标准 Telegram 请求头的规则。

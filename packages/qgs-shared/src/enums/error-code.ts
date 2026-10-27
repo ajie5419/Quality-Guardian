@@ -18,6 +18,8 @@
  *                                     processed (409)
  *   BAD_REQUEST   → malformed request
  *   DUPLICATE     → duplicate entity / unique violation (409)
+ *   WORK_ORDER_EXISTS → work order number already used by an active work
+ *                       order (409, fulfillment integration contract)
  *   EXPORT_LIMIT_EXCEEDED → export row limit exceeded; narrow filters (400)
  *   BUSINESS      → generic business failure → warning toast
  *   INTERNAL      → unexpected internal failure → error toast + log
@@ -36,6 +38,7 @@ export const ErrorCode = {
   IDEMPOTENCY_REQUEST_IN_PROGRESS: 'IDEMPOTENCY_REQUEST_IN_PROGRESS',
   BAD_REQUEST: 'BAD_REQUEST',
   DUPLICATE: 'DUPLICATE',
+  WORK_ORDER_EXISTS: 'WORK_ORDER_EXISTS',
   EXPORT_LIMIT_EXCEEDED: 'EXPORT_LIMIT_EXCEEDED',
   BUSINESS: 'BUSINESS',
   INTERNAL: 'INTERNAL',
@@ -55,6 +58,7 @@ export const ERROR_UX_LEVEL = {
   IDEMPOTENCY_REQUEST_IN_PROGRESS: 'warning',
   BAD_REQUEST: 'error',
   DUPLICATE: 'warning',
+  WORK_ORDER_EXISTS: 'warning',
   EXPORT_LIMIT_EXCEEDED: 'error',
   BUSINESS: 'warning',
   INTERNAL: 'error',
