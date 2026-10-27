@@ -6,6 +6,27 @@
 - QMS 工单页隐藏新建、编辑、导入、删除、批量删除，显示「工单由履约系统维护」提示；`api/qms/work-order` 的 `index.post`/`index.put`/`import.post`/`index.delete`/`batch-delete.post` 一律 403「工单由履约系统维护，请到履约系统操作」。工单要求等子功能不变。
 - 验证：后端定向单测、全量后端 vitest、前后端类型检查、改动文件 ESLint/Prettier、`check:qms-arch`、`check:docs-drift` 通过；桌面 Web E2E 规格已按新行为改写，但本环境无 macOS container，未实际执行。上线须先备份数据库，QMS 发版后履约紧接着发版。
 
+## [0.31.0](https://github.com/ajie5419/Quality-Guardian/compare/qgs-v0.30.1...qgs-v0.31.0) (2026-10-27)
+
+
+### Features
+
+* **@qgs/backend:** let the fulfillment system maintain work orders ([59e89ab](https://github.com/ajie5419/Quality-Guardian/commit/59e89ab9e6b8ed2d3512ad7b34afcb1125cd51b0))
+* **@qgs/backend:** 履约系统维护工单并写入 QMS 工单库 ([24c1c92](https://github.com/ajie5419/Quality-Guardian/commit/24c1c925456bffeabe4d059a2c9440500cdad6f4))
+
+
+### Bug Fixes
+
+* **@qgs/backend:** clear division id when fulfillment unsets division ([f41ea11](https://github.com/ajie5419/Quality-Guardian/commit/f41ea1126055bfda9345ceed298cad5a367c92e4))
+* 保留登录失败重试的原始回跳目标 ([f4e6487](https://github.com/ajie5419/Quality-Guardian/commit/f4e6487257a4e2af4224317806342877de3a96fc))
+* 收紧 Telegram webhook 鉴权与输入边界 ([77f6044](https://github.com/ajie5419/Quality-Guardian/commit/77f60442cdc36d62247565a19c46df40cf091b0a))
+* 收紧 Telegram webhook 鉴权与输入边界 ([ad34213](https://github.com/ajie5419/Quality-Guardian/commit/ad3421331bbd7559655ddf14cf4cd85a73435949))
+* 统一不可用账号的密码校验工作量 ([bdea23c](https://github.com/ajie5419/Quality-Guardian/commit/bdea23ce8d6bcd60d8ce20516050c96e247da001))
+* 阻止软删除账号登录和刷新令牌 ([72e21ba](https://github.com/ajie5419/Quality-Guardian/commit/72e21bac685065a1695c8f8b4b346b9699bbb0cb))
+* 阻止软删除账号登录和刷新令牌 ([00689bb](https://github.com/ajie5419/Quality-Guardian/commit/00689bb765362de1f33c7caaae1c77b5f4f49375))
+* 阻止错误响应泄漏内部异常信息 ([65d60c7](https://github.com/ajie5419/Quality-Guardian/commit/65d60c7d4c8c5d7684e9a20bd07ce0300a9ffa49))
+* 阻止错误响应泄漏内部异常信息 ([c116761](https://github.com/ajie5419/Quality-Guardian/commit/c116761f19b259127c2190eea58074754b3fe96d))
+
 ### 2026-10-21 A3：Telegram webhook 缺密钥时拒绝请求
 
 - 未配置或空 `TELEGRAM_WEBHOOK_SECRET` 返回 503，已配置但缺头或不匹配返回 401；按 UTF-8 字节长度判断后使用 `timingSafeEqual` 比较，保留非空 `x-tg-secret` 优先于标准 Telegram 请求头的规则。
