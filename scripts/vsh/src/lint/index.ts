@@ -23,13 +23,13 @@ async function runLint({ format }: LintCommandOptions) {
       },
     );
     await execaCommand(
-      `eslint . --cache --cache-location .lint-cache/eslint --fix`,
+      `eslint . --cache --cache-strategy content --cache-location .lint-cache/eslint --fix`,
       {
         stdio: 'inherit',
       },
     );
     await execaCommand(
-      `prettier . --write --cache --cache-location .lint-cache/prettier --log-level warn`,
+      `prettier . --write --cache --cache-strategy content --cache-location .lint-cache/prettier --log-level warn`,
       {
         stdio: 'inherit',
       },
@@ -37,11 +37,14 @@ async function runLint({ format }: LintCommandOptions) {
     return;
   }
   await Promise.all([
-    execaCommand(`eslint . --cache --cache-location .lint-cache/eslint`, {
-      stdio: 'inherit',
-    }),
     execaCommand(
-      `prettier . --ignore-unknown --check --cache --cache-location .lint-cache/prettier`,
+      `eslint . --cache --cache-strategy content --cache-location .lint-cache/eslint`,
+      {
+        stdio: 'inherit',
+      },
+    ),
+    execaCommand(
+      `prettier . --ignore-unknown --check --cache --cache-strategy content --cache-location .lint-cache/prettier`,
       {
         stdio: 'inherit',
       },
