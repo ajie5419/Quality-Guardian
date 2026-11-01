@@ -1,5 +1,7 @@
 import type { CAC } from 'cac';
 
+import { mkdirSync } from 'node:fs';
+
 import { execaCommand } from '@vben/node-utils';
 
 interface LintCommandOptions {
@@ -11,29 +13,48 @@ interface LintCommandOptions {
 
 async function runLint({ format }: LintCommandOptions) {
   // process.env.FORCE_COLOR = '3';
+  mkdirSync('.lint-cache', { recursive: true });
 
   if (format) {
-    await execaCommand(`stylelint "**/*.{vue,css,less,scss}" --cache --fix`, {
-      stdio: 'inherit',
-    });
-    await execaCommand(`eslint . --cache --fix`, {
-      stdio: 'inherit',
-    });
-    await execaCommand(`prettier . --write --cache --log-level warn`, {
-      stdio: 'inherit',
-    });
+    await execaCommand(
+      `stylelint "**/*.{vue,css,less,scss}" --cache --cache-location .lint-cache/stylelint --fix`,
+      {
+        stdio: 'inherit',
+      },
+    );
+    await execaCommand(
+      `eslint . --cache --cache-strategy content --cache-location .lint-cache/eslint --fix`,
+      {
+        stdio: 'inherit',
+      },
+    );
+    await execaCommand(
+      `prettier . --write --cache --cache-strategy content --cache-location .lint-cache/prettier --log-level warn`,
+      {
+        stdio: 'inherit',
+      },
+    );
     return;
   }
   await Promise.all([
-    execaCommand(`eslint . --cache`, {
-      stdio: 'inherit',
-    }),
-    execaCommand(`prettier . --ignore-unknown --check --cache`, {
-      stdio: 'inherit',
-    }),
-    execaCommand(`stylelint "**/*.{vue,css,less,scss}" --cache`, {
-      stdio: 'inherit',
-    }),
+    execaCommand(
+      `eslint . --cache --cache-strategy content --cache-location .lint-cache/eslint`,
+      {
+        stdio: 'inherit',
+      },
+    ),
+    execaCommand(
+      `prettier . --ignore-unknown --check --cache --cache-strategy content --cache-location .lint-cache/prettier`,
+      {
+        stdio: 'inherit',
+      },
+    ),
+    execaCommand(
+      `stylelint "**/*.{vue,css,less,scss}" --cache --cache-location .lint-cache/stylelint`,
+      {
+        stdio: 'inherit',
+      },
+    ),
   ]);
 }
 
