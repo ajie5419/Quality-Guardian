@@ -40,3 +40,5 @@ packages/
 ## License
 
 [MIT](./LICENSE)
+
+<!-- ci probe: docs-only change to verify job gating; safe to discard -->
