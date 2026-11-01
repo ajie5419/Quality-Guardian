@@ -180,7 +180,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Run unit tests
-        run: pnpm run test:unit -- --shard=${{ matrix.shard }}/2
+        # Call vitest directly: `pnpm run test:unit -- --shard=...` forwards a
+        # literal `--` and vitest then ignores the shard flag (verified by
+        # counting executed tests: 4094 instead of ~2050).
+        run: pnpm exec vitest run --dom --shard=${{ matrix.shard }}/2
 
   unit-tests-required:
     name: Unit Tests
